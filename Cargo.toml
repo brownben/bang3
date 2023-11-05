@@ -1,0 +1,16 @@
+[package]
+name = "bang3"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bumpalo = { version = "3.14.0", features = ["boxed"] }
+
+[dev-dependencies]
+indoc = "2.0.4"
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+strip = true
+panic = "abort"
