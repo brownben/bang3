@@ -2,10 +2,15 @@
 //!
 //! Based upon this [blog post](https://www.georgevreilly.com/blog/2023/01/24/TreeInRust2PrintingTrees.html)
 
-use super::expression::*;
+use super::{expression::*, statement::*};
 use std::fmt;
 
 impl fmt::Display for Expression<'_, '_> {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    self.pretty(f, "", false)
+  }
+}
+impl fmt::Display for Statement<'_, '_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     self.pretty(f, "", false)
   }
@@ -23,18 +28,17 @@ pub trait PrettyPrint {
 impl PrettyPrint for Expression<'_, '_> {
   fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
     match self {
-      Expression::Binary(x) => x.pretty(f, prefix, last),
-      Expression::Call(x) => x.pretty(f, prefix, last),
-      Expression::Comment(x) => x.pretty(f, prefix, last),
-      Expression::Group(x) => x.pretty(f, prefix, last),
-      Expression::If(x) => x.pretty(f, prefix, last),
-      Expression::Literal(x) => x.pretty(f, prefix, last),
-      Expression::Unary(x) => x.pretty(f, prefix, last),
-      Expression::Variable(x) => x.pretty(f, prefix, last),
+      Self::Binary(x) => x.pretty(f, prefix, last),
+      Self::Call(x) => x.pretty(f, prefix, last),
+      Self::Comment(x) => x.pretty(f, prefix, last),
+      Self::Group(x) => x.pretty(f, prefix, last),
+      Self::If(x) => x.pretty(f, prefix, last),
+      Self::Literal(x) => x.pretty(f, prefix, last),
+      Self::Unary(x) => x.pretty(f, prefix, last),
+      Self::Variable(x) => x.pretty(f, prefix, last),
     }
   }
 }
-
 impl PrettyPrint for Binary<'_, '_> {
   fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
     let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
@@ -128,5 +132,30 @@ impl PrettyPrint for Variable<'_> {
   fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
     let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
     writeln!(f, "{prefix}{connector}Variable ({})", self.name)
+  }
+}
+
+impl PrettyPrint for Statement<'_, '_> {
+  fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
+    match self {
+      Self::Comment(x) => x.pretty(f, prefix, last),
+      Self::Expression(x) => x.pretty(f, prefix, last),
+      Self::Let(x) => x.pretty(f, prefix, last),
+    }
+  }
+}
+impl PrettyPrint for CommentStmt<'_> {
+  fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
+    let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
+    writeln!(f, "{prefix}{connector}Comment ({})", self.text.trim())
+  }
+}
+impl PrettyPrint for Let<'_, '_> {
+  fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
+    let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
+    writeln!(f, "{prefix}{connector}Let '{}' =", self.identifier)?;
+
+    let new_prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
+    self.expression.pretty(f, &new_prefix, true)
   }
 }

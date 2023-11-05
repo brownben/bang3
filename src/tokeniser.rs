@@ -1,7 +1,7 @@
 use crate::ast::Span;
-use std::fmt;
+use std::{fmt, iter};
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
 pub enum TokenKind {
   // Brackets
   LeftParen,
@@ -45,6 +45,7 @@ pub enum TokenKind {
   EndOfFile,
 
   // Error
+  #[default]
   Unknown,
   UnterminatedString,
 }
@@ -89,7 +90,7 @@ impl fmt::Display for TokenKind {
 
       // Whitespace + Comments
       Self::Comment => write!(f, "Comment"),
-      Self::EndOfLine => write!(f, "End of Line"),
+      Self::EndOfLine => write!(f, "New Line"),
       Self::EndOfFile => write!(f, "End of File"),
 
       // Errors
@@ -99,22 +100,12 @@ impl fmt::Display for TokenKind {
   }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Token {
   pub kind: TokenKind,
   pub start: u32,
   pub end: u32,
   pub line: u16,
-}
-impl Default for Token {
-  fn default() -> Self {
-    Self {
-      kind: TokenKind::Unknown,
-      start: 0,
-      end: 0,
-      line: 0,
-    }
-  }
 }
 impl From<Token> for Span {
   fn from(token: Token) -> Self {
@@ -307,4 +298,4 @@ impl Iterator for Tokeniser<'_> {
     })
   }
 }
-impl std::iter::FusedIterator for Tokeniser<'_> {}
+impl iter::FusedIterator for Tokeniser<'_> {}

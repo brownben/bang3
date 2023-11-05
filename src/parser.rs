@@ -1,6 +1,6 @@
 use crate::{
   allocator::{Allocator, Box},
-  ast::{expression::*, GetSpan, Span},
+  ast::{expression::*, statement::*, GetSpan, Span},
   tokeniser::{Token, TokenKind, Tokeniser},
 };
 use std::{error, fmt, iter};
@@ -100,12 +100,16 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     }
   }
 
-  pub fn parse_expression(&mut self) -> ParseResult<Expression<'s, 'ast>> {
-    self.parse_expression_inner(ParsePrecedence::None)
+  pub fn is_finished(&mut self) -> bool {
+    self.tokeniser.peek().is_none()
   }
 
   fn next_token(&mut self) -> Token {
     self.tokeniser.next().unwrap_or_default()
+  }
+
+  fn peek_token(&mut self) -> Token {
+    self.tokeniser.peek().copied().unwrap_or_default()
   }
 
   fn expect(&mut self, kind: TokenKind) -> ParseResult<Token> {
@@ -116,6 +120,22 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     } else {
       Err(ParseError::Expected {
         expected: kind,
+        recieved: token,
+      })
+    }
+  }
+
+  fn expect_newline(&mut self) -> ParseResult<()> {
+    let token = self.next_token();
+
+    if matches!(
+      token.kind,
+      TokenKind::EndOfLine | TokenKind::EndOfFile | TokenKind::Unknown
+    ) {
+      Ok(())
+    } else {
+      Err(ParseError::Expected {
+        expected: TokenKind::EndOfLine,
         recieved: token,
       })
     }
@@ -147,6 +167,18 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     Box<'ast, T>: Into<Expression<'s, 'ast>>,
   {
     Ok(Box::new_in(x, self.allocator).into())
+  }
+
+  fn allocate_statement<T>(&mut self, x: T) -> ParseResult<Statement<'s, 'ast>>
+  where
+    T: 'ast,
+    Box<'ast, T>: Into<Statement<'s, 'ast>>,
+  {
+    Ok(Box::new_in(x, self.allocator).into())
+  }
+
+  pub fn parse_expression(&mut self) -> ParseResult<Expression<'s, 'ast>> {
+    self.parse_expression_inner(ParsePrecedence::None)
   }
 
   fn parse_expression_inner(
@@ -389,46 +421,106 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       span,
     })
   }
+
+  pub fn parse_statement(&mut self) -> ParseResult<Statement<'s, 'ast>> {
+    match self.peek_token().kind {
+      TokenKind::Let => self.declaration_statement(),
+      TokenKind::Comment => self.comment_statement(),
+      _ => self.expression_statement(),
+    }
+  }
+
+  fn comment_statement(&mut self) -> ParseResult<Statement<'s, 'ast>> {
+    let span = Span::from(self.next_token());
+    let text = &span.source_text(self.source)[2..];
+    self.expect_newline()?;
+
+    self.allocate_statement(CommentStmt { text, span })
+  }
+
+  fn declaration_statement(&mut self) -> ParseResult<Statement<'s, 'ast>> {
+    let let_token = self.expect(TokenKind::Let)?;
+    let identifier_token = self.expect(TokenKind::Identifier)?;
+    self.expect(TokenKind::Equal)?;
+    let expression = self.parse_expression()?;
+    self.expect_newline()?;
+
+    let identifier = Span::from(identifier_token).source_text(self.source);
+    let span = Span::from(let_token).merge(expression.span());
+
+    self.allocate_statement(Let {
+      identifier,
+      expression,
+      span,
+    })
+  }
+
+  fn expression_statement(&mut self) -> ParseResult<Statement<'s, 'ast>> {
+    let expression = self.parse_expression()?;
+    self.expect_newline()?;
+
+    self.allocate_statement(expression)
+  }
 }
+
+impl<'s: 'ast, 'ast> Iterator for Parser<'s, 'ast> {
+  type Item = Result<Statement<'s, 'ast>, ParseError>;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    if self.is_finished() {
+      return None;
+    }
+
+    Some(self.parse_statement())
+  }
+}
+impl<'s> iter::FusedIterator for Parser<'s, 's> {}
 
 #[cfg(test)]
 mod test {
   use super::*;
   use indoc::indoc;
 
-  fn parse<'s, 'ast>(
-    source: &'s str,
-    allocator: &'ast Allocator,
-  ) -> ParseResult<Expression<'s, 'ast>> {
+  fn parse_expression<'a>(
+    source: &'a str,
+    allocator: &'a Allocator,
+  ) -> ParseResult<Expression<'a, 'a>> {
     Parser::new(source, allocator).parse_expression()
+  }
+
+  fn parse_statement<'a>(
+    source: &'a str,
+    allocator: &'a Allocator,
+  ) -> ParseResult<Statement<'a, 'a>> {
+    Parser::new(source, allocator).parse_statement()
   }
 
   fn parse_to_string<'s, 'ast>(source: &'s str) -> String {
     let allocator = Allocator::new();
-    let ast = Parser::new(source, &allocator).parse_expression().unwrap();
+    let ast = Parser::new(source, &allocator).parse_statement().unwrap();
     ast.to_string()
   }
 
   #[test]
   fn unterminated_string() {
     let allocator = Allocator::new();
-    assert!(parse("'unterminated string", &allocator).is_err());
-    assert!(parse("\"un", &allocator).is_err());
-    assert!(parse("`", &allocator).is_err());
+    assert!(parse_expression("'unterminated string", &allocator).is_err());
+    assert!(parse_expression("\"un", &allocator).is_err());
+    assert!(parse_expression("`", &allocator).is_err());
 
-    assert!(parse("``", &allocator).is_ok());
-    assert!(parse("`hello world`", &allocator).is_ok());
+    assert!(parse_expression("``", &allocator).is_ok());
+    assert!(parse_expression("`hello world`", &allocator).is_ok());
   }
 
   #[test]
   fn unknown_character() {
     let allocator = Allocator::new();
-    assert!(parse("¬", &allocator).is_err());
-    assert!(parse("🤗", &allocator).is_err());
+    assert!(parse_expression("¬", &allocator).is_err());
+    assert!(parse_expression("🤗", &allocator).is_err());
 
     // Having unknown characters in strings are fine
-    assert!(parse("'¬'", &allocator).is_ok());
-    assert!(parse("'🤗'", &allocator).is_ok());
+    assert!(parse_expression("'¬'", &allocator).is_ok());
+    assert!(parse_expression("'🤗'", &allocator).is_ok());
   }
 
   #[test]
@@ -477,17 +569,17 @@ mod test {
   #[test]
   fn binary_missing_left_expression() {
     let allocator = Allocator::new();
-    assert!(parse("+ 5", &allocator).is_err());
-    assert!(parse("*", &allocator).is_err());
-    assert!(parse(" || 7", &allocator).is_err());
+    assert!(parse_expression("+ 5", &allocator).is_err());
+    assert!(parse_expression("*", &allocator).is_err());
+    assert!(parse_expression(" || 7", &allocator).is_err());
   }
 
   #[test]
   fn binary_missing_right_expression() {
     let allocator = Allocator::new();
-    assert!(parse("4 +", &allocator).is_err());
-    assert!(parse("'hello' *", &allocator).is_err());
-    assert!(parse("false ||", &allocator).is_err());
+    assert!(parse_expression("4 +", &allocator).is_err());
+    assert!(parse_expression("'hello' *", &allocator).is_err());
+    assert!(parse_expression("false ||", &allocator).is_err());
   }
 
   #[test]
@@ -523,15 +615,15 @@ mod test {
   #[test]
   fn call_missing_brackets() {
     let allocator = Allocator::new();
-    assert!(parse("f(", &allocator).is_err());
-    assert!(parse("f(6", &allocator).is_err());
+    assert!(parse_expression("f(", &allocator).is_err());
+    assert!(parse_expression("f(6", &allocator).is_err());
 
-    assert!(parse("f ()", &allocator).is_ok());
-    assert!(parse("f()", &allocator).is_ok());
-    assert!(parse("f(\n)", &allocator).is_ok());
-    assert!(parse("f(\n'hello')", &allocator).is_ok());
-    assert!(parse("f('hello'\n)", &allocator).is_ok());
-    assert!(parse("f(\n'hello'\n)", &allocator).is_ok());
+    assert!(parse_expression("f ()", &allocator).is_ok());
+    assert!(parse_expression("f()", &allocator).is_ok());
+    assert!(parse_expression("f(\n)", &allocator).is_ok());
+    assert!(parse_expression("f(\n'hello')", &allocator).is_ok());
+    assert!(parse_expression("f('hello'\n)", &allocator).is_ok());
+    assert!(parse_expression("f(\n'hello'\n)", &allocator).is_ok());
   }
 
   #[test]
@@ -591,28 +683,28 @@ mod test {
   #[test]
   fn if_missing_parts() {
     let allocator = Allocator::new();
-    assert!(parse("if 'hello')", &allocator).is_err());
-    assert!(parse("if'hello')", &allocator).is_err());
-    assert!(parse("if ('hello')", &allocator).is_err());
-    assert!(parse("if('hello')", &allocator).is_err());
-    assert!(parse("if ('hello'", &allocator).is_err());
+    assert!(parse_expression("if 'hello')", &allocator).is_err());
+    assert!(parse_expression("if'hello')", &allocator).is_err());
+    assert!(parse_expression("if ('hello')", &allocator).is_err());
+    assert!(parse_expression("if('hello')", &allocator).is_err());
+    assert!(parse_expression("if ('hello'", &allocator).is_err());
 
-    assert!(parse("if ('hello') then", &allocator).is_ok());
-    assert!(parse("if('hello') then", &allocator).is_ok());
-    assert!(parse("if(\n'hello') then", &allocator).is_ok());
-    assert!(parse("if('hello'\n) then", &allocator).is_ok());
-    assert!(parse("if(\n'hello'\n) then", &allocator).is_ok());
+    assert!(parse_expression("if ('hello') then", &allocator).is_ok());
+    assert!(parse_expression("if('hello') then", &allocator).is_ok());
+    assert!(parse_expression("if(\n'hello') then", &allocator).is_ok());
+    assert!(parse_expression("if('hello'\n) then", &allocator).is_ok());
+    assert!(parse_expression("if(\n'hello'\n) then", &allocator).is_ok());
   }
 
   #[test]
   fn group_no_end_bracket() {
     let allocator = Allocator::new();
-    assert!(parse("(4 + 5 ", &allocator).is_err());
-    assert!(parse("('hello'", &allocator).is_err());
-    assert!(parse("(", &allocator).is_err());
+    assert!(parse_expression("(4 + 5 ", &allocator).is_err());
+    assert!(parse_expression("('hello'", &allocator).is_err());
+    assert!(parse_expression("(", &allocator).is_err());
 
-    assert!(parse("('hello')", &allocator).is_ok());
-    assert!(parse("(5)", &allocator).is_ok());
+    assert!(parse_expression("('hello')", &allocator).is_ok());
+    assert!(parse_expression("(5)", &allocator).is_ok());
   }
 
   #[test]
@@ -672,5 +764,36 @@ mod test {
     let ast = parse_to_string("count");
     let expected = "├─ Variable (count)\n";
     assert_eq!(ast, expected);
+  }
+
+  #[test]
+  fn comment_statement() {
+    let ast = parse_to_string("// comments");
+    let expected = "├─ Comment (comments)\n";
+    assert_eq!(ast, expected);
+  }
+
+  #[test]
+  fn let_statement() {
+    let ast = parse_to_string("let variable = 4 + 33");
+    let expected = indoc! {"
+      ├─ Let 'variable' =
+      │  ╰─ Binary (+)
+      │     ├─ Number (4)
+      │     ╰─ Number (33)
+    "};
+    assert_eq!(ast, expected);
+  }
+
+  #[test]
+  fn let_statement_missing_parts() {
+    let allocator = Allocator::new();
+    assert!(parse_statement("let = 7", &allocator).is_err());
+    assert!(parse_statement("let var", &allocator).is_err());
+    assert!(parse_statement("let var =", &allocator).is_err());
+    assert!(parse_statement("let var 7", &allocator).is_err());
+    assert!(parse_statement("let false = 7", &allocator).is_err());
+
+    assert!(parse_statement("let var = 7", &allocator).is_ok());
   }
 }
