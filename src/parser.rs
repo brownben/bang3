@@ -1,5 +1,5 @@
 use crate::{
-  allocator::{Allocator, Box},
+  allocator::{Allocator, Box, Vec},
   ast::{expression::*, statement::*, GetSpan, Span},
   tokeniser::{Token, TokenKind, Tokeniser},
 };
@@ -205,6 +205,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       TokenKind::String => self.literal_string(token),
       TokenKind::Identifier => self.variable(token),
 
+      TokenKind::LeftCurly => self.block(token),
       TokenKind::LeftParen => self.group(token),
       TokenKind::If => self.if_(token),
       TokenKind::Minus | TokenKind::Bang => self.unary(token),
@@ -277,6 +278,21 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     })
   }
 
+  fn block(&mut self, opening_curly: Token) -> ParseResult<Expression<'s, 'ast>> {
+    let mut statements = Vec::with_capacity_in(4, self.allocator);
+    let closing_curly = loop {
+      statements.push(self.parse_statement()?);
+      self.skip_newline();
+
+      if let Some(closing_curly) = self.matches(TokenKind::RightCurly) {
+        break closing_curly;
+      }
+    };
+    let span = Span::from(opening_curly).merge(closing_curly.into());
+
+    self.allocate_expression(Block { statements, span })
+  }
+
   fn call(
     &mut self,
     expression: Expression<'s, 'ast>,
@@ -321,12 +337,12 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     })
   }
 
-  fn group(&mut self, opening_brace: Token) -> ParseResult<Expression<'s, 'ast>> {
+  fn group(&mut self, opening_paren: Token) -> ParseResult<Expression<'s, 'ast>> {
     self.skip_newline();
     let expression = self.parse_expression()?;
     self.skip_newline();
-    let closing_brace = self.expect(TokenKind::RightParen)?;
-    let span = Span::from(opening_brace).merge(closing_brace.into());
+    let closing_paren = self.expect(TokenKind::RightParen)?;
+    let span = Span::from(opening_paren).merge(closing_paren.into());
 
     self.allocate_expression(Group { expression, span })
   }
@@ -423,6 +439,8 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   }
 
   pub fn parse_statement(&mut self) -> ParseResult<Statement<'s, 'ast>> {
+    self.skip_newline();
+
     match self.peek_token().kind {
       TokenKind::Let => self.declaration_statement(),
       TokenKind::Comment => self.comment_statement(),
@@ -457,7 +475,12 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
   fn expression_statement(&mut self) -> ParseResult<Statement<'s, 'ast>> {
     let expression = self.parse_expression()?;
-    self.expect_newline()?;
+
+    // Blocks should end with an expression, thus allow block end instead of new line
+    match self.peek_token().kind {
+      TokenKind::RightCurly => {}
+      _ => self.expect_newline()?,
+    }
 
     self.allocate_statement(expression)
   }
@@ -580,6 +603,47 @@ mod test {
     assert!(parse_expression("4 +", &allocator).is_err());
     assert!(parse_expression("'hello' *", &allocator).is_err());
     assert!(parse_expression("false ||", &allocator).is_err());
+  }
+
+  #[test]
+  fn blocks() {
+    let ast = parse_to_string("{false}");
+    let expected = indoc! {"
+      ├─ Block
+      │  ╰─ Boolean (false)
+    "};
+    assert_eq!(ast, expected);
+
+    let ast = parse_to_string(indoc! {"{
+      let x = 4
+      x + 2
+    }"});
+    let expected = indoc! {"
+      ├─ Block
+      │  ├─ Let 'x' =
+      │  │  ╰─ Number (4)
+      │  ╰─ Binary (+)
+      │     ├─ Variable (x)
+      │     ╰─ Number (2)
+    "};
+    assert_eq!(ast, expected);
+
+    let ast = parse_to_string("{call()}");
+    let expected = indoc! {"
+      ├─ Block
+      │  ├─ Variable (call)
+      │  │  ╰─ Call
+    "};
+    assert_eq!(ast, expected);
+  }
+
+  #[test]
+  fn blocks_incompelete() {
+    let allocator = Allocator::new();
+    assert!(parse_expression("{let x = 4\nx + 2", &allocator).is_err());
+    assert!(parse_expression("{}", &allocator).is_err());
+    assert!(parse_expression("{let a = 1}", &allocator).is_err());
+    assert!(parse_expression("{7", &allocator).is_err());
   }
 
   #[test]

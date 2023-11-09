@@ -5,4 +5,5 @@ pub mod ast;
 mod parser;
 mod tokeniser;
 
+pub use allocator::Allocator;
 pub use parser::{ParseError, Parser};

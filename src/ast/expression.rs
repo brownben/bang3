@@ -1,10 +1,14 @@
-use super::span::{GetSpan, Span};
-use crate::allocator::Box;
+use super::{
+  span::{GetSpan, Span},
+  statement::Statement,
+};
+use crate::allocator::{Box, Vec};
 use std::fmt;
 
 #[derive(Debug)]
 pub enum Expression<'source, 'ast> {
   Binary(Box<'ast, Binary<'source, 'ast>>),
+  Block(Box<'ast, Block<'source, 'ast>>),
   Call(Box<'ast, Call<'source, 'ast>>),
   Comment(Box<'ast, Comment<'source, 'ast>>),
   Group(Box<'ast, Group<'source, 'ast>>),
@@ -57,6 +61,12 @@ impl fmt::Display for BinaryOperator {
       Self::Pipeline => write!(f, ">>"),
     }
   }
+}
+
+#[derive(Debug)]
+pub struct Block<'source, 'ast> {
+  pub statements: Vec<'ast, Statement<'source, 'ast>>,
+  pub span: Span,
 }
 
 #[derive(Debug)]
@@ -130,6 +140,11 @@ impl<'s, 'ast> From<Box<'ast, Binary<'s, 'ast>>> for Expression<'s, 'ast> {
     Self::Binary(value)
   }
 }
+impl<'s, 'ast> From<Box<'ast, Block<'s, 'ast>>> for Expression<'s, 'ast> {
+  fn from(value: Box<'ast, Block<'s, 'ast>>) -> Self {
+    Self::Block(value)
+  }
+}
 impl<'s, 'ast> From<Box<'ast, Call<'s, 'ast>>> for Expression<'s, 'ast> {
   fn from(value: Box<'ast, Call<'s, 'ast>>) -> Self {
     Self::Call(value)
@@ -170,6 +185,7 @@ impl GetSpan for Expression<'_, '_> {
   fn span(&self) -> Span {
     match self {
       Self::Binary(x) => x.span(),
+      Self::Block(x) => x.span(),
       Self::Call(x) => x.span(),
       Self::Comment(x) => x.span(),
       Self::Group(x) => x.span(),
@@ -181,6 +197,11 @@ impl GetSpan for Expression<'_, '_> {
   }
 }
 impl GetSpan for Binary<'_, '_> {
+  fn span(&self) -> Span {
+    self.span
+  }
+}
+impl GetSpan for Block<'_, '_> {
   fn span(&self) -> Span {
     self.span
   }

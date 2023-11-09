@@ -29,6 +29,7 @@ impl PrettyPrint for Expression<'_, '_> {
   fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
     match self {
       Self::Binary(x) => x.pretty(f, prefix, last),
+      Self::Block(x) => x.pretty(f, prefix, last),
       Self::Call(x) => x.pretty(f, prefix, last),
       Self::Comment(x) => x.pretty(f, prefix, last),
       Self::Group(x) => x.pretty(f, prefix, last),
@@ -42,12 +43,24 @@ impl PrettyPrint for Expression<'_, '_> {
 impl PrettyPrint for Binary<'_, '_> {
   fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
     let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
-
     writeln!(f, "{prefix}{connector}Binary ({})", self.operator)?;
 
     let new_prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
     self.left.pretty(f, &new_prefix, false)?;
     self.right.pretty(f, &new_prefix, true)
+  }
+}
+impl PrettyPrint for Block<'_, '_> {
+  fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
+    let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
+    writeln!(f, "{prefix}{connector}Block")?;
+
+    let (last_statement, statements) = self.statements.split_last().unwrap();
+    for statement in statements {
+      statement.pretty(f, &format!("{prefix}{OTHER_CHILD}"), false)?;
+    }
+    let x = if last { FINAL_CHILD } else { OTHER_CHILD };
+    last_statement.pretty(f, &format!("{prefix}{x}"), true)
   }
 }
 impl PrettyPrint for Call<'_, '_> {

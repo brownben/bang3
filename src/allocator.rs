@@ -18,3 +18,4 @@ impl ops::Deref for Allocator {
 }
 
 pub type Box<'allocator, T> = bumpalo::boxed::Box<'allocator, T>;
+pub type Vec<'allocator, T> = bumpalo::collections::Vec<'allocator, T>;

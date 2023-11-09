@@ -6,6 +6,8 @@ pub enum TokenKind {
   // Brackets
   LeftParen,
   RightParen,
+  LeftCurly,
+  RightCurly,
 
   // Operators
   Minus,
@@ -55,6 +57,8 @@ impl fmt::Display for TokenKind {
       // Brackets
       Self::LeftParen => write!(f, "("),
       Self::RightParen => write!(f, ")"),
+      Self::LeftCurly => write!(f, "{{"),
+      Self::RightCurly => write!(f, "}}"),
 
       // Operators
       Self::Minus => write!(f, "-"),
@@ -166,6 +170,8 @@ impl<'source> Tokeniser<'source> {
       // Brackets
       b'(' => (TokenKind::LeftParen, 1),
       b')' => (TokenKind::RightParen, 1),
+      b'{' => (TokenKind::LeftCurly, 1),
+      b'}' => (TokenKind::RightCurly, 1),
 
       // Operators
       b'+' => (TokenKind::Plus, 1),
