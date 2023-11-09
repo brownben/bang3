@@ -203,6 +203,10 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       TokenKind::True | TokenKind::False => self.literal_boolean(token),
       TokenKind::Number => self.literal_number(token),
       TokenKind::String => self.literal_string(token),
+
+      TokenKind::Identifier if self.matches(TokenKind::FatRightArrow).is_some() => {
+        self.function(token)
+      }
       TokenKind::Identifier => self.variable(token),
 
       TokenKind::LeftCurly => self.block(token),
@@ -333,6 +337,20 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     self.allocate_expression(Comment {
       expression,
       text,
+      span,
+    })
+  }
+
+  fn function(&mut self, parameter: Token) -> ParseResult<Expression<'s, 'ast>> {
+    let parameter_span = Span::from(parameter);
+    let parameter = parameter_span.source_text(self.source);
+
+    let body = self.parse_expression()?;
+    let span = parameter_span.merge(body.span());
+
+    self.allocate_expression(Function {
+      parameter,
+      body,
       span,
     })
   }
@@ -696,6 +714,29 @@ mod test {
     let expected = indoc! {"
       ├─ Number (5)
       │  ╰─ Comment (hello world)
+    "};
+    assert_eq!(ast, expected);
+  }
+
+  #[test]
+  fn function() {
+    let ast = parse_to_string("x => x + 1");
+    let expected = indoc! {"
+      ├─ Function: x =>
+      │  ╰─ Binary (+)
+      │     ├─ Variable (x)
+      │     ╰─ Number (1)
+    "};
+    assert_eq!(ast, expected);
+
+    let ast = parse_to_string("let plusOne = a => { a + 1 }");
+    let expected = indoc! {"
+      ├─ Let 'plusOne' =
+      │  ╰─ Function: a =>
+      │     ╰─ Block
+      │        ╰─ Binary (+)
+      │           ├─ Variable (a)
+      │           ╰─ Number (1)
     "};
     assert_eq!(ast, expected);
   }

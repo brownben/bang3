@@ -32,6 +32,7 @@ impl PrettyPrint for Expression<'_, '_> {
       Self::Block(x) => x.pretty(f, prefix, last),
       Self::Call(x) => x.pretty(f, prefix, last),
       Self::Comment(x) => x.pretty(f, prefix, last),
+      Self::Function(x) => x.pretty(f, prefix, last),
       Self::Group(x) => x.pretty(f, prefix, last),
       Self::If(x) => x.pretty(f, prefix, last),
       Self::Literal(x) => x.pretty(f, prefix, last),
@@ -84,6 +85,15 @@ impl PrettyPrint for Comment<'_, '_> {
       "{prefix}{OTHER_CHILD}{FINAL_ENTRY}Comment ({})",
       self.text.trim()
     )
+  }
+}
+impl PrettyPrint for Function<'_, '_> {
+  fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
+    let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
+    writeln!(f, "{prefix}{connector}Function: {} =>", self.parameter)?;
+
+    let new_prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
+    self.body.pretty(f, &new_prefix, true)
   }
 }
 impl PrettyPrint for Group<'_, '_> {

@@ -18,7 +18,10 @@ pub enum TokenKind {
   Bang,
   And,
   Or,
+
+  // Functions
   RightRight,
+  FatRightArrow,
 
   // Comparators
   BangEqual,
@@ -69,7 +72,10 @@ impl fmt::Display for TokenKind {
       Self::Bang => write!(f, "!"),
       Self::Or => write!(f, "or"),
       Self::And => write!(f, "and"),
+
+      // Functions
       Self::RightRight => write!(f, ">>"),
+      Self::FatRightArrow => write!(f, "=>"),
 
       // Equalities
       Self::BangEqual => write!(f, "!="),
@@ -181,7 +187,10 @@ impl<'source> Tokeniser<'source> {
       b'%' => (TokenKind::Percent, 1),
       b'&' if matches!(next_character, Some(b'&')) => (TokenKind::And, 2),
       b'|' if matches!(next_character, Some(b'|')) => (TokenKind::Or, 2),
+
+      // Functions
       b'>' if matches!(next_character, Some(b'>')) => (TokenKind::RightRight, 2),
+      b'=' if matches!(next_character, Some(b'>')) => (TokenKind::FatRightArrow, 2),
 
       // Equalities
       b'!' if matches!(next_character, Some(b'=')) => (TokenKind::BangEqual, 2),
