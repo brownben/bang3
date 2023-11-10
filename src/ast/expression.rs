@@ -110,7 +110,7 @@ pub struct Literal<'source> {
   pub kind: LiteralKind<'source>,
   pub span: Span,
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum LiteralKind<'source> {
   Boolean(bool),
   Number(f64),

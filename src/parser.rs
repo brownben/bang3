@@ -1,6 +1,6 @@
 use crate::{
   allocator::{Allocator, Box, Vec},
-  ast::{expression::*, statement::*, GetSpan, Span},
+  ast::{expression::*, statement::*, GetSpan, Span, AST},
   tokeniser::{Token, TokenKind, Tokeniser},
 };
 use std::{error, fmt, iter};
@@ -100,7 +100,16 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     }
   }
 
-  pub fn is_finished(&mut self) -> bool {
+  pub fn parse(mut self) -> ParseResult<AST<'s, 'ast>> {
+    let mut statements = Vec::new_in(self.allocator);
+    while !self.is_finished() {
+      statements.push(self.parse_statement()?);
+    }
+
+    Ok(AST { statements })
+  }
+
+  fn is_finished(&mut self) -> bool {
     self.tokeniser.peek().is_none()
   }
 
@@ -504,19 +513,6 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   }
 }
 
-impl<'s: 'ast, 'ast> Iterator for Parser<'s, 'ast> {
-  type Item = Result<Statement<'s, 'ast>, ParseError>;
-
-  fn next(&mut self) -> Option<Self::Item> {
-    if self.is_finished() {
-      return None;
-    }
-
-    Some(self.parse_statement())
-  }
-}
-impl<'s> iter::FusedIterator for Parser<'s, 's> {}
-
 #[cfg(test)]
 mod test {
   use super::*;
@@ -538,7 +534,7 @@ mod test {
 
   fn parse_to_string<'s, 'ast>(source: &'s str) -> String {
     let allocator = Allocator::new();
-    let ast = Parser::new(source, &allocator).parse_statement().unwrap();
+    let ast = Parser::new(source, &allocator).parse().unwrap();
     ast.to_string()
   }
 

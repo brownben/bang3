@@ -2,15 +2,24 @@
 //!
 //! Based upon this [blog post](https://www.georgevreilly.com/blog/2023/01/24/TreeInRust2PrintingTrees.html)
 
-use super::{expression::*, statement::*};
+use super::{expression::*, statement::*, AST};
 use std::fmt;
 
-impl fmt::Display for Expression<'_, '_> {
+impl fmt::Display for AST<'_, '_> {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    for statement in &self.statements {
+      statement.pretty(f, "", false)?;
+    }
+
+    Ok(())
+  }
+}
+impl fmt::Display for Statement<'_, '_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     self.pretty(f, "", false)
   }
 }
-impl fmt::Display for Statement<'_, '_> {
+impl fmt::Display for Expression<'_, '_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     self.pretty(f, "", false)
   }
