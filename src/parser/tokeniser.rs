@@ -126,14 +126,13 @@ impl fmt::Display for TokenKind {
 pub struct Token {
   pub kind: TokenKind,
   pub start: u32,
-  pub end: u32,
-  pub line: u16,
+  pub length: u16,
 }
 impl From<Token> for Span {
   fn from(token: Token) -> Self {
     Self {
       start: token.start,
-      end: token.end,
+      end: token.start + token.length as u32,
     }
   }
 }
@@ -328,8 +327,7 @@ impl Iterator for Tokeniser<'_> {
     Some(Token {
       kind,
       start: start as u32,
-      end: self.position as u32,
-      line: self.line,
+      length: (self.position - start) as u16,
     })
   }
 }
