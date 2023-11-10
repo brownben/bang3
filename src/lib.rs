@@ -4,7 +4,6 @@ mod allocator;
 mod ast;
 mod linter;
 mod parser;
-mod tokeniser;
 
 pub use allocator::Allocator;
 pub use ast::AST;
