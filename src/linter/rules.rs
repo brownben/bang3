@@ -26,6 +26,12 @@ impl LintRule for NoConstantConditions {
     {
       context.add_diagnostic(&Self, if_.condition.span());
     }
+
+    if let Expression::Match(match_) = &expression
+      && match_.value.is_constant()
+    {
+      context.add_diagnostic(&Self, match_.value.span());
+    }
   }
 }
 

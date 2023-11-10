@@ -12,6 +12,7 @@ pub enum ParseError {
     recieved: Token,
   },
   ExpectedExpression(Token),
+  ExpectedPattern(Token),
   UnknownCharacter(Token),
   UnterminatedString(Token),
 }
@@ -23,6 +24,9 @@ impl fmt::Display for ParseError {
       }
       Self::ExpectedExpression(t) => {
         write!(f, "expected expression but got {}", t.kind)
+      }
+      Self::ExpectedPattern(t) => {
+        write!(f, "expected pattern but got {}", t.kind)
       }
       Self::UnknownCharacter(_) => write!(f, "got unknown character"),
       Self::UnterminatedString(_) => write!(f, "unterminated string"),
@@ -87,16 +91,22 @@ impl From<TokenKind> for ParsePrecedence {
 type ParseResult<T> = Result<T, ParseError>;
 
 pub struct Parser<'source, 'ast> {
+  allocator: &'ast Allocator,
+
   source: &'source str,
   tokeniser: iter::Peekable<Tokeniser<'source>>,
-  allocator: &'ast Allocator,
+
+  skipped_newline: bool,
 }
 impl<'s, 'ast> Parser<'s, 'ast> {
   pub fn new(source: &'s str, allocator: &'ast Allocator) -> Self {
     Self {
+      allocator,
+
       source,
       tokeniser: Tokeniser::from(source).peekable(),
-      allocator,
+
+      skipped_newline: false,
     }
   }
 
@@ -114,6 +124,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   }
 
   fn next_token(&mut self) -> Token {
+    self.skipped_newline = false;
     self.tokeniser.next().unwrap_or_default()
   }
 
@@ -135,6 +146,10 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   }
 
   fn expect_newline(&mut self) -> ParseResult<()> {
+    if self.skipped_newline {
+      return Ok(());
+    }
+
     let token = self.next_token();
 
     if matches!(
@@ -167,6 +182,17 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       .is_some_and(|t| t.kind == TokenKind::EndOfLine)
     {
       self.next_token();
+    }
+  }
+
+  fn skip_maybe_newline(&mut self) {
+    while self
+      .tokeniser
+      .peek()
+      .is_some_and(|t| t.kind == TokenKind::EndOfLine)
+    {
+      self.next_token();
+      self.skipped_newline = true;
     }
   }
 
@@ -209,19 +235,23 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
   fn prefix_expression(&mut self, token: Token) -> ParseResult<Expression<'s, 'ast>> {
     match token.kind {
-      TokenKind::True | TokenKind::False => self.literal_boolean(token),
-      TokenKind::Number => self.literal_number(token),
-      TokenKind::String => self.literal_string(token),
-
+      TokenKind::True | TokenKind::False | TokenKind::Number | TokenKind::String => {
+        self.literal(token)
+      }
       TokenKind::Identifier if self.matches(TokenKind::FatRightArrow).is_some() => {
         self.function(token)
       }
-      TokenKind::Identifier => self.variable(token),
+      TokenKind::Identifier => {
+        let variable = self.variable(token);
+        self.allocate_expression(variable)
+      }
 
       TokenKind::LeftCurly => self.block(token),
       TokenKind::LeftParen => self.group(token),
-      TokenKind::If => self.if_(token),
       TokenKind::Minus | TokenKind::Bang => self.unary(token),
+
+      TokenKind::If => self.if_(token),
+      TokenKind::Match => self.match_(token),
 
       TokenKind::Unknown => Err(ParseError::UnknownCharacter(token)),
       TokenKind::UnterminatedString => Err(ParseError::UnterminatedString(token)),
@@ -384,6 +414,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     let if_token_span = Span::from(if_token);
     let then = self.parse_expression()?;
 
+    self.skip_maybe_newline();
     let (otherwise, span) = if self.matches(TokenKind::Else).is_some() {
       let expression = self.parse_expression()?;
       let span = if_token_span.merge(expression.span());
@@ -401,7 +432,18 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     })
   }
 
-  fn literal_boolean(&mut self, token: Token) -> ParseResult<Expression<'s, 'ast>> {
+  fn literal(&mut self, token: Token) -> ParseResult<Expression<'s, 'ast>> {
+    let literal = match token.kind {
+      TokenKind::True | TokenKind::False => self.literal_boolean(token),
+      TokenKind::Number => self.literal_number(token),
+      TokenKind::String => self.literal_string(token),
+      _ => unreachable!("only literal tokens are passed"),
+    };
+
+    self.allocate_expression(literal)
+  }
+
+  fn literal_boolean(&mut self, token: Token) -> Literal<'s> {
     let span = Span::from(token);
     let kind = match token.kind {
       TokenKind::True => LiteralKind::Boolean(true),
@@ -409,10 +451,10 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       _ => unreachable!("only literal tokens are passed"),
     };
 
-    self.allocate_expression(Literal { kind, span })
+    Literal { kind, span }
   }
 
-  fn literal_number(&mut self, token: Token) -> ParseResult<Expression<'s, 'ast>> {
+  fn literal_number(&mut self, token: Token) -> Literal<'s> {
     let span = Span::from(token);
     let number_source = span.source_text(self.source);
 
@@ -423,21 +465,64 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     }
     .expect("string to be valid number representation");
 
-    self.allocate_expression(Literal {
+    Literal {
       kind: LiteralKind::Number(value),
       span,
-    })
+    }
   }
 
-  fn literal_string(&mut self, token: Token) -> ParseResult<Expression<'s, 'ast>> {
+  fn literal_string(&mut self, token: Token) -> Literal<'s> {
     let span = Span::from(token);
     let full_string = span.source_text(self.source);
     let string_without_quotes = &full_string[1..(full_string.len() - 1)];
 
-    self.allocate_expression(Literal {
+    Literal {
       kind: LiteralKind::String(string_without_quotes),
       span,
-    })
+    }
+  }
+
+  fn match_(&mut self, token: Token) -> ParseResult<Expression<'s, 'ast>> {
+    let value = self.parse_expression()?;
+    let mut cases = Vec::new_in(self.allocator);
+
+    self.skip_newline();
+    self.expect(TokenKind::Pipe)?;
+
+    loop {
+      let pattern = self.pattern()?;
+      self.expect(TokenKind::RightArrow)?;
+      let expression = self.parse_expression()?;
+      let span = pattern.span().merge(expression.span());
+
+      cases.push(MatchCase {
+        pattern,
+        expression,
+        span,
+      });
+
+      if self.matches(TokenKind::Comma).is_some() {
+        self.skip_maybe_newline();
+      }
+      if self.matches(TokenKind::Pipe).is_none() {
+        break;
+      }
+    }
+
+    let span = Span::from(token).merge(cases.last().unwrap().span());
+    self.allocate_expression(Match { value, cases, span })
+  }
+
+  fn pattern(&mut self) -> ParseResult<Pattern<'s>> {
+    let token = self.next_token();
+    match token.kind {
+      TokenKind::Identifier => Ok(Pattern::Identifier(self.variable(token))),
+      TokenKind::String => Ok(Pattern::Literal(self.literal_string(token))),
+      TokenKind::Number => Ok(Pattern::Literal(self.literal_number(token))),
+      TokenKind::True => Ok(Pattern::Literal(self.literal_boolean(token))),
+      TokenKind::False => Ok(Pattern::Literal(self.literal_boolean(token))),
+      _ => Err(ParseError::ExpectedPattern(token)),
+    }
   }
 
   fn unary(&mut self, token: Token) -> ParseResult<Expression<'s, 'ast>> {
@@ -456,13 +541,13 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     })
   }
 
-  fn variable(&mut self, token: Token) -> ParseResult<Expression<'s, 'ast>> {
+  fn variable(&mut self, token: Token) -> Variable<'s> {
     let span = Span::from(token);
 
-    self.allocate_expression(Variable {
+    Variable {
       name: span.source_text(self.source),
       span,
-    })
+    }
   }
 
   pub fn parse_statement(&mut self) -> ParseResult<Statement<'s, 'ast>> {
@@ -525,11 +610,8 @@ mod test {
     Parser::new(source, allocator).parse_expression()
   }
 
-  fn parse_statement<'a>(
-    source: &'a str,
-    allocator: &'a Allocator,
-  ) -> ParseResult<Statement<'a, 'a>> {
-    Parser::new(source, allocator).parse_statement()
+  fn parse_statement<'a>(source: &'a str, allocator: &'a Allocator) -> ParseResult<AST<'a, 'a>> {
+    Parser::new(source, allocator).parse()
   }
 
   fn parse_to_string<'s, 'ast>(source: &'s str) -> String {
@@ -833,6 +915,51 @@ mod test {
     let ast = parse_to_string("'string\nnew\nlines'");
     let expected = "├─ String 'string\nnew\nlines'\n";
     assert_eq!(ast, expected);
+  }
+
+  #[test]
+  fn match_() {
+    let ast = parse_to_string("match n | 1 -> 0");
+    let expected = indoc! {"
+      ├─ Match
+      │  ├─ Variable (n)
+      │  ╰─ Cases:
+      │     ╰─ Pattern ─ Literal (1)
+      │        ╰─ Number (0)
+    "};
+    assert_eq!(ast, expected);
+
+    let ast = parse_to_string(indoc! {"
+        match n
+          | 1 -> 0,
+          | 2 -> 1,
+          | n -> n * 5,
+    "});
+    let expected = indoc! {"
+      ├─ Match
+      │  ├─ Variable (n)
+      │  ╰─ Cases:
+      │     ├─ Pattern ─ Literal (1)
+      │     │  ╰─ Number (0)
+      │     ├─ Pattern ─ Literal (2)
+      │     │  ╰─ Number (1)
+      │     ╰─ Pattern ─ Identifier 'n'
+      │        ╰─ Binary (*)
+      │           ├─ Variable (n)
+      │           ╰─ Number (5)
+    "};
+    assert_eq!(ast, expected);
+  }
+
+  #[test]
+  fn match_missing_parts() {
+    let allocator = Allocator::new();
+    assert!(parse_statement("match | 1 -> 2", &allocator).is_err());
+    assert!(parse_statement("match 3 | -5", &allocator).is_err());
+    assert!(parse_statement("match 3 1 -> 3", &allocator).is_err());
+    assert!(parse_statement("match 3 | 1 -> 3, 2 -> 4", &allocator).is_err());
+    assert!(parse_statement("match 3 | 1 -> 3\n 2 -> 4", &allocator).is_err());
+    assert!(parse_statement("match 3 | 1,", &allocator).is_err());
   }
 
   #[test]

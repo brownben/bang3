@@ -18,6 +18,7 @@ pub trait Visitor {
       Expression::Function(x) => self.visit_function(x),
       Expression::Group(x) => self.visit_group(x),
       Expression::If(x) => self.visit_if(x),
+      Expression::Match(x) => self.visit_match(x),
       Expression::Unary(x) => self.visit_unary(x),
       Expression::Literal(_) | Expression::Variable(_) => {}
     }
@@ -53,6 +54,12 @@ pub trait Visitor {
     self.visit_expression(&if_.then);
     if let Some(otherwise) = &if_.otherwise {
       self.visit_expression(otherwise);
+    }
+  }
+  fn visit_match(&mut self, match_: &Match) {
+    self.visit_expression(&match_.value);
+    for case in &match_.cases {
+      self.visit_expression(&case.expression);
     }
   }
   fn visit_unary(&mut self, unary: &Unary) {

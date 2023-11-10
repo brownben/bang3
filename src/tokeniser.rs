@@ -3,11 +3,12 @@ use std::{fmt, iter};
 
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
 pub enum TokenKind {
-  // Brackets
+  // Brackets + Separators
   LeftParen,
   RightParen,
   LeftCurly,
   RightCurly,
+  Comma,
 
   // Operators
   Minus,
@@ -42,7 +43,12 @@ pub enum TokenKind {
   False,
   If,
   Let,
+  Match,
   True,
+
+  // Pattern
+  Pipe,
+  RightArrow,
 
   // Whitespace + Comments
   Comment,
@@ -57,11 +63,12 @@ pub enum TokenKind {
 impl fmt::Display for TokenKind {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      // Brackets
+      // Brackets + Separators
       Self::LeftParen => write!(f, "("),
       Self::RightParen => write!(f, ")"),
       Self::LeftCurly => write!(f, "{{"),
       Self::RightCurly => write!(f, "}}"),
+      Self::Comma => write!(f, ","),
 
       // Operators
       Self::Minus => write!(f, "-"),
@@ -96,7 +103,12 @@ impl fmt::Display for TokenKind {
       Self::False => write!(f, "false"),
       Self::If => write!(f, "if"),
       Self::Let => write!(f, "let"),
+      Self::Match => write!(f, "match"),
       Self::True => write!(f, "true"),
+
+      // Pattern
+      Self::Pipe => write!(f, "|"),
+      Self::RightArrow => write!(f, "->"),
 
       // Whitespace + Comments
       Self::Comment => write!(f, "Comment"),
@@ -173,11 +185,20 @@ impl<'source> Tokeniser<'source> {
       b'_' | b'a'..=b'z' | b'A'..=b'Z' => self.identifier(),
       b'.' if matches!(next_character, Some(b'0'..=b'9')) => self.number(),
 
-      // Brackets
+      // Brackets + Separators
       b'(' => (TokenKind::LeftParen, 1),
       b')' => (TokenKind::RightParen, 1),
       b'{' => (TokenKind::LeftCurly, 1),
       b'}' => (TokenKind::RightCurly, 1),
+      b',' => (TokenKind::Comma, 1),
+
+      // Logical Operators
+      b'&' if matches!(next_character, Some(b'&')) => (TokenKind::And, 2),
+      b'|' if matches!(next_character, Some(b'|')) => (TokenKind::Or, 2),
+
+      // Pattern
+      b'|' => (TokenKind::Pipe, 1),
+      b'-' if matches!(next_character, Some(b'>')) => (TokenKind::RightArrow, 2),
 
       // Operators
       b'+' => (TokenKind::Plus, 1),
@@ -185,8 +206,6 @@ impl<'source> Tokeniser<'source> {
       b'/' => (TokenKind::Slash, 1),
       b'*' => (TokenKind::Star, 1),
       b'%' => (TokenKind::Percent, 1),
-      b'&' if matches!(next_character, Some(b'&')) => (TokenKind::And, 2),
-      b'|' if matches!(next_character, Some(b'|')) => (TokenKind::Or, 2),
 
       // Functions
       b'>' if matches!(next_character, Some(b'>')) => (TokenKind::RightRight, 2),
@@ -281,6 +300,7 @@ impl<'source> Tokeniser<'source> {
       b'f' if self.is_keyword(length, "false") => TokenKind::False,
       b'i' if self.is_keyword(length, "if") => TokenKind::If,
       b'l' if self.is_keyword(length, "let") => TokenKind::Let,
+      b'm' if self.is_keyword(length, "match") => TokenKind::Match,
       b'o' if self.is_keyword(length, "or") => TokenKind::Or,
       b't' if self.is_keyword(length, "true") => TokenKind::True,
       _ => TokenKind::Identifier,

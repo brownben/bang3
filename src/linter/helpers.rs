@@ -33,6 +33,7 @@ impl IsConstant for Expression<'_, '_> {
       Self::Comment(x) => x.is_constant(),
       Self::Group(x) => x.is_constant(),
       Self::If(x) => x.is_constant(),
+      Self::Match(x) => x.is_constant(),
       Self::Unary(x) => x.is_constant(),
     }
   }
@@ -77,6 +78,16 @@ impl IsConstant for If<'_, '_> {
         .map_or(true, IsConstant::is_constant)
   }
 }
+impl IsConstant for Match<'_, '_> {
+  fn is_constant(&self) -> bool {
+    self.cases.iter().all(IsConstant::is_constant)
+  }
+}
+impl IsConstant for MatchCase<'_, '_> {
+  fn is_constant(&self) -> bool {
+    self.expression.is_constant()
+  }
+}
 impl IsConstant for Unary<'_, '_> {
   fn is_constant(&self) -> bool {
     self.expression.is_constant()
@@ -107,6 +118,7 @@ impl ASTEquality for Expression<'_, '_> {
       (Self::Function(x), Self::Function(y)) => x.equals(y),
       (Self::If(x), Self::If(y)) => x.equals(y),
       (Self::Literal(x), Self::Literal(y)) => x.equals(y),
+      (Self::Match(x), Self::Match(y)) => x.equals(y),
       (Self::Unary(x), Self::Unary(y)) => x.equals(y),
       (Self::Variable(x), Self::Variable(y)) => x.equals(y),
       _ => false,
@@ -161,6 +173,30 @@ impl ASTEquality for If<'_, '_> {
 impl ASTEquality for Literal<'_> {
   fn equals(&self, other: &Self) -> bool {
     self.kind == other.kind
+  }
+}
+impl ASTEquality for Match<'_, '_> {
+  fn equals(&self, other: &Self) -> bool {
+    self.value.equals(&other.value)
+      && self
+        .cases
+        .iter()
+        .zip(&other.cases)
+        .all(|(x, y)| x.equals(y))
+  }
+}
+impl ASTEquality for MatchCase<'_, '_> {
+  fn equals(&self, other: &Self) -> bool {
+    self.pattern.equals(&other.pattern) && self.expression.equals(&other.expression)
+  }
+}
+impl ASTEquality for Pattern<'_> {
+  fn equals(&self, other: &Self) -> bool {
+    match (self, other) {
+      (Self::Identifier(_), Self::Identifier(_)) => true,
+      (Self::Literal(x), Self::Literal(y)) => x.equals(y),
+      _ => false,
+    }
   }
 }
 impl ASTEquality for Unary<'_, '_> {

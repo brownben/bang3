@@ -15,6 +15,7 @@ pub enum Expression<'source, 'ast> {
   Group(Box<'ast, Group<'source, 'ast>>),
   If(Box<'ast, If<'source, 'ast>>),
   Literal(Box<'ast, Literal<'source>>),
+  Match(Box<'ast, Match<'source, 'ast>>),
   Unary(Box<'ast, Unary<'source, 'ast>>),
   Variable(Box<'ast, Variable<'source>>),
 }
@@ -118,6 +119,24 @@ pub enum LiteralKind<'source> {
 }
 
 #[derive(Debug)]
+pub struct Match<'source, 'ast> {
+  pub value: Expression<'source, 'ast>,
+  pub cases: Vec<'ast, MatchCase<'source, 'ast>>,
+  pub span: Span,
+}
+#[derive(Debug)]
+pub struct MatchCase<'source, 'ast> {
+  pub pattern: Pattern<'source>,
+  pub expression: Expression<'source, 'ast>,
+  pub span: Span,
+}
+#[derive(Debug)]
+pub enum Pattern<'source> {
+  Identifier(Variable<'source>),
+  Literal(Literal<'source>),
+}
+
+#[derive(Debug)]
 pub struct Unary<'source, 'ast> {
   pub operator: UnaryOperator,
   pub expression: Expression<'source, 'ast>,
@@ -183,6 +202,11 @@ impl<'s, 'ast> From<Box<'ast, Literal<'s>>> for Expression<'s, 'ast> {
     Self::Literal(value)
   }
 }
+impl<'s, 'ast> From<Box<'ast, Match<'s, 'ast>>> for Expression<'s, 'ast> {
+  fn from(value: Box<'ast, Match<'s, 'ast>>) -> Self {
+    Self::Match(value)
+  }
+}
 impl<'s, 'ast> From<Box<'ast, Unary<'s, 'ast>>> for Expression<'s, 'ast> {
   fn from(value: Box<'ast, Unary<'s, 'ast>>) -> Self {
     Self::Unary(value)
@@ -205,6 +229,7 @@ impl GetSpan for Expression<'_, '_> {
       Self::Group(x) => x.span(),
       Self::If(x) => x.span(),
       Self::Literal(x) => x.span(),
+      Self::Match(x) => x.span(),
       Self::Unary(x) => x.span(),
       Self::Variable(x) => x.span(),
     }
@@ -248,6 +273,24 @@ impl GetSpan for If<'_, '_> {
 impl GetSpan for Literal<'_> {
   fn span(&self) -> Span {
     self.span
+  }
+}
+impl GetSpan for Match<'_, '_> {
+  fn span(&self) -> Span {
+    self.span
+  }
+}
+impl GetSpan for MatchCase<'_, '_> {
+  fn span(&self) -> Span {
+    self.span
+  }
+}
+impl GetSpan for Pattern<'_> {
+  fn span(&self) -> Span {
+    match self {
+      Pattern::Identifier(x) => x.span(),
+      Pattern::Literal(x) => x.span(),
+    }
   }
 }
 impl GetSpan for Unary<'_, '_> {

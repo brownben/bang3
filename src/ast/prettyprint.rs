@@ -45,6 +45,7 @@ impl PrettyPrint for Expression<'_, '_> {
       Self::Group(x) => x.pretty(f, prefix, last),
       Self::If(x) => x.pretty(f, prefix, last),
       Self::Literal(x) => x.pretty(f, prefix, last),
+      Self::Match(x) => x.pretty(f, prefix, last),
       Self::Unary(x) => x.pretty(f, prefix, last),
       Self::Variable(x) => x.pretty(f, prefix, last),
     }
@@ -148,6 +149,48 @@ impl PrettyPrint for Literal<'_> {
       LiteralKind::Boolean(x) => writeln!(f, "{prefix}{connector}Boolean ({x})"),
       LiteralKind::Number(x) => writeln!(f, "{prefix}{connector}Number ({x})"),
       LiteralKind::String(x) => writeln!(f, "{prefix}{connector}String '{x}'"),
+    }
+  }
+}
+impl PrettyPrint for Match<'_, '_> {
+  fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
+    let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
+    writeln!(f, "{prefix}{connector}Match")?;
+
+    let prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
+    self.value.pretty(f, &prefix, false)?;
+
+    writeln!(f, "{prefix}{FINAL_ENTRY}Cases:")?;
+    let (last_case, cases) = self.cases.split_last().unwrap();
+    for case in cases {
+      case.pretty(f, &prefix, false)?;
+    }
+    last_case.pretty(f, &prefix, true)?;
+
+    Ok(())
+  }
+}
+impl PrettyPrint for MatchCase<'_, '_> {
+  fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
+    let prefix = format!("{prefix}{FINAL_CHILD}");
+    self.pattern.pretty(f, &prefix, last)?;
+
+    let gap = if last { FINAL_CHILD } else { OTHER_CHILD };
+    self.expression.pretty(f, &format!("{prefix}{gap}"), true)
+  }
+}
+impl PrettyPrint for Pattern<'_> {
+  fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
+    let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
+    write!(f, "{prefix}{connector}Pattern ─ ")?;
+
+    match self {
+      Self::Literal(x) => match x.kind {
+        LiteralKind::Boolean(x) => writeln!(f, "Literal ({x})"),
+        LiteralKind::Number(x) => writeln!(f, "Literal ({x})"),
+        LiteralKind::String(x) => writeln!(f, "Literal '{x}'"),
+      },
+      Self::Identifier(x) => writeln!(f, "Identifier '{}'", x.name),
     }
   }
 }
