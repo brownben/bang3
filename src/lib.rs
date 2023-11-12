@@ -17,6 +17,7 @@ pub fn parse<'source, 'ast>(
   parser::Parser::new(source, allocator).parse()
 }
 
+#[must_use]
 pub fn lint(ast: &AST) -> Vec<Diagnostic> {
   linter::Linter::new().check(ast)
 }

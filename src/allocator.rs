@@ -2,6 +2,7 @@
 
 use std::ops;
 
+#[must_use]
 #[derive(Debug, Default)]
 pub struct Allocator(bumpalo::Bump);
 impl Allocator {

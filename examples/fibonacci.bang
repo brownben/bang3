@@ -1,0 +1,12 @@
+let fibonnacciMatch = n => match n
+  | ..2 -> 1
+  | n -> fibonnacciMatch(n-1) + fibonnacciMatch(n-2)
+
+let fibonnaciIf = n => if (n < 2) {
+  1
+} else {
+  fibonnacciMatch(n-1) + fibonnacciMatch(n-2)
+}
+
+print(fibonnacciMatch(25))
+print(fibonnaciIf(25))

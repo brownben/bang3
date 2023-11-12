@@ -181,9 +181,6 @@ impl PrettyPrint for MatchCase<'_, '_> {
 }
 impl PrettyPrint for Pattern<'_, '_> {
   fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
-    let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
-    write!(f, "{prefix}{connector}Pattern ─ ")?;
-
     fn display_pattern_part(f: &mut fmt::Formatter<'_>, pattern: &Pattern<'_, '_>) -> fmt::Result {
       match pattern {
         Pattern::Literal(x) => match x.kind {
@@ -192,9 +189,12 @@ impl PrettyPrint for Pattern<'_, '_> {
           LiteralKind::String(x) => write!(f, "'{x}'"),
         },
         Pattern::Identifier(x) => write!(f, "{}", x.name),
-        _ => unreachable!("not a basic pattern part"),
+        Pattern::Range(_) => unreachable!("not a basic pattern part"),
       }
     }
+
+    let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
+    write!(f, "{prefix}{connector}Pattern ─ ")?;
 
     match self {
       Self::Range(range) => {
