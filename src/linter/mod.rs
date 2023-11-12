@@ -19,18 +19,16 @@ pub struct Linter {
   context: Context,
 }
 impl Linter {
-  fn new() -> Self {
+  pub fn new() -> Self {
     Self::default()
   }
 
-  pub fn check(ast: &AST) -> Vec<Diagnostic> {
-    let mut linter = Self::new();
-
+  pub fn check(mut self, ast: &AST) -> Vec<Diagnostic> {
     for statement in &ast.statements {
-      linter.visit_statement(statement);
+      self.visit_statement(statement);
     }
 
-    linter.context.diagnostics
+    self.context.diagnostics
   }
 }
 impl Visitor for Linter {

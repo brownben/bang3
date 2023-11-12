@@ -224,7 +224,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     Ok(Box::new_in(x, self.allocator).into())
   }
 
-  pub fn parse_expression(&mut self) -> ParseResult<Expression<'s, 'ast>> {
+  fn parse_expression(&mut self) -> ParseResult<Expression<'s, 'ast>> {
     self.parse_expression_inner(ParsePrecedence::None)
   }
 
@@ -588,7 +588,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     }
   }
 
-  pub fn parse_statement(&mut self) -> ParseResult<Statement<'s, 'ast>> {
+  fn parse_statement(&mut self) -> ParseResult<Statement<'s, 'ast>> {
     self.skip_newline();
 
     match self.peek_token() {

@@ -1,9 +1,9 @@
-use crate::{Allocator, Linter, Parser};
+use crate::{lint as lint_ast, parse, Allocator};
 
 fn lint(source: &str) -> Result<(), ()> {
   let allocator = Allocator::new();
-  let ast = Parser::new(source, &allocator).parse().unwrap();
-  let diagnostics = Linter::check(&ast);
+  let ast = parse(source, &allocator).unwrap();
+  let diagnostics = lint_ast(&ast);
 
   if diagnostics.is_empty() {
     Ok(())

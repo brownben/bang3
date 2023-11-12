@@ -1,13 +1,9 @@
-use crate::{Allocator, ParseError, Parser, AST};
+use crate::{parse, Allocator};
 use indoc::indoc;
-
-fn parse<'a>(source: &'a str, allocator: &'a Allocator) -> Result<AST<'a, 'a>, ParseError> {
-  Parser::new(source, allocator).parse()
-}
 
 fn parse_to_string<'s, 'ast>(source: &'s str) -> String {
   let allocator = Allocator::new();
-  let ast = Parser::new(source, &allocator).parse().unwrap();
+  let ast = parse(source, &allocator).unwrap();
   ast.to_string()
 }
 
