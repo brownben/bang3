@@ -190,13 +190,19 @@ impl ASTEquality for MatchCase<'_, '_> {
     self.pattern.equals(&other.pattern) && self.expression.equals(&other.expression)
   }
 }
-impl ASTEquality for Pattern<'_> {
+impl ASTEquality for Pattern<'_, '_> {
   fn equals(&self, other: &Self) -> bool {
     match (self, other) {
       (Self::Identifier(_), Self::Identifier(_)) => true,
       (Self::Literal(x), Self::Literal(y)) => x.equals(y),
+      (Self::Range(x), Self::Range(y)) => x.equals(y),
       _ => false,
     }
+  }
+}
+impl ASTEquality for PatternRange<'_, '_> {
+  fn equals(&self, other: &Self) -> bool {
+    self.start.equals(&other.start) && self.end.equals(&other.end)
   }
 }
 impl ASTEquality for Unary<'_, '_> {

@@ -179,19 +179,39 @@ impl PrettyPrint for MatchCase<'_, '_> {
     self.expression.pretty(f, &format!("{prefix}{gap}"), true)
   }
 }
-impl PrettyPrint for Pattern<'_> {
+impl PrettyPrint for Pattern<'_, '_> {
   fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
     let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
     write!(f, "{prefix}{connector}Pattern ─ ")?;
 
-    match self {
-      Self::Literal(x) => match x.kind {
-        LiteralKind::Boolean(x) => writeln!(f, "Literal ({x})"),
-        LiteralKind::Number(x) => writeln!(f, "Literal ({x})"),
-        LiteralKind::String(x) => writeln!(f, "Literal '{x}'"),
-      },
-      Self::Identifier(x) => writeln!(f, "Identifier '{}'", x.name),
+    fn display_pattern_part(f: &mut fmt::Formatter<'_>, pattern: &Pattern<'_, '_>) -> fmt::Result {
+      match pattern {
+        Pattern::Literal(x) => match x.kind {
+          LiteralKind::Boolean(x) => write!(f, "{x}"),
+          LiteralKind::Number(x) => write!(f, "{x}"),
+          LiteralKind::String(x) => write!(f, "'{x}'"),
+        },
+        Pattern::Identifier(x) => write!(f, "{}", x.name),
+        _ => unreachable!("not a basic pattern part"),
+      }
     }
+
+    match self {
+      Self::Range(range) => {
+        if let Some(start) = &range.start {
+          display_pattern_part(f, start)?;
+          write!(f, " ")?;
+        }
+        write!(f, "..")?;
+        if let Some(end) = &range.end {
+          write!(f, " ")?;
+          display_pattern_part(f, end)?;
+        };
+      }
+      pattern => display_pattern_part(f, pattern)?,
+    };
+
+    writeln!(f)
   }
 }
 impl PrettyPrint for Unary<'_, '_> {

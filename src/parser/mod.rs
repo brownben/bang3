@@ -17,6 +17,7 @@ pub enum ParseError {
   },
   ExpectedExpression(Token),
   ExpectedPattern(Token),
+  ExpectedPatternRangeEnd(Token),
   UnknownCharacter(Token),
   UnterminatedString(Token),
 }
@@ -31,6 +32,9 @@ impl fmt::Display for ParseError {
       }
       Self::ExpectedPattern(t) => {
         write!(f, "expected pattern but got {}", t.kind)
+      }
+      Self::ExpectedPatternRangeEnd(t) => {
+        write!(f, "expected end of pattern range but got {}", t.kind)
       }
       Self::UnknownCharacter(_) => write!(f, "got unknown character"),
       Self::UnterminatedString(_) => write!(f, "unterminated string"),
@@ -132,8 +136,12 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     self.tokeniser.next().unwrap_or_default()
   }
 
-  fn peek_token(&mut self) -> Token {
-    self.tokeniser.peek().copied().unwrap_or_default()
+  fn peek_token(&mut self) -> TokenKind {
+    self
+      .tokeniser
+      .peek()
+      .map(|token| token.kind)
+      .unwrap_or_default()
   }
 
   fn expect(&mut self, kind: TokenKind) -> ParseResult<Token> {
@@ -505,9 +513,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
         span,
       });
 
-      if self.matches(TokenKind::Comma).is_some() {
-        self.skip_maybe_newline();
-      }
+      self.skip_maybe_newline();
       if self.matches(TokenKind::Pipe).is_none() {
         break;
       }
@@ -517,16 +523,44 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     self.allocate_expression(Match { value, cases, span })
   }
 
-  fn pattern(&mut self) -> ParseResult<Pattern<'s>> {
+  fn pattern(&mut self) -> ParseResult<Pattern<'s, 'ast>> {
     let token = self.next_token();
-    match token.kind {
-      TokenKind::Identifier => Ok(Pattern::Identifier(self.variable(token))),
-      TokenKind::String => Ok(Pattern::Literal(self.literal_string(token))),
-      TokenKind::Number => Ok(Pattern::Literal(self.literal_number(token))),
-      TokenKind::True => Ok(Pattern::Literal(self.literal_boolean(token))),
-      TokenKind::False => Ok(Pattern::Literal(self.literal_boolean(token))),
-      _ => Err(ParseError::ExpectedPattern(token)),
+    let pattern = match token.kind {
+      TokenKind::String => Pattern::Literal(self.literal_string(token)),
+      TokenKind::Number => Pattern::Literal(self.literal_number(token)),
+      TokenKind::True => return Ok(Pattern::Literal(self.literal_boolean(token))),
+      TokenKind::False => return Ok(Pattern::Literal(self.literal_boolean(token))),
+      TokenKind::Identifier => return Ok(Pattern::Identifier(self.variable(token))),
+      TokenKind::DotDot => return self.pattern_range(None, true),
+      _ => return Err(ParseError::ExpectedPattern(token)),
+    };
+
+    if self.matches(TokenKind::DotDot).is_none() {
+      return Ok(pattern);
     }
+
+    let range_has_end = self.peek_token() != TokenKind::RightArrow;
+    self.pattern_range(Some(pattern), range_has_end)
+  }
+
+  fn pattern_range(
+    &mut self,
+    start: Option<Pattern<'s, 'ast>>,
+    has_end: bool,
+  ) -> ParseResult<Pattern<'s, 'ast>> {
+    let mut pattern = PatternRange { start, end: None };
+
+    if has_end {
+      let token = self.next_token();
+
+      pattern.end = match token.kind {
+        TokenKind::String => Some(Pattern::Literal(self.literal_string(token))),
+        TokenKind::Number => Some(Pattern::Literal(self.literal_number(token))),
+        _ => return Err(ParseError::ExpectedPatternRangeEnd(token)),
+      }
+    }
+
+    Ok(Pattern::Range(Box::new_in(pattern, self.allocator)))
   }
 
   fn unary(&mut self, token: Token) -> ParseResult<Expression<'s, 'ast>> {
@@ -557,7 +591,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   pub fn parse_statement(&mut self) -> ParseResult<Statement<'s, 'ast>> {
     self.skip_newline();
 
-    match self.peek_token().kind {
+    match self.peek_token() {
       TokenKind::Let => self.declaration_statement(),
       TokenKind::Comment => self.comment_statement(),
       _ => self.expression_statement(),
@@ -593,7 +627,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     let expression = self.parse_expression()?;
 
     // Blocks should end with an expression, thus allow block end instead of new line
-    match self.peek_token().kind {
+    match self.peek_token() {
       TokenKind::RightCurly => {}
       _ => self.expect_newline()?,
     }

@@ -3,12 +3,11 @@ use std::{fmt, iter};
 
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
 pub enum TokenKind {
-  // Brackets + Separators
+  // Brackets
   LeftParen,
   RightParen,
   LeftCurly,
   RightCurly,
-  Comma,
 
   // Operators
   Minus,
@@ -49,6 +48,7 @@ pub enum TokenKind {
   // Pattern
   Pipe,
   RightArrow,
+  DotDot,
 
   // Whitespace + Comments
   Comment,
@@ -63,12 +63,11 @@ pub enum TokenKind {
 impl fmt::Display for TokenKind {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      // Brackets + Separators
+      // Brackets
       Self::LeftParen => write!(f, "("),
       Self::RightParen => write!(f, ")"),
       Self::LeftCurly => write!(f, "{{"),
       Self::RightCurly => write!(f, "}}"),
-      Self::Comma => write!(f, ","),
 
       // Operators
       Self::Minus => write!(f, "-"),
@@ -109,6 +108,7 @@ impl fmt::Display for TokenKind {
       // Pattern
       Self::Pipe => write!(f, "|"),
       Self::RightArrow => write!(f, "->"),
+      Self::DotDot => write!(f, ".."),
 
       // Whitespace + Comments
       Self::Comment => write!(f, "Comment"),
@@ -189,7 +189,6 @@ impl<'source> Tokeniser<'source> {
       b')' => (TokenKind::RightParen, 1),
       b'{' => (TokenKind::LeftCurly, 1),
       b'}' => (TokenKind::RightCurly, 1),
-      b',' => (TokenKind::Comma, 1),
 
       // Logical Operators
       b'&' if matches!(next_character, Some(b'&')) => (TokenKind::And, 2),
@@ -198,6 +197,7 @@ impl<'source> Tokeniser<'source> {
       // Pattern
       b'|' => (TokenKind::Pipe, 1),
       b'-' if matches!(next_character, Some(b'>')) => (TokenKind::RightArrow, 2),
+      b'.' if matches!(next_character, Some(b'.')) => (TokenKind::DotDot, 2),
 
       // Operators
       b'+' => (TokenKind::Plus, 1),

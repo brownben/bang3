@@ -315,26 +315,44 @@ fn match_() {
     ├─ Match
     │  ├─ Variable (n)
     │  ╰─ Cases:
-    │     ╰─ Pattern ─ Literal (1)
+    │     ╰─ Pattern ─ 1
     │        ╰─ Number (0)
   "};
   assert_eq!(ast, expected);
 
   let ast = parse_to_string(indoc! {"
       match n
-        | 1 -> 0,
-        | 2 -> 1,
-        | n -> n * 5,
+        | 1 -> 0
+        | 2 -> 1
+        | n -> n * 5
   "});
   let expected = indoc! {"
     ├─ Match
     │  ├─ Variable (n)
     │  ╰─ Cases:
-    │     ├─ Pattern ─ Literal (1)
+    │     ├─ Pattern ─ 1
     │     │  ╰─ Number (0)
-    │     ├─ Pattern ─ Literal (2)
+    │     ├─ Pattern ─ 2
     │     │  ╰─ Number (1)
-    │     ╰─ Pattern ─ Identifier 'n'
+    │     ╰─ Pattern ─ n
+    │        ╰─ Binary (*)
+    │           ├─ Variable (n)
+    │           ╰─ Number (5)
+  "};
+  assert_eq!(ast, expected);
+
+  let ast = parse_to_string(indoc! {"
+    match x
+      | 0..1 -> 1
+      | n -> n * 5
+  "});
+  let expected = indoc! {"
+    ├─ Match
+    │  ├─ Variable (x)
+    │  ╰─ Cases:
+    │     ├─ Pattern ─ 0 .. 1
+    │     │  ╰─ Number (1)
+    │     ╰─ Pattern ─ n
     │        ╰─ Binary (*)
     │           ├─ Variable (n)
     │           ╰─ Number (5)
@@ -351,6 +369,13 @@ fn match_missing_parts() {
   assert!(parse("match 3 | 1 -> 3, 2 -> 4", &allocator).is_err());
   assert!(parse("match 3 | 1 -> 3\n 2 -> 4", &allocator).is_err());
   assert!(parse("match 3 | 1,", &allocator).is_err());
+  assert!(parse("match true | .. -> 2", &allocator).is_err());
+
+  assert!(parse("match true | 1 -> 2", &allocator).is_ok());
+  assert!(parse("match 4 + 5 | ..9 -> 2", &allocator).is_ok());
+  assert!(parse("match 4 + 5 | ..'z' -> 2", &allocator).is_ok());
+  assert!(parse("match char | 'a'..'z' -> true | _ -> false", &allocator).is_ok());
+  assert!(parse("match false | 1.. -> 2", &allocator).is_ok());
 }
 
 #[test]

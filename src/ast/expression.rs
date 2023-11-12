@@ -126,14 +126,20 @@ pub struct Match<'source, 'ast> {
 }
 #[derive(Debug)]
 pub struct MatchCase<'source, 'ast> {
-  pub pattern: Pattern<'source>,
+  pub pattern: Pattern<'source, 'ast>,
   pub expression: Expression<'source, 'ast>,
   pub span: Span,
 }
 #[derive(Debug)]
-pub enum Pattern<'source> {
+pub enum Pattern<'source, 'ast> {
   Identifier(Variable<'source>),
   Literal(Literal<'source>),
+  Range(Box<'ast, PatternRange<'source, 'ast>>),
+}
+#[derive(Debug)]
+pub struct PatternRange<'source, 'ast> {
+  pub start: Option<Pattern<'source, 'ast>>,
+  pub end: Option<Pattern<'source, 'ast>>,
 }
 
 #[derive(Debug)]
@@ -285,11 +291,21 @@ impl GetSpan for MatchCase<'_, '_> {
     self.span
   }
 }
-impl GetSpan for Pattern<'_> {
+impl GetSpan for Pattern<'_, '_> {
   fn span(&self) -> Span {
     match self {
       Pattern::Identifier(x) => x.span(),
       Pattern::Literal(x) => x.span(),
+      Pattern::Range(x) => x.span(),
+    }
+  }
+}
+impl GetSpan for PatternRange<'_, '_> {
+  fn span(&self) -> Span {
+    match (&self.start, &self.end) {
+      (None, None) => unreachable!("range must have either start or end"),
+      (None, Some(x)) | (Some(x), None) => x.span(),
+      (Some(start), Some(end)) => start.span().merge(end.span()),
     }
   }
 }
