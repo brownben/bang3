@@ -1,144 +1,6 @@
 use crate::ast::Span;
 use std::{fmt, iter};
 
-/// The type of a token
-#[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
-pub enum TokenKind {
-  // Brackets
-  LeftParen,
-  RightParen,
-  LeftCurly,
-  RightCurly,
-
-  // Operators
-  Minus,
-  Plus,
-  Slash,
-  Star,
-  Percent,
-  Bang,
-  And,
-  Or,
-
-  // Functions
-  RightRight,
-  FatRightArrow,
-
-  // Comparators
-  BangEqual,
-  Equal,
-  EqualEqual,
-  Greater,
-  GreaterEqual,
-  Less,
-  LessEqual,
-
-  // Values
-  Identifier,
-  Number,
-  String,
-
-  // Keywords
-  Else,
-  False,
-  If,
-  Let,
-  Match,
-  True,
-
-  // Pattern
-  Pipe,
-  RightArrow,
-  DotDot,
-
-  // Whitespace + Comments
-  Comment,
-  EndOfLine,
-  EndOfFile,
-
-  // Error
-  #[default]
-  Unknown,
-  UnterminatedString,
-}
-impl fmt::Display for TokenKind {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      // Brackets
-      Self::LeftParen => write!(f, "("),
-      Self::RightParen => write!(f, ")"),
-      Self::LeftCurly => write!(f, "{{"),
-      Self::RightCurly => write!(f, "}}"),
-
-      // Operators
-      Self::Minus => write!(f, "-"),
-      Self::Plus => write!(f, "+"),
-      Self::Slash => write!(f, "/"),
-      Self::Star => write!(f, "*"),
-      Self::Percent => write!(f, "%"),
-      Self::Bang => write!(f, "!"),
-      Self::Or => write!(f, "or"),
-      Self::And => write!(f, "and"),
-
-      // Functions
-      Self::RightRight => write!(f, ">>"),
-      Self::FatRightArrow => write!(f, "=>"),
-
-      // Equalities
-      Self::BangEqual => write!(f, "!="),
-      Self::Equal => write!(f, "="),
-      Self::EqualEqual => write!(f, "=="),
-      Self::Greater => write!(f, ">"),
-      Self::GreaterEqual => write!(f, ">="),
-      Self::Less => write!(f, "<"),
-      Self::LessEqual => write!(f, "<="),
-
-      // With Values
-      Self::Identifier => write!(f, "Identifier"),
-      Self::Number => write!(f, "Number"),
-      Self::String => write!(f, "String"),
-
-      // Keywords
-      Self::Else => write!(f, "else"),
-      Self::False => write!(f, "false"),
-      Self::If => write!(f, "if"),
-      Self::Let => write!(f, "let"),
-      Self::Match => write!(f, "match"),
-      Self::True => write!(f, "true"),
-
-      // Pattern
-      Self::Pipe => write!(f, "|"),
-      Self::RightArrow => write!(f, "->"),
-      Self::DotDot => write!(f, ".."),
-
-      // Whitespace + Comments
-      Self::Comment => write!(f, "Comment"),
-      Self::EndOfLine => write!(f, "New Line"),
-      Self::EndOfFile => write!(f, "End of File"),
-
-      // Errors
-      Self::Unknown => write!(f, "Unknown Character"),
-      Self::UnterminatedString => write!(f, "Unterminated String"),
-    }
-  }
-}
-
-/// A token of source code, indicating it's type and location
-#[derive(Clone, Copy, Debug, Default)]
-pub struct Token {
-  pub kind: TokenKind,
-  pub start: u32,
-  pub length: u16,
-}
-impl From<Token> for Span {
-  fn from(token: Token) -> Self {
-    Self {
-      start: token.start,
-      end: token.start + u32::from(token.length),
-    }
-  }
-}
-
 /// Gets tokens from a string of source code. Is an `Iterator` of `Token`s
 pub struct Tokeniser<'source> {
   source: &'source [u8],
@@ -156,8 +18,6 @@ impl<'source> From<&'source str> for Tokeniser<'source> {
     }
   }
 }
-
-type TokenLength = usize;
 impl<'source> Tokeniser<'source> {
   fn is_end(&self, position: usize) -> bool {
     position >= self.source.len()
@@ -316,7 +176,6 @@ impl<'source> Tokeniser<'source> {
     &self.source[self.position..end] == keyword.as_bytes()
   }
 }
-
 impl Iterator for Tokeniser<'_> {
   type Item = Token;
 
@@ -339,3 +198,143 @@ impl Iterator for Tokeniser<'_> {
   }
 }
 impl iter::FusedIterator for Tokeniser<'_> {}
+
+/// A token of source code, indicating it's type and location
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Token {
+  pub kind: TokenKind,
+  pub start: u32,
+  pub length: u16,
+}
+impl From<Token> for Span {
+  fn from(token: Token) -> Self {
+    Self {
+      start: token.start,
+      end: token.start + u32::from(token.length),
+    }
+  }
+}
+
+type TokenLength = usize;
+
+/// The type of a token
+#[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
+pub enum TokenKind {
+  // Brackets
+  LeftParen,
+  RightParen,
+  LeftCurly,
+  RightCurly,
+
+  // Operators
+  Minus,
+  Plus,
+  Slash,
+  Star,
+  Percent,
+  Bang,
+  And,
+  Or,
+
+  // Functions
+  RightRight,
+  FatRightArrow,
+
+  // Comparators
+  BangEqual,
+  Equal,
+  EqualEqual,
+  Greater,
+  GreaterEqual,
+  Less,
+  LessEqual,
+
+  // Values
+  Identifier,
+  Number,
+  String,
+
+  // Keywords
+  Else,
+  False,
+  If,
+  Let,
+  Match,
+  True,
+
+  // Pattern
+  Pipe,
+  RightArrow,
+  DotDot,
+
+  // Whitespace + Comments
+  Comment,
+  EndOfLine,
+  EndOfFile,
+
+  // Error
+  #[default]
+  Unknown,
+  UnterminatedString,
+}
+impl fmt::Display for TokenKind {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      // Brackets
+      Self::LeftParen => write!(f, "("),
+      Self::RightParen => write!(f, ")"),
+      Self::LeftCurly => write!(f, "{{"),
+      Self::RightCurly => write!(f, "}}"),
+
+      // Operators
+      Self::Minus => write!(f, "-"),
+      Self::Plus => write!(f, "+"),
+      Self::Slash => write!(f, "/"),
+      Self::Star => write!(f, "*"),
+      Self::Percent => write!(f, "%"),
+      Self::Bang => write!(f, "!"),
+      Self::Or => write!(f, "or"),
+      Self::And => write!(f, "and"),
+
+      // Functions
+      Self::RightRight => write!(f, ">>"),
+      Self::FatRightArrow => write!(f, "=>"),
+
+      // Equalities
+      Self::BangEqual => write!(f, "!="),
+      Self::Equal => write!(f, "="),
+      Self::EqualEqual => write!(f, "=="),
+      Self::Greater => write!(f, ">"),
+      Self::GreaterEqual => write!(f, ">="),
+      Self::Less => write!(f, "<"),
+      Self::LessEqual => write!(f, "<="),
+
+      // With Values
+      Self::Identifier => write!(f, "Identifier"),
+      Self::Number => write!(f, "Number"),
+      Self::String => write!(f, "String"),
+
+      // Keywords
+      Self::Else => write!(f, "else"),
+      Self::False => write!(f, "false"),
+      Self::If => write!(f, "if"),
+      Self::Let => write!(f, "let"),
+      Self::Match => write!(f, "match"),
+      Self::True => write!(f, "true"),
+
+      // Pattern
+      Self::Pipe => write!(f, "|"),
+      Self::RightArrow => write!(f, "->"),
+      Self::DotDot => write!(f, ".."),
+
+      // Whitespace + Comments
+      Self::Comment => write!(f, "Comment"),
+      Self::EndOfLine => write!(f, "New Line"),
+      Self::EndOfFile => write!(f, "End of File"),
+
+      // Errors
+      Self::Unknown => write!(f, "Unknown Character"),
+      Self::UnterminatedString => write!(f, "Unterminated String"),
+    }
+  }
+}

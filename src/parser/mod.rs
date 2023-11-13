@@ -12,140 +12,6 @@ use crate::{
 use std::{error, fmt, iter};
 use tokeniser::{Token, TokenKind, Tokeniser};
 
-/// An error from parsing the source code
-#[derive(Clone, Copy, Debug)]
-pub enum ParseError {
-  /// Expected a token of a certain kind
-  Expected {
-    /// Expected Token Kind to be
-    expected: TokenKind,
-    /// Recieved this Token instead
-    recieved: Token,
-  },
-  /// Expected Expression
-  ExpectedExpression(Token),
-  /// Expected Pattern
-  ExpectedPattern(Token),
-  /// Expected End of a Range Pattern
-  ExpectedPatternRangeEnd(Token),
-  /// Unknown Character
-  UnknownCharacter(Token),
-  /// Unterminated String Literal
-  UnterminatedString(Token),
-}
-impl ParseError {
-  /// The title of the error message
-  #[must_use]
-  pub fn title(&self) -> String {
-    match self {
-      Self::Expected { expected, .. } => format!("Expected {expected}"),
-      Self::ExpectedExpression(_) => "Expected Expression".into(),
-      Self::ExpectedPattern(_) => "Expected Pattern".into(),
-      Self::ExpectedPatternRangeEnd(_) => "Expected End of Pattern Range".into(),
-      Self::UnknownCharacter(_) => "Unknown Character".into(),
-      Self::UnterminatedString(_) => "Unterminated String".into(),
-    }
-  }
-
-  /// The body of the error message describing what has gone wrong
-  #[must_use]
-  pub fn message(&self) -> String {
-    match self {
-      Self::Expected { expected, recieved } => {
-        format!("expected {expected} but got {}", recieved.kind)
-      }
-      Self::ExpectedExpression(t) => {
-        format!("expected expression but got {}", t.kind)
-      }
-      Self::ExpectedPattern(t) => {
-        format!("expected pattern but got {}", t.kind)
-      }
-      Self::ExpectedPatternRangeEnd(t) => {
-        format!("expected end of range pattern but got {}", t.kind)
-      }
-      Self::UnknownCharacter(_) => "got unknown character".into(),
-      Self::UnterminatedString(_) => "missing closing quote for string".into(),
-    }
-  }
-}
-impl GetSpan for ParseError {
-  fn span(&self) -> Span {
-    let token = match self {
-      Self::Expected { recieved, .. } => recieved,
-      Self::ExpectedExpression(token)
-      | Self::ExpectedPattern(token)
-      | Self::ExpectedPatternRangeEnd(token)
-      | Self::UnknownCharacter(token)
-      | Self::UnterminatedString(token) => token,
-    };
-
-    Span::from(*token)
-  }
-}
-impl fmt::Display for ParseError {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", self.message())
-  }
-}
-impl error::Error for ParseError {}
-
-/// The precendence of the different binary operators
-#[derive(Clone, Copy, Debug, PartialOrd, PartialEq, Eq)]
-enum ParsePrecedence {
-  None = 1,
-  Assignment, // =
-  Pipeline,   // >>
-  Or,         // or
-  And,        // and
-  Nullish,    // ??
-  Equality,   // == !=
-  Comparison, // < > <= >=
-  Term,       // + -
-  Factor,     // * /
-  Unary,      // ! -
-  Call,       // () []
-  Primary,
-  Comment,
-}
-impl ParsePrecedence {
-  fn next(self) -> Self {
-    match self {
-      Self::None => Self::Assignment,
-      Self::Assignment => Self::Pipeline,
-      Self::Pipeline => Self::Or,
-      Self::Or => Self::And,
-      Self::And => Self::Nullish,
-      Self::Nullish => Self::Equality,
-      Self::Equality => Self::Comparison,
-      Self::Comparison => Self::Term,
-      Self::Term => Self::Factor,
-      Self::Factor => Self::Unary,
-      Self::Unary => Self::Call,
-      Self::Call | Self::Primary | Self::Comment => Self::Primary,
-    }
-  }
-}
-impl From<TokenKind> for ParsePrecedence {
-  fn from(kind: TokenKind) -> Self {
-    match kind {
-      TokenKind::LeftParen => Self::Call,
-      TokenKind::Plus | TokenKind::Minus => Self::Term,
-      TokenKind::Star | TokenKind::Slash | TokenKind::Percent => Self::Factor,
-      TokenKind::BangEqual | TokenKind::EqualEqual => Self::Equality,
-      TokenKind::Greater | TokenKind::GreaterEqual | TokenKind::Less | TokenKind::LessEqual => {
-        Self::Comparison
-      }
-      TokenKind::Or => Self::Or,
-      TokenKind::And => Self::And,
-      TokenKind::RightRight => Self::Pipeline,
-      TokenKind::Comment => Self::Comment,
-      _ => Self::None,
-    }
-  }
-}
-
-type ParseResult<T> = Result<T, ParseError>;
-
 /// Parse a source code string into an AST
 pub struct Parser<'source, 'ast> {
   allocator: &'ast Allocator,
@@ -692,5 +558,139 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     }
 
     self.allocate_statement(expression)
+  }
+}
+
+/// An error from parsing the source code
+#[derive(Clone, Copy, Debug)]
+pub enum ParseError {
+  /// Expected a token of a certain kind
+  Expected {
+    /// Expected Token Kind to be
+    expected: TokenKind,
+    /// Recieved this Token instead
+    recieved: Token,
+  },
+  /// Expected Expression
+  ExpectedExpression(Token),
+  /// Expected Pattern
+  ExpectedPattern(Token),
+  /// Expected End of a Range Pattern
+  ExpectedPatternRangeEnd(Token),
+  /// Unknown Character
+  UnknownCharacter(Token),
+  /// Unterminated String Literal
+  UnterminatedString(Token),
+}
+impl ParseError {
+  /// The title of the error message
+  #[must_use]
+  pub fn title(&self) -> String {
+    match self {
+      Self::Expected { expected, .. } => format!("Expected {expected}"),
+      Self::ExpectedExpression(_) => "Expected Expression".into(),
+      Self::ExpectedPattern(_) => "Expected Pattern".into(),
+      Self::ExpectedPatternRangeEnd(_) => "Expected End of Pattern Range".into(),
+      Self::UnknownCharacter(_) => "Unknown Character".into(),
+      Self::UnterminatedString(_) => "Unterminated String".into(),
+    }
+  }
+
+  /// The body of the error message describing what has gone wrong
+  #[must_use]
+  pub fn message(&self) -> String {
+    match self {
+      Self::Expected { expected, recieved } => {
+        format!("expected {expected} but got {}", recieved.kind)
+      }
+      Self::ExpectedExpression(t) => {
+        format!("expected expression but got {}", t.kind)
+      }
+      Self::ExpectedPattern(t) => {
+        format!("expected pattern but got {}", t.kind)
+      }
+      Self::ExpectedPatternRangeEnd(t) => {
+        format!("expected end of range pattern but got {}", t.kind)
+      }
+      Self::UnknownCharacter(_) => "got unknown character".into(),
+      Self::UnterminatedString(_) => "missing closing quote for string".into(),
+    }
+  }
+}
+impl GetSpan for ParseError {
+  fn span(&self) -> Span {
+    let token = match self {
+      Self::Expected { recieved, .. } => recieved,
+      Self::ExpectedExpression(token)
+      | Self::ExpectedPattern(token)
+      | Self::ExpectedPatternRangeEnd(token)
+      | Self::UnknownCharacter(token)
+      | Self::UnterminatedString(token) => token,
+    };
+
+    Span::from(*token)
+  }
+}
+impl fmt::Display for ParseError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.message())
+  }
+}
+impl error::Error for ParseError {}
+
+type ParseResult<T> = Result<T, ParseError>;
+
+/// The precendence of the different binary operators
+#[derive(Clone, Copy, Debug, PartialOrd, PartialEq, Eq)]
+enum ParsePrecedence {
+  None = 1,
+  Assignment, // =
+  Pipeline,   // >>
+  Or,         // or
+  And,        // and
+  Nullish,    // ??
+  Equality,   // == !=
+  Comparison, // < > <= >=
+  Term,       // + -
+  Factor,     // * /
+  Unary,      // ! -
+  Call,       // () []
+  Primary,
+  Comment,
+}
+impl ParsePrecedence {
+  fn next(self) -> Self {
+    match self {
+      Self::None => Self::Assignment,
+      Self::Assignment => Self::Pipeline,
+      Self::Pipeline => Self::Or,
+      Self::Or => Self::And,
+      Self::And => Self::Nullish,
+      Self::Nullish => Self::Equality,
+      Self::Equality => Self::Comparison,
+      Self::Comparison => Self::Term,
+      Self::Term => Self::Factor,
+      Self::Factor => Self::Unary,
+      Self::Unary => Self::Call,
+      Self::Call | Self::Primary | Self::Comment => Self::Primary,
+    }
+  }
+}
+impl From<TokenKind> for ParsePrecedence {
+  fn from(kind: TokenKind) -> Self {
+    match kind {
+      TokenKind::LeftParen => Self::Call,
+      TokenKind::Plus | TokenKind::Minus => Self::Term,
+      TokenKind::Star | TokenKind::Slash | TokenKind::Percent => Self::Factor,
+      TokenKind::BangEqual | TokenKind::EqualEqual => Self::Equality,
+      TokenKind::Greater | TokenKind::GreaterEqual | TokenKind::Less | TokenKind::LessEqual => {
+        Self::Comparison
+      }
+      TokenKind::Or => Self::Or,
+      TokenKind::And => Self::And,
+      TokenKind::RightRight => Self::Pipeline,
+      TokenKind::Comment => Self::Comment,
+      _ => Self::None,
+    }
   }
 }

@@ -10,14 +10,6 @@ mod test;
 use crate::ast::{Expression, GetSpan, Span, Statement, Visitor, AST};
 use std::{error, fmt};
 
-trait LintRule {
-  fn name(&self) -> &'static str;
-  fn message(&self) -> &'static str;
-
-  fn visit_expression(&self, _: &mut Context, _: &Expression) {}
-  fn visit_statement(&self, _: &mut Context, _: &Statement) {}
-}
-
 #[derive(Debug, Default)]
 pub struct Linter {
   context: Context,
@@ -47,6 +39,14 @@ impl Visitor for Linter {
       rule.visit_statement(&mut self.context, statement);
     }
   }
+}
+
+trait LintRule {
+  fn name(&self) -> &'static str;
+  fn message(&self) -> &'static str;
+
+  fn visit_expression(&self, _: &mut Context, _: &Expression) {}
+  fn visit_statement(&self, _: &mut Context, _: &Statement) {}
 }
 
 #[derive(Debug, Default)]
