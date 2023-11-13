@@ -1,16 +1,19 @@
-pub mod expression;
-pub use expression::Expression;
+pub(crate) mod expression;
+pub(crate) use expression::Expression;
+
+mod lines;
+pub use lines::LineIndex;
 
 mod prettyprint;
 
 mod span;
 pub use span::{GetSpan, Span};
 
-pub mod statement;
-pub use statement::Statement;
+pub(crate) mod statement;
+pub(crate) use statement::Statement;
 
 mod visitor;
-pub use visitor::Visitor;
+pub(crate) use visitor::Visitor;
 
 use crate::allocator::Vec;
 pub struct AST<'source, 'allocator> {

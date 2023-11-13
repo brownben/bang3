@@ -1,7 +1,7 @@
 #![feature(let_chains)]
 
 mod allocator;
-mod ast;
+pub mod ast;
 mod linter;
 mod parser;
 
