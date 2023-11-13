@@ -1,3 +1,6 @@
+//! # Parser
+//! Parse source code into an AST
+
 #[cfg(test)]
 mod test;
 mod tokeniser;
@@ -9,19 +12,30 @@ use crate::{
 use std::{error, fmt, iter};
 use tokeniser::{Token, TokenKind, Tokeniser};
 
-#[derive(Clone, Debug)]
+/// An error from parsing the source code
+#[derive(Clone, Copy, Debug)]
 pub enum ParseError {
+  /// Expected a token of a certain kind
   Expected {
+    /// Expected Token Kind to be
     expected: TokenKind,
+    /// Recieved this Token instead
     recieved: Token,
   },
+  /// Expected Expression
   ExpectedExpression(Token),
+  /// Expected Pattern
   ExpectedPattern(Token),
+  /// Expected End of a Range Pattern
   ExpectedPatternRangeEnd(Token),
+  /// Unknown Character
   UnknownCharacter(Token),
+  /// Unterminated String Literal
   UnterminatedString(Token),
 }
 impl ParseError {
+  /// The title of the error message
+  #[must_use]
   pub fn title(&self) -> String {
     match self {
       Self::Expected { expected, .. } => format!("Expected {expected}"),
@@ -33,6 +47,8 @@ impl ParseError {
     }
   }
 
+  /// The body of the error message describing what has gone wrong
+  #[must_use]
   pub fn message(&self) -> String {
     match self {
       Self::Expected { expected, recieved } => {
@@ -55,12 +71,12 @@ impl ParseError {
 impl GetSpan for ParseError {
   fn span(&self) -> Span {
     let token = match self {
-      ParseError::Expected { recieved, .. } => recieved,
-      ParseError::ExpectedExpression(token)
-      | ParseError::ExpectedPattern(token)
-      | ParseError::ExpectedPatternRangeEnd(token)
-      | ParseError::UnknownCharacter(token)
-      | ParseError::UnterminatedString(token) => token,
+      Self::Expected { recieved, .. } => recieved,
+      Self::ExpectedExpression(token)
+      | Self::ExpectedPattern(token)
+      | Self::ExpectedPatternRangeEnd(token)
+      | Self::UnknownCharacter(token)
+      | Self::UnterminatedString(token) => token,
     };
 
     Span::from(*token)
@@ -73,6 +89,7 @@ impl fmt::Display for ParseError {
 }
 impl error::Error for ParseError {}
 
+/// The precendence of the different binary operators
 #[derive(Clone, Copy, Debug, PartialOrd, PartialEq, Eq)]
 enum ParsePrecedence {
   None = 1,
@@ -115,8 +132,9 @@ impl From<TokenKind> for ParsePrecedence {
       TokenKind::Plus | TokenKind::Minus => Self::Term,
       TokenKind::Star | TokenKind::Slash | TokenKind::Percent => Self::Factor,
       TokenKind::BangEqual | TokenKind::EqualEqual => Self::Equality,
-      TokenKind::Greater | TokenKind::GreaterEqual => Self::Comparison,
-      TokenKind::Less | TokenKind::LessEqual => Self::Comparison,
+      TokenKind::Greater | TokenKind::GreaterEqual | TokenKind::Less | TokenKind::LessEqual => {
+        Self::Comparison
+      }
       TokenKind::Or => Self::Or,
       TokenKind::And => Self::And,
       TokenKind::RightRight => Self::Pipeline,
@@ -128,6 +146,7 @@ impl From<TokenKind> for ParsePrecedence {
 
 type ParseResult<T> = Result<T, ParseError>;
 
+/// Parse a source code string into an AST
 pub struct Parser<'source, 'ast> {
   allocator: &'ast Allocator,
 
@@ -137,6 +156,12 @@ pub struct Parser<'source, 'ast> {
   skipped_newline: bool,
 }
 impl<'s, 'ast> Parser<'s, 'ast> {
+  /// Creates a new parser
+  ///
+  /// For given source code string, and allocator to place the AST in
+  ///
+  /// # Panics
+  /// If the source string length is greater than `u32::MAX`
   pub fn new(source: &'s str, allocator: &'ast Allocator) -> Self {
     Self {
       allocator,
@@ -148,6 +173,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     }
   }
 
+  /// Parse the source code into an AST
   pub fn parse(mut self) -> ParseResult<AST<'s, 'ast>> {
     let mut statements = Vec::new_in(self.allocator);
     while !self.is_finished() {
@@ -238,6 +264,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     }
   }
 
+  #[allow(clippy::unnecessary_wraps, reason = "is always wrapped at call site")]
   fn allocate_expression<T>(&mut self, x: T) -> ParseResult<Expression<'s, 'ast>>
   where
     T: 'ast,
@@ -246,6 +273,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     Ok(Box::new_in(x, self.allocator).into())
   }
 
+  #[allow(clippy::unnecessary_wraps, reason = "is always wrapped at call site")]
   fn allocate_statement<T>(&mut self, x: T) -> ParseResult<Statement<'s, 'ast>>
   where
     T: 'ast,
@@ -476,7 +504,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
   fn literal(&mut self, token: Token) -> ParseResult<Expression<'s, 'ast>> {
     let literal = match token.kind {
-      TokenKind::True | TokenKind::False => self.literal_boolean(token),
+      TokenKind::True | TokenKind::False => Self::literal_boolean(token),
       TokenKind::Number => self.literal_number(token),
       TokenKind::String => self.literal_string(token),
       _ => unreachable!("only literal tokens are passed"),
@@ -485,7 +513,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     self.allocate_expression(literal)
   }
 
-  fn literal_boolean(&mut self, token: Token) -> Literal<'s> {
+  fn literal_boolean(token: Token) -> Literal<'s> {
     let span = Span::from(token);
     let kind = match token.kind {
       TokenKind::True => LiteralKind::Boolean(true),
@@ -558,8 +586,9 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     let pattern = match token.kind {
       TokenKind::String => Pattern::Literal(self.literal_string(token)),
       TokenKind::Number => Pattern::Literal(self.literal_number(token)),
-      TokenKind::True => return Ok(Pattern::Literal(self.literal_boolean(token))),
-      TokenKind::False => return Ok(Pattern::Literal(self.literal_boolean(token))),
+      TokenKind::True | TokenKind::False => {
+        return Ok(Pattern::Literal(Self::literal_boolean(token)))
+      }
       TokenKind::Identifier => return Ok(Pattern::Identifier(self.variable(token))),
       TokenKind::DotDot => return self.pattern_range(None, true),
       _ => return Err(ParseError::ExpectedPattern(token)),

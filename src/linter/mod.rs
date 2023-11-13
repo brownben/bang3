@@ -1,3 +1,6 @@
+//! # Linter
+//! Static analysis to find possible problems in an AST
+
 mod helpers;
 mod rules;
 
@@ -60,10 +63,14 @@ impl Context {
   }
 }
 
-#[derive(Debug)]
+/// A diagnostic warning found by the linter
+#[derive(Clone, Copy, Debug)]
 pub struct LintDiagnostic {
+  /// The name of the lint rule which triggered this diagnostic
   pub title: &'static str,
+  /// The help message of the lint rule
   pub message: &'static str,
+  /// The span of the source code which triggered this diagnostic
   pub span: Span,
 }
 impl GetSpan for LintDiagnostic {

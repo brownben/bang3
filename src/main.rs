@@ -88,14 +88,14 @@ mod helpers {
   }
   pub struct Message {
     title: String,
-    message: String,
+    body: String,
     severity: Severity,
   }
   impl Message {
     pub fn error(message: &str) -> Self {
       Self {
         title: message.to_owned(),
-        message: String::new(),
+        body: String::new(),
         severity: Severity::Error,
       }
     }
@@ -108,8 +108,8 @@ mod helpers {
       }?;
       writeln!(f, "{} {}", ":".bold(), &self.title.bold())?;
 
-      if !self.message.is_empty() {
-        writeln!(f, "{}", &self.message)?;
+      if !self.body.is_empty() {
+        writeln!(f, "{}", &self.body)?;
       }
 
       Ok(())
@@ -119,7 +119,7 @@ mod helpers {
     fn from(error: &ParseError) -> Self {
       Self {
         title: error.title(),
-        message: error.message(),
+        body: error.message(),
         severity: Severity::Error,
       }
     }
@@ -128,7 +128,7 @@ mod helpers {
     fn from(error: &LintDiagnostic) -> Self {
       Self {
         title: error.title.to_owned(),
-        message: error.message.to_owned(),
+        body: error.message.to_owned(),
         severity: Severity::Warning,
       }
     }
@@ -170,9 +170,16 @@ mod helpers {
   pub fn read_file(filename: &str) -> Result<String, ()> {
     match fs::read_to_string(filename) {
       Ok(file) if !file.is_empty() => Ok(file),
-      Ok(_) => {
-        eprintln!("{}", Message::error("File is empty"));
-        Err(())
+      Ok(file) => {
+        if file.is_empty() {
+          eprintln!("{}", Message::error("File is empty"));
+          Err(())
+        } else if file.bytes().len() > u32::MAX as usize {
+          eprintln!("{}", Message::error("File too large - max size 4GB"));
+          Err(())
+        } else {
+          Ok(file)
+        }
       }
       Err(_) => {
         eprintln!("{}", Message::error("File not found"));
@@ -186,11 +193,11 @@ mod helpers {
     source: &'s str,
     allocator: &'a Allocator,
   ) -> Result<AST<'s, 'a>, ()> {
-    match bang::parse(&source, allocator) {
+    match bang::parse(source, allocator) {
       Ok(ast) => Ok(ast),
       Err(error) => {
         eprintln!("{}", Message::from(&error));
-        eprintln!("{}", CodeFrame::new(filename, &source, error.span()));
+        eprintln!("{}", CodeFrame::new(filename, source, error.span()));
         Err(())
       }
     }

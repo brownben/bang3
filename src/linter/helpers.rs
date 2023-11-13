@@ -1,3 +1,4 @@
+//! Helpers to simplify the definitions of lint rules
 use crate::ast::{expression::*, statement::*};
 
 impl Expression<'_, '_> {

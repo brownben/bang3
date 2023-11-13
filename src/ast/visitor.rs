@@ -1,5 +1,6 @@
 use super::{expression::*, statement::*};
 
+/// Traverse the AST, visiting all nodes
 pub trait Visitor {
   fn enter_expression(&mut self, _: &Expression) {}
   fn exit_expression(&mut self, _: &Expression) {}

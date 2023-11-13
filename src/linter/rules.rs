@@ -1,3 +1,4 @@
+//! Definitions of the lint rules
 use super::{
   helpers::{ASTEquality, IsConstant},
   Context, LintRule,

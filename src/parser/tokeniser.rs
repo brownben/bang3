@@ -1,6 +1,7 @@
 use crate::ast::Span;
 use std::{fmt, iter};
 
+/// The type of a token
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
 pub enum TokenKind {
   // Brackets
@@ -122,6 +123,7 @@ impl fmt::Display for TokenKind {
   }
 }
 
+/// A token of source code, indicating it's type and location
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Token {
   pub kind: TokenKind,
@@ -132,11 +134,12 @@ impl From<Token> for Span {
   fn from(token: Token) -> Self {
     Self {
       start: token.start,
-      end: token.start + token.length as u32,
+      end: token.start + u32::from(token.length),
     }
   }
 }
 
+/// Gets tokens from a string of source code. Is an `Iterator` of `Token`s
 pub struct Tokeniser<'source> {
   source: &'source [u8],
   position: usize,
@@ -144,6 +147,8 @@ pub struct Tokeniser<'source> {
 }
 impl<'source> From<&'source str> for Tokeniser<'source> {
   fn from(value: &'source str) -> Self {
+    assert!(value.len() < u32::MAX as usize);
+
     Self {
       source: value.as_ref(),
       position: 0,
@@ -326,8 +331,10 @@ impl Iterator for Tokeniser<'_> {
 
     Some(Token {
       kind,
+
+      #[allow(clippy::cast_possible_truncation, reason = "source.len() < u32::MAX")]
       start: start as u32,
-      length: (self.position - start) as u16,
+      length: u16::try_from(self.position - start).unwrap(),
     })
   }
 }
