@@ -21,24 +21,54 @@ pub enum ParseError {
   UnknownCharacter(Token),
   UnterminatedString(Token),
 }
-impl fmt::Display for ParseError {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl ParseError {
+  pub fn title(&self) -> String {
+    match self {
+      Self::Expected { expected, .. } => format!("Expected {expected}"),
+      Self::ExpectedExpression(_) => "Expected Expression".into(),
+      Self::ExpectedPattern(_) => "Expected Pattern".into(),
+      Self::ExpectedPatternRangeEnd(_) => "Expected End of Pattern Range".into(),
+      Self::UnknownCharacter(_) => "Unknown Character".into(),
+      Self::UnterminatedString(_) => "Unterminated String".into(),
+    }
+  }
+
+  pub fn message(&self) -> String {
     match self {
       Self::Expected { expected, recieved } => {
-        write!(f, "expected {expected} but got {}", recieved.kind)
+        format!("expected {expected} but got {}", recieved.kind)
       }
       Self::ExpectedExpression(t) => {
-        write!(f, "expected expression but got {}", t.kind)
+        format!("expected expression but got {}", t.kind)
       }
       Self::ExpectedPattern(t) => {
-        write!(f, "expected pattern but got {}", t.kind)
+        format!("expected pattern but got {}", t.kind)
       }
       Self::ExpectedPatternRangeEnd(t) => {
-        write!(f, "expected end of pattern range but got {}", t.kind)
+        format!("expected end of range pattern but got {}", t.kind)
       }
-      Self::UnknownCharacter(_) => write!(f, "got unknown character"),
-      Self::UnterminatedString(_) => write!(f, "unterminated string"),
+      Self::UnknownCharacter(_) => "got unknown character".into(),
+      Self::UnterminatedString(_) => "missing closing quote for string".into(),
     }
+  }
+}
+impl GetSpan for ParseError {
+  fn span(&self) -> Span {
+    let token = match self {
+      ParseError::Expected { recieved, .. } => recieved,
+      ParseError::ExpectedExpression(token)
+      | ParseError::ExpectedPattern(token)
+      | ParseError::ExpectedPatternRangeEnd(token)
+      | ParseError::UnknownCharacter(token)
+      | ParseError::UnterminatedString(token) => token,
+    };
+
+    Span::from(*token)
+  }
+}
+impl fmt::Display for ParseError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.message())
   }
 }
 impl error::Error for ParseError {}

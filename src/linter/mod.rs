@@ -4,7 +4,8 @@ mod rules;
 #[cfg(test)]
 mod test;
 
-use crate::ast::{Expression, Span, Statement, Visitor, AST};
+use crate::ast::{Expression, GetSpan, Span, Statement, Visitor, AST};
+use std::{error, fmt};
 
 trait LintRule {
   fn name(&self) -> &'static str;
@@ -23,7 +24,7 @@ impl Linter {
     Self::default()
   }
 
-  pub fn check(mut self, ast: &AST) -> Vec<Diagnostic> {
+  pub fn check(mut self, ast: &AST) -> Vec<LintDiagnostic> {
     for statement in &ast.statements {
       self.visit_statement(statement);
     }
@@ -45,23 +46,34 @@ impl Visitor for Linter {
   }
 }
 
-#[derive(Debug)]
-pub struct Diagnostic {
-  pub title: &'static str,
-  pub message: &'static str,
-  pub span: Span,
-}
-
 #[derive(Debug, Default)]
 struct Context {
-  diagnostics: Vec<Diagnostic>,
+  diagnostics: Vec<LintDiagnostic>,
 }
 impl Context {
   fn add_diagnostic(&mut self, rule: &'static dyn LintRule, span: Span) {
-    self.diagnostics.push(Diagnostic {
+    self.diagnostics.push(LintDiagnostic {
       title: rule.name(),
       message: rule.message(),
       span,
     });
   }
 }
+
+#[derive(Debug)]
+pub struct LintDiagnostic {
+  pub title: &'static str,
+  pub message: &'static str,
+  pub span: Span,
+}
+impl GetSpan for LintDiagnostic {
+  fn span(&self) -> Span {
+    self.span
+  }
+}
+impl fmt::Display for LintDiagnostic {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}: {}", self.title, self.message)
+  }
+}
+impl error::Error for LintDiagnostic {}

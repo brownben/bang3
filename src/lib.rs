@@ -7,7 +7,7 @@ mod parser;
 
 pub use allocator::Allocator;
 pub use ast::AST;
-pub use linter::Diagnostic;
+pub use linter::LintDiagnostic;
 pub use parser::ParseError;
 
 pub fn parse<'source, 'ast>(
@@ -18,6 +18,6 @@ pub fn parse<'source, 'ast>(
 }
 
 #[must_use]
-pub fn lint(ast: &AST) -> Vec<Diagnostic> {
+pub fn lint(ast: &AST) -> Vec<LintDiagnostic> {
   linter::Linter::new().check(ast)
 }

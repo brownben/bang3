@@ -18,7 +18,7 @@ impl LintRule for NoConstantConditions {
     "No Constant Conditions"
   }
   fn message(&self) -> &'static str {
-    "The control flow could be removed, as the condition is always true or false"
+    "the control flow could be removed, as the condition is always true or false"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression) {
     if let Expression::If(if_) = &expression
@@ -41,7 +41,7 @@ impl LintRule for NoNegativeZero {
     "No Negative Zero"
   }
   fn message(&self) -> &'static str {
-    "Negative zero is unnecessary as 0 == -0"
+    "negative zero is unnecessary as 0 == -0"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression) {
     if let Expression::Unary(unary) = &expression
@@ -61,7 +61,7 @@ impl LintRule for NoSelfAssign {
     "No Self Assign"
   }
   fn message(&self) -> &'static str {
-    "Assigning a variable to itself is unnecessary"
+    "assigning a variable to itself is unnecessary"
   }
   fn visit_statement(&self, context: &mut Context, expression: &Statement) {
     if let Statement::Let(let_) = &expression
@@ -79,7 +79,7 @@ impl LintRule for NoSelfComparison {
     "No Self Comparison"
   }
   fn message(&self) -> &'static str {
-    "Comparing a variable to itself is unnecessary"
+    "comparing a variable to itself is unnecessary"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression) {
     fn is_comparison(operator: BinaryOperator) -> bool {
@@ -109,7 +109,7 @@ impl LintRule for NoYodaComparison {
     "No Yoda Equality"
   }
   fn message(&self) -> &'static str {
-    "It is clearer to have the variable first then the value to compare to"
+    "it is clearer to have the variable first then the value to compare to"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression) {
     if let Expression::Binary(binary) = &expression

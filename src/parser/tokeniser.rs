@@ -116,7 +116,7 @@ impl fmt::Display for TokenKind {
       Self::EndOfFile => write!(f, "End of File"),
 
       // Errors
-      Self::Unknown => write!(f, "Unknown"),
+      Self::Unknown => write!(f, "Unknown Character"),
       Self::UnterminatedString => write!(f, "Unterminated String"),
     }
   }
