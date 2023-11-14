@@ -5,11 +5,13 @@ use super::{
 };
 use crate::ast::{expression::*, statement::*, GetSpan};
 
-pub const RULES: [&dyn LintRule; 5] = [
+pub const RULES: [&dyn LintRule; 7] = [
   &NoConstantConditions,
   &NoNegativeZero,
   &NoSelfAssign,
   &NoSelfComparison,
+  &NoTodoComments,
+  &NoUselessMatch,
   &NoYodaComparison,
 ];
 
@@ -100,6 +102,48 @@ impl LintRule for NoSelfComparison {
       && binary.left.equals(&binary.right)
     {
       context.add_diagnostic(&Self, binary.span());
+    }
+  }
+}
+
+pub struct NoTodoComments;
+impl LintRule for NoTodoComments {
+  fn name(&self) -> &'static str {
+    "No TODO Comments"
+  }
+  fn message(&self) -> &'static str {
+    "line contains TODO, consider resolving the issue"
+  }
+  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+    if let Expression::Comment(comment) = &expression
+      && comment.text.trim().starts_with("TODO:")
+    {
+      context.add_diagnostic(&Self, comment.span());
+    }
+  }
+  fn visit_statement(&self, context: &mut Context, statement: &Statement) {
+    if let Statement::Comment(comment) = &statement
+      && comment.text.trim().starts_with("TODO:")
+    {
+      context.add_diagnostic(&Self, comment.span());
+    }
+  }
+}
+
+pub struct NoUselessMatch;
+impl LintRule for NoUselessMatch {
+  fn name(&self) -> &'static str {
+    "No Useless Match"
+  }
+  fn message(&self) -> &'static str {
+    "match statement is unnecessary as it only has one case which matches everything"
+  }
+  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+    if let Expression::Match(match_) = &expression
+      && match_.cases.len() == 1
+      && let Pattern::Identifier(_) = match_.cases[0].pattern
+    {
+      context.add_diagnostic(&Self, match_.span());
     }
   }
 }

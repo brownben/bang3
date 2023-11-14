@@ -57,6 +57,28 @@ fn no_self_comparison() {
 }
 
 #[test]
+fn no_todo_comment() {
+  assert!(lint("7 != x // TODO: stuff").is_err());
+  assert!(lint("7 // TODO: stuff").is_err());
+  assert!(lint("// TODO: jkfal").is_err());
+
+  assert!(lint("// still todo").is_ok());
+  assert!(lint("// ToDo: ").is_ok());
+  assert!(lint("// Yet TODO: ").is_ok());
+  assert!(lint("// TOD0: 2").is_ok());
+}
+
+#[test]
+fn no_useless_match() {
+  assert!(lint("match n | _ -> 3").is_err());
+  assert!(lint("match x\n | x -> 3").is_err());
+  assert!(lint("match x\n | pattern -> 3").is_err());
+
+  assert!(lint("match n | 3 -> 3").is_ok());
+  assert!(lint("match n | true -> 3 | false -> 4").is_ok());
+}
+
+#[test]
 fn no_yoda_comparison() {
   assert!(lint("7 != x").is_err());
   assert!(lint("7 == x").is_err());
