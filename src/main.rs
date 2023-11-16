@@ -1,3 +1,6 @@
+//! # Bang - My Language
+// CLI to access the language, and associated tools like the linter and formatter.
+
 use clap::{Parser, Subcommand};
 use std::process;
 

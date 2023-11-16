@@ -2,8 +2,6 @@
 
 #![feature(let_chains)]
 #![feature(lint_reasons)]
-#![warn(clippy::pedantic, missing_docs)]
-#![allow(clippy::wildcard_imports)]
 
 mod allocator;
 pub mod ast;

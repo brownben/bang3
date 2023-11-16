@@ -17,3 +17,8 @@ codegen-units = 1
 lto = "fat"
 strip = true
 panic = "abort"
+
+[lints]
+rust.missing_docs = "warn"
+clippy.pedantic = "warn"
+clippy.wildcard_imports = { level = "allow", priority = 1 }
