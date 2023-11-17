@@ -156,7 +156,7 @@ mod helpers {
   }
   impl fmt::Display for CodeFrame<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-      let start_line = self.lines.get_line(self.span);
+      let start_line = self.lines.get_line(self.span).max(1);
       let end_line = self.lines.get_final_line(self.span);
 
       writeln!(f, "    ╭─[{}]", self.title)?;
@@ -164,6 +164,9 @@ mod helpers {
       for line in start_line..=end_line {
         let line_text = self.lines.line_span(line).source_text(self.source);
         write!(f, "{line:>3} │ {line_text}")?;
+        if !line_text.ends_with('\n') {
+          writeln!(f)?;
+        }
       }
 
       write!(f, "────╯")

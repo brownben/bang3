@@ -12,6 +12,7 @@ type LineNumber = usize;
 #[derive(Debug)]
 pub struct LineIndex {
   line_starts: Vec<FilePosition>,
+  file_length: FilePosition,
 }
 impl LineIndex {
   /// Create a new `LineIndex` from a source string.
@@ -19,6 +20,7 @@ impl LineIndex {
   /// # Panics
   ///
   /// Panics if the source string is longer than `u32::MAX` bytes.
+  #[allow(clippy::cast_possible_truncation, reason = "source.len() < u32::MAX")]
   pub fn from_source(source: &str) -> Self {
     assert!(source.len() < u32::MAX as usize);
 
@@ -27,12 +29,14 @@ impl LineIndex {
 
     for (index, character) in source.as_bytes().iter().enumerate() {
       if *character == b'\n' {
-        #[allow(clippy::cast_possible_truncation, reason = "source.len() < u32::MAX")]
         line_starts.push(index as FilePosition + 1);
       }
     }
 
-    Self { line_starts }
+    Self {
+      line_starts,
+      file_length: source.len() as FilePosition,
+    }
   }
 
   /// Get the line number which a `Span` starts on
@@ -57,7 +61,7 @@ impl LineIndex {
   /// Panics if the line number doesn't exist
   pub fn line_span(&self, line: LineNumber) -> Span {
     let start = self.line_starts[line - 1];
-    let end = self.line_starts[line];
+    let end = *self.line_starts.get(line).unwrap_or(&self.file_length);
 
     Span::new(start, end)
   }
