@@ -114,7 +114,7 @@ pub struct Literal<'source> {
 #[derive(Debug, PartialEq)]
 pub enum LiteralKind<'source> {
   Boolean(bool),
-  Number(f64),
+  Number { value: f64, raw: &'source str },
   String(&'source str),
 }
 

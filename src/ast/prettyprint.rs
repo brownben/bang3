@@ -147,7 +147,7 @@ impl PrettyPrint for Literal<'_> {
 
     match self.kind {
       LiteralKind::Boolean(x) => writeln!(f, "{prefix}{connector}Boolean ({x})"),
-      LiteralKind::Number(x) => writeln!(f, "{prefix}{connector}Number ({x})"),
+      LiteralKind::Number { value, .. } => writeln!(f, "{prefix}{connector}Number ({value})"),
       LiteralKind::String(x) => writeln!(f, "{prefix}{connector}String '{x}'"),
     }
   }
@@ -185,7 +185,7 @@ impl PrettyPrint for Pattern<'_, '_> {
       match pattern {
         Pattern::Literal(x) => match x.kind {
           LiteralKind::Boolean(x) => write!(f, "{x}"),
-          LiteralKind::Number(x) => write!(f, "{x}"),
+          LiteralKind::Number { value, .. } => write!(f, "{value}"),
           LiteralKind::String(x) => write!(f, "'{x}'"),
         },
         Pattern::Identifier(x) => write!(f, "{}", x.name),

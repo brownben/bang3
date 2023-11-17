@@ -392,17 +392,17 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
   fn literal_number(&mut self, token: Token) -> Literal<'s> {
     let span = Span::from(token);
-    let number_source = span.source_text(self.source);
+    let raw = span.source_text(self.source);
 
-    let value = if number_source.contains('_') {
-      number_source.replace('_', "").parse()
+    let value = if raw.contains('_') {
+      raw.replace('_', "").parse()
     } else {
-      number_source.parse()
+      raw.parse()
     }
     .expect("string to be valid number representation");
 
     Literal {
-      kind: LiteralKind::Number(value),
+      kind: LiteralKind::Number { value, raw },
       span,
     }
   }

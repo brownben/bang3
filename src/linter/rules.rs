@@ -50,7 +50,7 @@ impl LintRule for NoNegativeZero {
     if let Expression::Unary(unary) = &expression
       && unary.operator == UnaryOperator::Minus
       && let Expression::Literal(literal) = &unary.expression
-      && let LiteralKind::Number(value) = literal.kind
+      && let LiteralKind::Number { value, .. } = literal.kind
       && value == 0.0
     {
       context.add_diagnostic(&Self, unary.span());
