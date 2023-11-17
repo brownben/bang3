@@ -75,26 +75,34 @@ impl PrettyPrint for Block<'_, '_> {
   }
 }
 impl PrettyPrint for Call<'_, '_> {
-  fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, _last: bool) -> fmt::Result {
-    self.expression.pretty(f, prefix, false)?;
+  fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
+    let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
+    writeln!(f, "{prefix}{connector}Call")?;
 
-    writeln!(f, "{prefix}{OTHER_CHILD}{FINAL_ENTRY}Call")?;
+    let prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
     if let Some(argument) = &self.argument {
-      argument.pretty(f, &format!("{prefix}{OTHER_CHILD}{FINAL_CHILD}"), true)?;
+      let child_prefix = format!("{prefix}{OTHER_CHILD}");
+      let final_child_prefix = format!("{prefix}{FINAL_CHILD}");
+
+      writeln!(f, "{prefix}{OTHER_ENTRY}Callee")?;
+      self.expression.pretty(f, &child_prefix, true)?;
+
+      writeln!(f, "{prefix}{FINAL_ENTRY}Argument")?;
+      argument.pretty(f, &final_child_prefix, true)?;
+    } else {
+      self.expression.pretty(f, &prefix, true)?;
     }
 
     Ok(())
   }
 }
 impl PrettyPrint for Comment<'_, '_> {
-  fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, _last: bool) -> fmt::Result {
-    self.expression.pretty(f, prefix, false)?;
+  fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
+    let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
+    writeln!(f, "{prefix}{connector}Comment ({})", self.text.trim())?;
 
-    writeln!(
-      f,
-      "{prefix}{OTHER_CHILD}{FINAL_ENTRY}Comment ({})",
-      self.text.trim()
-    )
+    let new_prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
+    self.expression.pretty(f, &new_prefix, true)
   }
 }
 impl PrettyPrint for Function<'_, '_> {

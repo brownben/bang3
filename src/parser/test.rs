@@ -114,8 +114,8 @@ fn blocks() {
   let ast = parse_to_string("{call()}");
   let expected = indoc! {"
     ├─ Block
-    │  ├─ Variable (call)
-    │  │  ╰─ Call
+    │  ╰─ Call
+    │     ╰─ Variable (call)
   "};
   assert_eq!(ast, expected);
 }
@@ -133,8 +133,10 @@ fn blocks_incompelete() {
 fn call() {
   let ast = parse_to_string("function('hello world')");
   let expected = indoc! {"
-    ├─ Variable (function)
-    │  ╰─ Call
+    ├─ Call
+    │  ├─ Callee
+    │  │  ╰─ Variable (function)
+    │  ╰─ Argument
     │     ╰─ String 'hello world'
   "};
   assert_eq!(ast, expected);
@@ -142,8 +144,10 @@ fn call() {
   let ast = parse_to_string("f ( 7 ) + 5");
   let expected = indoc! {"
     ├─ Binary (+)
-    │  ├─ Variable (f)
-    │  │  ╰─ Call
+    │  ├─ Call
+    │  │  ├─ Callee
+    │  │  │  ╰─ Variable (f)
+    │  │  ╰─ Argument
     │  │     ╰─ Number (7)
     │  ╰─ Number (5)
   "};
@@ -152,8 +156,8 @@ fn call() {
   let ast = parse_to_string("f() + 32.1");
   let expected = indoc! {"
     ├─ Binary (+)
-    │  ├─ Variable (f)
-    │  │  ╰─ Call
+    │  ├─ Call
+    │  │  ╰─ Variable (f)
     │  ╰─ Number (32.1)
   "};
   assert_eq!(ast, expected);
@@ -177,8 +181,8 @@ fn call_missing_brackets() {
 fn comment() {
   let ast = parse_to_string("5 // hello world");
   let expected = indoc! {"
-    ├─ Number (5)
-    │  ╰─ Comment (hello world)
+    ├─ Comment (hello world)
+    │  ╰─ Number (5)
   "};
   assert_eq!(ast, expected);
 }
