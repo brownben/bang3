@@ -366,6 +366,17 @@ fn match_() {
     │           ╰─ Number (5)
   "};
   assert_eq!(ast, expected);
+
+  let ast = parse_to_string("match x | 0 -> 1\n// comment");
+  let expected = indoc! {"
+    ├─ Match
+    │  ├─ Variable (x)
+    │  ╰─ Cases:
+    │     ╰─ Pattern ─ 0
+    │        ╰─ Number (1)
+    ├─ Comment (comment)
+  "};
+  assert_eq!(ast, expected);
 }
 
 #[test]

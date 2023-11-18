@@ -161,6 +161,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
     while let Some(t) = self.tokeniser.peek()
       && precedence < ParsePrecedence::from(t.kind)
+      && !self.skipped_newline
     {
       let token = self.next_token();
       previous = self.infix_expression(previous, token)?;
