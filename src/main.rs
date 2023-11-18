@@ -1,30 +1,56 @@
 //! # Bang - My Language
 // CLI to access the language, and associated tools like the linter and formatter.
 
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use std::process;
 
 #[derive(Parser)]
 #[clap(name = "bang", version)]
 enum App {
-  #[clap(about = "Checks for lint warnings")]
+  /// Formats source files
+  #[clap(alias = "fmt")]
+  Format(FormatOptions),
+
+  /// Checks for lint warnings
   Lint {
-    #[clap(help = "The file to lint")]
+    /// The file to lint
     file: String,
   },
 
-  #[clap(about = "Prints debugging information")]
+  /// Prints debugging information
   Print {
     #[command(subcommand)]
     command: PrintCommand,
   },
 }
 
+#[derive(Args)]
+struct FormatOptions {
+  /// The file to format
+  file: String,
+  /// Preview the results of the formatting
+  #[clap(long)]
+  dryrun: bool,
+  /// Check the file is formatted
+  #[clap(long)]
+  check: bool,
+
+  /// Use single quotes. Defaults to true
+  #[clap(long, default_value_t = true)]
+  config_single_quote: bool,
+  /// Maximum line width
+  #[clap(long, default_value_t = 80)]
+  config_print_width: u16,
+  /// Indentation size (spaces) to use. If 0 uses tabs
+  #[clap(long, default_value_t = 2)]
+  config_indent_size: u8,
+}
+
 #[derive(Subcommand)]
 enum PrintCommand {
-  #[clap(about = "Displays the Abstract Syntax Tree")]
+  /// Displays the Abstract Syntax Tree
   Ast {
-    #[clap(help = "The file to parse")]
+    /// The file to print
     file: String,
   },
 }
@@ -33,6 +59,7 @@ fn main() -> process::ExitCode {
   let args = App::parse();
 
   let result = match args {
+    App::Format(options) => commands::format(&options),
     App::Lint { file } => commands::lint(&file),
     App::Print { command } => match command {
       PrintCommand::Ast { file } => commands::print_ast(&file),
@@ -47,11 +74,42 @@ fn main() -> process::ExitCode {
 
 mod commands {
   use super::helpers::{parse, read_file, CodeFrame, Message};
-  use anstream::println;
-  use bang::Allocator;
+  use super::FormatOptions;
+  use anstream::{eprintln, println};
+  use std::fs;
+
+  pub fn format(options: &FormatOptions) -> Result<(), ()> {
+    let config = bang::FormatterConfig {
+      print_width: options.config_print_width,
+      single_quotes: options.config_single_quote,
+      indentation: options.config_indent_size,
+    };
+
+    let allocator = bang::Allocator::new();
+    let source = read_file(&options.file)?;
+    let ast = parse(&options.file, &source, &allocator)?;
+    let formatted_source = bang::format(&ast, config);
+
+    if options.dryrun {
+      println!("{formatted_source}");
+      return Ok(());
+    }
+
+    if options.check && formatted_source != source {
+      eprintln!("{}", Message::error("File is not formatted"));
+      Err(())?;
+    }
+
+    if formatted_source != source && fs::write(&options.file, formatted_source).is_err() {
+      eprintln!("{}", Message::error("Problem writing to file"));
+      Err(())?;
+    };
+
+    Ok(())
+  }
 
   pub fn lint(filename: &str) -> Result<(), ()> {
-    let allocator = Allocator::new();
+    let allocator = bang::Allocator::new();
     let source = read_file(filename)?;
     let ast = parse(filename, &source, &allocator)?;
     let diagnostics = bang::lint(&ast);
@@ -65,7 +123,7 @@ mod commands {
   }
 
   pub fn print_ast(filename: &str) -> Result<(), ()> {
-    let allocator = Allocator::new();
+    let allocator = bang::Allocator::new();
     let source = read_file(filename)?;
     let ast = parse(filename, &source, &allocator)?;
 

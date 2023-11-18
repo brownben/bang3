@@ -44,24 +44,29 @@ pub enum BinaryOperator {
   Or,
   Pipeline,
 }
+impl BinaryOperator {
+  pub fn as_str(self) -> &'static str {
+    match self {
+      Self::Add => "+",
+      Self::Subtract => "-",
+      Self::Multiply => "*",
+      Self::Divide => "/",
+      Self::Remainder => "%",
+      Self::NotEqual => "!=",
+      Self::Equal => "==",
+      Self::Greater => ">",
+      Self::GreaterEqual => ">=",
+      Self::Less => "<",
+      Self::LessEqual => "<=",
+      Self::And => "and",
+      Self::Or => "or",
+      Self::Pipeline => ">>",
+    }
+  }
+}
 impl fmt::Display for BinaryOperator {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      Self::Add => write!(f, "+"),
-      Self::Subtract => write!(f, "-"),
-      Self::Multiply => write!(f, "*"),
-      Self::Divide => write!(f, "/"),
-      Self::Remainder => write!(f, "%"),
-      Self::NotEqual => write!(f, "!="),
-      Self::Equal => write!(f, "=="),
-      Self::Greater => write!(f, ">"),
-      Self::GreaterEqual => write!(f, ">="),
-      Self::Less => write!(f, "<"),
-      Self::LessEqual => write!(f, "<="),
-      Self::And => write!(f, "and"),
-      Self::Or => write!(f, "or"),
-      Self::Pipeline => write!(f, ">>"),
-    }
+    write!(f, "{}", self.as_str())
   }
 }
 
@@ -153,12 +158,17 @@ pub enum UnaryOperator {
   Not,
   Minus,
 }
+impl UnaryOperator {
+  pub fn as_str(self) -> &'static str {
+    match self {
+      Self::Not => "!",
+      Self::Minus => "-",
+    }
+  }
+}
 impl fmt::Display for UnaryOperator {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      Self::Not => write!(f, "!"),
-      Self::Minus => write!(f, "-"),
-    }
+    write!(f, "{}", self.as_str())
   }
 }
 

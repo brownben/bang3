@@ -17,6 +17,24 @@ macro example_benchmark($name:ident) {
 
       b.iter(|| bang::parse(black_box(source), &allocator));
     }
+
+    #[bench]
+    fn lint(b: &mut Bencher) {
+      let allocator = Allocator::new();
+      let source = include_str!(concat!("../examples/", stringify!($name), ".bang"));
+      let ast = bang::parse(source, &allocator).unwrap();
+
+      b.iter(|| bang::lint(black_box(&ast)));
+    }
+
+    #[bench]
+    fn format(b: &mut Bencher) {
+      let allocator = Allocator::new();
+      let source = include_str!(concat!("../examples/", stringify!($name), ".bang"));
+      let ast = bang::parse(source, &allocator).unwrap();
+
+      b.iter(|| bang::format(black_box(&ast), bang::FormatterConfig::default()));
+    }
   }
 }
 
