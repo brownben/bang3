@@ -4,11 +4,17 @@
 #![feature(lint_reasons)]
 #![feature(decl_macro)]
 
-mod allocator;
 pub mod ast;
 mod formatter;
 mod linter;
 mod parser;
+
+pub(crate) mod allocator {
+  /// Arena allocator
+  pub type Allocator = bumpalo::Bump;
+  pub type Box<'allocator, T> = bumpalo::boxed::Box<'allocator, T>;
+  pub type Vec<'allocator, T> = bumpalo::collections::Vec<'allocator, T>;
+}
 
 #[doc(inline)]
 pub use allocator::Allocator;
