@@ -80,18 +80,14 @@ impl PrettyPrint for Call<'_, '_> {
     writeln!(f, "{prefix}{connector}Call")?;
 
     let prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
-    if let Some(argument) = &self.argument {
-      let child_prefix = format!("{prefix}{OTHER_CHILD}");
-      let final_child_prefix = format!("{prefix}{FINAL_CHILD}");
+    let child_prefix = format!("{prefix}{OTHER_CHILD}");
+    let final_child_prefix = format!("{prefix}{FINAL_CHILD}");
 
-      writeln!(f, "{prefix}{OTHER_ENTRY}Callee")?;
-      self.expression.pretty(f, &child_prefix, true)?;
+    writeln!(f, "{prefix}{OTHER_ENTRY}Callee")?;
+    self.expression.pretty(f, &child_prefix, true)?;
 
-      writeln!(f, "{prefix}{FINAL_ENTRY}Argument")?;
-      argument.pretty(f, &final_child_prefix, true)?;
-    } else {
-      self.expression.pretty(f, &prefix, true)?;
-    }
+    writeln!(f, "{prefix}{FINAL_ENTRY}Argument")?;
+    self.argument.pretty(f, &final_child_prefix, true)?;
 
     Ok(())
   }

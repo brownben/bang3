@@ -75,8 +75,8 @@ x => 3 + 5
 // Are always truthy
 (!!(_ => 3))   // true
 
-// Functions are called with brackets
-(_ => 3)()        // 3
+// Functions are called with brackets, and always have an argument
+(_ => 3)(0)        // 3
 (x => x + 3)(4)  // 7
 
 
@@ -138,12 +138,8 @@ a // 7
 
 // Passes the value on the left as the first argument to the function on the right.
 
-25 >> type()           // 'number'
-25 >> type() >> type() // 'string'
-
-// You can also omit the braces if you want.
 25 >> type           // 'number'
-25 >> type >> type   // 'string'
+25 >> type >> type // 'string'
 
 
 // ==========================

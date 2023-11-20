@@ -142,11 +142,14 @@ fn blocks() {
   "};
   assert_eq!(ast, expected);
 
-  let ast = parse_to_string("{call()}");
+  let ast = parse_to_string("{call(true)}");
   let expected = indoc! {"
     ├─ Block
     │  ╰─ Call
-    │     ╰─ Variable (call)
+    │     ├─ Callee
+    │     │  ╰─ Variable (call)
+    │     ╰─ Argument
+    │        ╰─ Boolean (true)
   "};
   assert_eq!(ast, expected);
 }
@@ -184,25 +187,29 @@ fn call() {
   "};
   assert_eq!(ast, expected);
 
-  let ast = parse_to_string("f() + 32.1");
+  let ast = parse_to_string("f(x) + 32.1");
   let expected = indoc! {"
     ├─ Binary (+)
     │  ├─ Call
-    │  │  ╰─ Variable (f)
+    │  │  ├─ Callee
+    │  │  │  ╰─ Variable (f)
+    │  │  ╰─ Argument
+    │  │     ╰─ Variable (x)
     │  ╰─ Number (32.1)
   "};
   assert_eq!(ast, expected);
 }
 
 #[test]
-fn call_missing_brackets() {
+fn call_missing_brackets_or_expression() {
   let allocator = Allocator::new();
   assert!(parse("f(", &allocator).is_err());
   assert!(parse("f(6", &allocator).is_err());
 
-  assert!(parse("f ()", &allocator).is_ok());
-  assert!(parse("f()", &allocator).is_ok());
-  assert!(parse("f(\n)", &allocator).is_ok());
+  assert!(parse("f()", &allocator).is_err());
+  assert!(parse("f ()", &allocator).is_err());
+  assert!(parse("f(\n)", &allocator).is_err());
+
   assert!(parse("f(\n'hello')", &allocator).is_ok());
   assert!(parse("f('hello'\n)", &allocator).is_ok());
   assert!(parse("f(\n'hello'\n)", &allocator).is_ok());

@@ -81,7 +81,7 @@ pub struct Block<'source, 'ast> {
 #[derive(Debug)]
 pub struct Call<'source, 'ast> {
   pub expression: Expression<'source, 'ast>,
-  pub argument: Option<Expression<'source, 'ast>>,
+  pub argument: Expression<'source, 'ast>,
   pub span: Span,
 }
 

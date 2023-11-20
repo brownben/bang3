@@ -37,9 +37,7 @@ pub trait Visitor {
   }
   fn visit_call(&mut self, call: &Call) {
     self.visit_expression(&call.expression);
-    if let Some(argument) = &call.argument {
-      self.visit_expression(argument);
-    }
+    self.visit_expression(&call.argument);
   }
   fn visit_comment(&mut self, comment: &Comment) {
     self.visit_expression(&comment.expression);
