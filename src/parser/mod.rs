@@ -208,6 +208,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       | TokenKind::Star
       | TokenKind::Slash
       | TokenKind::Percent
+      | TokenKind::PlusPlus
       | TokenKind::BangEqual
       | TokenKind::EqualEqual
       | TokenKind::Greater
@@ -232,6 +233,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       TokenKind::Star => BinaryOperator::Multiply,
       TokenKind::Slash => BinaryOperator::Divide,
       TokenKind::Percent => BinaryOperator::Remainder,
+      TokenKind::PlusPlus => BinaryOperator::AddString,
       TokenKind::BangEqual => BinaryOperator::NotEqual,
       TokenKind::EqualEqual => BinaryOperator::Equal,
       TokenKind::Greater => BinaryOperator::Greater,
@@ -680,7 +682,7 @@ impl From<TokenKind> for ParsePrecedence {
   fn from(kind: TokenKind) -> Self {
     match kind {
       TokenKind::LeftParen => Self::Call,
-      TokenKind::Plus | TokenKind::Minus => Self::Term,
+      TokenKind::Plus | TokenKind::Minus | TokenKind::PlusPlus => Self::Term,
       TokenKind::Star | TokenKind::Slash | TokenKind::Percent => Self::Factor,
       TokenKind::BangEqual | TokenKind::EqualEqual => Self::Equality,
       TokenKind::Greater | TokenKind::GreaterEqual | TokenKind::Less | TokenKind::LessEqual => {

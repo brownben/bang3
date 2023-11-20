@@ -23,7 +23,7 @@
 
 'hello' == "hello" // true
 'cat' > 'bat'      // true
-'he' + 'llo'       // 'hello'
+'he' ++ 'llo'       // 'hello'
 (!"")              // true
 (!'stuff')         // false
 

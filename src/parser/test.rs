@@ -39,6 +39,14 @@ fn binary() {
   "};
   assert_eq!(ast, expected);
 
+  let ast = parse_to_string("'hello ' ++ 'world'");
+  let expected = indoc! {"
+    ├─ Binary (++)
+    │  ├─ String 'hello '
+    │  ╰─ String 'world'
+  "};
+  assert_eq!(ast, expected);
+
   let ast = parse_to_string("4 * 56 >> 32");
   let expected = indoc! {"
     ├─ Binary (>>)

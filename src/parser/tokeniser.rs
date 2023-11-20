@@ -65,6 +65,7 @@ impl<'source> Tokeniser<'source> {
       b'.' if matches!(next_character, Some(b'.')) => (TokenKind::DotDot, 2),
 
       // Operators
+      b'+' if matches!(next_character, Some(b'+')) => (TokenKind::PlusPlus, 2),
       b'+' => (TokenKind::Plus, 1),
       b'-' => (TokenKind::Minus, 1),
       b'/' => (TokenKind::Slash, 1),
@@ -232,6 +233,7 @@ pub enum TokenKind {
   Slash,
   Star,
   Percent,
+  PlusPlus,
   Bang,
   And,
   Or,
@@ -292,6 +294,7 @@ impl fmt::Display for TokenKind {
       Self::Slash => write!(f, "/"),
       Self::Star => write!(f, "*"),
       Self::Percent => write!(f, "%"),
+      Self::PlusPlus => write!(f, "++"),
       Self::Bang => write!(f, "!"),
       Self::Or => write!(f, "or"),
       Self::And => write!(f, "and"),
