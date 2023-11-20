@@ -81,6 +81,29 @@ fn binary() {
 }
 
 #[test]
+fn binary_precedence() {
+  let ast = parse_to_string("1 + 2 * 3");
+  let expected = indoc! {"
+    ├─ Binary (+)
+    │  ├─ Number (1)
+    │  ╰─ Binary (*)
+    │     ├─ Number (2)
+    │     ╰─ Number (3)
+  "};
+  assert_eq!(ast, expected);
+
+  let ast = parse_to_string("5 + 3 * 2");
+  let expected = indoc! {"
+    ├─ Binary (+)
+    │  ├─ Number (5)
+    │  ╰─ Binary (*)
+    │     ├─ Number (3)
+    │     ╰─ Number (2)
+  "};
+  assert_eq!(ast, expected);
+}
+
+#[test]
 fn binary_missing_left_expression() {
   let allocator = Allocator::new();
   assert!(parse("+ 5", &allocator).is_err());

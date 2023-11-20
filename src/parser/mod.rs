@@ -149,7 +149,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   }
 
   fn parse_expression(&mut self) -> ParseResult<Expression<'s, 'ast>> {
-    self.parse_expression_inner(ParsePrecedence::None)
+    self.parse_expression_inner(ParsePrecedence::Assignment)
   }
 
   fn parse_expression_inner(
@@ -160,7 +160,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     let mut previous = self.prefix_expression(token)?;
 
     while let Some(t) = self.tokeniser.peek()
-      && precedence < ParsePrecedence::from(t.kind)
+      && precedence <= ParsePrecedence::from(t.kind)
       && !self.skipped_newline
     {
       let token = self.next_token();
