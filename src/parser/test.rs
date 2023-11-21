@@ -239,7 +239,7 @@ fn function() {
   let ast = parse_to_string("let plusOne = a => { a + 1 }");
   let expected = indoc! {"
     ├─ Let 'plusOne' =
-    │  ╰─ Function: a =>
+    │  ╰─ Function (plusOne): a =>
     │     ╰─ Block
     │        ╰─ Binary (+)
     │           ├─ Variable (a)

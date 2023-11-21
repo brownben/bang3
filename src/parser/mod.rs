@@ -317,6 +317,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     let span = parameter_span.merge(body.span());
 
     self.allocate_expression(Function {
+      name: None,
       parameter,
       body,
       span,
@@ -366,7 +367,6 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
     self.allocate_expression(literal)
   }
-
   fn literal_boolean(token: Token) -> Literal<'s> {
     let span = Span::from(token);
     let kind = match token.kind {
@@ -523,11 +523,15 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     let let_token = self.expect(TokenKind::Let)?;
     let identifier_token = self.expect(TokenKind::Identifier)?;
     self.expect(TokenKind::Equal)?;
-    let expression = self.parse_expression()?;
+    let mut expression = self.parse_expression()?;
     self.expect_newline()?;
 
     let identifier = Span::from(identifier_token).source_text(self.source);
     let span = Span::from(let_token).merge(expression.span());
+
+    if let Expression::Function(ref mut function) = &mut expression {
+      function.name = Some(identifier);
+    }
 
     self.allocate_statement(Let {
       identifier,

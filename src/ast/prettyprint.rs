@@ -104,7 +104,11 @@ impl PrettyPrint for Comment<'_, '_> {
 impl PrettyPrint for Function<'_, '_> {
   fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
     let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
-    writeln!(f, "{prefix}{connector}Function: {} =>", self.parameter)?;
+    write!(f, "{prefix}{connector}Function")?;
+    if let Some(name) = self.name {
+      write!(f, " ({name})")?;
+    }
+    writeln!(f, ": {} =>", self.parameter)?;
 
     let new_prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
     self.body.pretty(f, &new_prefix, true)
