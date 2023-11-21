@@ -123,11 +123,8 @@ impl<'a, 'b> Formattable<'a, 'b> for If<'a, '_> {
         IR::Text(") "),
       ]),
       self.then.format(f),
-      self
-        .otherwise
-        .as_ref()
-        .map(|else_| f.concat([IR::Text(" else "), else_.format(f)]))
-        .unwrap_or_default(),
+      IR::Text(" else "),
+      self.otherwise.format(f),
     ])
   }
 }

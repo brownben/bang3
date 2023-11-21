@@ -14,10 +14,10 @@ fn lint(source: &str) -> Result<(), ()> {
 
 #[test]
 fn constant_conditions() {
-  assert!(lint("if (true) pass").is_err());
-  assert!(lint("if (4 > 5) pass").is_err());
+  assert!(lint("if (true) pass else other").is_err());
+  assert!(lint("if (4 > 5) pass else other").is_err());
 
-  assert!(lint("if (x > 6) pass").is_ok());
+  assert!(lint("if (x > 6) pass else other").is_ok());
 }
 
 #[test]

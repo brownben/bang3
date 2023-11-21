@@ -279,15 +279,17 @@ fn if_() {
   "};
   assert_eq!(ast, expected);
 
-  let ast = parse_to_string("if (7 > x) doStuff");
+  let ast = parse_to_string("if (7 > x) doStuff else false");
   let expected = indoc! {"
     ├─ If
     │  ├─ Condition
     │  │  ╰─ Binary (>)
     │  │     ├─ Number (7)
     │  │     ╰─ Variable (x)
-    │  ╰─ Then
-    │     ╰─ Variable (doStuff)
+    │  ├─ Then
+    │  │  ╰─ Variable (doStuff)
+    │  ╰─ Otherwise
+    │     ╰─ Boolean (false)
   "};
   assert_eq!(ast, expected);
 }
@@ -300,12 +302,16 @@ fn if_missing_parts() {
   assert!(parse("if ('hello')", &allocator).is_err());
   assert!(parse("if('hello')", &allocator).is_err());
   assert!(parse("if ('hello'", &allocator).is_err());
+  assert!(parse("if ('hello') then", &allocator).is_err());
+  assert!(parse("if('hello') then", &allocator).is_err());
+  assert!(parse("if(\n'hello') then", &allocator).is_err());
+  assert!(parse("if('hello') then else", &allocator).is_err());
 
-  assert!(parse("if ('hello') then", &allocator).is_ok());
-  assert!(parse("if('hello') then", &allocator).is_ok());
-  assert!(parse("if(\n'hello') then", &allocator).is_ok());
-  assert!(parse("if('hello'\n) then", &allocator).is_ok());
-  assert!(parse("if(\n'hello'\n) then", &allocator).is_ok());
+  assert!(parse("if ('hello') then else false", &allocator).is_ok());
+  assert!(parse("if('hello') then else true", &allocator).is_ok());
+  assert!(parse("if(\n'hello') then else x", &allocator).is_ok());
+  assert!(parse("if('hello'\n) then else stuff", &allocator).is_ok());
+  assert!(parse("if(\n'hello'\n) then else otherwise", &allocator).is_ok());
 }
 
 #[test]

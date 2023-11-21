@@ -71,12 +71,7 @@ impl IsConstant for Group<'_, '_> {
 }
 impl IsConstant for If<'_, '_> {
   fn is_constant(&self) -> bool {
-    self.condition.is_constant()
-      && self.then.is_constant()
-      && self
-        .otherwise
-        .as_ref()
-        .map_or(true, IsConstant::is_constant)
+    self.condition.is_constant() && self.then.is_constant() && self.otherwise.is_constant()
   }
 }
 impl IsConstant for Match<'_, '_> {

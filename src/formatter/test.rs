@@ -141,12 +141,12 @@ fn group_with_forced_line() {
 
 #[test]
 fn if_() {
-  assert_format!("if (true) false", "if (true) false", 25);
-  assert_format!("if   (true) false", "if (true) false", 25);
-  assert_format!("if (  true) false", "if (true) false", 25);
-  assert_format!("if (true  ) false", "if (true) false", 25);
-  assert_format!("if (true)   false", "if (true) false", 25);
-  assert_format!("if   ( true )  false", "if (true) false", 25);
+  assert_format!("if (true) false else 7", "if (true) false else 7", 25);
+  assert_format!("if   (true) false else 7", "if (true) false else 7", 25);
+  assert_format!("if (  true) false else 7", "if (true) false else 7", 25);
+  assert_format!("if (true  ) false else 7", "if (true) false else 7", 25);
+  assert_format!("if (true)   false else 7", "if (true) false else 7", 25);
+  assert_format!("if   ( true )  false  else 7", "if (true) false else 7", 25);
 }
 
 #[test]

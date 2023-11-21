@@ -340,18 +340,13 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     self.skip_newline();
     self.expect(TokenKind::RightParen)?;
 
-    let if_token_span = Span::from(if_token);
     let then = self.parse_expression()?;
 
     self.skip_maybe_newline();
-    let (otherwise, span) = if self.matches(TokenKind::Else).is_some() {
-      let expression = self.parse_expression()?;
-      let span = if_token_span.merge(expression.span());
+    self.expect(TokenKind::Else)?;
+    let otherwise = self.parse_expression()?;
 
-      (Some(expression), span)
-    } else {
-      (None, if_token_span.merge(then.span()))
-    };
+    let span = Span::from(if_token).merge(otherwise.span());
 
     self.allocate_expression(If {
       condition,

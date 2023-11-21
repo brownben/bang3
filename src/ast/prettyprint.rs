@@ -131,16 +131,11 @@ impl PrettyPrint for If<'_, '_> {
     writeln!(f, "{prefix}{OTHER_ENTRY}Condition")?;
     self.condition.pretty(f, &child_prefix, true)?;
 
-    if let Some(otherwise) = &self.otherwise {
-      writeln!(f, "{prefix}{OTHER_ENTRY}Then")?;
-      self.then.pretty(f, &child_prefix, true)?;
+    writeln!(f, "{prefix}{OTHER_ENTRY}Then")?;
+    self.then.pretty(f, &child_prefix, true)?;
 
-      writeln!(f, "{prefix}{FINAL_ENTRY}Otherwise")?;
-      otherwise.pretty(f, &final_child_prefix, true)?;
-    } else {
-      writeln!(f, "{prefix}{FINAL_ENTRY}Then")?;
-      self.then.pretty(f, &final_child_prefix, true)?;
-    }
+    writeln!(f, "{prefix}{FINAL_ENTRY}Otherwise")?;
+    self.otherwise.pretty(f, &final_child_prefix, true)?;
 
     Ok(())
   }
