@@ -2,12 +2,21 @@
 
 #![feature(let_chains)]
 #![feature(lint_reasons)]
+#![feature(strict_provenance)]
 #![feature(decl_macro)]
 
 pub mod ast;
 mod formatter;
+mod interpreter;
 mod linter;
 mod parser;
+
+/// More efficient datastructures than in standard library
+pub(crate) mod collections {
+  pub use rustc_hash::FxHashMap as HashMap;
+  pub use smallvec::SmallVec;
+  pub use smartstring::alias::String;
+}
 
 pub(crate) mod allocator {
   /// Arena allocator
@@ -77,3 +86,24 @@ pub fn format(ast: &AST, config: FormatterConfig) -> String {
   formatter.print(ast)
 }
 pub use formatter::Config as FormatterConfig;
+
+/// Compile an AST into a bytecode chunk
+///
+/// # Examples
+/// ```
+/// use bang::{parse, Allocator};
+/// let allocator = Allocator::new();
+/// let source = "5 + 3";
+/// let ast = parse(source, &allocator).unwrap();
+/// let chunk = bang::compile(&ast).unwrap();
+/// ```
+///
+/// # Errors
+/// If there is a problem constructing the bytecode
+pub fn compile<'s: 'a, 'a>(ast: &AST<'s, '_>) -> Result<Chunk, CompileError> {
+  let mut compiler = interpreter::Compiler::new();
+  compiler.compile(ast)?;
+  let chunk = compiler.finish();
+  Ok(chunk)
+}
+pub use interpreter::{Chunk, CompileError, RuntimeError, Value, VM};

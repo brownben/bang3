@@ -7,6 +7,12 @@ use std::process;
 #[derive(Parser)]
 #[clap(name = "bang", version)]
 enum App {
+  /// Runs a file
+  Run {
+    /// The file to run
+    file: String,
+  },
+
   /// Formats source files
   #[clap(alias = "fmt")]
   Format(FormatOptions),
@@ -53,16 +59,23 @@ enum PrintCommand {
     /// The file to print
     file: String,
   },
+  /// Displays the bytecode
+  Bytecode {
+    /// The file to print
+    file: String,
+  },
 }
 
 fn main() -> process::ExitCode {
   let args = App::parse();
 
   let result = match args {
+    App::Run { file } => commands::run(&file),
     App::Format(options) => commands::format(&options),
     App::Lint { file } => commands::lint(&file),
     App::Print { command } => match command {
       PrintCommand::Ast { file } => commands::print_ast(&file),
+      PrintCommand::Bytecode { file } => commands::print_chunk(&file),
     },
   };
 
@@ -73,10 +86,27 @@ fn main() -> process::ExitCode {
 }
 
 mod commands {
-  use super::helpers::{parse, read_file, CodeFrame, Message};
+  use super::helpers::{compile, parse, read_file, CodeFrame, Message};
   use super::FormatOptions;
   use anstream::{eprintln, println};
+  use bang::ast::GetSpan;
   use std::fs;
+
+  pub fn run(filename: &str) -> Result<(), ()> {
+    let allocator = bang::Allocator::new();
+    let source = read_file(filename)?;
+    let ast = parse(filename, &source, &allocator)?;
+    let chunk = compile(filename, &source, &ast)?;
+
+    let mut vm = bang::VM::new();
+    if let Err(error) = vm.run(&chunk) {
+      eprintln!("{}", Message::from(&error));
+      eprintln!("{}", CodeFrame::new(filename, &source, error.span()));
+      return Err(());
+    }
+
+    Ok(())
+  }
 
   pub fn format(options: &FormatOptions) -> Result<(), ()> {
     let config = bang::FormatterConfig {
@@ -131,13 +161,24 @@ mod commands {
 
     Ok(())
   }
+
+  pub fn print_chunk(filename: &str) -> Result<(), ()> {
+    let allocator = bang::Allocator::new();
+    let source = read_file(filename)?;
+    let ast = parse(filename, &source, &allocator)?;
+    let chunk = compile(filename, &source, &ast)?;
+
+    print!("{chunk}");
+
+    Ok(())
+  }
 }
 
 mod helpers {
   use anstream::eprintln;
   use bang::{
     ast::{GetSpan, LineIndex, Span},
-    Allocator, LintDiagnostic, ParseError, AST,
+    Allocator, Chunk, CompileError, LintDiagnostic, ParseError, RuntimeError, AST,
   };
   use owo_colors::OwoColorize;
   use std::{fmt, fs};
@@ -180,6 +221,24 @@ mod helpers {
     fn from(error: &ParseError) -> Self {
       Self {
         title: error.title(),
+        body: error.message(),
+        severity: Severity::Error,
+      }
+    }
+  }
+  impl From<&CompileError> for Message {
+    fn from(error: &CompileError) -> Self {
+      Self {
+        title: error.title().to_owned(),
+        body: error.message().to_owned(),
+        severity: Severity::Error,
+      }
+    }
+  }
+  impl From<&RuntimeError> for Message {
+    fn from(error: &RuntimeError) -> Self {
+      Self {
+        title: error.title().to_owned(),
         body: error.message(),
         severity: Severity::Error,
       }
@@ -262,6 +321,19 @@ mod helpers {
       Err(error) => {
         eprintln!("{}", Message::from(&error));
         eprintln!("{}", CodeFrame::new(filename, source, error.span()));
+        Err(())
+      }
+    }
+  }
+
+  pub fn compile(filename: &str, source: &str, ast: &AST) -> Result<Chunk, ()> {
+    match bang::compile(ast) {
+      Ok(chunk) => Ok(chunk),
+      Err(error) => {
+        eprintln!("{}", Message::from(&error));
+        if error.span() != Span::default() {
+          eprintln!("{}", CodeFrame::new(filename, source, error.span()));
+        }
         Err(())
       }
     }

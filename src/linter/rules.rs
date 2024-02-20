@@ -136,11 +136,10 @@ impl LintRule for NoUselessMatch {
     "No Useless Match"
   }
   fn message(&self) -> &'static str {
-    "match statement is unnecessary as it only has one case which matches everything"
+    "match statement is unnecessary as the first case matches everything"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression) {
     if let Expression::Match(match_) = &expression
-      && match_.cases.len() == 1
       && let Pattern::Identifier(_) = match_.cases[0].pattern
     {
       context.add_diagnostic(&Self, match_.span());

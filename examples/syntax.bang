@@ -98,8 +98,6 @@ true and 2       // 2
 false and false  // false
 false and true   // false
 false and 77     // false
-null and "hello" // null
-null && "hello"  // null
 
 // Or. Short circuiting operator, returning the first truthy value. The word form is prefered over ||.
 
@@ -107,8 +105,6 @@ null && "hello"  // null
 false or false   // false
 false or true    // true
 false or 77      // 77
-null or "hello"  // 'hello'
-
 
 // ==========================
 // Variables
@@ -162,7 +158,7 @@ match x
 // you can match on literal values, on a range, or catch all
 
 // Or we can write them on a line
-match value | true -> 4 | false -> 1
+match value | true -> 4 | false -> 1 | _ -> 2
 
 
 // ==========================
