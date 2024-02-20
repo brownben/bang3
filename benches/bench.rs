@@ -19,6 +19,40 @@ macro example_benchmark($name:ident) {
     }
 
     #[bench]
+    fn compile(b: &mut Bencher) {
+      let allocator = Allocator::new();
+      let source = include_str!(concat!("../examples/", stringify!($name), ".bang"));
+      let ast = bang::parse(source, &allocator).unwrap();
+
+      b.iter(|| bang::compile(black_box(&ast)));
+    }
+
+    #[bench]
+    fn run(b: &mut Bencher) {
+      let allocator = Allocator::new();
+      let source = include_str!(concat!("../examples/", stringify!($name), ".bang"));
+      let ast = bang::parse(source, &allocator).unwrap();
+      let chunk = bang::compile(&ast).unwrap();
+
+      b.iter(|| {
+        let mut vm = bang::VM::new();
+        vm.run(black_box(&chunk))
+      });
+    }
+
+    #[bench]
+    fn parse_compile_run(b: &mut Bencher) {
+      b.iter(|| {
+        let allocator = Allocator::new();
+        let source = include_str!(concat!("../examples/", stringify!($name), ".bang"));
+        let ast = bang::parse(black_box(source), &allocator).unwrap();
+        let chunk = bang::compile(&ast).unwrap();
+        let mut vm = bang::VM::new();
+        vm.run(&chunk)
+      });
+    }
+
+    #[bench]
     fn lint(b: &mut Bencher) {
       let allocator = Allocator::new();
       let source = include_str!(concat!("../examples/", stringify!($name), ".bang"));
