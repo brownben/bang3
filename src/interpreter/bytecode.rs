@@ -37,6 +37,11 @@ pub enum OpCode {
   Call,
   Return,
 
+  // Closures
+  Closure,
+  GetUpvalue,
+  GetAllocated,
+
   // VM Operations
   Pop,
   PopBelow,
@@ -53,6 +58,8 @@ impl OpCode {
       | OpCode::DefineGlobal
       | OpCode::GetGlobal
       | OpCode::GetLocal
+      | OpCode::GetUpvalue
+      | OpCode::GetAllocated
       | OpCode::PopBelow => 2,
       _ => 1,
     }
@@ -192,6 +199,16 @@ impl fmt::Display for Chunk {
           let jump_by = self.get_long_value(position + 1);
           let jump_location = position + usize::from(jump_by) + 3;
           write!(f, "JumpIfFalse {jump_by} ({jump_location:0>4})")
+        }
+        OpCode::GetUpvalue => {
+          let upvalue_position = self.get_value(position + 1);
+
+          write!(f, "GetUpvalue ({upvalue_position})")
+        }
+        OpCode::GetAllocated => {
+          let local_position = self.get_value(position + 1);
+
+          write!(f, "GetAllocated ({local_position})")
         }
 
         code => write!(f, "{code:?}"),

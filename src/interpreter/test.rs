@@ -169,6 +169,9 @@ fn concatenate_strings() {
 
   let numeric_add_for_strings = run(indoc! {"'a' + 'b'"});
   assert!(numeric_add_for_strings.is_err());
+
+  let non_string_concat = run(indoc! {"'a' ++ 3"});
+  assert!(non_string_concat.is_err());
 }
 
 #[test]
@@ -454,6 +457,13 @@ fn block() {
   assert_variable!(multiple_statements; b, 7.0);
   assert_variable!(multiple_statements; c, 33.0);
   assert_variable!(multiple_statements; d, 2.0);
+
+  let must_end_with_expression = run(indoc! {"
+    let a = {
+      let b = 0
+    }
+  "});
+  assert!(must_end_with_expression.is_err());
 }
 
 #[test]
@@ -479,6 +489,15 @@ fn call() {
   assert_variable!(uses_argument; b, 1.0);
   assert_variable!(uses_argument; c, 3.0);
   assert_variable!(uses_argument; d, -2.0);
+
+  let call_number = run(indoc! {"3(0)"});
+  assert!(call_number.is_err());
+
+  let call_string = run(indoc! {"'hello world'(0)"});
+  assert!(call_string.is_err());
+
+  let call_boolean = run(indoc! {"false(0)"});
+  assert!(call_boolean.is_err());
 }
 
 #[test]
@@ -508,4 +527,80 @@ fn if_() {
 
   assert_variable!(vm; a, 1.0);
   assert_variable!(vm; b, 4.0);
+}
+
+#[test]
+fn access_variables_in_higher_scopes() {
+  let vm = run(indoc! {"
+    let a = 5
+    let b = {
+      let c = 3
+      a + c
+    }
+  "});
+
+  assert_variable!(vm; a, 5.0);
+  assert_variable!(vm; b, 8.0);
+}
+
+#[test]
+fn single_closure_access() {
+  let single_closure = run(indoc! {"
+    let value = {
+      let a = 5
+      let x = _ => a
+      x(0)
+    }
+  "});
+  assert_variable!(single_closure; value, 5.0);
+
+  let use_value = run(indoc! {"
+    let value = {
+      let a = 5
+      let x = _ => a + 4
+      x(0)
+    }
+  "});
+  assert_variable!(use_value; value, 9.0);
+
+  let close_over_twice = run(indoc! {"
+    let value = {
+      let a = 5
+      let x = _ => a + 4
+      let y = _ => a
+      x(0) + y(0)
+    }
+  "});
+  assert_variable!(close_over_twice; value, 14.0);
+
+  let use_after_closure = run(indoc! {"
+    let value = {
+      let a = 5
+      let x = _ => a
+      let b = a
+      x(0) + b
+    }
+  "});
+  assert_variable!(use_after_closure; value, 10.0);
+
+  let nested_closure_intermediate = run(indoc! {"
+  let value = {
+    let a = 5
+    let x = _ => {
+      let b = a + 1
+      _ => b
+    }
+    x(0)(0)
+  }
+"});
+  assert_variable!(nested_closure_intermediate; value, 6.0);
+
+  let nested_closure = run(indoc! {"
+  let value = {
+    let a = 5
+    let x = _ => _ => a
+    x(0)(0)
+  }
+"});
+  assert_variable!(nested_closure; value, 5.0);
 }

@@ -1,14 +1,15 @@
 use super::{
   bytecode::{Chunk, OpCode},
-  value::{Object, Value},
+  value::{Closure, ClosureStatus, Object, Value},
 };
-use crate::collections::HashMap;
+use crate::collections::{HashMap, SmallVec};
 use std::{error, fmt};
 
 #[derive(Clone, Debug)]
 struct CallFrame {
   ip: usize,
   offset: usize,
+  upvalues: SmallVec<[Value; 4]>,
 }
 
 /// A virtual machine to execute compiled bytecode
@@ -52,6 +53,20 @@ impl VM {
   fn get_stack_value(&self, position: usize) -> Value {
     // SAFETY: Assume bytecode is valid, so position exists
     unsafe { self.stack.get_unchecked(position) }.clone()
+  }
+
+  #[inline]
+  fn peek_frame(&self) -> &CallFrame {
+    // SAFETY: Assume bytecode is valid, so frames is not empty
+    unsafe { self.frames.last().unwrap_unchecked() }
+  }
+  #[inline]
+  fn push_frame(&mut self, ip: usize, offset: usize, upvalues: SmallVec<[Value; 4]>) {
+    self.frames.push(CallFrame {
+      ip,
+      offset,
+      upvalues,
+    });
   }
 
   /// Run a chunk of bytecode
@@ -167,13 +182,18 @@ impl VM {
 
           match callee.as_object() {
             Object::Function(func) => {
-              self.frames.push(CallFrame { ip, offset });
+              self.push_frame(ip, offset, SmallVec::new());
               ip = func.start - 1;
               offset = self.stack.len() - 1;
             }
             Object::NativeFunction(func) => {
               let result = func(&self.pop());
               self.push(result);
+            }
+            Object::Closure(closure) => {
+              self.push_frame(ip, offset, closure.upvalues.clone());
+              ip = closure.func.start - 1;
+              offset = self.stack.len() - 1;
             }
             Object::String(_) => {
               break Err(RuntimeError::NotCallable(callee.get_type()));
@@ -185,9 +205,49 @@ impl VM {
           self.stack.drain(offset - 1..);
           self.push(result);
 
-          let frame = unsafe { self.frames.pop().unwrap_unchecked() };
+          let frame = self.peek_frame();
           ip = frame.ip;
           offset = frame.offset;
+        }
+
+        // Closures
+        OpCode::Closure => {
+          let value = self.pop();
+
+          if value.is_object()
+            && let Object::Function(func) = value.as_object()
+          {
+            let upvalues = func
+              .upvalues
+              .iter()
+              .map(|(index, closed)| match closed {
+                ClosureStatus::Open => {
+                  let local = &mut self.stack[offset + usize::from(*index)];
+                  let allocated = local.clone().allocate();
+                  *local = allocated.clone();
+                  allocated
+                }
+                ClosureStatus::Closed => self.stack[offset + usize::from(*index)].clone(),
+                ClosureStatus::Upvalue => self.peek_frame().upvalues[usize::from(*index)].clone(),
+              })
+              .collect();
+
+            self.push(Closure::new(func.clone(), upvalues).into());
+          } else {
+            break Err(RuntimeError::NonFunctionClosure);
+          }
+        }
+        OpCode::GetUpvalue => {
+          let upvalue = chunk.get_value(ip + 1);
+          let address = self.peek_frame().upvalues[usize::from(upvalue)].as_allocated();
+
+          self.push(address.borrow().clone());
+        }
+        OpCode::GetAllocated => {
+          let slot = chunk.get_value(ip + 1);
+          let address = self.stack[offset + usize::from(slot)].as_allocated();
+
+          self.push(address.borrow().clone());
         }
 
         // VM Operations
@@ -276,6 +336,8 @@ pub enum RuntimeError {
   UndefinedVariable(String),
   /// Tried to call a value which is not a function
   NotCallable(&'static str),
+  /// Tried to close over a non-function value
+  NonFunctionClosure,
 }
 impl RuntimeError {
   /// The title of the error message
@@ -285,6 +347,7 @@ impl RuntimeError {
       Self::TypeError { .. } | Self::TypeErrorBinary { .. } => "Type Error",
       Self::UndefinedVariable(_) => "Undefined Variable",
       Self::NotCallable(_) => "Not Callable",
+      Self::NonFunctionClosure => "Non-Function Closure",
     }
   }
 
@@ -304,6 +367,7 @@ impl RuntimeError {
       RuntimeError::NotCallable(type_) => {
         format!("`{type_}` is not callable, only functions are callable")
       }
+      RuntimeError::NonFunctionClosure => "can only close over functions".into(),
     }
   }
 }

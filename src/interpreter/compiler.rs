@@ -1,20 +1,40 @@
 use super::{
   bytecode::{Chunk, OpCode},
-  value::{self, Value},
+  value::{self, ClosureStatus, Value},
 };
-use crate::ast::{expression::*, statement::*, GetSpan, Span, AST};
-use std::{error, fmt};
+use crate::{
+  ast::{expression::*, statement::*, GetSpan, Span, AST},
+  collections::SmallVec,
+};
+use std::{error, fmt, mem};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Local<'s> {
   name: &'s str,
   depth: u8,
+  status: LocalStatus,
+}
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+enum LocalStatus {
+  #[default]
+  Open,
+  Closed,
+}
+impl Into<ClosureStatus> for LocalStatus {
+  fn into(self) -> ClosureStatus {
+    match self {
+      Self::Open => ClosureStatus::Open,
+      Self::Closed => ClosureStatus::Closed,
+    }
+  }
 }
 
 pub struct Compiler<'s> {
   chunk: Chunk,
 
   scope_depth: u8,
-  locals: Vec<Local<'s>>,
+  locals: Vec<Vec<Local<'s>>>,
+  closures: Vec<SmallVec<[(u8, ClosureStatus); 8]>>,
 }
 impl<'s> Compiler<'s> {
   pub fn new() -> Self {
@@ -22,7 +42,8 @@ impl<'s> Compiler<'s> {
       chunk: Chunk::new(),
 
       scope_depth: 0,
-      locals: Vec::with_capacity(16),
+      locals: vec![Vec::new()],
+      closures: Vec::new(),
     }
   }
   pub fn compile(&mut self, ast: &AST<'s, '_>) -> Result<(), CompileError> {
@@ -92,22 +113,30 @@ impl<'s> Compiler<'s> {
   fn end_scope(&mut self) {
     let mut count: usize = 0;
 
-    while let Some(last) = self.locals.last()
+    while let Some(last) = self.function_locals().last()
       && last.depth == self.scope_depth
     {
-      self.locals.pop();
+      self.function_locals().pop();
       count += 1;
     }
 
-    self.add_opcode(OpCode::PopBelow);
-    self.add_value(count as u8);
+    if count > 0 {
+      self.add_opcode(OpCode::PopBelow);
+      self.add_value(count as u8);
+    }
     self.scope_depth -= 1;
   }
+  fn function_locals(&mut self) -> &mut Vec<Local<'s>> {
+    self.locals.last_mut().unwrap()
+  }
   fn define_variable(&mut self, name: &'s str) -> Result<(), CompileError> {
-    if self.scope_depth > 0 {
-      self.locals.push(Local {
+    let depth = self.scope_depth;
+
+    if depth > 0 {
+      self.function_locals().push(Local {
         name,
-        depth: self.scope_depth,
+        depth,
+        status: LocalStatus::Open,
       });
     } else {
       self.add_opcode(OpCode::DefineGlobal);
@@ -306,15 +335,22 @@ impl<'s> Compile<'s> for Function<'s, '_> {
 
     let start = compiler.chunk.len();
     compiler.begin_scope();
+    compiler.locals.push(Vec::new());
+    compiler.closures.push(SmallVec::new());
+
     compiler.define_variable(self.parameter)?;
     self.body.compile(compiler)?;
     compiler.add_opcode(OpCode::Return);
+
     compiler.end_scope();
+    compiler.locals.pop();
+    let upvalues = compiler.closures.pop().unwrap();
+    let has_upvalues = upvalues.len() > 0;
 
     compiler.patch_jump(jump_position)?;
 
     let name = self.name.unwrap_or("").into();
-    let function_value = value::Function { name, start }.into();
+    let function_value = value::Function::new(name, start, upvalues).into();
     let constant_value = compiler.chunk.add_constant(function_value);
 
     if let Ok(constant_value) = u16::try_from(constant_value) {
@@ -323,6 +359,10 @@ impl<'s> Compile<'s> for Function<'s, '_> {
         .replace_long_value(constant_position, constant_value);
     } else {
       return Err(CompileError::TooManyConstants);
+    }
+
+    if has_upvalues {
+      compiler.add_opcode(OpCode::Closure)
     }
 
     Ok(())
@@ -377,18 +417,61 @@ impl<'s> Compile<'s> for Unary<'s, '_> {
 }
 impl<'s> Compile<'s> for Variable<'s> {
   fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+    // See if the variable is local to the current function
     if let Some(local_position) = compiler
+      .function_locals()
+      .iter()
+      .rposition(|local| local.name == self.name)
+    {
+      match compiler.function_locals()[local_position].status {
+        LocalStatus::Open => compiler.add_opcode(OpCode::GetLocal),
+        LocalStatus::Closed => compiler.add_opcode(OpCode::GetAllocated),
+      }
+      compiler.add_value(local_position as u8);
+
+      return Ok(());
+    }
+
+    // Check for it being a closure of an outer function
+    if let Some((scope_index, local_index)) = compiler
       .locals
       .iter()
-      .position(|local| local.name == self.name)
+      .enumerate()
+      .rev()
+      .skip(1)
+      .find_map(|(scope_index, locals)| {
+        locals
+          .iter()
+          .rposition(|local| local.name == self.name)
+          .map(|local_index| (scope_index, local_index))
+      })
     {
-      let local_position = local_position as u8;
-      compiler.add_opcode(OpCode::GetLocal);
-      compiler.add_value(local_position);
-    } else {
-      compiler.add_opcode(OpCode::GetGlobal);
-      compiler.add_constant_string(self.name)?;
+      let local_status = mem::replace(
+        &mut compiler.locals[scope_index][local_index].status,
+        LocalStatus::Closed,
+      );
+
+      let (mut index, mut status) = (local_index, local_status.into());
+      for closures in compiler.closures.iter_mut().skip(scope_index) {
+        index = closures
+          .iter()
+          .rposition(|(i, _)| usize::from(*i) == index)
+          .unwrap_or_else(|| {
+            closures.push((u8::try_from(index).unwrap_or(0), status));
+            closures.len() - 1
+          });
+        status = ClosureStatus::Upvalue;
+      }
+
+      compiler.add_opcode(OpCode::GetUpvalue);
+      compiler.add_value(index as u8);
+
+      return Ok(());
     }
+
+    // Otherwise, it must be a global variable
+    compiler.add_opcode(OpCode::GetGlobal);
+    compiler.add_constant_string(self.name)?;
 
     Ok(())
   }

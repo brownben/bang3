@@ -1,21 +1,27 @@
-use crate::collections::String;
-use std::{fmt, mem, ptr, rc::Rc};
+use crate::collections::{SmallVec, String};
+use std::{cell::RefCell, fmt, mem, rc::Rc};
 
 // Store bits at the end of the pointer, to denote as a pointer rather than NaN
 // Force alignment greater than 8, so we can use the last 3 bits
 const _ALIGNMENT_ASSERT: () = assert!(std::mem::align_of::<Object>() >= 8);
 
 const TO_STORED: usize =
-  0b1111_1111_1111_1111_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000;
+  0b1111_1111_1111_1111_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0101;
 const FROM_STORED: usize =
-  0b0000_0000_0000_0000_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1000;
+  0b0000_0000_0000_0000_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1010;
+
 const IS_NUMBER: usize =
   0b0111_1111_1111_1100_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000;
 
-const TRUE: *const Object =
-  ptr::invalid(0b1111_1111_1111_1101_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000);
-const FALSE: *const Object =
-  ptr::invalid(0b1111_1111_1111_1110_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000);
+const TO_ALLOCATED: usize =
+  0b1111_1111_1111_1111_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0011;
+const FROM_ALLOCATED: usize =
+  0b0000_0000_0000_0000_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1100;
+
+pub const TRUE: *const Object =
+  (0b1111_1111_1111_1101_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000) as *const _;
+pub const FALSE: *const Object =
+  (0b1111_1111_1111_1110_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000) as *const _;
 
 /// A basic value in the interpreter
 /// Either a boolean, number, or a pointer to a heap allocated [Object]
@@ -37,6 +43,32 @@ impl Value {
   pub(crate) fn as_object(&self) -> &Object {
     let pointer = self.0.map_addr(|ptr| ptr & FROM_STORED);
     unsafe { &*pointer }
+  }
+
+  /// Allocate a [Value] to the heap, and get a pointer to it stored as a [Value]
+  #[must_use]
+  pub fn allocate(self) -> Self {
+    let memory = Rc::new(RefCell::new(self));
+
+    let pointer = Rc::into_raw(memory);
+    let stored_pointer = pointer.map_addr(|ptr| ptr | TO_ALLOCATED);
+
+    Self(stored_pointer.cast::<Object>())
+  }
+  /// Check is the current value is a pointer to a heap allocated [Value]
+  #[inline]
+  pub fn is_allocated(&self) -> bool {
+    (self.0.addr() & TO_ALLOCATED) == TO_ALLOCATED
+  }
+  /// View the current value as a pointer to a heap allocated [Value]
+  /// SAFETY: Must check it is a pointer to an allocated value using [Value::is_allocated]
+  #[inline]
+  pub(crate) fn as_allocated(&self) -> Rc<RefCell<Self>> {
+    let pointer = self.0.map_addr(|ptr| ptr & FROM_ALLOCATED);
+    let pointer = pointer.cast::<RefCell<Self>>();
+
+    unsafe { Rc::increment_strong_count(pointer) };
+    unsafe { Rc::from_raw(pointer) }
   }
 
   /// Check is the current value is a number
@@ -82,6 +114,11 @@ impl Clone for Value {
       let pointer = self.0.map_addr(|ptr| ptr & FROM_STORED);
 
       unsafe { Rc::increment_strong_count(pointer) };
+    } else if self.is_allocated() {
+      let pointer = self.0.map_addr(|ptr| ptr & FROM_ALLOCATED);
+      let pointer = pointer.cast::<RefCell<Self>>();
+
+      unsafe { Rc::increment_strong_count(pointer) };
     }
 
     Self(self.0)
@@ -91,6 +128,11 @@ impl Drop for Value {
   fn drop(&mut self) {
     if self.is_object() {
       let pointer = self.0.map_addr(|ptr| ptr & FROM_STORED);
+
+      unsafe { Rc::decrement_strong_count(pointer) };
+    } else if self.is_allocated() {
+      let pointer = self.0.map_addr(|ptr| ptr & FROM_ALLOCATED);
+      let pointer = pointer.cast::<RefCell<Self>>();
 
       unsafe { Rc::decrement_strong_count(pointer) };
     }
@@ -122,7 +164,9 @@ impl fmt::Debug for Value {
       Self(TRUE) => write!(f, "true"),
       Self(FALSE) => write!(f, "false"),
       a if a.is_number() => write!(f, "{}", a.as_number()),
-      a => write!(f, "{}", a.as_object()),
+      a if a.is_object() => write!(f, "{}", a.as_object()),
+      a if a.is_allocated() => write!(f, "{:?}", a.as_allocated().borrow()),
+      _ => unreachable!(),
     }
   }
 }
@@ -139,7 +183,7 @@ impl From<bool> for Value {
 impl From<f64> for Value {
   fn from(value: f64) -> Self {
     #[allow(clippy::cast_possible_truncation)] // u64 == usize
-    Self(ptr::invalid(value.to_bits() as usize))
+    Self(value.to_bits() as *const _)
   }
 }
 impl<T: Into<Object>> From<T> for Value {
@@ -151,11 +195,12 @@ impl<T: Into<Object>> From<T> for Value {
 }
 
 /// An heap allocated object in the interpreter
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Object {
   String(String),
   Function(Function),
   NativeFunction(fn(&Value) -> Value),
+  Closure(Closure),
 }
 impl Object {
   /// Check if the current object is falsy
@@ -163,7 +208,7 @@ impl Object {
   pub fn is_falsy(&self) -> bool {
     match self {
       Self::String(string) => string.is_empty(),
-      Self::Function(_) | Self::NativeFunction(_) => false,
+      Self::Function(_) | Self::NativeFunction(_) | Self::Closure(_) => false,
     }
   }
 
@@ -171,7 +216,7 @@ impl Object {
   pub fn get_type(&self) -> &'static str {
     match self {
       Self::String(_) => "string",
-      Self::Function(_) | Self::NativeFunction(_) => "function",
+      Self::Function(_) | Self::NativeFunction(_) | Self::Closure(_) => "function",
     }
   }
 }
@@ -179,7 +224,9 @@ impl fmt::Display for Object {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       Object::String(x) => write!(f, "{x}"),
-      Object::Function(_) | Object::NativeFunction(_) => write!(f, "<function>"),
+      Object::Function(x) => x.fmt(f),
+      Object::NativeFunction(_) => write!(f, "<function>"),
+      Object::Closure(x) => x.fmt(f),
     }
   }
 }
@@ -199,16 +246,60 @@ impl From<Function> for Object {
     Self::Function(value)
   }
 }
+impl From<Closure> for Object {
+  fn from(value: Closure) -> Self {
+    Self::Closure(value)
+  }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Function {
   pub(crate) name: String,
   pub(crate) start: usize,
+  pub(crate) upvalues: SmallVec<[(u8, ClosureStatus); 8]>,
+}
+impl Function {
+  pub fn new(name: String, start: usize, upvalues: SmallVec<[(u8, ClosureStatus); 8]>) -> Self {
+    Self {
+      name,
+      start,
+      upvalues,
+    }
+  }
 }
 impl fmt::Display for Function {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "<function {}>", self.name)
+    if self.name.is_empty() {
+      write!(f, "<function>")
+    } else {
+      write!(f, "<function {}>", self.name)
+    }
   }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Closure {
+  pub func: Function,
+  pub(crate) upvalues: SmallVec<[Value; 4]>,
+}
+impl Closure {
+  pub fn new(func: Function, upvalues: SmallVec<[Value; 4]>) -> Self {
+    Self { func, upvalues }
+  }
+}
+impl fmt::Display for Closure {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    // self.func.fmt(f)
+    write!(f, "<closure {} [{:?}]>", self.func, self.upvalues)
+  }
+}
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum ClosureStatus {
+  #[default]
+  Open,
+  Closed,
+  Upvalue,
 }
 
 #[cfg(test)]
@@ -279,7 +370,27 @@ mod test {
     let function = Function {
       start: 0,
       name: "".into(),
+      upvalues: SmallVec::new(),
     };
     assert_eq!(Value::from(function).is_falsy(), false);
+  }
+
+  #[test]
+  fn allocate() {
+    let string = Value::from("hello");
+    assert!(string.is_object());
+    assert!(!string.is_number());
+    assert!(!string.is_allocated());
+    assert_eq!(string, Object::String("hello".into()).into());
+
+    let string = string.allocate();
+    assert!(string.is_allocated());
+    assert!(!string.is_object());
+    assert!(!string.is_number());
+    assert_eq!(
+      *string.as_allocated().borrow(),
+      Value::from(Object::String("hello".into()))
+    );
+    assert_eq!(string.as_allocated().clone(), string.as_allocated().clone(),);
   }
 }
