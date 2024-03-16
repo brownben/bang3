@@ -66,12 +66,12 @@ impl PrettyPrint for Block<'_, '_> {
     let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
     writeln!(f, "{prefix}{connector}Block")?;
 
+    let prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
     let (last_statement, statements) = self.statements.split_last().unwrap();
     for statement in statements {
-      statement.pretty(f, &format!("{prefix}{OTHER_CHILD}"), false)?;
+      statement.pretty(f, &prefix, false)?;
     }
-    let x = if last { FINAL_CHILD } else { OTHER_CHILD };
-    last_statement.pretty(f, &format!("{prefix}{x}"), true)
+    last_statement.pretty(f, &prefix, true)
   }
 }
 impl PrettyPrint for Call<'_, '_> {
