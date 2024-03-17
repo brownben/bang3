@@ -13,6 +13,8 @@ smallvec = "1.13.1"
 smartstring = "1.0.1"
 
 [dev-dependencies]
+bencher = "0.1.5"
+codspeed-bencher-compat = "2.4.0"
 indoc = "2.0.4"
 
 [profile.release]
@@ -25,3 +27,7 @@ panic = "abort"
 rust.missing_docs = "warn"
 clippy.pedantic = "warn"
 clippy.wildcard_imports = { level = "allow", priority = 1 }
+
+[[bench]]
+name = "fib"
+harness = false
