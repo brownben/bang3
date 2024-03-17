@@ -7,7 +7,7 @@
 //! - Then calculates how much of the intermediate representation it can fit in printWidth
 //! - Converts to a second IR which can be directly printed
 //!
-//! Based upon the algorithm described by Philip Wadler in ["A prettier printer"](https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf).
+//! Based upon the algorithm described by Philip Wadler in [`A prettier printer`](https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf).
 
 mod ast;
 mod config;

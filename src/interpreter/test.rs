@@ -544,7 +544,7 @@ fn access_variables_in_higher_scopes() {
 }
 
 #[test]
-fn single_closure_access() {
+fn closures() {
   let single_closure = run(indoc! {"
     let value = {
       let a = 5
@@ -584,23 +584,32 @@ fn single_closure_access() {
   assert_variable!(use_after_closure; value, 10.0);
 
   let nested_closure_intermediate = run(indoc! {"
-  let value = {
-    let a = 5
-    let x = _ => {
-      let b = a + 1
-      _ => b
+    let value = {
+      let a = 5
+      let x = _ => {
+        let b = a + 1
+        _ => b
+      }
+      x(0)(0)
     }
-    x(0)(0)
-  }
-"});
+  "});
   assert_variable!(nested_closure_intermediate; value, 6.0);
 
   let nested_closure = run(indoc! {"
-  let value = {
-    let a = 5
-    let x = _ => _ => a
-    x(0)(0)
-  }
-"});
+    let value = {
+      let a = 5
+      let x = _ => _ => a
+      x(0)(0)
+    }
+  "});
   assert_variable!(nested_closure; value, 5.0);
+
+  let two_parameters = run(indoc! {"
+    let add = a => b => a + b
+
+    let x = add(2)(3)
+    let y = add(3.5)(0.25)
+  "});
+  assert_variable!(two_parameters; x, 5.0);
+  assert_variable!(two_parameters; y, 3.75);
 }

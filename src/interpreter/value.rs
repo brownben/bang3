@@ -1,5 +1,5 @@
 use crate::collections::{SmallVec, String};
-use std::{cell::RefCell, fmt, mem, rc::Rc};
+use std::{cell::RefCell, fmt, mem, ptr, rc::Rc};
 
 // Store bits at the end of the pointer, to denote as a pointer rather than NaN
 // Force alignment greater than 8, so we can use the last 3 bits
@@ -18,10 +18,12 @@ const TO_ALLOCATED: usize =
 const FROM_ALLOCATED: usize =
   0b0000_0000_0000_0000_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1100;
 
-pub const TRUE: *const Object =
-  (0b1111_1111_1111_1101_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000) as *const _;
-pub const FALSE: *const Object =
-  (0b1111_1111_1111_1110_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000) as *const _;
+pub const TRUE: *const Object = ptr::without_provenance(
+  0b1111_1111_1111_1101_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000,
+);
+pub const FALSE: *const Object = ptr::without_provenance(
+  0b1111_1111_1111_1110_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000,
+);
 
 /// A basic value in the interpreter
 /// Either a boolean, number, or a pointer to a heap allocated [Object]
@@ -34,6 +36,7 @@ impl Value {
 
   /// Check is the current value is a heap allocated [Object]
   #[inline]
+  #[must_use]
   pub fn is_object(&self) -> bool {
     (self.0.addr() & TO_STORED) == TO_STORED
   }
@@ -57,11 +60,12 @@ impl Value {
   }
   /// Check is the current value is a pointer to a heap allocated [Value]
   #[inline]
+  #[must_use]
   pub fn is_allocated(&self) -> bool {
     (self.0.addr() & TO_ALLOCATED) == TO_ALLOCATED
   }
   /// View the current value as a pointer to a heap allocated [Value]
-  /// SAFETY: Must check it is a pointer to an allocated value using [Value::is_allocated]
+  /// SAFETY: Must check it is a pointer to an allocated value using [`Value::is_allocated`]
   #[inline]
   pub(crate) fn as_allocated(&self) -> Rc<RefCell<Self>> {
     let pointer = self.0.map_addr(|ptr| ptr & FROM_ALLOCATED);
@@ -73,12 +77,14 @@ impl Value {
 
   /// Check is the current value is a number
   #[inline]
+  #[must_use]
   pub fn is_number(&self) -> bool {
     (self.0.addr() & IS_NUMBER) != IS_NUMBER
   }
   /// View the current value as a number.
   /// Does not check if the value is a number
   #[inline]
+  #[must_use]
   pub fn as_number(&self) -> f64 {
     // SAFETY: All u64 should be valid f64s
     unsafe { mem::transmute(self.0) }
@@ -89,6 +95,7 @@ impl Value {
   /// Check if the current value is falsy
   /// It is falsy if false, 0, or an empty collection
   #[inline]
+  #[must_use]
   pub fn is_falsy(&self) -> bool {
     match self {
       Self(TRUE) => false,
@@ -99,6 +106,7 @@ impl Value {
   }
 
   /// Get the type of the value
+  #[must_use]
   pub fn get_type(&self) -> &'static str {
     match self {
       Self(TRUE | FALSE) => "boolean",
@@ -165,7 +173,7 @@ impl fmt::Debug for Value {
       Self(FALSE) => write!(f, "false"),
       a if a.is_number() => write!(f, "{}", a.as_number()),
       a if a.is_object() => write!(f, "{}", a.as_object()),
-      a if a.is_allocated() => write!(f, "{:?}", a.as_allocated().borrow()),
+      a if a.is_allocated() => write!(f, "<allocated {:?}>", a.as_allocated().borrow()),
       _ => unreachable!(),
     }
   }
@@ -183,7 +191,7 @@ impl From<bool> for Value {
 impl From<f64> for Value {
   fn from(value: f64) -> Self {
     #[allow(clippy::cast_possible_truncation)] // u64 == usize
-    Self(value.to_bits() as *const _)
+    Self(ptr::without_provenance(value.to_bits() as usize))
   }
 }
 impl<T: Into<Object>> From<T> for Value {
@@ -289,8 +297,7 @@ impl Closure {
 }
 impl fmt::Display for Closure {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    // self.func.fmt(f)
-    write!(f, "<closure {} [{:?}]>", self.func, self.upvalues)
+    self.func.fmt(f)
   }
 }
 

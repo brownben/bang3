@@ -70,6 +70,10 @@ impl VM {
   }
 
   /// Run a chunk of bytecode
+  ///
+  /// # Errors
+  /// Returns an error if a runtime error is encountered in the bytecode being executed
+  #[allow(clippy::too_many_lines)]
   pub fn run(&mut self, chunk: &Chunk) -> Result<(), RuntimeError> {
     let mut ip = 0;
     let mut offset = 0;

@@ -20,11 +20,11 @@ enum LocalStatus {
   Open,
   Closed,
 }
-impl Into<ClosureStatus> for LocalStatus {
-  fn into(self) -> ClosureStatus {
-    match self {
-      Self::Open => ClosureStatus::Open,
-      Self::Closed => ClosureStatus::Closed,
+impl From<LocalStatus> for ClosureStatus {
+  fn from(value: LocalStatus) -> Self {
+    match value {
+      LocalStatus::Open => Self::Open,
+      LocalStatus::Closed => Self::Closed,
     }
   }
 }
@@ -110,7 +110,7 @@ impl<'s> Compiler<'s> {
   fn begin_scope(&mut self) {
     self.scope_depth += 1;
   }
-  fn end_scope(&mut self) {
+  fn end_scope(&mut self) -> Result<(), CompileError> {
     let mut count: usize = 0;
 
     while let Some(last) = self.function_locals().last()
@@ -122,9 +122,15 @@ impl<'s> Compiler<'s> {
 
     if count > 0 {
       self.add_opcode(OpCode::PopBelow);
-      self.add_value(count as u8);
+      if let Ok(count) = u8::try_from(count) {
+        self.add_value(count);
+      } else {
+        Err(CompileError::TooManyLocalVariables)?;
+      }
     }
     self.scope_depth -= 1;
+
+    Ok(())
   }
   fn function_locals(&mut self) -> &mut Vec<Local<'s>> {
     self.locals.last_mut().unwrap()
@@ -156,6 +162,10 @@ pub enum CompileError {
   TooManyStrings,
   /// Too big jump
   TooBigJump,
+  /// Too many closures
+  TooManyClosures,
+  /// Too many local variables
+  TooManyLocalVariables,
   /// Block must end with expression
   BlockMustEndWithExpression(Span),
 }
@@ -167,6 +177,8 @@ impl CompileError {
       Self::TooManyConstants => "Too Many Constants",
       Self::TooManyStrings => "Too Many Strings",
       Self::TooBigJump => "Too Big Jump",
+      Self::TooManyClosures => "Too Many Closures",
+      Self::TooManyLocalVariables => "Too Many Local Variables",
       Self::BlockMustEndWithExpression(_) => "Block Must End With Expression",
     }
   }
@@ -175,9 +187,11 @@ impl CompileError {
   #[must_use]
   pub fn message(&self) -> &'static str {
     match self {
-      Self::TooManyConstants => "the maximum number of constants has been reached (65536)",
-      Self::TooManyStrings => "the maximum number of strings has been reached (256)",
+      Self::TooManyConstants => "the maximum no. of constants has been reached (65536)",
+      Self::TooManyStrings => "the maximum no. of strings has been reached (256)",
       Self::TooBigJump => "the maximum jump size has been reached (65536)",
+      Self::TooManyClosures => "the maximum no. of closures has been reached (256)",
+      Self::TooManyLocalVariables => "more than 256 local variables have been defined",
       Self::BlockMustEndWithExpression(_) => {
         "a blocks must return with a value, and so must end with an expression"
       }
@@ -187,7 +201,7 @@ impl CompileError {
 impl GetSpan for CompileError {
   fn span(&self) -> Span {
     match self {
-      Self::BlockMustEndWithExpression(span) => span.clone(),
+      Self::BlockMustEndWithExpression(span) => *span,
       _ => Span::default(),
     }
   }
@@ -310,9 +324,7 @@ impl<'s> Compile<'s> for Block<'s, '_> {
       stmt => Err(CompileError::BlockMustEndWithExpression(stmt.span()))?,
     }
 
-    compiler.end_scope();
-
-    Ok(())
+    compiler.end_scope()
   }
 }
 impl<'s> Compile<'s> for Call<'s, '_> {
@@ -342,27 +354,25 @@ impl<'s> Compile<'s> for Function<'s, '_> {
     self.body.compile(compiler)?;
     compiler.add_opcode(OpCode::Return);
 
-    compiler.end_scope();
+    compiler.end_scope()?;
     compiler.locals.pop();
     let upvalues = compiler.closures.pop().unwrap();
-    let has_upvalues = upvalues.len() > 0;
+    let has_upvalues = !upvalues.is_empty();
 
     compiler.patch_jump(jump_position)?;
 
     let name = self.name.unwrap_or("").into();
-    let function_value = value::Function::new(name, start, upvalues).into();
-    let constant_value = compiler.chunk.add_constant(function_value);
+    let function_value = value::Function::new(name, start, upvalues);
+    let constant_value = compiler.chunk.add_constant(function_value.into());
 
-    if let Ok(constant_value) = u16::try_from(constant_value) {
-      compiler
-        .chunk
-        .replace_long_value(constant_position, constant_value);
+    if let Ok(value) = u16::try_from(constant_value) {
+      compiler.chunk.replace_long_value(constant_position, value);
     } else {
       return Err(CompileError::TooManyConstants);
     }
 
     if has_upvalues {
-      compiler.add_opcode(OpCode::Closure)
+      compiler.add_opcode(OpCode::Closure);
     }
 
     Ok(())
@@ -427,7 +437,11 @@ impl<'s> Compile<'s> for Variable<'s> {
         LocalStatus::Open => compiler.add_opcode(OpCode::GetLocal),
         LocalStatus::Closed => compiler.add_opcode(OpCode::GetAllocated),
       }
-      compiler.add_value(local_position as u8);
+      if let Ok(local_position) = u8::try_from(local_position) {
+        compiler.add_value(local_position);
+      } else {
+        Err(CompileError::TooManyLocalVariables)?;
+      }
 
       return Ok(());
     }
@@ -464,7 +478,11 @@ impl<'s> Compile<'s> for Variable<'s> {
       }
 
       compiler.add_opcode(OpCode::GetUpvalue);
-      compiler.add_value(index as u8);
+      if let Ok(index) = u8::try_from(index) {
+        compiler.add_value(index);
+      } else {
+        Err(CompileError::TooManyClosures)?;
+      }
 
       return Ok(());
     }
