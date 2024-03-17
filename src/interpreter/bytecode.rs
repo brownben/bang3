@@ -45,6 +45,7 @@ pub enum OpCode {
   // VM Operations
   Pop,
   PopBelow,
+  Peek,
   Jump,
   JumpIfFalse,
   Halt,
@@ -160,30 +161,25 @@ impl fmt::Display for Chunk {
         OpCode::Constant => {
           let constant_location = self.get_value(position + 1);
           let constant = self.get_constant(constant_location.into());
-
           write!(f, "Constant {constant:?} ({constant_location})")
         }
         OpCode::ConstantLong => {
           let constant_location = self.get_long_value(position + 1);
           let constant = self.get_constant(constant_location.into());
-
           write!(f, "ConstantLong {constant:?} ({constant_location})")
         }
         OpCode::DefineGlobal => {
           let string_location = self.get_value(position + 1);
           let string = self.get_string(string_location.into());
-
           write!(f, "DefineGlobal '{string}' ({string_location})")
         }
         OpCode::GetGlobal => {
           let string_location = self.get_value(position + 1);
           let string = self.get_string(string_location.into());
-
           write!(f, "GetGlobal '{string}' ({string_location})")
         }
         OpCode::GetLocal => {
           let local_position = self.get_value(position + 1);
-
           write!(f, "GetLocal ({local_position})")
         }
         OpCode::PopBelow => {
@@ -202,12 +198,10 @@ impl fmt::Display for Chunk {
         }
         OpCode::GetUpvalue => {
           let upvalue_position = self.get_value(position + 1);
-
           write!(f, "GetUpvalue ({upvalue_position})")
         }
         OpCode::GetAllocated => {
           let local_position = self.get_value(position + 1);
-
           write!(f, "GetAllocated ({local_position})")
         }
 

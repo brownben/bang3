@@ -613,3 +613,68 @@ fn closures() {
   assert_variable!(two_parameters; x, 5.0);
   assert_variable!(two_parameters; y, 3.75);
 }
+
+#[test]
+fn match_() {
+  let single_catch_all = run("let a = match 5 | x -> x + 1");
+  assert_variable!(single_catch_all; a, 6.0);
+
+  let multiple_catch_all = run("let a = match 0 | x -> x + 1 | y -> y + 2");
+  assert_variable!(multiple_catch_all; a, 1.0);
+
+  let literal_no_catch_all = run("let a = match true | true -> 1");
+  assert!(literal_no_catch_all.is_err());
+
+  let literal = run("let a = match true | true -> 1 | _ -> 2");
+  assert_variable!(literal; a, 1.0);
+
+  let literal_multi_case = run(indoc! {"
+    let a = match true | false -> 1 | true -> 2 | _ -> 3
+    let b = match false | false -> 1 | true -> 2 | _ -> 3
+    let c = match 4 | false -> 1 | true -> 2 | _ -> 3
+  "});
+  assert_variable!(literal_multi_case; a, 2.0);
+  assert_variable!(literal_multi_case; b, 1.0);
+  assert_variable!(literal_multi_case; c, 3.0);
+
+  let max_range = run(indoc! {"
+    let a = match 5 | ..10 -> 1 | _ -> 2
+    let b = match 10 | ..10 -> 1 | _ -> 2
+    let c = match 15 | ..10 -> 1 | _ -> 2
+  "});
+  assert_variable!(max_range; a, 1.0);
+  assert_variable!(max_range; b, 1.0);
+  assert_variable!(max_range; c, 2.0);
+
+  let min_range = run(indoc! {"
+    let a = match 5 | 10.. -> 1 | _ -> 2
+    let b = match 10 | 10.. -> 1 | _ -> 2
+    let c = match 15 | 10.. -> 1 | _ -> 2
+  "});
+  assert_variable!(min_range; a, 2.0);
+  assert_variable!(min_range; b, 1.0);
+  assert_variable!(min_range; c, 1.0);
+
+  let both_range = run(indoc! {"
+    let a = match 5 | 10..15 -> 1 | _ -> 2
+    let b = match 10 | 10..15 -> 1 | _ -> 2
+    let c = match 12 | 10..15 -> 1 | _ -> 2
+    let d = match 15 | 10..15 -> 1 | _ -> 2
+    let e = match 20 | 10..15 -> 1 | _ -> 2
+  "});
+  assert_variable!(both_range; a, 2.0);
+  assert_variable!(both_range; b, 1.0);
+  assert_variable!(both_range; c, 1.0);
+  assert_variable!(both_range; d, 1.0);
+  assert_variable!(both_range; e, 2.0);
+
+  let fibonnacci_match = run(indoc! {"
+    let fibonnacciMatch = n => match n
+      | ..2 -> 1
+      | n -> fibonnacciMatch(n - 1) + fibonnacciMatch(n - 2)
+    let a = fibonnacciMatch(0)
+    let b = fibonnacciMatch(3)
+  "});
+  assert_variable!(fibonnacci_match; a, 1.0);
+  assert_variable!(fibonnacci_match; b, 8.0);
+}

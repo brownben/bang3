@@ -8,27 +8,6 @@ use crate::{
 };
 use std::{error, fmt, mem};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Local<'s> {
-  name: &'s str,
-  depth: u8,
-  status: LocalStatus,
-}
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-enum LocalStatus {
-  #[default]
-  Open,
-  Closed,
-}
-impl From<LocalStatus> for ClosureStatus {
-  fn from(value: LocalStatus) -> Self {
-    match value {
-      LocalStatus::Open => Self::Open,
-      LocalStatus::Closed => Self::Closed,
-    }
-  }
-}
-
 pub struct Compiler<'s> {
   chunk: Chunk,
 
@@ -153,65 +132,26 @@ impl<'s> Compiler<'s> {
   }
 }
 
-/// An error from compiling an AST into bytecode
-#[derive(Debug, Clone, Copy)]
-pub enum CompileError {
-  /// Too many constants
-  TooManyConstants,
-  /// Too many strings
-  TooManyStrings,
-  /// Too big jump
-  TooBigJump,
-  /// Too many closures
-  TooManyClosures,
-  /// Too many local variables
-  TooManyLocalVariables,
-  /// Block must end with expression
-  BlockMustEndWithExpression(Span),
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Local<'s> {
+  name: &'s str,
+  depth: u8,
+  status: LocalStatus,
 }
-impl CompileError {
-  /// The title of the error message
-  #[must_use]
-  pub fn title(&self) -> &'static str {
-    match self {
-      Self::TooManyConstants => "Too Many Constants",
-      Self::TooManyStrings => "Too Many Strings",
-      Self::TooBigJump => "Too Big Jump",
-      Self::TooManyClosures => "Too Many Closures",
-      Self::TooManyLocalVariables => "Too Many Local Variables",
-      Self::BlockMustEndWithExpression(_) => "Block Must End With Expression",
-    }
-  }
-
-  /// The body of the error message describing what has gone wrong
-  #[must_use]
-  pub fn message(&self) -> &'static str {
-    match self {
-      Self::TooManyConstants => "the maximum no. of constants has been reached (65536)",
-      Self::TooManyStrings => "the maximum no. of strings has been reached (256)",
-      Self::TooBigJump => "the maximum jump size has been reached (65536)",
-      Self::TooManyClosures => "the maximum no. of closures has been reached (256)",
-      Self::TooManyLocalVariables => "more than 256 local variables have been defined",
-      Self::BlockMustEndWithExpression(_) => {
-        "a blocks must return with a value, and so must end with an expression"
-      }
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+enum LocalStatus {
+  #[default]
+  Open,
+  Closed,
+}
+impl From<LocalStatus> for ClosureStatus {
+  fn from(value: LocalStatus) -> Self {
+    match value {
+      LocalStatus::Open => Self::Open,
+      LocalStatus::Closed => Self::Closed,
     }
   }
 }
-impl GetSpan for CompileError {
-  fn span(&self) -> Span {
-    match self {
-      Self::BlockMustEndWithExpression(span) => *span,
-      _ => Span::default(),
-    }
-  }
-}
-impl fmt::Display for CompileError {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", self.message())
-  }
-}
-impl error::Error for CompileError {}
 
 trait Compile<'s> {
   fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError>;
@@ -243,7 +183,7 @@ impl<'s> Compile<'s> for Expression<'s, '_> {
       Expression::Group(group) => group.compile(compiler),
       Expression::If(if_) => if_.compile(compiler),
       Expression::Literal(literal) => literal.compile(compiler),
-      Expression::Match(_) => todo!(),
+      Expression::Match(match_) => match_.compile(compiler),
       Expression::Unary(unary) => unary.compile(compiler),
       Expression::Variable(variable) => variable.compile(compiler),
     }
@@ -413,6 +353,106 @@ impl<'s> Compile<'s> for Literal<'s> {
     Ok(())
   }
 }
+impl<'s> Compile<'s> for Match<'s, '_> {
+  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+    let is_exhaustive = self
+      .cases
+      .iter()
+      .any(|case| matches!(case.pattern, Pattern::Identifier(_)));
+
+    if !is_exhaustive {
+      Err(CompileError::NonExhaustiveMatch)?;
+    }
+
+    self.value.compile(compiler)?;
+
+    let mut case_end_jumps = Vec::new();
+    for case in &self.cases {
+      match &case.pattern {
+        Pattern::Identifier(variable) => {
+          compiler.begin_scope();
+          compiler.define_variable(variable.name)?;
+          case.expression.compile(compiler)?;
+          compiler.end_scope()?; // clears up the value being matched upon
+          break;
+        }
+        Pattern::Literal(literal) => {
+          // Check if the value matches the literal
+          compiler.add_opcode(OpCode::Peek);
+          literal.compile(compiler)?;
+          compiler.add_opcode(OpCode::Equals);
+
+          // If it does, do the expression
+          let non_match_jump = compiler.add_jump(OpCode::JumpIfFalse);
+          compiler.add_opcode(OpCode::Pop);
+          case.expression.compile(compiler)?;
+          case_end_jumps.push(compiler.add_jump(OpCode::Jump));
+
+          // Otherwise skip to the next case
+          compiler.patch_jump(non_match_jump)?;
+          compiler.add_opcode(OpCode::Pop);
+        }
+        Pattern::Range(range) => {
+          match (&range.start, &range.end) {
+            (None, Some(pattern)) => {
+              compiler.add_opcode(OpCode::Peek);
+              match pattern {
+                Pattern::Literal(literal) => literal.compile(compiler)?,
+                _ => unreachable!(),
+              }
+              compiler.add_opcode(OpCode::LessEqual);
+            }
+            (Some(pattern), None) => {
+              compiler.add_opcode(OpCode::Peek);
+              match pattern {
+                Pattern::Literal(literal) => literal.compile(compiler)?,
+                _ => unreachable!(),
+              }
+              compiler.add_opcode(OpCode::GreaterEqual);
+            }
+            (Some(greater_than), Some(less_than)) => {
+              compiler.add_opcode(OpCode::Peek);
+              match greater_than {
+                Pattern::Literal(literal) => literal.compile(compiler)?,
+                _ => unreachable!(),
+              }
+              compiler.add_opcode(OpCode::GreaterEqual);
+
+              let jump = compiler.add_jump(OpCode::JumpIfFalse);
+              compiler.add_opcode(OpCode::Pop);
+
+              compiler.add_opcode(OpCode::Peek);
+              match less_than {
+                Pattern::Literal(literal) => literal.compile(compiler)?,
+                _ => unreachable!(),
+              }
+              compiler.add_opcode(OpCode::LessEqual);
+
+              compiler.patch_jump(jump)?;
+            }
+            (None, None) => unreachable!("range has bound, checked in parser"),
+          }
+
+          // If it does, do the expression
+          let non_match_jump = compiler.add_jump(OpCode::JumpIfFalse);
+          compiler.add_opcode(OpCode::Pop);
+          case.expression.compile(compiler)?;
+          case_end_jumps.push(compiler.add_jump(OpCode::Jump));
+
+          // Otherwise skip to the next case
+          compiler.patch_jump(non_match_jump)?;
+          compiler.add_opcode(OpCode::Pop);
+        }
+      }
+    }
+
+    for jump in case_end_jumps {
+      compiler.patch_jump(jump)?;
+    }
+
+    Ok(())
+  }
+}
 impl<'s> Compile<'s> for Unary<'s, '_> {
   fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
     self.expression.compile(compiler)?;
@@ -510,3 +550,67 @@ impl<'s> Compile<'s> for Let<'s, '_> {
     compiler.define_variable(self.identifier)
   }
 }
+
+/// An error from compiling an AST into bytecode
+#[derive(Debug, Clone, Copy)]
+pub enum CompileError {
+  /// Too many constants
+  TooManyConstants,
+  /// Too many strings
+  TooManyStrings,
+  /// Too big jump
+  TooBigJump,
+  /// Too many closures
+  TooManyClosures,
+  /// Too many local variables
+  TooManyLocalVariables,
+  /// Block must end with expression
+  BlockMustEndWithExpression(Span),
+  /// Non-exhaustive match
+  NonExhaustiveMatch,
+}
+impl CompileError {
+  /// The title of the error message
+  #[must_use]
+  pub fn title(&self) -> &'static str {
+    match self {
+      Self::TooManyConstants => "Too Many Constants",
+      Self::TooManyStrings => "Too Many Strings",
+      Self::TooBigJump => "Too Big Jump",
+      Self::TooManyClosures => "Too Many Closures",
+      Self::TooManyLocalVariables => "Too Many Local Variables",
+      Self::BlockMustEndWithExpression(_) => "Block Must End With Expression",
+      Self::NonExhaustiveMatch => "Non-Exhaustive Match",
+    }
+  }
+
+  /// The body of the error message describing what has gone wrong
+  #[must_use]
+  pub fn message(&self) -> &'static str {
+    match self {
+      Self::TooManyConstants => "the maximum no. of constants has been reached (65536)",
+      Self::TooManyStrings => "the maximum no. of strings has been reached (256)",
+      Self::TooBigJump => "the maximum jump size has been reached (65536)",
+      Self::TooManyClosures => "the maximum no. of closures has been reached (256)",
+      Self::TooManyLocalVariables => "more than 256 local variables have been defined",
+      Self::BlockMustEndWithExpression(_) => {
+        "a blocks must return a value, so must end with an expression"
+      }
+      Self::NonExhaustiveMatch => "a match expression must always match an arm",
+    }
+  }
+}
+impl GetSpan for CompileError {
+  fn span(&self) -> Span {
+    match self {
+      Self::BlockMustEndWithExpression(span) => *span,
+      _ => Span::default(),
+    }
+  }
+}
+impl fmt::Display for CompileError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.message())
+  }
+}
+impl error::Error for CompileError {}

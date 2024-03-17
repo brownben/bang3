@@ -264,6 +264,10 @@ impl VM {
           self.stack.truncate(self.stack.len() - usize::from(count));
           self.push(value);
         }
+        OpCode::Peek => {
+          let value = unsafe { self.stack.last().unwrap_unchecked() }.clone();
+          self.push(value);
+        }
         OpCode::Jump => {
           let jump = chunk.get_long_value(ip + 1);
           ip += usize::from(jump);
