@@ -1,10 +1,10 @@
-let fibonnacciMatch = n => match n
+let fibonacciMatch = n => match n
   | ..2 -> 1
-  | n -> fibonnacciMatch(n - 1) + fibonnacciMatch(n - 2)
+  | n -> fibonacciMatch(n - 1) + fibonacciMatch(n - 2)
 
-let fibonnaciIf = n => if (n < 2) { 1 } else {
-  fibonnacciMatch(n - 1) + fibonnacciMatch(n - 2)
+let fibonacciIf = n => if (n < 2) { 1 } else {
+  fibonacciIf(n - 1) + fibonacciIf(n - 2)
 }
 
-print(fibonnacciMatch(25))
-print(fibonnaciIf(25))
+fibonacciIf(25)
+fibonacciMatch(25)

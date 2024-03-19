@@ -21,6 +21,9 @@ lto = "fat"
 strip = true
 panic = "abort"
 
+[profile.bench]
+debug = true
+
 [lints]
 rust.missing_docs = "warn"
 clippy.pedantic = "warn"
