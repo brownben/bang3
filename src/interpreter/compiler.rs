@@ -365,10 +365,6 @@ impl<'s> Compile<'s> for Match<'s, '_> {
       .iter()
       .any(|case| matches!(case.pattern, Pattern::Identifier(_)));
 
-    if !is_exhaustive {
-      Err(CompileError::NonExhaustiveMatch(self.span))?;
-    }
-
     self.value.compile(compiler)?;
 
     let mut case_end_jumps = Vec::new();
@@ -450,6 +446,11 @@ impl<'s> Compile<'s> for Match<'s, '_> {
           compiler.add_opcode(OpCode::Pop, self.span);
         }
       }
+    }
+
+    if !is_exhaustive {
+      compiler.add_opcode(OpCode::Pop, self.span);
+      compiler.add_opcode(OpCode::Null, self.span);
     }
 
     for jump in case_end_jumps {
@@ -575,8 +576,6 @@ pub enum CompileError {
   TooManyLocalVariables,
   /// Block must end with expression
   BlockMustEndWithExpression(Span),
-  /// Non-exhaustive match
-  NonExhaustiveMatch(Span),
 }
 impl CompileError {
   /// The title of the error message
@@ -589,7 +588,6 @@ impl CompileError {
       Self::TooManyClosures => "Too Many Closures",
       Self::TooManyLocalVariables => "Too Many Local Variables",
       Self::BlockMustEndWithExpression(_) => "Block Must End With Expression",
-      Self::NonExhaustiveMatch(_) => "Non-Exhaustive Match",
     }
   }
 
@@ -605,14 +603,13 @@ impl CompileError {
       Self::BlockMustEndWithExpression(_) => {
         "a blocks must return a value, so must end with an expression"
       }
-      Self::NonExhaustiveMatch(_) => "a match expression must always match an arm",
     }
   }
 }
 impl GetSpan for CompileError {
   fn span(&self) -> Span {
     match self {
-      Self::BlockMustEndWithExpression(span) | Self::NonExhaustiveMatch(span) => *span,
+      Self::BlockMustEndWithExpression(span) => *span,
       _ => Span::default(),
     }
   }

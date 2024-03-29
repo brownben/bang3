@@ -623,6 +623,8 @@ fn match_() {
   assert_variable!(multiple_catch_all; a, 1.0);
 
   let literal_no_catch_all = run("let a = match true | true -> 1");
+  assert_variable!(literal_no_catch_all; a, 1.0);
+  let literal_no_catch_all = run("let a = (match false | true -> 1) + 1");
   assert!(literal_no_catch_all.is_err());
 
   let literal = run("let a = match true | true -> 1 | _ -> 2");
