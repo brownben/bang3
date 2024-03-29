@@ -316,9 +316,9 @@ impl GetSpan for Pattern<'_, '_> {
 impl GetSpan for PatternRange<'_, '_> {
   fn span(&self) -> Span {
     match (&self.start, &self.end) {
-      (None, None) => unreachable!("range must have either start or end"),
-      (None, Some(x)) | (Some(x), None) => x.span(),
       (Some(start), Some(end)) => start.span().merge(end.span()),
+      (None, Some(x)) | (Some(x), None) => x.span(),
+      (None, None) => unreachable!("range must have either start or end"),
     }
   }
 }

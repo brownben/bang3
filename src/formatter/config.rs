@@ -39,11 +39,6 @@ impl Indentation {
     }
   }
 }
-impl Default for Indentation {
-  fn default() -> Self {
-    Self::Space(2)
-  }
-}
 impl From<u8> for Indentation {
   /// The number of spaces to use for indentation. If 0 use tabs.
   fn from(n: u8) -> Self {

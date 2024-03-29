@@ -242,7 +242,9 @@ impl<'s> Compile<'s> for Binary<'s, '_> {
         BinaryOperator::GreaterEqual => OpCode::GreaterEqual,
         BinaryOperator::Less => OpCode::Less,
         BinaryOperator::LessEqual => OpCode::LessEqual,
-        _ => unreachable!(),
+        BinaryOperator::And | BinaryOperator::Or | BinaryOperator::Pipeline => {
+          unreachable!("handled above")
+        }
       },
       self.span,
     );

@@ -14,16 +14,6 @@ impl fmt::Display for AST<'_, '_> {
     Ok(())
   }
 }
-impl fmt::Display for Statement<'_, '_> {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    self.pretty(f, "", false)
-  }
-}
-impl fmt::Display for Expression<'_, '_> {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    self.pretty(f, "", false)
-  }
-}
 
 const OTHER_CHILD: &str = "│  ";
 const OTHER_ENTRY: &str = "├─ ";

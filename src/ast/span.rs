@@ -19,13 +19,6 @@ impl Span {
     Self { start, end }
   }
 
-  /// Get the length of a `Span` in bytes
-  #[must_use]
-  pub fn size(self) -> u32 {
-    debug_assert!(self.start <= self.end);
-    self.end - self.start
-  }
-
   /// Combine two `Span`s into one
   pub fn merge(self, other: Self) -> Self {
     Self::new(self.start.min(other.start), self.end.max(other.end))

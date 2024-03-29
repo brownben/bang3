@@ -23,6 +23,8 @@ fn unknown_character() {
   let allocator = Allocator::new();
   assert!(parse("¬", &allocator).is_err());
   assert!(parse("🤗", &allocator).is_err());
+  assert!(parse(".-2", &allocator).is_err());
+  assert!(parse("&", &allocator).is_err());
 
   // Having unknown characters in strings are fine
   assert!(parse("'¬'", &allocator).is_ok());
@@ -462,6 +464,10 @@ fn variable() {
 
   let ast = parse_to_string("count");
   let expected = "├─ Variable (count)\n";
+  assert_eq!(ast, expected);
+
+  let ast = parse_to_string("leaf");
+  let expected = "├─ Variable (leaf)\n";
   assert_eq!(ast, expected);
 }
 

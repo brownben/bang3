@@ -16,8 +16,11 @@ fn lint(source: &str) -> Result<(), ()> {
 fn constant_conditions() {
   assert!(lint("if (true) pass else other").is_err());
   assert!(lint("if (4 > 5) pass else other").is_err());
+  assert!(lint("match false | _ -> false").is_err());
 
   assert!(lint("if (x > 6) pass else other").is_ok());
+  assert!(lint("match x | 1 -> false | _ -> true").is_ok());
+  assert!(lint("5 >> 4").is_ok());
 }
 
 #[test]
@@ -28,6 +31,8 @@ fn no_negative_zero() {
 
   assert!(lint("0").is_ok());
   assert!(lint("5 - 0").is_ok());
+  assert!(lint("!0").is_ok());
+  assert!(lint("function(-5)").is_ok());
 }
 
 #[test]
@@ -48,12 +53,14 @@ fn no_self_comparison() {
   assert!(lint("bla <= bla // bla").is_err());
   assert!(lint("a < a").is_err());
   assert!(lint("a > a").is_err());
+  assert!(lint("a > { a }").is_err());
 
   assert!(lint("x == y").is_ok());
   assert!(lint("(variable) >= var").is_ok());
   assert!(lint("bla <= blabber // bla").is_ok());
   assert!(lint("a < b").is_ok());
   assert!(lint("a > d").is_ok());
+  assert!(lint("a > { d \n b }").is_ok());
 }
 
 #[test]

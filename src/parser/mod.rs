@@ -518,13 +518,13 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   fn comment_statement(&mut self) -> ParseResult<Statement<'s, 'ast>> {
     let span = Span::from(self.next_token());
     let text = &span.source_text(self.source)[2..];
-    self.expect_newline()?;
+    self.skip_newline();
 
     self.allocate_statement(CommentStmt { text, span })
   }
 
   fn declaration_statement(&mut self) -> ParseResult<Statement<'s, 'ast>> {
-    let let_token = self.expect(TokenKind::Let)?;
+    let let_token = self.next_token();
     let identifier_token = self.expect(TokenKind::Identifier)?;
     self.expect(TokenKind::Equal)?;
     let mut expression = self.parse_expression()?;

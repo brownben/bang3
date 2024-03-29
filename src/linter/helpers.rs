@@ -7,10 +7,11 @@ impl Expression<'_, '_> {
       Self::Comment(comment) => comment.expression.unwrap(),
       Self::Group(group) => group.expression.unwrap(),
       Self::Block(block) => {
-        if let Some(statement) = block.statements.first()
+        if block.statements.len() == 1
+          && let Some(statement) = block.statements.first()
           && let Statement::Expression(expression) = statement
         {
-          expression
+          expression.unwrap()
         } else {
           self
         }
@@ -102,12 +103,7 @@ pub(super) trait ASTEquality {
 
 impl ASTEquality for Expression<'_, '_> {
   fn equals(&self, other: &Self) -> bool {
-    match (self, other) {
-      (Self::Comment(x), y) => x.expression.equals(y),
-      (x, Self::Comment(y)) => x.equals(&y.expression),
-      (Self::Group(x), y) => x.expression.equals(y),
-      (x, Self::Group(y)) => x.equals(&y.expression),
-
+    match (self.unwrap(), other.unwrap()) {
       (Self::Binary(x), Self::Binary(y)) => x.equals(y),
       (Self::Block(x), Self::Block(y)) => x.equals(y),
       (Self::Call(x), Self::Call(y)) => x.equals(y),

@@ -3,14 +3,8 @@ use indoc::indoc;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum Error {
-  ParseError,
   CompileError,
   RuntimeError,
-}
-impl From<crate::ParseError> for Error {
-  fn from(_: crate::ParseError) -> Self {
-    Self::ParseError
-  }
 }
 impl From<crate::CompileError> for Error {
   fn from(_: crate::CompileError) -> Self {
@@ -25,7 +19,7 @@ impl From<crate::RuntimeError> for Error {
 
 fn run(source: &str) -> Result<VM, Error> {
   let allocator = Allocator::new();
-  let ast = parse(source, &allocator)?;
+  let ast = parse(source, &allocator).unwrap();
   let chunk = compile(&ast)?;
   let mut vm = VM::new();
   vm.run(&chunk)?;
@@ -171,6 +165,9 @@ fn concatenate_strings() {
   assert!(numeric_add_for_strings.is_err());
 
   let non_string_concat = run(indoc! {"'a' ++ 3"});
+  assert!(non_string_concat.is_err());
+
+  let non_string_concat = run(indoc! {"3 ++ 'a'"});
   assert!(non_string_concat.is_err());
 }
 

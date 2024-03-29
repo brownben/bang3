@@ -1,7 +1,7 @@
 use indoc::indoc;
 
-use super::{config::*, *};
-use crate::parse;
+use super::Formatter;
+use crate::{parse, Allocator, FormatterConfig as Config};
 
 fn format(source: &str, print_width: u16) -> String {
   let config = Config {
@@ -10,9 +10,8 @@ fn format(source: &str, print_width: u16) -> String {
   };
   let allocator = Allocator::new();
   let ast = parse(source, &allocator).unwrap();
-  let formatter = Formatter::new(config, &allocator);
 
-  formatter.print(&ast)
+  crate::format(&ast, config)
 }
 
 macro assert_format($source:expr, $expected:expr, $print_width:expr) {
@@ -60,6 +59,11 @@ fn binary() {
   assert_format!("a % b", "a % b", 2);
   assert_format!("a and b && c", "a and b and c", 2);
   assert_format!("a || b or c", "a or b or c", 6);
+
+  assert_format!("a > b", "a > b", 25);
+  assert_format!("a    < b", "a < b", 25);
+  assert_format!("a >=    b", "a >= b", 25);
+  assert_format!("a    <=    b", "a <= b", 25);
 }
 
 #[test]
@@ -147,6 +151,11 @@ fn if_() {
   assert_format!("if (true  ) false else 7", "if (true) false else 7", 25);
   assert_format!("if (true)   false else 7", "if (true) false else 7", 25);
   assert_format!("if   ( true )  false  else 7", "if (true) false else 7", 25);
+  assert_format!(
+    "if (true !=false) 6 else 7",
+    "if (true != false) 6 else 7",
+    25
+  );
 }
 
 #[test]
