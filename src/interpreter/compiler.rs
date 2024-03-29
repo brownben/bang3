@@ -274,7 +274,11 @@ impl<'s> Compile<'s> for Block<'s, '_> {
 impl<'s> Compile<'s> for Call<'s, '_> {
   fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
     self.expression.compile(compiler)?;
-    self.argument.compile(compiler)?;
+    if let Some(argument) = &self.argument {
+      argument.compile(compiler)?;
+    } else {
+      compiler.add_opcode(OpCode::Null, self.span);
+    }
     compiler.add_opcode(OpCode::Call, self.span);
     Ok(())
   }

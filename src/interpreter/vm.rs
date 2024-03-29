@@ -103,6 +103,7 @@ impl VM {
         }
         OpCode::True => self.push(Value::TRUE),
         OpCode::False => self.push(Value::FALSE),
+        OpCode::Null => self.push(Value::NULL),
 
         // Numeric Operations
         OpCode::Add => numeric_operation!((self, chunk), +),

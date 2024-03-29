@@ -206,9 +206,9 @@ fn call_missing_brackets_or_expression() {
   assert!(parse("f(", &allocator).is_err());
   assert!(parse("f(6", &allocator).is_err());
 
-  assert!(parse("f()", &allocator).is_err());
-  assert!(parse("f ()", &allocator).is_err());
-  assert!(parse("f(\n)", &allocator).is_err());
+  assert!(parse("f()", &allocator).is_ok());
+  assert!(parse("f ()", &allocator).is_ok());
+  assert!(parse("f(\n)", &allocator).is_ok());
 
   assert!(parse("f(\n'hello')", &allocator).is_ok());
   assert!(parse("f('hello'\n)", &allocator).is_ok());

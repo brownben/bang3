@@ -24,6 +24,9 @@ pub const TRUE: *const Object = ptr::without_provenance(
 pub const FALSE: *const Object = ptr::without_provenance(
   0b1111_1111_1111_1110_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000,
 );
+pub const NULL: *const Object = ptr::without_provenance(
+  0b1111_1111_1111_1111_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000,
+);
 
 /// A basic value in the interpreter
 /// Either a boolean, number, or a pointer to a heap allocated [Object]
@@ -33,6 +36,8 @@ impl Value {
   pub const TRUE: Self = Self(TRUE);
   /// A boolean value of `false`
   pub const FALSE: Self = Self(FALSE);
+  /// A null value, only used for error states in the VM
+  pub const NULL: Self = Self(NULL);
 
   /// Check is the current value is a heap allocated [Object]
   #[inline]
@@ -99,7 +104,7 @@ impl Value {
   pub fn is_falsy(&self) -> bool {
     match self {
       Self(TRUE) => false,
-      Self(FALSE) => true,
+      Self(FALSE | NULL) => true,
       a if a.is_number() => (a.as_number() - 0.0).abs() < f64::EPSILON,
       b => b.as_object().is_falsy(),
     }
@@ -110,6 +115,7 @@ impl Value {
   pub fn get_type(&self) -> &'static str {
     match self {
       Self(TRUE | FALSE) => "boolean",
+      Self(NULL) => "null",
       a if a.is_number() => "number",
       b => b.as_object().get_type(),
     }
@@ -171,6 +177,7 @@ impl fmt::Debug for Value {
     match self {
       Self(TRUE) => write!(f, "true"),
       Self(FALSE) => write!(f, "false"),
+      Self(NULL) => write!(f, "null"),
       a if a.is_number() => write!(f, "{}", a.as_number()),
       a if a.is_object() => write!(f, "{}", a.as_object()),
       a if a.is_allocated() => write!(f, "<allocated {:?}>", a.as_allocated().borrow()),
@@ -334,22 +341,26 @@ mod test {
       let num = Value::from(number);
       assert!(num.is_number());
       assert!(!num.is_object());
+      assert!(!num.is_allocated());
       assert_eq!(num.as_number(), number)
     }
 
     let num = Value::from(f64::NAN);
     assert!(num.is_number());
     assert!(!num.is_object());
+    assert!(!num.is_allocated());
     assert!(num.as_number().is_nan());
 
     let num = Value::from(f64::INFINITY);
     assert!(num.is_number());
     assert!(!num.is_object());
+    assert!(!num.is_allocated());
     assert_eq!(num.as_number(), f64::INFINITY);
 
     let num = Value::from(f64::asin(55.0));
     assert!(num.is_number());
     assert!(!num.is_object());
+    assert!(!num.is_allocated());
     assert!(num.as_number().is_nan());
   }
 
@@ -358,13 +369,23 @@ mod test {
     let string = Value::from("hello");
     assert!(string.is_object());
     assert!(!string.is_number());
+    assert!(!string.is_allocated());
     assert_eq!(string, Object::String("hello".into()).into());
+  }
+
+  #[test]
+  fn null() {
+    let null = Value::NULL;
+    assert!(!null.is_number());
+    assert!(!null.is_object());
+    assert!(!null.is_allocated());
   }
 
   #[test]
   fn is_falsy() {
     assert_eq!(Value::TRUE.is_falsy(), false);
     assert_eq!(Value::FALSE.is_falsy(), true);
+    assert_eq!(Value::NULL.is_falsy(), true);
 
     assert_eq!(Value::from(0.0).is_falsy(), true);
     assert_eq!(Value::from(-0.0).is_falsy(), true);

@@ -470,7 +470,7 @@ fn block() {
 fn call() {
   let returns_literal = run(indoc! {"
     let a = _ => 7
-    let b = a(false)
+    let b = a()
   "});
   assert_variable!(returns_literal; b, 7.0);
 

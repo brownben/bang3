@@ -76,7 +76,7 @@ x => 3 + 5
 (!!(_ => 3))   // true
 
 // Functions are called with brackets, and always have an argument
-(_ => 3)(0)        // 3
+(_ => 3)()        // 3
 (x => x + 3)(4)  // 7
 
 

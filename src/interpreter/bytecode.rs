@@ -10,6 +10,7 @@ pub enum OpCode {
   ConstantLong,
   True,
   False,
+  Null,
 
   // Numeric Operations
   Add,

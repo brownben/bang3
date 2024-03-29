@@ -281,7 +281,11 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     _left_bracket: Token,
   ) -> ParseResult<Expression<'s, 'ast>> {
     self.skip_newline();
-    let argument = self.parse_expression()?;
+    let argument = if self.peek_token() == TokenKind::RightParen {
+      None
+    } else {
+      Some(self.parse_expression()?)
+    };
     self.skip_newline();
     let right_paren = self.expect(TokenKind::RightParen)?;
     let span = expression.span().merge(right_paren.into());

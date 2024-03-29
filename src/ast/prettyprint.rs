@@ -86,8 +86,10 @@ impl PrettyPrint for Call<'_, '_> {
     writeln!(f, "{prefix}{OTHER_ENTRY}Callee")?;
     self.expression.pretty(f, &child_prefix, true)?;
 
-    writeln!(f, "{prefix}{FINAL_ENTRY}Argument")?;
-    self.argument.pretty(f, &final_child_prefix, true)?;
+    if let Some(argument) = &self.argument {
+      writeln!(f, "{prefix}{FINAL_ENTRY}Argument")?;
+      argument.pretty(f, &final_child_prefix, true)?;
+    }
 
     Ok(())
   }
