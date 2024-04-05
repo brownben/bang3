@@ -43,7 +43,8 @@ impl LineIndex {
   #[must_use]
   pub fn get_line(&self, span: Span) -> LineNumber {
     match self.line_starts.binary_search(&span.start) {
-      Ok(line) | Err(line) => line,
+      Ok(line) => line + 1,
+      Err(line) => line,
     }
   }
 
@@ -51,7 +52,8 @@ impl LineIndex {
   #[must_use]
   pub fn get_final_line(&self, span: Span) -> LineNumber {
     match self.line_starts.binary_search(&span.end) {
-      Ok(line) | Err(line) => line,
+      Ok(line) => line + 1,
+      Err(line) => line,
     }
   }
 

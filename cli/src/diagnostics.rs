@@ -104,7 +104,7 @@ impl fmt::Display for CodeFrame<'_> {
     let start_line = self.lines.get_line(self.span).max(1);
     let end_line = self.lines.get_final_line(self.span);
 
-    writeln!(f, "    ╭─[{}]", self.title)?;
+    writeln!(f, "    ╭─[{}:{}]", self.title, start_line)?;
 
     for line in start_line..=end_line {
       let line_text = self.lines.line_span(line).source_text(self.source);
