@@ -501,3 +501,25 @@ fn let_statement_missing_parts() {
 
   assert!(parse("let var = 7", &allocator).is_ok());
 }
+
+#[test]
+fn pipeline_can_break_lines() {
+  let ast = parse_to_string("5 \n    >> add3");
+  let expected = indoc! {"
+    ├─ Binary (>>)
+    │  ├─ Number (5)
+    │  ╰─ Variable (add3)
+  "};
+  assert_eq!(ast, expected);
+
+  let ast = parse_to_string("let x = 5 \n    >> add3\n>>times2");
+  let expected = indoc! {"
+    ├─ Let 'x' =
+    │  ╰─ Binary (>>)
+    │     ├─ Binary (>>)
+    │     │  ├─ Number (5)
+    │     │  ╰─ Variable (add3)
+    │     ╰─ Variable (times2)
+  "};
+  assert_eq!(ast, expected);
+}

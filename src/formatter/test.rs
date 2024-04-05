@@ -73,9 +73,9 @@ fn binary_pipeline() {
   assert_format!("a >>    b", "a >> b", 25);
   assert_format!("a    >>     b", "a >> b", 25);
 
-  assert_format!("a >> b", "a >>\n  b", 2);
-  assert_format!("a >> b >> c", "a >>\n  b >>\n  c", 2);
-  assert_format!("a >> b >> c", "a >> b >>\n  c", 6);
+  assert_format!("a >> b", "a\n  >> b", 2);
+  assert_format!("a >> b >> c", "a\n  >> b\n  >> c", 2);
+  assert_format!("a >> b >> c", "a >> b\n  >> c", 6);
 }
 
 #[test]

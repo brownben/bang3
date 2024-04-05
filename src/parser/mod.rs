@@ -260,6 +260,20 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     })
   }
 
+  fn pipeline(&mut self, left: Expression<'s, 'ast>) -> ParseResult<Expression<'s, 'ast>> {
+    let token = self.next_token();
+    let precedence = ParsePrecedence::from(token.kind);
+    let right = self.parse_expression_inner(precedence.next())?;
+    let span = left.span().merge(right.span());
+
+    self.allocate_expression(Binary {
+      left,
+      operator: BinaryOperator::Pipeline,
+      right,
+      span,
+    })
+  }
+
   fn block(&mut self, opening_curly: Token) -> ParseResult<Expression<'s, 'ast>> {
     let mut statements = Vec::with_capacity_in(4, self.allocator);
     let closing_curly = loop {
@@ -527,7 +541,15 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     let let_token = self.next_token();
     let identifier_token = self.expect(TokenKind::Identifier)?;
     self.expect(TokenKind::Equal)?;
+
     let mut expression = self.parse_expression()?;
+    loop {
+      self.skip_maybe_newline();
+      match self.peek_token() {
+        TokenKind::RightRight => expression = self.pipeline(expression)?,
+        _ => break self.expect_newline()?,
+      }
+    }
     self.expect_newline()?;
 
     let identifier = Span::from(identifier_token).source_text(self.source);
@@ -545,12 +567,15 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   }
 
   fn expression_statement(&mut self) -> ParseResult<Statement<'s, 'ast>> {
-    let expression = self.parse_expression()?;
+    let mut expression = self.parse_expression()?;
 
-    // Blocks should end with an expression, thus allow block end instead of new line
-    match self.peek_token() {
-      TokenKind::RightCurly => {}
-      _ => self.expect_newline()?,
+    loop {
+      self.skip_maybe_newline();
+      match self.peek_token() {
+        TokenKind::RightCurly => break, // allow block to end without newline
+        TokenKind::RightRight => expression = self.pipeline(expression)?,
+        _ => break self.expect_newline()?,
+      }
     }
 
     self.allocate_statement(expression)

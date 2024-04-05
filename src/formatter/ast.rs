@@ -39,8 +39,7 @@ impl<'a, 'b> Formattable<'a, 'b> for Binary<'a, '_> {
     if self.operator == BinaryOperator::Pipeline {
       return f.group([
         self.left.format(f),
-        IR::Text(" >>"),
-        f.indent([IR::LineOrSpace, self.right.format(f)]),
+        f.indent([IR::LineOrSpace, IR::Text(">> "), self.right.format(f)]),
       ]);
     }
 
