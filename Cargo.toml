@@ -1,19 +1,12 @@
-[package]
-name = "bang"
-version = "3.0.0"
-edition = "2021"
+[workspace]
+members = ["cli", "lib"]
+resolver = "2"
 
-[dependencies]
-anstream = "0.6.4"
-bumpalo = { version = "3.14.0", features = ["boxed", "collections"] }
-clap = { version = "4.4.8", features = ["derive"] }
-owo-colors = "3.5.0"
-rustc-hash = "1.1.0"
-smallvec = "1.13.1"
-smartstring = "1.0.1"
+[workspace.lints]
+rust.missing_docs = "warn"
+clippy.pedantic = "warn"
+clippy.wildcard_imports = { level = "allow", priority = 1 }
 
-[dev-dependencies]
-indoc = "2.0.4"
 
 [profile.release]
 codegen-units = 1
@@ -23,8 +16,3 @@ panic = "abort"
 
 [profile.bench]
 debug = true
-
-[lints]
-rust.missing_docs = "warn"
-clippy.pedantic = "warn"
-clippy.wildcard_imports = { level = "allow", priority = 1 }

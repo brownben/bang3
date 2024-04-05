@@ -60,14 +60,21 @@ checksum = "f1fdabc7756949593fe60f30ec81974b613357de856987752631dea1e3394c80"
 name = "bang"
 version = "3.0.0"
 dependencies = [
- "anstream",
  "bumpalo",
- "clap",
  "indoc",
- "owo-colors",
  "rustc-hash",
  "smallvec",
  "smartstring",
+]
+
+[[package]]
+name = "bang-cli"
+version = "3.0.0"
+dependencies = [
+ "anstream",
+ "bang",
+ "clap",
+ "owo-colors",
 ]
 
 [[package]]
