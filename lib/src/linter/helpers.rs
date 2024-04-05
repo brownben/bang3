@@ -106,8 +106,6 @@ impl ASTEquality for Expression<'_, '_> {
     match (self.unwrap(), other.unwrap()) {
       (Self::Binary(x), Self::Binary(y)) => x.equals(y),
       (Self::Block(x), Self::Block(y)) => x.equals(y),
-      (Self::Call(x), Self::Call(y)) => x.equals(y),
-      (Self::Function(x), Self::Function(y)) => x.equals(y),
       (Self::If(x), Self::If(y)) => x.equals(y),
       (Self::Literal(x), Self::Literal(y)) => x.equals(y),
       (Self::Match(x), Self::Match(y)) => x.equals(y),
