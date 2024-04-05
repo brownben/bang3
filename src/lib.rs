@@ -1,4 +1,6 @@
-//! # Bang - My Language
+//! # Bang
+//!
+//! My attempt at creating my own language. A strongly typed, functional, bytecode interpreter written.
 
 #![feature(let_chains)]
 #![feature(lint_reasons)]
