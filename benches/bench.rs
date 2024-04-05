@@ -69,6 +69,15 @@ macro example_benchmark($name:ident) {
 
       b.iter(|| bang::format(black_box(&ast), bang::FormatterConfig::default()));
     }
+
+    #[bench]
+    fn typecheck(b: &mut Bencher) {
+      let allocator = Allocator::new();
+      let source = include_str!(concat!("../examples/", stringify!($name), ".bang"));
+      let ast = bang::parse(source, &allocator).unwrap();
+
+      b.iter(|| bang::typecheck(black_box(&ast)));
+    }
   }
 }
 

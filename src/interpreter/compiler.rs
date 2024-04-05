@@ -400,36 +400,24 @@ impl<'s> Compile<'s> for Match<'s, '_> {
           match (&range.start, &range.end) {
             (None, Some(pattern)) => {
               compiler.add_opcode(OpCode::Peek, self.span);
-              match pattern {
-                Pattern::Literal(literal) => literal.compile(compiler)?,
-                _ => unreachable!(),
-              }
+              pattern.get_range_literal().compile(compiler)?;
               compiler.add_opcode(OpCode::LessEqual, self.span);
             }
             (Some(pattern), None) => {
               compiler.add_opcode(OpCode::Peek, self.span);
-              match pattern {
-                Pattern::Literal(literal) => literal.compile(compiler)?,
-                _ => unreachable!(),
-              }
+              pattern.get_range_literal().compile(compiler)?;
               compiler.add_opcode(OpCode::GreaterEqual, self.span);
             }
             (Some(greater_than), Some(less_than)) => {
               compiler.add_opcode(OpCode::Peek, self.span);
-              match greater_than {
-                Pattern::Literal(literal) => literal.compile(compiler)?,
-                _ => unreachable!(),
-              }
+              greater_than.get_range_literal().compile(compiler)?;
               compiler.add_opcode(OpCode::GreaterEqual, self.span);
 
               let jump = compiler.add_jump(OpCode::JumpIfFalse, self.span);
               compiler.add_opcode(OpCode::Pop, self.span);
 
               compiler.add_opcode(OpCode::Peek, self.span);
-              match less_than {
-                Pattern::Literal(literal) => literal.compile(compiler)?,
-                _ => unreachable!(),
-              }
+              less_than.get_range_literal().compile(compiler)?;
               compiler.add_opcode(OpCode::LessEqual, self.span);
 
               compiler.patch_jump(jump)?;

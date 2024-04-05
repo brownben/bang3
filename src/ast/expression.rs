@@ -144,6 +144,18 @@ pub enum Pattern<'source, 'ast> {
   Literal(Literal<'source>),
   Range(Box<'ast, PatternRange<'source, 'ast>>),
 }
+impl<'source, 'ast> Pattern<'source, 'ast> {
+  /// Get a literal from a Pattern as part of a range
+  ///
+  /// # Panics
+  /// Panics if the not a Literal. The parser ensures that range parts must be literals.
+  pub(crate) fn get_range_literal<'a>(&'a self) -> &'a Literal<'source> {
+    match self {
+      Pattern::Literal(literal) => literal,
+      _ => unreachable!("parser enforces range pattern start and end are literals"),
+    }
+  }
+}
 #[derive(Debug)]
 pub struct PatternRange<'source, 'ast> {
   pub start: Option<Pattern<'source, 'ast>>,

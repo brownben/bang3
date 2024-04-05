@@ -23,6 +23,12 @@ enum App {
     file: String,
   },
 
+  /// Checks the file for type errors
+  Typecheck {
+    /// The file to typecheck
+    file: String,
+  },
+
   /// Prints debugging information
   Print {
     #[command(subcommand)]
@@ -73,6 +79,7 @@ fn main() -> process::ExitCode {
     App::Run { file } => commands::run(&file),
     App::Format(options) => commands::format(&options),
     App::Lint { file } => commands::lint(&file),
+    App::Typecheck { file } => commands::typecheck(&file),
     App::Print { command } => match command {
       PrintCommand::Ast { file } => commands::print_ast(&file),
       PrintCommand::Bytecode { file } => commands::print_chunk(&file),
@@ -89,7 +96,7 @@ mod commands {
   use super::helpers::{compile, parse, read_file, CodeFrame, Message};
   use super::FormatOptions;
   use anstream::{eprintln, println};
-  use bang::ast::GetSpan;
+  use bang::GetSpan;
   use std::fs;
 
   pub fn run(filename: &str) -> Result<(), ()> {
@@ -152,6 +159,20 @@ mod commands {
     Ok(())
   }
 
+  pub fn typecheck(filename: &str) -> Result<(), ()> {
+    let allocator = bang::Allocator::new();
+    let source = read_file(filename)?;
+    let ast = parse(filename, &source, &allocator)?;
+    let errors = bang::typecheck(&ast);
+
+    for error in &errors {
+      println!("{}", Message::from(error));
+      println!("{}", CodeFrame::new(filename, &source, error.span()));
+    }
+
+    Ok(())
+  }
+
   pub fn print_ast(filename: &str) -> Result<(), ()> {
     let allocator = bang::Allocator::new();
     let source = read_file(filename)?;
@@ -177,8 +198,8 @@ mod commands {
 mod helpers {
   use anstream::eprintln;
   use bang::{
-    ast::{GetSpan, LineIndex, Span},
-    Allocator, Chunk, CompileError, LintDiagnostic, ParseError, RuntimeError, AST,
+    Allocator, Chunk, CompileError, GetSpan, LineIndex, LintDiagnostic, ParseError, RuntimeError,
+    Span, TypeError, AST,
   };
   use owo_colors::OwoColorize;
   use std::{fmt, fs};
@@ -250,6 +271,15 @@ mod helpers {
         title: error.title.to_owned(),
         body: error.message.to_owned(),
         severity: Severity::Warning,
+      }
+    }
+  }
+  impl From<&TypeError> for Message {
+    fn from(error: &TypeError) -> Self {
+      Self {
+        title: error.title().to_string(),
+        body: error.message(),
+        severity: Severity::Error,
       }
     }
   }

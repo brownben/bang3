@@ -5,11 +5,12 @@
 #![feature(strict_provenance)]
 #![feature(decl_macro)]
 
-pub mod ast;
+mod ast;
 mod formatter;
 mod interpreter;
 mod linter;
 mod parser;
+mod typechecker;
 
 /// More efficient datastructures than in standard library
 pub(crate) mod collections {
@@ -24,12 +25,7 @@ pub(crate) mod allocator {
   pub type Box<'allocator, T> = bumpalo::boxed::Box<'allocator, T>;
   pub type Vec<'allocator, T> = bumpalo::collections::Vec<'allocator, T>;
 }
-
-#[doc(inline)]
 pub use allocator::Allocator;
-
-#[doc(inline)]
-pub use ast::AST;
 
 /// Parses a source code string into an AST
 ///
@@ -49,7 +45,29 @@ pub fn parse<'source, 'ast>(
 ) -> Result<AST<'source, 'ast>, ParseError> {
   parser::Parser::new(source, allocator).parse()
 }
+pub use ast::{GetSpan, LineIndex, Span, AST};
 pub use parser::ParseError;
+
+/// Compile an AST into a bytecode chunk
+///
+/// # Examples
+/// ```
+/// use bang::{parse, Allocator};
+/// let allocator = Allocator::new();
+/// let source = "5 + 3";
+/// let ast = parse(source, &allocator).unwrap();
+/// let chunk = bang::compile(&ast).unwrap();
+/// ```
+///
+/// # Errors
+/// If there is a problem constructing the bytecode
+pub fn compile<'s: 'a, 'a>(ast: &AST<'s, '_>) -> Result<Chunk, CompileError> {
+  let mut compiler = interpreter::Compiler::new();
+  compiler.compile(ast)?;
+  let chunk = compiler.finish();
+  Ok(chunk)
+}
+pub use interpreter::{Chunk, CompileError, RuntimeError, Value, VM};
 
 /// Runs the linter against a given AST, returns a list of diagnostics found
 ///
@@ -87,23 +105,18 @@ pub fn format(ast: &AST, config: FormatterConfig) -> String {
 }
 pub use formatter::Config as FormatterConfig;
 
-/// Compile an AST into a bytecode chunk
+/// Runs the typechecker against a given AST, returns a list of errors found
 ///
 /// # Examples
 /// ```
-/// use bang::{parse, Allocator};
+/// use bang::{typecheck, parse, Allocator};
 /// let allocator = Allocator::new();
 /// let source = "5 + 3";
 /// let ast = parse(source, &allocator).unwrap();
-/// let chunk = bang::compile(&ast).unwrap();
+/// let diagnostics = typecheck(&ast);
 /// ```
-///
-/// # Errors
-/// If there is a problem constructing the bytecode
-pub fn compile<'s: 'a, 'a>(ast: &AST<'s, '_>) -> Result<Chunk, CompileError> {
-  let mut compiler = interpreter::Compiler::new();
-  compiler.compile(ast)?;
-  let chunk = compiler.finish();
-  Ok(chunk)
+#[must_use]
+pub fn typecheck(ast: &AST) -> Vec<TypeError> {
+  typechecker::Typechecker::new().check(ast)
 }
-pub use interpreter::{Chunk, CompileError, RuntimeError, Value, VM};
+pub use typechecker::TypeError;
