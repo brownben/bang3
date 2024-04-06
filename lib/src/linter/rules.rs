@@ -5,12 +5,13 @@ use super::{
 };
 use crate::ast::{expression::*, statement::*, GetSpan};
 
-pub const RULES: [&dyn LintRule; 7] = [
+pub const RULES: [&dyn LintRule; 8] = [
   &NoConstantConditions,
   &NoNegativeZero,
   &NoSelfAssign,
   &NoSelfComparison,
   &NoTodoComments,
+  &NoUnderscoreVariableUse,
   &NoUselessMatch,
   &NoYodaComparison,
 ];
@@ -126,6 +127,23 @@ impl LintRule for NoTodoComments {
       && comment.text.trim().starts_with("TODO:")
     {
       context.add_diagnostic(&Self, comment.span());
+    }
+  }
+}
+
+pub struct NoUnderscoreVariableUse;
+impl LintRule for NoUnderscoreVariableUse {
+  fn name(&self) -> &'static str {
+    "No `_` Variable Use"
+  }
+  fn message(&self) -> &'static str {
+    "`_` indicates the variable/ parameter is not used, consider a more descriptive name"
+  }
+  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+    if let Expression::Variable(variable) = &expression
+      && variable.name == "_"
+    {
+      context.add_diagnostic(&Self, variable.span());
     }
   }
 }

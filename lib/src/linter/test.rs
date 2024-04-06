@@ -76,6 +76,15 @@ fn no_todo_comment() {
 }
 
 #[test]
+fn no_underscore_variable_use() {
+  assert!(lint("match n | _ -> _").is_err());
+  assert!(lint("let _ = 3\n_ + 2").is_err());
+
+  assert!(lint("match n | 1 -> 2 | _ -> 3").is_ok());
+  assert!(lint("let _ = 3").is_ok());
+}
+
+#[test]
 fn no_useless_match() {
   assert!(lint("match n | _ -> 3").is_err());
   assert!(lint("match x\n | x -> 3").is_err());
