@@ -4,13 +4,6 @@
 
 My attempt at creating my own language. A strongly typed, functional, bytecode interpreter written in Rust. Based on the syntax and style of the languages I have liked using. Complete with a custom opinionated code formatter, linter, type-checker.
 
-Inspired by the awesome [Crafting Interpreters](https://craftinginterpreters.com/) by Robert Nystrom.
-
-Looking for an older version?
-
-- [v2 (a slower Rust interpreter, with slightly different syntax)](https://github.com/brownben/bang2)
-- [v1 (a tree walk interpreter in TypeScript)](https://github.com/brownben/bang/releases/tag/JS)
-
 ### Examples
 
 ```bang
@@ -57,9 +50,29 @@ cargo clippy
 # To run the tests:
 cargo test
 
+# To run the tests with Miri:
+cargo miri test
+
 # To build Bang:
 cargo build --release
 ```
+
+### Resources
+
+I have been inspired by/ used the following guides/ projects when creating Bang.
+
+- [Crafting Interpreters](https://craftinginterpreters.com/) by Robert Nystrom
+- [A prettier printer](https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf) by Philip Wadler
+- [Ruff](https://github.com/astral-sh/ruff)
+- [Oxc Performance Guide](https://oxc-project.github.io/docs/learn/performance.html)
+- [Printing Trees in Rust](https://www.georgevreilly.com/blog/2023/01/24/TreeInRust2PrintingTrees.html)
+
+### Looking for an older version?
+
+I am no longer working on previous versions, but you can find them here:
+
+- [v2 (a slower Rust interpreter, with slightly different syntax)](https://github.com/brownben/bang2)
+- [v1 (a tree walk interpreter in TypeScript)](https://github.com/brownben/bang/releases/tag/JS)
 
 ### License
 

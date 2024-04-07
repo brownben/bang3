@@ -119,14 +119,13 @@ let variable = 0  // declare with an initial value
 // variables must be defined before they can be accessed or assigned to
 variable
 
-// you can't redefine the same variable in the same scope
-// but you can redefine it in a lower scope, by using it in a block
 // variables are dropped at the end of a scope
 let a = 7
   let a = 5
   a // 5
 a // 7
 
+// variables at the top level are global, and have a hash table lookup, whereas all other variables are looked up from the lexical scope
 
 // ==========================
 // Pipeline Operator
@@ -143,6 +142,7 @@ a // 7
 // ==========================
 
 // If expressions
+// both branches must return a value
 if (condition) doSomething else doSomethingElse
 
 // can be chained to make if else
@@ -158,7 +158,7 @@ match x
 // you can match on literal values, on a range, or catch all
 
 // Or we can write them on a line
-match value | true -> 4 | false -> 1 | _ -> 2
+match value | true -> 4 | false -> 1 | x -> x + 2
 
 
 // ==========================
