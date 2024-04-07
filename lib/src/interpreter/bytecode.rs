@@ -72,6 +72,8 @@ impl From<u8> for OpCode {
   #[inline]
   fn from(value: u8) -> Self {
     // SAFETY: Assume bytecode is valid, so value is a valid OpCode
+    debug_assert!(value <= OpCode::Halt as u8);
+
     unsafe { mem::transmute(value) }
   }
 }
@@ -137,12 +139,16 @@ impl Chunk {
 
   #[inline]
   pub(crate) fn get(&self, position: usize) -> OpCode {
-    // SAFETY: Assume bytecode is valid, so position exists and OpCode is valid
+    // SAFETY: Assume bytecode is valid, so bytecode at the position exists
+    debug_assert!(position < self.code.len());
+
     OpCode::from(*unsafe { self.code.get_unchecked(position) })
   }
   #[inline]
   pub(crate) fn get_value(&self, position: usize) -> u8 {
     // SAFETY: Assume bytecode is valid, so position exists
+    debug_assert!(position < self.code.len());
+
     unsafe { *self.code.get_unchecked(position) }
   }
   #[inline]
@@ -152,11 +158,15 @@ impl Chunk {
   #[inline]
   pub(crate) fn get_constant(&self, pointer: usize) -> Value {
     // SAFETY: Assume bytecode is valid, so constant exists at pointer
+    debug_assert!(pointer < self.constants.len());
+
     unsafe { self.constants.get_unchecked(pointer) }.clone()
   }
   #[inline]
   pub(crate) fn get_string(&self, pointer: usize) -> &String {
     // SAFETY: Assume bytecode is valid, so constant exists at pointer
+    debug_assert!(pointer < self.strings.len());
+
     unsafe { self.strings.get_unchecked(pointer) }
   }
 

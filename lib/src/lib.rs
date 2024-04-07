@@ -6,6 +6,7 @@
 #![feature(lint_reasons)]
 #![feature(strict_provenance)]
 #![feature(decl_macro)]
+#![deny(unsafe_code)]
 
 mod ast;
 mod formatter;

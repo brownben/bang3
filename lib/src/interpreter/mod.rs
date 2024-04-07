@@ -1,3 +1,5 @@
+#![allow(unsafe_code)] // allow unsafe code for optimisations
+
 mod bytecode;
 mod compiler;
 mod value;

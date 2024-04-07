@@ -42,10 +42,15 @@ impl VM {
   #[inline]
   fn pop(&mut self) -> Value {
     // SAFETY: Assume bytecode is valid, so stack is not empty
+    debug_assert!(!self.stack.is_empty());
+
     unsafe { self.stack.pop().unwrap_unchecked() }
   }
   #[inline]
   fn peek(&self) -> &Value {
+    // SAFETY: Assume bytecode is valid, so stack is not empty
+    debug_assert!(!self.stack.is_empty());
+
     unsafe { self.stack.last().unwrap_unchecked() }
   }
   #[inline]
@@ -55,12 +60,16 @@ impl VM {
   #[inline]
   fn get_stack_value(&self, position: usize) -> Value {
     // SAFETY: Assume bytecode is valid, so position exists
+    debug_assert!(position < self.stack.len());
+
     unsafe { self.stack.get_unchecked(position) }.clone()
   }
 
   #[inline]
   fn peek_frame(&self) -> &CallFrame {
     // SAFETY: Assume bytecode is valid, so frames is not empty
+    debug_assert!(!self.frames.is_empty());
+
     unsafe { self.frames.last().unwrap_unchecked() }
   }
   #[inline]
@@ -74,6 +83,8 @@ impl VM {
   #[inline]
   fn pop_frame(&mut self) -> CallFrame {
     // SAFETY: Assume bytecode is valid, so frames is not empty
+    debug_assert!(!self.frames.is_empty());
+
     unsafe { self.frames.pop().unwrap_unchecked() }
   }
 
