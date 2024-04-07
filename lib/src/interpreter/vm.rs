@@ -1,12 +1,12 @@
 use super::{
-  bytecode::{Chunk, OpCode},
+  bytecode::{Chunk, ConstantValue, OpCode},
   value::{Closure, ClosureStatus, Object, Value},
 };
 use crate::{
   ast::{GetSpan, Span},
-  collections::{HashMap, SmallVec},
+  collections::{HashMap, SmallVec, String},
 };
-use std::{error, fmt};
+use std::{error, fmt, ptr};
 
 #[derive(Clone, Debug)]
 struct CallFrame {
@@ -105,13 +105,22 @@ impl VM {
         OpCode::Constant => {
           let constant_position = chunk.get_value(ip + 1);
           let constant = chunk.get_constant(constant_position.into());
-          self.push(constant);
+
+          self.push(match constant {
+            ConstantValue::String(string) => Value::from(ptr::from_ref(string)),
+            ConstantValue::Function(function) => Value::from(ptr::from_ref(function)),
+          });
         }
         OpCode::ConstantLong => {
           let constant_position = chunk.get_long_value(ip + 1);
           let constant = chunk.get_constant(constant_position.into());
-          self.push(constant);
+
+          self.push(match constant {
+            ConstantValue::String(string) => Value::from(ptr::from_ref(string)),
+            ConstantValue::Function(function) => Value::from(ptr::from_ref(function)),
+          });
         }
+        OpCode::Number => self.push(chunk.get_number(ip + 1).into()),
         OpCode::True => self.push(Value::TRUE),
         OpCode::False => self.push(Value::FALSE),
         OpCode::Null => self.push(Value::NULL),
@@ -126,12 +135,9 @@ impl VM {
           let right = self.pop();
           let left = self.pop();
 
-          if (left.is_object() && right.is_object())
-            && let Object::String(left) = left.as_object()
-            && let Object::String(right) = right.as_object()
-          {
-            let mut new = left.clone();
-            new.push_str(right);
+          if left.is_string() && right.is_string() {
+            let mut new = left.as_string().clone();
+            new.push_str(right.as_string());
             self.push(new.into());
           } else {
             break Some(ErrorKind::TypeErrorBinary {
@@ -178,7 +184,12 @@ impl VM {
         OpCode::DefineGlobal => {
           let string_position = chunk.get_value(ip + 1);
           let string = chunk.get_string(string_position.into()).clone();
-          let value = self.pop();
+          let mut value = self.pop();
+
+          if value.is_constant_string() {
+            value = Value::from(Object::from(value.as_string().clone()));
+          }
+
           self.globals.insert(string, value);
         }
         OpCode::GetGlobal => {
@@ -187,7 +198,7 @@ impl VM {
 
           match self.globals.get(string) {
             Some(value) => self.push(value.clone()),
-            None => break Some(ErrorKind::UndefinedVariable(string.into())),
+            None => break Some(ErrorKind::UndefinedVariable(string.to_string())),
           }
         }
         OpCode::GetLocal => {
@@ -200,28 +211,17 @@ impl VM {
         OpCode::Call => {
           let callee = self.get_stack_value(self.stack.len() - 2);
 
-          if !callee.is_object() {
+          if callee.is_function() {
+            self.push_frame(ip, offset, SmallVec::new());
+            ip = callee.as_function().start - 1;
+            offset = self.stack.len() - 1;
+          } else if callee.is_closure() {
+            let closure = callee.as_closure();
+            self.push_frame(ip, offset, closure.upvalues.clone());
+            ip = closure.function().start - 1;
+            offset = self.stack.len() - 1;
+          } else {
             break Some(ErrorKind::NotCallable(callee.get_type()));
-          }
-
-          match callee.as_object() {
-            Object::Function(func) => {
-              self.push_frame(ip, offset, SmallVec::new());
-              ip = func.start - 1;
-              offset = self.stack.len() - 1;
-            }
-            Object::NativeFunction(func) => {
-              let result = func(&self.pop());
-              self.push(result);
-            }
-            Object::Closure(closure) => {
-              self.push_frame(ip, offset, closure.upvalues.clone());
-              ip = closure.func.start - 1;
-              offset = self.stack.len() - 1;
-            }
-            Object::String(_) => {
-              break Some(ErrorKind::NotCallable(callee.get_type()));
-            }
           }
         }
         OpCode::Return => {
@@ -238,9 +238,8 @@ impl VM {
         OpCode::Closure => {
           let value = self.pop();
 
-          if value.is_object()
-            && let Object::Function(func) = value.as_object()
-          {
+          if value.is_function() {
+            let func = value.as_function();
             let upvalues = func
               .upvalues
               .iter()
@@ -256,22 +255,24 @@ impl VM {
               })
               .collect();
 
-            self.push(Closure::new(func.clone(), upvalues).into());
+            self.push(Closure::new(ptr::from_ref(func), upvalues).into());
           } else {
             break Some(ErrorKind::NonFunctionClosure);
           }
         }
         OpCode::GetUpvalue => {
           let upvalue = chunk.get_value(ip + 1);
-          let address = self.peek_frame().upvalues[usize::from(upvalue)].as_allocated();
+          let address = &self.peek_frame().upvalues[usize::from(upvalue)];
+          let value = address.as_allocated().borrow().clone();
 
-          self.push(address.borrow().clone());
+          self.push(value);
         }
         OpCode::GetAllocated => {
           let slot = chunk.get_value(ip + 1);
-          let address = self.stack[offset + usize::from(slot)].as_allocated();
+          let address = &self.stack[offset + usize::from(slot)];
+          let value = address.as_allocated().borrow().clone();
 
-          self.push(address.borrow().clone());
+          self.push(value);
         }
 
         // VM Operations
@@ -285,7 +286,7 @@ impl VM {
           self.push(value);
         }
         OpCode::Peek => {
-          let value = unsafe { self.stack.last().unwrap_unchecked() }.clone();
+          let value = self.peek().clone();
           self.push(value);
         }
         OpCode::Jump => {
@@ -339,11 +340,8 @@ macro comparison_operation(($vm:expr, $chunk:expr), $operator:tt) {{
 
   if left.is_number() && right.is_number() {
     $vm.push(Value::from(left.as_number() $operator right.as_number()));
-  } else if (left.is_object() && right.is_object())
-    && let Object::String(left) = left.as_object()
-    && let Object::String(right) = right.as_object()
-  {
-    $vm.push(Value::from(left $operator right));
+  } else if left.is_string() && right.is_string() {
+    $vm.push(Value::from(left.as_string() $operator right.as_string()));
   } else {
     break Some(ErrorKind::TypeErrorBinary {
       expected: "two numbers or two strings",
@@ -367,7 +365,7 @@ impl RuntimeError {
 
   /// The body of the error message describing what has gone wrong
   #[must_use]
-  pub fn message(&self) -> String {
+  pub fn message(&self) -> std::string::String {
     self.kind.message()
   }
 }
@@ -391,9 +389,9 @@ enum ErrorKind {
   },
   TypeErrorBinary {
     expected: &'static str,
-    got: String,
+    got: std::string::String,
   },
-  UndefinedVariable(String),
+  UndefinedVariable(std::string::String),
   NotCallable(&'static str),
   NonFunctionClosure,
 }
@@ -409,11 +407,9 @@ impl ErrorKind {
   }
 
   #[must_use]
-  fn message(&self) -> String {
+  fn message(&self) -> std::string::String {
     match self {
-      Self::TypeError { expected, got } => {
-        format!("expected `{expected}`, got `{got}`")
-      }
+      Self::TypeError { expected, got } => format!("expected `{expected}`, got `{got}`"),
       Self::TypeErrorBinary { expected, got } => {
         format!("expected `{expected}`, got `{got}`")
       }

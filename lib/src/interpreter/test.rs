@@ -262,6 +262,19 @@ fn equals() {
   assert_variable!(functions; c, true);
   assert_variable!(functions; d, false);
   assert_variable!(functions; e, true);
+
+  let closures = run(indoc! {"
+    let x = v => _ => v
+    let y = x(7)
+    let z = _ => 7
+
+    let c = y == z
+    let d = y == y
+    let e = z == z
+  "});
+  assert_variable!(closures; c, false);
+  assert_variable!(closures; d, true);
+  assert_variable!(closures; e, true);
 }
 
 #[test]
@@ -280,6 +293,7 @@ fn not_equals() {
     let b = 'hello' != \"goodbye\"
     let c = 'hello' != 'hello!'
     let d = \"hello\" != \"hello\"
+    let e = \"hello\" ++ 'x' != 7
   "});
   assert_variable!(strings; a, false);
   assert_variable!(strings; b, true);
@@ -388,7 +402,6 @@ fn greater_than() {
 }
 
 #[test]
-
 fn and() {
   let vm = run(indoc! {"
     let a = false and true

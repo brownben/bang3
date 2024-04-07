@@ -1,6 +1,6 @@
 use super::{
-  bytecode::{Chunk, OpCode},
-  value::{self, ClosureStatus, Value},
+  bytecode::{Chunk, ConstantValue, OpCode},
+  value::{self, ClosureStatus},
 };
 use crate::{
   ast::{expression::*, statement::*, GetSpan, Span, AST},
@@ -34,7 +34,7 @@ impl<'s> Compiler<'s> {
     self.chunk
   }
 
-  fn add_constant(&mut self, value: Value, span: Span) -> Result<(), CompileError> {
+  fn add_constant(&mut self, value: ConstantValue, span: Span) -> Result<(), CompileError> {
     let constant_position = self.chunk.add_constant(value);
 
     if let Ok(constant_position) = u8::try_from(constant_position) {
@@ -343,8 +343,8 @@ impl<'s> Compile<'s> for Literal<'s> {
     match self.kind {
       LiteralKind::Boolean(true) => compiler.chunk.add_opcode(OpCode::True, self.span),
       LiteralKind::Boolean(false) => compiler.chunk.add_opcode(OpCode::False, self.span),
-      LiteralKind::Number { value, .. } => compiler.add_constant(Value::from(value), self.span)?,
-      LiteralKind::String(value) => compiler.add_constant(Value::from(value), self.span)?,
+      LiteralKind::Number { value, .. } => compiler.chunk.add_number(value, self.span),
+      LiteralKind::String(value) => compiler.add_constant(value.into(), self.span)?,
     };
 
     Ok(())

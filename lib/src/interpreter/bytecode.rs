@@ -1,6 +1,123 @@
-use super::Value;
-use crate::ast::Span;
+use crate::{ast::Span, collections::String, interpreter::value::Function};
 use std::{fmt, mem};
+
+/// A chunk of bytecode
+#[derive(Debug, Default)]
+pub struct Chunk {
+  code: Vec<u8>,
+  constants: Vec<ConstantValue>,
+  strings: Vec<String>,
+  debug_info: DebugInfo,
+}
+impl Chunk {
+  pub(crate) fn new() -> Self {
+    Self {
+      code: Vec::with_capacity(512),
+      constants: Vec::with_capacity(32),
+      strings: Vec::with_capacity(16),
+      debug_info: DebugInfo::new(),
+    }
+  }
+  pub(crate) fn finalize(&mut self) {
+    self.debug_info.finalize();
+  }
+  pub(crate) fn len(&self) -> usize {
+    self.code.len()
+  }
+
+  pub(crate) fn add_opcode(&mut self, opcode: OpCode, span: Span) {
+    self.code.push(opcode as u8);
+    self.debug_info.add(span);
+  }
+  pub(crate) fn add_value(&mut self, value: u8, span: Span) {
+    self.code.push(value);
+    self.debug_info.add(span);
+  }
+  pub(crate) fn add_long_value(&mut self, value: u16, span: Span) {
+    let [a, b] = u16::to_le_bytes(value);
+    self.code.push(a);
+    self.code.push(b);
+    self.debug_info.add(span);
+    self.debug_info.add(span);
+  }
+  pub(crate) fn add_number(&mut self, value: f64, span: Span) {
+    self.add_opcode(OpCode::Number, span);
+    self.code.extend_from_slice(&value.to_le_bytes());
+
+    for _ in 0..8 {
+      self.debug_info.add(span);
+    }
+  }
+  pub(crate) fn add_constant(&mut self, value: ConstantValue) -> usize {
+    if let Some(constant_position) = self.constants.iter().position(|x| x == &value) {
+      constant_position
+    } else {
+      let constant_position = self.constants.len();
+      self.constants.push(value);
+      constant_position
+    }
+  }
+  pub(crate) fn add_string(&mut self, string: &str) -> usize {
+    let string_position = self.strings.len();
+    self.strings.push(string.into());
+    string_position
+  }
+  pub(crate) fn replace_long_value(&mut self, position: usize, value: u16) {
+    let [a, b] = u16::to_le_bytes(value);
+    self.code[position] = a;
+    self.code[position + 1] = b;
+  }
+
+  #[inline]
+  pub(crate) fn get(&self, position: usize) -> OpCode {
+    // SAFETY: Assume bytecode is valid, so bytecode at the position exists
+    debug_assert!(position < self.code.len());
+
+    OpCode::from(*unsafe { self.code.get_unchecked(position) })
+  }
+  #[inline]
+  pub(crate) fn get_value(&self, position: usize) -> u8 {
+    // SAFETY: Assume bytecode is valid, so position exists
+    debug_assert!(position < self.code.len());
+
+    unsafe { *self.code.get_unchecked(position) }
+  }
+  #[inline]
+  pub(crate) fn get_long_value(&self, position: usize) -> u16 {
+    u16::from_le_bytes([self.get_value(position), self.get_value(position + 1)])
+  }
+  #[inline]
+  pub(crate) fn get_number(&self, position: usize) -> f64 {
+    f64::from_le_bytes([
+      self.get_value(position),
+      self.get_value(position + 1),
+      self.get_value(position + 2),
+      self.get_value(position + 3),
+      self.get_value(position + 4),
+      self.get_value(position + 5),
+      self.get_value(position + 6),
+      self.get_value(position + 7),
+    ])
+  }
+  #[inline]
+  pub(crate) fn get_constant(&self, pointer: usize) -> &ConstantValue {
+    // SAFETY: Assume bytecode is valid, so constant exists at pointer
+    debug_assert!(pointer < self.constants.len());
+
+    unsafe { self.constants.get_unchecked(pointer) }
+  }
+  #[inline]
+  pub(crate) fn get_string(&self, pointer: usize) -> &String {
+    // SAFETY: Assume bytecode is valid, so constant exists at pointer
+    debug_assert!(pointer < self.strings.len());
+
+    unsafe { self.strings.get_unchecked(pointer) }
+  }
+
+  pub(crate) fn get_span(&self, opcode_position: usize) -> Span {
+    self.debug_info.get(opcode_position)
+  }
+}
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -8,6 +125,7 @@ pub enum OpCode {
   // Constants
   Constant,
   ConstantLong,
+  Number,
   True,
   False,
   Null,
@@ -56,6 +174,7 @@ impl OpCode {
   #[inline]
   pub fn length(self) -> usize {
     match self {
+      OpCode::Number => 9,
       OpCode::ConstantLong | OpCode::Jump | OpCode::JumpIfFalse => 3,
       OpCode::Constant
       | OpCode::DefineGlobal
@@ -78,100 +197,25 @@ impl From<u8> for OpCode {
   }
 }
 
-/// A chunk of bytecode
-#[derive(Debug, Default)]
-pub struct Chunk {
-  code: Vec<u8>,
-  constants: Vec<Value>,
-  strings: Vec<String>,
-  debug_info: DebugInfo,
+/// A constant value which is stored in a [Chunk]
+#[derive(Clone, Debug, PartialEq)]
+pub enum ConstantValue {
+  String(crate::collections::String),
+  Function(Function),
 }
-impl Chunk {
-  pub(crate) fn new() -> Self {
-    Self {
-      code: Vec::with_capacity(512),
-      constants: Vec::with_capacity(32),
-      strings: Vec::with_capacity(16),
-      debug_info: DebugInfo::new(),
-    }
+impl From<&str> for ConstantValue {
+  fn from(value: &str) -> Self {
+    Self::String(value.into())
   }
-  pub(crate) fn finalize(&mut self) {
-    self.debug_info.finalize();
+}
+impl From<String> for ConstantValue {
+  fn from(value: String) -> Self {
+    Self::String(value)
   }
-  pub(crate) fn len(&self) -> usize {
-    self.code.len()
-  }
-
-  pub(crate) fn add_opcode(&mut self, opcode: OpCode, span: Span) {
-    self.code.push(opcode as u8);
-    self.debug_info.add(span);
-  }
-  pub(crate) fn add_value(&mut self, value: u8, span: Span) {
-    self.code.push(value);
-    self.debug_info.add(span);
-  }
-  pub(crate) fn add_long_value(&mut self, value: u16, span: Span) {
-    let [a, b] = u16::to_le_bytes(value);
-    self.code.push(a);
-    self.code.push(b);
-    self.debug_info.add(span);
-    self.debug_info.add(span);
-  }
-  pub(crate) fn add_constant(&mut self, value: Value) -> usize {
-    if let Some(constant_position) = self.constants.iter().position(|x| x == &value) {
-      constant_position
-    } else {
-      let constant_position = self.constants.len();
-      self.constants.push(value);
-      constant_position
-    }
-  }
-  pub(crate) fn add_string(&mut self, string: &str) -> usize {
-    let string_position = self.strings.len();
-    self.strings.push(string.into());
-    string_position
-  }
-  pub(crate) fn replace_long_value(&mut self, position: usize, value: u16) {
-    let [a, b] = u16::to_le_bytes(value);
-    self.code[position] = a;
-    self.code[position + 1] = b;
-  }
-
-  #[inline]
-  pub(crate) fn get(&self, position: usize) -> OpCode {
-    // SAFETY: Assume bytecode is valid, so bytecode at the position exists
-    debug_assert!(position < self.code.len());
-
-    OpCode::from(*unsafe { self.code.get_unchecked(position) })
-  }
-  #[inline]
-  pub(crate) fn get_value(&self, position: usize) -> u8 {
-    // SAFETY: Assume bytecode is valid, so position exists
-    debug_assert!(position < self.code.len());
-
-    unsafe { *self.code.get_unchecked(position) }
-  }
-  #[inline]
-  pub(crate) fn get_long_value(&self, position: usize) -> u16 {
-    u16::from_le_bytes([self.get_value(position), self.get_value(position + 1)])
-  }
-  #[inline]
-  pub(crate) fn get_constant(&self, pointer: usize) -> Value {
-    // SAFETY: Assume bytecode is valid, so constant exists at pointer
-    debug_assert!(pointer < self.constants.len());
-
-    unsafe { self.constants.get_unchecked(pointer) }.clone()
-  }
-  #[inline]
-  pub(crate) fn get_string(&self, pointer: usize) -> &String {
-    // SAFETY: Assume bytecode is valid, so constant exists at pointer
-    debug_assert!(pointer < self.strings.len());
-
-    unsafe { self.strings.get_unchecked(pointer) }
-  }
-
-  pub(crate) fn get_span(&self, opcode_position: usize) -> Span {
-    self.debug_info.get(opcode_position)
+}
+impl From<Function> for ConstantValue {
+  fn from(value: Function) -> Self {
+    Self::Function(value)
   }
 }
 
@@ -245,6 +289,10 @@ impl fmt::Display for Chunk {
           let constant_location = self.get_long_value(position + 1);
           let constant = self.get_constant(constant_location.into());
           write!(f, "ConstantLong {constant:?} ({constant_location})")
+        }
+        OpCode::Number => {
+          let number = self.get_number(position + 1);
+          write!(f, "Number {number:?}")
         }
         OpCode::DefineGlobal => {
           let string_location = self.get_value(position + 1);
