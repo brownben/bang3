@@ -29,30 +29,20 @@ impl<'s> Compiler<'s> {
     ast.compile(self)
   }
   pub fn finish(mut self) -> Chunk {
-    self.add_opcode(OpCode::Halt, Span::default());
+    self.chunk.add_opcode(OpCode::Halt, Span::default());
     self.chunk.finalize();
     self.chunk
-  }
-
-  fn add_opcode(&mut self, opcode: OpCode, span: Span) {
-    self.chunk.add_opcode(opcode, span);
-  }
-  fn add_value(&mut self, value: u8, span: Span) {
-    self.chunk.add_value(value, span);
-  }
-  fn add_long_value(&mut self, value: u16, span: Span) {
-    self.chunk.add_long_value(value, span);
   }
 
   fn add_constant(&mut self, value: Value, span: Span) -> Result<(), CompileError> {
     let constant_position = self.chunk.add_constant(value);
 
     if let Ok(constant_position) = u8::try_from(constant_position) {
-      self.add_opcode(OpCode::Constant, span);
-      self.add_value(constant_position, span);
+      self.chunk.add_opcode(OpCode::Constant, span);
+      self.chunk.add_value(constant_position, span);
     } else if let Ok(constant_position) = u16::try_from(constant_position) {
-      self.add_opcode(OpCode::ConstantLong, span);
-      self.add_long_value(constant_position, span);
+      self.chunk.add_opcode(OpCode::ConstantLong, span);
+      self.chunk.add_long_value(constant_position, span);
     } else {
       Err(CompileError::TooManyConstants)?;
     }
@@ -63,7 +53,7 @@ impl<'s> Compiler<'s> {
     let string_position = self.chunk.add_string(string);
 
     if let Ok(string_position) = u8::try_from(string_position) {
-      self.add_value(string_position, span);
+      self.chunk.add_value(string_position, span);
     } else {
       Err(CompileError::TooManyStrings)?;
     }
@@ -72,8 +62,8 @@ impl<'s> Compiler<'s> {
   }
 
   fn add_jump(&mut self, instruction: OpCode, span: Span) -> usize {
-    self.add_opcode(instruction, span);
-    self.add_long_value(u16::MAX, span);
+    self.chunk.add_opcode(instruction, span);
+    self.chunk.add_long_value(u16::MAX, span);
     self.chunk.len() - 2
   }
   fn patch_jump(&mut self, offset: usize) -> Result<(), CompileError> {
@@ -101,9 +91,9 @@ impl<'s> Compiler<'s> {
     }
 
     if count > 0 {
-      self.add_opcode(OpCode::PopBelow, span);
+      self.chunk.add_opcode(OpCode::PopBelow, span);
       if let Ok(count) = u8::try_from(count) {
-        self.add_value(count, span);
+        self.chunk.add_value(count, span);
       } else {
         Err(CompileError::TooManyLocalVariables)?;
       }
@@ -125,7 +115,7 @@ impl<'s> Compiler<'s> {
         status: LocalStatus::Open,
       });
     } else {
-      self.add_opcode(OpCode::DefineGlobal, span);
+      self.chunk.add_opcode(OpCode::DefineGlobal, span);
       self.add_constant_string(name, span)?;
     }
 
@@ -164,7 +154,7 @@ impl<'s> Compile<'s> for AST<'s, '_> {
       statement.compile(compiler)?;
 
       match statement {
-        Statement::Expression(_) => compiler.add_opcode(OpCode::Pop, statement.span()),
+        Statement::Expression(_) => compiler.chunk.add_opcode(OpCode::Pop, statement.span()),
         Statement::Comment(_) | Statement::Let(_) => {}
       }
     }
@@ -196,7 +186,7 @@ impl<'s> Compile<'s> for Binary<'s, '_> {
       BinaryOperator::And => {
         self.left.compile(compiler)?;
         let jump = compiler.add_jump(OpCode::JumpIfFalse, self.span);
-        compiler.add_opcode(OpCode::Pop, self.span);
+        compiler.chunk.add_opcode(OpCode::Pop, self.span);
         self.right.compile(compiler)?;
         compiler.patch_jump(jump)?;
 
@@ -208,7 +198,7 @@ impl<'s> Compile<'s> for Binary<'s, '_> {
         let end_jump = compiler.add_jump(OpCode::Jump, self.span);
 
         compiler.patch_jump(else_jump)?;
-        compiler.add_opcode(OpCode::Pop, self.span);
+        compiler.chunk.add_opcode(OpCode::Pop, self.span);
 
         self.right.compile(compiler)?;
         compiler.patch_jump(end_jump)?;
@@ -218,7 +208,7 @@ impl<'s> Compile<'s> for Binary<'s, '_> {
       BinaryOperator::Pipeline => {
         self.right.compile(compiler)?;
         self.left.compile(compiler)?;
-        compiler.add_opcode(OpCode::Call, self.span);
+        compiler.chunk.add_opcode(OpCode::Call, self.span);
 
         return Ok(());
       }
@@ -228,7 +218,7 @@ impl<'s> Compile<'s> for Binary<'s, '_> {
     self.left.compile(compiler)?;
     self.right.compile(compiler)?;
 
-    compiler.add_opcode(
+    compiler.chunk.add_opcode(
       match self.operator {
         BinaryOperator::Add => OpCode::Add,
         BinaryOperator::Subtract => OpCode::Subtract,
@@ -261,7 +251,7 @@ impl<'s> Compile<'s> for Block<'s, '_> {
       statement.compile(compiler)?;
 
       match statement {
-        Statement::Expression(_) => compiler.add_opcode(OpCode::Pop, self.span),
+        Statement::Expression(_) => compiler.chunk.add_opcode(OpCode::Pop, self.span),
         Statement::Comment(_) | Statement::Let(_) => {}
       }
     }
@@ -279,9 +269,9 @@ impl<'s> Compile<'s> for Call<'s, '_> {
     if let Some(argument) = &self.argument {
       argument.compile(compiler)?;
     } else {
-      compiler.add_opcode(OpCode::Null, self.span);
+      compiler.chunk.add_opcode(OpCode::Null, self.span);
     }
-    compiler.add_opcode(OpCode::Call, self.span);
+    compiler.chunk.add_opcode(OpCode::Call, self.span);
     Ok(())
   }
 }
@@ -302,7 +292,7 @@ impl<'s> Compile<'s> for Function<'s, '_> {
 
     compiler.define_variable(self.parameter, self.span)?;
     self.body.compile(compiler)?;
-    compiler.add_opcode(OpCode::Return, self.span);
+    compiler.chunk.add_opcode(OpCode::Return, self.span);
 
     compiler.end_scope(self.span)?;
     compiler.locals.pop();
@@ -310,7 +300,7 @@ impl<'s> Compile<'s> for Function<'s, '_> {
 
     let upvalues = compiler.closures.pop().unwrap();
     if !upvalues.is_empty() {
-      compiler.add_opcode(OpCode::Closure, self.span);
+      compiler.chunk.add_opcode(OpCode::Closure, self.span);
     }
 
     let name = self.name.unwrap_or("").into();
@@ -335,12 +325,12 @@ impl<'s> Compile<'s> for If<'s, '_> {
     self.condition.compile(compiler)?;
     let jump_to_else = compiler.add_jump(OpCode::JumpIfFalse, self.span);
 
-    compiler.add_opcode(OpCode::Pop, self.span);
+    compiler.chunk.add_opcode(OpCode::Pop, self.span);
     self.then.compile(compiler)?;
     let jump_to_end = compiler.add_jump(OpCode::Jump, self.span);
 
     compiler.patch_jump(jump_to_else)?;
-    compiler.add_opcode(OpCode::Pop, self.span);
+    compiler.chunk.add_opcode(OpCode::Pop, self.span);
     self.otherwise.compile(compiler)?;
 
     compiler.patch_jump(jump_to_end)?;
@@ -351,8 +341,8 @@ impl<'s> Compile<'s> for If<'s, '_> {
 impl<'s> Compile<'s> for Literal<'s> {
   fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
     match self.kind {
-      LiteralKind::Boolean(true) => compiler.add_opcode(OpCode::True, self.span),
-      LiteralKind::Boolean(false) => compiler.add_opcode(OpCode::False, self.span),
+      LiteralKind::Boolean(true) => compiler.chunk.add_opcode(OpCode::True, self.span),
+      LiteralKind::Boolean(false) => compiler.chunk.add_opcode(OpCode::False, self.span),
       LiteralKind::Number { value, .. } => compiler.add_constant(Value::from(value), self.span)?,
       LiteralKind::String(value) => compiler.add_constant(Value::from(value), self.span)?,
     };
@@ -381,44 +371,44 @@ impl<'s> Compile<'s> for Match<'s, '_> {
         }
         Pattern::Literal(literal) => {
           // Check if the value matches the literal
-          compiler.add_opcode(OpCode::Peek, self.span);
+          compiler.chunk.add_opcode(OpCode::Peek, self.span);
           literal.compile(compiler)?;
-          compiler.add_opcode(OpCode::Equals, self.span);
+          compiler.chunk.add_opcode(OpCode::Equals, self.span);
 
           // If it does, do the expression
           let non_match_jump = compiler.add_jump(OpCode::JumpIfFalse, self.span);
-          compiler.add_opcode(OpCode::Pop, self.span);
+          compiler.chunk.add_opcode(OpCode::Pop, self.span);
           case.expression.compile(compiler)?;
           case_end_jumps.push(compiler.add_jump(OpCode::Jump, self.span));
 
           // Otherwise skip to the next case
           compiler.patch_jump(non_match_jump)?;
-          compiler.add_opcode(OpCode::Pop, self.span);
+          compiler.chunk.add_opcode(OpCode::Pop, self.span);
         }
         Pattern::Range(range) => {
           // check that the value is within the range
           match (&range.start, &range.end) {
             (None, Some(pattern)) => {
-              compiler.add_opcode(OpCode::Peek, self.span);
+              compiler.chunk.add_opcode(OpCode::Peek, self.span);
               pattern.get_range_literal().compile(compiler)?;
-              compiler.add_opcode(OpCode::LessEqual, self.span);
+              compiler.chunk.add_opcode(OpCode::LessEqual, self.span);
             }
             (Some(pattern), None) => {
-              compiler.add_opcode(OpCode::Peek, self.span);
+              compiler.chunk.add_opcode(OpCode::Peek, self.span);
               pattern.get_range_literal().compile(compiler)?;
-              compiler.add_opcode(OpCode::GreaterEqual, self.span);
+              compiler.chunk.add_opcode(OpCode::GreaterEqual, self.span);
             }
             (Some(greater_than), Some(less_than)) => {
-              compiler.add_opcode(OpCode::Peek, self.span);
+              compiler.chunk.add_opcode(OpCode::Peek, self.span);
               greater_than.get_range_literal().compile(compiler)?;
-              compiler.add_opcode(OpCode::GreaterEqual, self.span);
+              compiler.chunk.add_opcode(OpCode::GreaterEqual, self.span);
 
               let jump = compiler.add_jump(OpCode::JumpIfFalse, self.span);
-              compiler.add_opcode(OpCode::Pop, self.span);
+              compiler.chunk.add_opcode(OpCode::Pop, self.span);
 
-              compiler.add_opcode(OpCode::Peek, self.span);
+              compiler.chunk.add_opcode(OpCode::Peek, self.span);
               less_than.get_range_literal().compile(compiler)?;
-              compiler.add_opcode(OpCode::LessEqual, self.span);
+              compiler.chunk.add_opcode(OpCode::LessEqual, self.span);
 
               compiler.patch_jump(jump)?;
             }
@@ -427,20 +417,20 @@ impl<'s> Compile<'s> for Match<'s, '_> {
 
           // If it does, do the expression
           let non_match_jump = compiler.add_jump(OpCode::JumpIfFalse, self.span);
-          compiler.add_opcode(OpCode::Pop, self.span);
+          compiler.chunk.add_opcode(OpCode::Pop, self.span);
           case.expression.compile(compiler)?;
           case_end_jumps.push(compiler.add_jump(OpCode::Jump, self.span));
 
           // Otherwise skip to the next case
           compiler.patch_jump(non_match_jump)?;
-          compiler.add_opcode(OpCode::Pop, self.span);
+          compiler.chunk.add_opcode(OpCode::Pop, self.span);
         }
       }
     }
 
     if !is_exhaustive {
-      compiler.add_opcode(OpCode::Pop, self.span);
-      compiler.add_opcode(OpCode::Null, self.span);
+      compiler.chunk.add_opcode(OpCode::Pop, self.span);
+      compiler.chunk.add_opcode(OpCode::Null, self.span);
     }
 
     for jump in case_end_jumps {
@@ -454,7 +444,7 @@ impl<'s> Compile<'s> for Unary<'s, '_> {
   fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
     self.expression.compile(compiler)?;
 
-    compiler.add_opcode(
+    compiler.chunk.add_opcode(
       match self.operator {
         UnaryOperator::Not => OpCode::Not,
         UnaryOperator::Minus => OpCode::Negate,
@@ -474,11 +464,11 @@ impl<'s> Compile<'s> for Variable<'s> {
       .rposition(|local| local.name == self.name)
     {
       match compiler.function_locals()[local_position].status {
-        LocalStatus::Open => compiler.add_opcode(OpCode::GetLocal, self.span),
-        LocalStatus::Closed => compiler.add_opcode(OpCode::GetAllocated, self.span),
+        LocalStatus::Open => compiler.chunk.add_opcode(OpCode::GetLocal, self.span),
+        LocalStatus::Closed => compiler.chunk.add_opcode(OpCode::GetAllocated, self.span),
       }
       if let Ok(local_position) = u8::try_from(local_position) {
-        compiler.add_value(local_position, self.span);
+        compiler.chunk.add_value(local_position, self.span);
       } else {
         Err(CompileError::TooManyLocalVariables)?;
       }
@@ -517,9 +507,9 @@ impl<'s> Compile<'s> for Variable<'s> {
         status = ClosureStatus::Upvalue;
       }
 
-      compiler.add_opcode(OpCode::GetUpvalue, self.span);
+      compiler.chunk.add_opcode(OpCode::GetUpvalue, self.span);
       if let Ok(index) = u8::try_from(index) {
-        compiler.add_value(index, self.span);
+        compiler.chunk.add_value(index, self.span);
       } else {
         Err(CompileError::TooManyClosures)?;
       }
@@ -528,7 +518,7 @@ impl<'s> Compile<'s> for Variable<'s> {
     }
 
     // Otherwise, it must be a global variable
-    compiler.add_opcode(OpCode::GetGlobal, self.span);
+    compiler.chunk.add_opcode(OpCode::GetGlobal, self.span);
     compiler.add_constant_string(self.name, self.span)?;
 
     Ok(())
