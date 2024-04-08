@@ -158,9 +158,11 @@ pub enum OpCode {
   Return,
 
   // Closures
+  Allocate,
   Closure,
   GetUpvalue,
-  GetAllocated,
+  GetAllocatedValue,
+  GetAllocatedPointer,
 
   // VM Operations
   Pop,
@@ -181,8 +183,11 @@ impl OpCode {
       | OpCode::GetGlobal
       | OpCode::GetLocal
       | OpCode::GetUpvalue
-      | OpCode::GetAllocated
-      | OpCode::PopBelow => 2,
+      | OpCode::PopBelow
+      | OpCode::Allocate
+      | OpCode::Closure
+      | OpCode::GetAllocatedValue
+      | OpCode::GetAllocatedPointer => 2,
       _ => 1,
     }
   }
@@ -322,13 +327,21 @@ impl fmt::Display for Chunk {
           let jump_location = position + usize::from(jump_by) + 3;
           write!(f, "JumpIfFalse {jump_by} ({jump_location:0>4})")
         }
+        OpCode::Allocate => {
+          let local_position = self.get_value(position + 1);
+          write!(f, "Allocate ({local_position})")
+        }
         OpCode::GetUpvalue => {
           let upvalue_position = self.get_value(position + 1);
           write!(f, "GetUpvalue ({upvalue_position})")
         }
-        OpCode::GetAllocated => {
+        OpCode::GetAllocatedValue => {
           let local_position = self.get_value(position + 1);
-          write!(f, "GetAllocated ({local_position})")
+          write!(f, "GetAllocatedValue ({local_position})")
+        }
+        OpCode::GetAllocatedPointer => {
+          let local_position = self.get_value(position + 1);
+          write!(f, "GetAllocatedPointer ({local_position})")
         }
 
         code => write!(f, "{code:?}"),

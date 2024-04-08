@@ -1,6 +1,6 @@
 use super::{
   bytecode::{Chunk, ConstantValue, OpCode},
-  value::{self, ClosureStatus},
+  value,
 };
 use crate::{
   ast::{expression::*, statement::*, GetSpan, Span, AST},
@@ -13,7 +13,7 @@ pub struct Compiler<'s> {
 
   scope_depth: u8,
   locals: Vec<Vec<Local<'s>>>,
-  closures: Vec<SmallVec<[(u8, ClosureStatus); 8]>>,
+  closures: Vec<SmallVec<[(u8, VariableStatus); 8]>>,
 }
 impl<'s> Compiler<'s> {
   pub fn new() -> Self {
@@ -112,7 +112,7 @@ impl<'s> Compiler<'s> {
       self.function_locals().push(Local {
         name,
         depth,
-        status: LocalStatus::Open,
+        status: VariableStatus::Open,
       });
     } else {
       self.chunk.add_opcode(OpCode::DefineGlobal, span);
@@ -127,21 +127,17 @@ impl<'s> Compiler<'s> {
 struct Local<'s> {
   name: &'s str,
   depth: u8,
-  status: LocalStatus,
+  status: VariableStatus,
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-enum LocalStatus {
+enum VariableStatus {
+  /// The local variable is a normal variable on the stack
   #[default]
   Open,
+  /// The variable has been allocated to the heap, but exists on the stack
   Closed,
-}
-impl From<LocalStatus> for ClosureStatus {
-  fn from(value: LocalStatus) -> Self {
-    match value {
-      LocalStatus::Open => Self::Open,
-      LocalStatus::Closed => Self::Closed,
-    }
-  }
+  /// The variable is in an outer function, and must be accessed through the call stack
+  Upvalue,
 }
 
 trait Compile<'s> {
@@ -300,11 +296,28 @@ impl<'s> Compile<'s> for Function<'s, '_> {
 
     let upvalues = compiler.closures.pop().unwrap();
     if !upvalues.is_empty() {
+      for (upvalue_index, status) in &upvalues {
+        compiler.chunk.add_opcode(
+          match status {
+            VariableStatus::Open => OpCode::Allocate,
+            VariableStatus::Closed => OpCode::GetLocal,
+            VariableStatus::Upvalue => OpCode::GetAllocatedPointer,
+          },
+          self.span,
+        );
+        compiler.chunk.add_value(*upvalue_index, self.span);
+      }
+
       compiler.chunk.add_opcode(OpCode::Closure, self.span);
+      if let Ok(value) = u8::try_from(upvalues.len()) {
+        compiler.chunk.add_value(value, self.span);
+      } else {
+        return Err(CompileError::TooManyClosures);
+      }
     }
 
     let name = self.name.unwrap_or("").into();
-    let function_value = value::Function::new(name, start, upvalues);
+    let function_value = value::Function::new(name, start);
     let constant_value = compiler.chunk.add_constant(function_value.into());
     if let Ok(value) = u16::try_from(constant_value) {
       compiler.chunk.replace_long_value(constant_position, value);
@@ -464,8 +477,11 @@ impl<'s> Compile<'s> for Variable<'s> {
       .rposition(|local| local.name == self.name)
     {
       match compiler.function_locals()[local_position].status {
-        LocalStatus::Open => compiler.chunk.add_opcode(OpCode::GetLocal, self.span),
-        LocalStatus::Closed => compiler.chunk.add_opcode(OpCode::GetAllocated, self.span),
+        VariableStatus::Open => compiler.chunk.add_opcode(OpCode::GetLocal, self.span),
+        VariableStatus::Closed => compiler
+          .chunk
+          .add_opcode(OpCode::GetAllocatedValue, self.span),
+        VariableStatus::Upvalue => unreachable!("we are only checking the current scope"),
       }
       if let Ok(local_position) = u8::try_from(local_position) {
         compiler.chunk.add_value(local_position, self.span);
@@ -492,10 +508,10 @@ impl<'s> Compile<'s> for Variable<'s> {
     {
       let local_status = mem::replace(
         &mut compiler.locals[scope_index][local_index].status,
-        LocalStatus::Closed,
+        VariableStatus::Closed,
       );
 
-      let (mut index, mut status) = (local_index, local_status.into());
+      let (mut index, mut status) = (local_index, local_status);
       for closures in compiler.closures.iter_mut().skip(scope_index) {
         index = closures
           .iter()
@@ -504,7 +520,7 @@ impl<'s> Compile<'s> for Variable<'s> {
             closures.push((u8::try_from(index).unwrap_or(0), status));
             closures.len() - 1
           });
-        status = ClosureStatus::Upvalue;
+        status = VariableStatus::Upvalue;
       }
 
       compiler.chunk.add_opcode(OpCode::GetUpvalue, self.span);

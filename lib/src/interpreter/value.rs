@@ -392,15 +392,10 @@ impl From<Closure> for Object {
 pub struct Function {
   pub(crate) name: String,
   pub(crate) start: usize,
-  pub(crate) upvalues: SmallVec<[(u8, ClosureStatus); 8]>,
 }
 impl Function {
-  pub fn new(name: String, start: usize, upvalues: SmallVec<[(u8, ClosureStatus); 8]>) -> Self {
-    Self {
-      name,
-      start,
-      upvalues,
-    }
+  pub fn new(name: String, start: usize) -> Self {
+    Self { name, start }
   }
 }
 impl fmt::Display for Function {
@@ -435,17 +430,6 @@ impl fmt::Display for Closure {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "<closure {}>", self.function())
   }
-}
-
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-pub enum ClosureStatus {
-  /// The upvalue is open, and is currently a normal value on the stack
-  #[default]
-  Open,
-  /// The upvalue is has been allocated, but a pointer exists on the stack
-  Closed,
-  /// The upvalue is has been allocated, and must be accessed through the call stack
-  Upvalue,
 }
 
 // To check if a value is a number, or a tagged pointer
@@ -598,11 +582,7 @@ mod test {
 
   #[test]
   fn function() {
-    let function = Function {
-      start: 0,
-      name: "".into(),
-      upvalues: SmallVec::new(),
-    };
+    let function = Function::new("".into(), 0);
     let function = Value::from(ptr::from_ref(&function));
     assert!(!function.is_number());
     assert!(!function.is_constant_string());
@@ -627,11 +607,7 @@ mod test {
     assert_eq!(Value::from("").is_falsy(), true);
     assert_eq!(Value::from("hello").is_falsy(), false);
 
-    let function = Function {
-      start: 0,
-      name: "".into(),
-      upvalues: SmallVec::new(),
-    };
+    let function = Function::new("".into(), 0);
     assert_eq!(Value::from(ptr::from_ref(&function)).is_falsy(), false);
   }
 

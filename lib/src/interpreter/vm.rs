@@ -1,6 +1,6 @@
 use super::{
   bytecode::{Chunk, ConstantValue, OpCode},
-  value::{Closure, ClosureStatus, Object, Value},
+  value::{Closure, Object, Value},
 };
 use crate::{
   ast::{GetSpan, Span},
@@ -235,27 +235,23 @@ impl VM {
         }
 
         // Closures
+        OpCode::Allocate => {
+          let index = chunk.get_value(ip + 1);
+          let local = &mut self.stack[offset + usize::from(index)];
+          let allocated = local.clone().allocate();
+          *local = allocated.clone();
+          self.push(allocated);
+        }
         OpCode::Closure => {
+          let upvalue_count = chunk.get_value(ip + 1);
+          let upvalues = self
+            .stack
+            .drain((self.stack.len() - usize::from(upvalue_count))..)
+            .collect();
+
           let value = self.pop();
-
           if value.is_function() {
-            let func = value.as_function();
-            let upvalues = func
-              .upvalues
-              .iter()
-              .map(|(index, closed)| match closed {
-                ClosureStatus::Open => {
-                  let local = &mut self.stack[offset + usize::from(*index)];
-                  let allocated = local.clone().allocate();
-                  *local = allocated.clone();
-                  allocated
-                }
-                ClosureStatus::Closed => self.stack[offset + usize::from(*index)].clone(),
-                ClosureStatus::Upvalue => self.peek_frame().upvalues[usize::from(*index)].clone(),
-              })
-              .collect();
-
-            self.push(Closure::new(ptr::from_ref(func), upvalues).into());
+            self.push(Closure::new(ptr::from_ref(value.as_function()), upvalues).into());
           } else {
             break Some(ErrorKind::NonFunctionClosure);
           }
@@ -267,12 +263,18 @@ impl VM {
 
           self.push(value);
         }
-        OpCode::GetAllocated => {
+        OpCode::GetAllocatedValue => {
           let slot = chunk.get_value(ip + 1);
           let address = &self.stack[offset + usize::from(slot)];
           let value = address.as_allocated().borrow().clone();
 
           self.push(value);
+        }
+        OpCode::GetAllocatedPointer => {
+          let index = chunk.get_value(ip + 1);
+          let allocated = self.peek_frame().upvalues[usize::from(index)].clone();
+
+          self.push(allocated);
         }
 
         // VM Operations
