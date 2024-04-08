@@ -2,7 +2,8 @@
 //!
 //! Based upon this [blog post](https://www.georgevreilly.com/blog/2023/01/24/TreeInRust2PrintingTrees.html)
 
-use super::{expression::*, statement::*, AST};
+use super::{expression::*, statement::*};
+use crate::parser::AST;
 use std::fmt;
 
 impl fmt::Display for AST<'_, '_> {

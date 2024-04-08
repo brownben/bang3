@@ -30,13 +30,16 @@ fn parse<'s, 'a>(
   source: &'s str,
   allocator: &'a Allocator,
 ) -> Result<AST<'s, 'a>, ()> {
-  match bang::parse(source, allocator) {
-    Ok(ast) => Ok(ast),
-    Err(error) => {
+  let ast = bang::parse(source, allocator);
+
+  if ast.errors.is_empty() {
+    Ok(ast)
+  } else {
+    for error in ast.errors {
       eprintln!("{}", Message::from(&error));
       eprintln!("{}", CodeFrame::new(filename, source, error.span()));
-      Err(())
     }
+    Err(())
   }
 }
 

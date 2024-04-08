@@ -1,4 +1,7 @@
-use crate::ast::{expression::*, statement::*, GetSpan, Span, AST};
+use crate::{
+  ast::{expression::*, statement::*, GetSpan, Span},
+  parser::AST,
+};
 use std::{
   error,
   fmt::{self, Debug},

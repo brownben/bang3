@@ -3,8 +3,9 @@ use super::{
   value,
 };
 use crate::{
-  ast::{expression::*, statement::*, GetSpan, Span, AST},
+  ast::{expression::*, statement::*, GetSpan, Span},
   collections::SmallVec,
+  parser::AST,
 };
 use std::{error, fmt, mem};
 

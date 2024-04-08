@@ -18,10 +18,3 @@ pub(crate) use statement::Statement;
 
 mod visitor;
 pub(crate) use visitor::Visitor;
-
-use crate::allocator::Vec;
-/// An Abstract Syntax Tree produced by the parser
-#[derive(Debug)]
-pub struct AST<'source, 'allocator> {
-  pub(crate) statements: Vec<'allocator, Statement<'source, 'allocator>>,
-}

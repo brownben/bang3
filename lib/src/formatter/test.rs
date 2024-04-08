@@ -9,7 +9,8 @@ fn format(source: &str, print_width: u16) -> String {
     ..Default::default()
   };
   let allocator = Allocator::new();
-  let ast = parse(source, &allocator).unwrap();
+  let ast = parse(source, &allocator);
+  assert!(ast.errors.is_empty());
 
   crate::format(&ast, config)
 }
@@ -23,7 +24,7 @@ macro assert_format($source:expr, $expected:expr, $print_width:expr) {
 #[test]
 fn config_indentation() {
   let allocator = Allocator::new();
-  let ast = parse("(a)", &allocator).unwrap();
+  let ast = parse("(a)", &allocator);
   let mut formatter = Formatter::new(Config::default(), &allocator);
 
   formatter.config.print_width = 1;
@@ -38,7 +39,7 @@ fn config_indentation() {
 #[test]
 fn config_quote() {
   let allocator = Allocator::new();
-  let ast = parse("'string'", &allocator).unwrap();
+  let ast = parse("'string'", &allocator);
   let mut formatter = Formatter::new(Config::default(), &allocator);
 
   formatter.config.single_quotes = true;

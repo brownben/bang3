@@ -7,10 +7,27 @@ mod tokeniser;
 
 use crate::{
   allocator::{Allocator, Box, Vec},
-  ast::{expression::*, statement::*, GetSpan, Span, AST},
+  ast::{expression::*, statement::*, GetSpan, Span},
 };
 use std::{error, fmt, iter};
 use tokeniser::{Token, TokenKind, Tokeniser};
+
+/// An Abstract Syntax Tree produced by the parser
+#[derive(Debug)]
+pub struct AST<'source, 'allocator> {
+  pub(crate) statements: Vec<'allocator, Statement<'source, 'allocator>>,
+
+  /// The errors found whilst parsing the abstract syntax tree
+  pub errors: Vec<'allocator, ParseError>,
+}
+impl<'ast> AST<'_, 'ast> {
+  fn new(allocator: &'ast Allocator) -> Self {
+    Self {
+      statements: Vec::new_in(&allocator),
+      errors: Vec::new_in(&allocator),
+    }
+  }
+}
 
 /// Parse a source code string into an AST
 pub struct Parser<'source, 'ast> {
@@ -20,6 +37,8 @@ pub struct Parser<'source, 'ast> {
   tokeniser: iter::Peekable<Tokeniser<'source>>,
 
   skipped_newline: bool,
+
+  ast: AST<'source, 'ast>,
 }
 impl<'s, 'ast> Parser<'s, 'ast> {
   /// Creates a new parser
@@ -36,17 +55,21 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       tokeniser: Tokeniser::from(source).peekable(),
 
       skipped_newline: false,
+
+      ast: AST::new(allocator),
     }
   }
 
   /// Parse the source code into an AST
-  pub fn parse(mut self) -> ParseResult<AST<'s, 'ast>> {
-    let mut statements = Vec::new_in(self.allocator);
+  pub fn parse(mut self) -> AST<'s, 'ast> {
     while !self.is_finished() {
-      statements.push(self.parse_statement()?);
+      match self.parse_statement() {
+        Ok(statement) => self.ast.statements.push(statement),
+        Err(error) => self.ast.errors.push(error),
+      }
     }
 
-    Ok(AST { statements })
+    self.ast
   }
 
   fn is_finished(&mut self) -> bool {
@@ -58,7 +81,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     self.tokeniser.next().unwrap_or_default()
   }
 
-  fn peek_token(&mut self) -> TokenKind {
+  fn peek_token_kind(&mut self) -> TokenKind {
     self
       .tokeniser
       .peek()
@@ -295,7 +318,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     _left_bracket: Token,
   ) -> ParseResult<Expression<'s, 'ast>> {
     self.skip_newline();
-    let argument = if self.peek_token() == TokenKind::RightParen {
+    let argument = if self.peek_token_kind() == TokenKind::RightParen {
       None
     } else {
       Some(self.parse_expression()?)
@@ -470,7 +493,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       return Ok(pattern);
     }
 
-    let range_has_end = self.peek_token() != TokenKind::RightArrow;
+    let range_has_end = self.peek_token_kind() != TokenKind::RightArrow;
     self.pattern_range(Some(pattern), range_has_end)
   }
 
@@ -522,7 +545,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   fn parse_statement(&mut self) -> ParseResult<Statement<'s, 'ast>> {
     self.skip_newline();
 
-    match self.peek_token() {
+    match self.peek_token_kind() {
       TokenKind::Let => self.declaration_statement(),
       TokenKind::Comment => self.comment_statement(),
       _ => self.expression_statement(),
@@ -545,7 +568,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     let mut expression = self.parse_expression()?;
     loop {
       self.skip_maybe_newline();
-      match self.peek_token() {
+      match self.peek_token_kind() {
         TokenKind::RightRight => expression = self.pipeline(expression)?,
         _ => break self.expect_newline()?,
       }
@@ -571,7 +594,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
     loop {
       self.skip_maybe_newline();
-      match self.peek_token() {
+      match self.peek_token_kind() {
         TokenKind::RightCurly => break, // allow block to end without newline
         TokenKind::RightRight => expression = self.pipeline(expression)?,
         _ => break self.expect_newline()?,

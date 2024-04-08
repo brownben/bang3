@@ -1,9 +1,18 @@
-use crate::{parse, Allocator};
+use crate::{parse, Allocator, AST};
 use indoc::indoc;
+
+impl AST<'_, '_> {
+  fn is_ok(&self) -> bool {
+    self.errors.is_empty()
+  }
+  fn is_err(&self) -> bool {
+    !self.errors.is_empty()
+  }
+}
 
 fn parse_to_string<'s, 'ast>(source: &'s str) -> String {
   let allocator = Allocator::new();
-  let ast = parse(source, &allocator).unwrap();
+  let ast = parse(source, &allocator);
   ast.to_string()
 }
 

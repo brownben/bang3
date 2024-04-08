@@ -7,7 +7,10 @@ mod rules;
 #[cfg(test)]
 mod test;
 
-use crate::ast::{Expression, GetSpan, Span, Statement, Visitor, AST};
+use crate::{
+  ast::{Expression, GetSpan, Span, Statement, Visitor},
+  parser::AST,
+};
 use std::{error, fmt};
 
 #[derive(Debug, Default)]

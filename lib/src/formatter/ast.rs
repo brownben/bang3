@@ -1,5 +1,8 @@
 use super::{Formattable, Formatter, IR};
-use crate::ast::{expression::*, statement::*, GetSpan, AST};
+use crate::{
+  ast::{expression::*, statement::*, GetSpan},
+  parser::AST,
+};
 
 impl<'a, 'b> Formattable<'a, 'b> for AST<'a, '_> {
   fn format(&self, f: &Formatter<'a, 'b>) -> IR<'a, 'b> {

@@ -37,7 +37,7 @@ pub use allocator::Allocator;
 /// use bang::{parse, Allocator};
 /// let allocator = Allocator::new();
 /// let source = "5 + 3";
-/// let ast = parse(source, &allocator).unwrap();
+/// let ast = parse(source, &allocator);
 /// ```
 ///
 /// # Errors
@@ -45,11 +45,11 @@ pub use allocator::Allocator;
 pub fn parse<'source, 'ast>(
   source: &'source str,
   allocator: &'ast Allocator,
-) -> Result<AST<'source, 'ast>, ParseError> {
+) -> AST<'source, 'ast> {
   parser::Parser::new(source, allocator).parse()
 }
-pub use ast::{GetSpan, LineIndex, Span, AST};
-pub use parser::ParseError;
+pub use ast::{GetSpan, LineIndex, Span};
+pub use parser::{ParseError, AST};
 
 /// Compile an AST into a bytecode chunk
 ///
@@ -58,7 +58,7 @@ pub use parser::ParseError;
 /// use bang::{parse, Allocator};
 /// let allocator = Allocator::new();
 /// let source = "5 + 3";
-/// let ast = parse(source, &allocator).unwrap();
+/// let ast = parse(source, &allocator);
 /// let chunk = bang::compile(&ast).unwrap();
 /// ```
 ///
@@ -79,7 +79,7 @@ pub use interpreter::{Chunk, CompileError, RuntimeError, Value, VM};
 /// use bang::{lint, parse, Allocator};
 /// let allocator = Allocator::new();
 /// let source = "5 + 3";
-/// let ast = parse(source, &allocator).unwrap();
+/// let ast = parse(source, &allocator);
 /// let diagnostics = lint(&ast);
 /// ```
 #[must_use]
@@ -96,7 +96,7 @@ pub use linter::LintDiagnostic;
 /// use bang::{format, parse, Allocator, FormatterConfig};
 /// let allocator = Allocator::new();
 /// let source = "5 + 3";
-/// let ast = parse(source, &allocator).unwrap();
+/// let ast = parse(source, &allocator);
 /// let config = FormatterConfig::default();
 /// let formatted = format(&ast, config);
 /// ```
@@ -115,7 +115,7 @@ pub use formatter::Config as FormatterConfig;
 /// use bang::{typecheck, parse, Allocator};
 /// let allocator = Allocator::new();
 /// let source = "5 + 3";
-/// let ast = parse(source, &allocator).unwrap();
+/// let ast = parse(source, &allocator);
 /// let diagnostics = typecheck(&ast);
 /// ```
 #[must_use]

@@ -2,7 +2,7 @@ use crate::{lint as lint_ast, parse, Allocator};
 
 fn lint(source: &str) -> Result<(), ()> {
   let allocator = Allocator::new();
-  let ast = parse(source, &allocator).unwrap();
+  let ast = parse(source, &allocator);
   let diagnostics = lint_ast(&ast);
 
   if diagnostics.is_empty() {

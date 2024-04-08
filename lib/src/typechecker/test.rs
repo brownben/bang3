@@ -4,14 +4,14 @@ use indoc::indoc;
 
 fn synthesize(source: &str) -> Type {
   let allocator = Allocator::new();
-  let ast = parse(source, &allocator).unwrap();
+  let ast = parse(source, &allocator);
   let mut typechecker = Typechecker::new();
   ast.typecheck(&mut typechecker)
 }
 
 fn has_type_error(source: &str) -> bool {
   let allocator = Allocator::new();
-  let ast = parse(source, &allocator).unwrap();
+  let ast = parse(source, &allocator);
 
   !typecheck(&ast).is_empty()
 }
