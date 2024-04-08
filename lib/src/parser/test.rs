@@ -532,3 +532,133 @@ fn pipeline_can_break_lines() {
   "};
   assert_eq!(ast, expected);
 }
+
+mod fault_tolerant {
+  use super::*;
+
+  #[test]
+  fn let_statement_missing_identfier() {
+    let allocator = Allocator::new();
+    let ast = parse("let = 4 + 33", &allocator);
+    let expected = indoc! {"
+      ├─ Let '' =
+      │  ╰─ Binary (+)
+      │     ├─ Number (4)
+      │     ╰─ Number (33)
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+  }
+
+  #[test]
+  fn let_double_identifier() {
+    let allocator = Allocator::new();
+    let ast = parse("let x x + 33", &allocator);
+    let expected = indoc! {"
+       ├─ Let 'x' =
+       │  ╰─ Binary (+)
+       │     ├─ Variable (x)
+       │     ╰─ Number (33)
+     "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+  }
+
+  #[test]
+  fn let_missing_equals() {
+    let allocator = Allocator::new();
+    let ast = parse("let x  4 + 33", &allocator);
+    let expected = indoc! {"
+      ├─ Let 'x' =
+      │  ╰─ Binary (+)
+      │     ├─ Number (4)
+      │     ╰─ Number (33)
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+  }
+
+  #[test]
+  fn call_closing_bracket() {
+    let allocator = Allocator::new();
+
+    let ast = parse("func(4", &allocator);
+    let expected = indoc! {"
+      ├─ Call
+      │  ├─ Callee
+      │  │  ╰─ Variable (func)
+      │  ╰─ Argument
+      │     ╰─ Number (4)
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+  }
+
+  #[test]
+  fn group_closing_bracket() {
+    let allocator = Allocator::new();
+
+    let ast = parse("(4 + 1", &allocator);
+    let expected = indoc! {"
+      ├─ Group
+      │  ╰─ Binary (+)
+      │     ├─ Number (4)
+      │     ╰─ Number (1)
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+
+    let ast = parse("('hello'", &allocator);
+    let expected = indoc! {"
+      ├─ Group
+      │  ╰─ String 'hello'
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+  }
+
+  #[test]
+  fn if_() {
+    let allocator = Allocator::new();
+
+    let expected = indoc! {"
+      ├─ If
+      │  ├─ Condition
+      │  │  ╰─ Boolean (true)
+      │  ├─ Then
+      │  │  ╰─ Boolean (false)
+      │  ╰─ Otherwise
+      │     ╰─ Boolean (true)
+    "};
+
+    let ast = parse("if (true false else true", &allocator);
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+
+    let ast = parse("if true) false else true", &allocator);
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+
+    let ast = parse("if (true) false true", &allocator);
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+  }
+
+  #[test]
+  fn match_() {
+    let allocator = Allocator::new();
+
+    let ast = parse("match 7 2.. -> true | _ false", &allocator);
+    let expected = indoc! {"
+      ├─ Match
+      │  ├─ Number (7)
+      │  ╰─ Cases:
+      │     ├─ Pattern ─ 2 ..
+      │     │  ╰─ Boolean (true)
+      │     ╰─ Pattern ─ _
+      │        ╰─ Boolean (false)
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+  }
+}

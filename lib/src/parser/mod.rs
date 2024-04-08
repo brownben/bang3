@@ -23,8 +23,8 @@ pub struct AST<'source, 'allocator> {
 impl<'ast> AST<'_, 'ast> {
   fn new(allocator: &'ast Allocator) -> Self {
     Self {
-      statements: Vec::new_in(&allocator),
-      errors: Vec::new_in(&allocator),
+      statements: Vec::new_in(allocator),
+      errors: Vec::new_in(allocator),
     }
   }
 }
@@ -81,6 +81,10 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     self.tokeniser.next().unwrap_or_default()
   }
 
+  fn peek_token(&mut self) -> Token {
+    self.tokeniser.peek().copied().unwrap_or_default()
+  }
+
   fn peek_token_kind(&mut self) -> TokenKind {
     self
       .tokeniser
@@ -89,16 +93,17 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       .unwrap_or_default()
   }
 
-  fn expect(&mut self, kind: TokenKind) -> ParseResult<Token> {
-    let token = self.next_token();
-
-    if token.kind == kind {
-      Ok(token)
+  fn expect(&mut self, kind: TokenKind) -> Option<Token> {
+    if self.peek_token_kind() == kind {
+      Some(self.next_token())
     } else {
-      Err(ParseError::Expected {
+      let error = ParseError::Expected {
         expected: kind,
-        recieved: token,
-      })
+        recieved: self.peek_token(),
+      };
+      self.ast.errors.push(error);
+
+      None
     }
   }
 
@@ -324,8 +329,12 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       Some(self.parse_expression()?)
     };
     self.skip_newline();
-    let right_paren = self.expect(TokenKind::RightParen)?;
-    let span = expression.span().merge(right_paren.into());
+
+    let span = if let Some(right_paren) = self.expect(TokenKind::RightParen) {
+      expression.span().merge(right_paren.into())
+    } else {
+      expression.span()
+    };
 
     self.allocate_expression(Call {
       expression,
@@ -369,23 +378,27 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     self.skip_newline();
     let expression = self.parse_expression()?;
     self.skip_newline();
-    let closing_paren = self.expect(TokenKind::RightParen)?;
-    let span = Span::from(opening_paren).merge(closing_paren.into());
+
+    let span = if let Some(closing_paren) = self.expect(TokenKind::RightParen) {
+      Span::from(opening_paren).merge(closing_paren.into())
+    } else {
+      Span::from(opening_paren)
+    };
 
     self.allocate_expression(Group { expression, span })
   }
 
   fn if_(&mut self, if_token: Token) -> ParseResult<Expression<'s, 'ast>> {
-    self.expect(TokenKind::LeftParen)?;
+    self.expect(TokenKind::LeftParen);
     self.skip_newline();
     let condition = self.parse_expression()?;
     self.skip_newline();
-    self.expect(TokenKind::RightParen)?;
+    self.expect(TokenKind::RightParen);
 
     let then = self.parse_expression()?;
 
     self.skip_maybe_newline();
-    self.expect(TokenKind::Else)?;
+    self.expect(TokenKind::Else);
     let otherwise = self.parse_expression()?;
 
     let span = Span::from(if_token).merge(otherwise.span());
@@ -452,11 +465,11 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     let mut cases = Vec::new_in(self.allocator);
 
     self.skip_newline();
-    self.expect(TokenKind::Pipe)?;
+    self.expect(TokenKind::Pipe);
 
     loop {
       let pattern = self.pattern()?;
-      self.expect(TokenKind::RightArrow)?;
+      self.expect(TokenKind::RightArrow);
       let expression = self.parse_expression()?;
       let span = pattern.span().merge(expression.span());
 
@@ -562,8 +575,13 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
   fn declaration_statement(&mut self) -> ParseResult<Statement<'s, 'ast>> {
     let let_token = self.next_token();
-    let identifier_token = self.expect(TokenKind::Identifier)?;
-    self.expect(TokenKind::Equal)?;
+
+    let identifier = self
+      .expect(TokenKind::Identifier)
+      .map(|token| Span::from(token).source_text(self.source))
+      .unwrap_or_default();
+
+    self.expect(TokenKind::Equal);
 
     let mut expression = self.parse_expression()?;
     loop {
@@ -575,7 +593,6 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     }
     self.expect_newline()?;
 
-    let identifier = Span::from(identifier_token).source_text(self.source);
     let span = Span::from(let_token).merge(expression.span());
 
     if let Expression::Function(ref mut function) = &mut expression {
