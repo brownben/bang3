@@ -34,6 +34,7 @@ impl<'a, 'b> Formattable<'a, 'b> for Expression<'a, '_> {
       Expression::Match(match_) => match_.format(f),
       Expression::Unary(unary) => unary.format(f),
       Expression::Variable(variable) => variable.format(f),
+      Expression::Invalid => IR::Empty,
     }
   }
 }

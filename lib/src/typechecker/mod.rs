@@ -265,6 +265,7 @@ impl TypecheckExpression for Expression<'_, '_> {
       Expression::Match(match_) => match_.typecheck(t),
       Expression::Unary(unary) => unary.typecheck(t),
       Expression::Variable(variable) => variable.typecheck(t),
+      Expression::Invalid => Ok(Type::Unknown),
     }
   }
 }

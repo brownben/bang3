@@ -39,6 +39,10 @@ impl PrettyPrint for Expression<'_, '_> {
       Self::Match(x) => x.pretty(f, prefix, last),
       Self::Unary(x) => x.pretty(f, prefix, last),
       Self::Variable(x) => x.pretty(f, prefix, last),
+      Self::Invalid => {
+        let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
+        writeln!(f, "{prefix}{connector}Invalid")
+      }
     }
   }
 }

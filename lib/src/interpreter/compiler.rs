@@ -174,6 +174,7 @@ impl<'s> Compile<'s> for Expression<'s, '_> {
       Expression::Match(match_) => match_.compile(compiler),
       Expression::Unary(unary) => unary.compile(compiler),
       Expression::Variable(variable) => variable.compile(compiler),
+      Expression::Invalid => Err(CompileError::InvalidAST),
     }
   }
 }
@@ -573,6 +574,8 @@ pub enum CompileError {
   TooManyLocalVariables,
   /// Block must end with expression
   BlockMustEndWithExpression(Span),
+  /// AST to compile has an error in it
+  InvalidAST,
 }
 impl CompileError {
   /// The title of the error message
@@ -585,6 +588,7 @@ impl CompileError {
       Self::TooManyClosures => "Too Many Closures",
       Self::TooManyLocalVariables => "Too Many Local Variables",
       Self::BlockMustEndWithExpression(_) => "Block Must End With Expression",
+      Self::InvalidAST => "Invalid AST",
     }
   }
 
@@ -600,6 +604,7 @@ impl CompileError {
       Self::BlockMustEndWithExpression(_) => {
         "a blocks must return a value, so must end with an expression"
       }
+      Self::InvalidAST => "the AST contains an error, see errors from parser",
     }
   }
 }

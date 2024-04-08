@@ -65,11 +65,15 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     while !self.is_finished() {
       match self.parse_statement() {
         Ok(statement) => self.ast.statements.push(statement),
-        Err(error) => self.ast.errors.push(error),
+        Err(error) => self.record_error(error),
       }
     }
 
     self.ast
+  }
+
+  fn record_error(&mut self, error: ParseError) {
+    self.ast.errors.push(error);
   }
 
   fn is_finished(&mut self) -> bool {
@@ -90,7 +94,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       .tokeniser
       .peek()
       .map(|token| token.kind)
-      .unwrap_or_default()
+      .unwrap_or(TokenKind::EndOfFile)
   }
 
   fn expect(&mut self, kind: TokenKind) -> Option<Token> {
@@ -101,7 +105,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
         expected: kind,
         recieved: self.peek_token(),
       };
-      self.ast.errors.push(error);
+      self.record_error(error);
 
       None
     }
@@ -124,6 +128,19 @@ impl<'s, 'ast> Parser<'s, 'ast> {
         expected: TokenKind::EndOfLine,
         recieved: token,
       })
+    }
+  }
+
+  /// Skip until the specified kind of token occurs, or the end of a line is reached
+  /// Used to get the parser to a known place where it can resume parsing an expression
+  fn resync_to(&mut self, kind: TokenKind) {
+    while self.peek_token_kind() != kind
+      && !matches!(
+        self.peek_token_kind(),
+        TokenKind::Comment | TokenKind::EndOfFile | TokenKind::EndOfLine
+      )
+    {
+      self.next_token();
     }
   }
 
@@ -376,7 +393,14 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
   fn group(&mut self, opening_paren: Token) -> ParseResult<Expression<'s, 'ast>> {
     self.skip_newline();
-    let expression = self.parse_expression()?;
+    let expression = match self.parse_expression() {
+      Ok(expression) => expression,
+      Err(error) => {
+        self.record_error(error);
+        self.resync_to(TokenKind::RightParen);
+        Expression::Invalid
+      }
+    };
     self.skip_newline();
 
     let span = if let Some(closing_paren) = self.expect(TokenKind::RightParen) {

@@ -534,7 +534,8 @@ fn pipeline_can_break_lines() {
 }
 
 mod fault_tolerant {
-  use super::*;
+  use super::{parse, Allocator};
+  use indoc::indoc;
 
   #[test]
   fn let_statement_missing_identfier() {
@@ -618,7 +619,7 @@ mod fault_tolerant {
   }
 
   #[test]
-  fn if_() {
+  fn if_missing_brackets_or_else() {
     let allocator = Allocator::new();
 
     let expected = indoc! {"
@@ -645,7 +646,7 @@ mod fault_tolerant {
   }
 
   #[test]
-  fn match_() {
+  fn match_missing_initial_pipe_or_arrow() {
     let allocator = Allocator::new();
 
     let ast = parse("match 7 2.. -> true | _ false", &allocator);
@@ -657,6 +658,27 @@ mod fault_tolerant {
       │     │  ╰─ Boolean (true)
       │     ╰─ Pattern ─ _
       │        ╰─ Boolean (false)
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+  }
+
+  #[test]
+  fn group_recovers() {
+    let allocator = Allocator::new();
+
+    let ast = parse("(¬)", &allocator);
+    let expected = indoc! {"
+      ├─ Group
+      │  ╰─ Invalid
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+
+    let ast = parse("(2 /+/ 5)", &allocator);
+    let expected = indoc! {"
+      ├─ Group
+      │  ╰─ Invalid
     "};
     assert!(ast.is_err());
     assert_eq!(ast.to_string(), expected);
