@@ -21,7 +21,13 @@ impl Span {
 
   /// Combine two `Span`s into one
   pub fn merge(self, other: Self) -> Self {
-    Self::new(self.start.min(other.start), self.end.max(other.end))
+    if self == Self::default() {
+      other
+    } else if other == Self::default() {
+      self
+    } else {
+      Self::new(self.start.min(other.start), self.end.max(other.end))
+    }
   }
 
   /// Get the source text for a `Span` from a source string

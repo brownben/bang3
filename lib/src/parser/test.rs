@@ -478,6 +478,10 @@ fn variable() {
   let ast = parse_to_string("leaf");
   let expected = "├─ Variable (leaf)\n";
   assert_eq!(ast, expected);
+
+  let ast = parse_to_string("igloo");
+  let expected = "├─ Variable (igloo)\n";
+  assert_eq!(ast, expected);
 }
 
 #[test]
@@ -679,6 +683,61 @@ mod fault_tolerant {
     let expected = indoc! {"
       ├─ Group
       │  ╰─ Invalid
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+  }
+
+  #[test]
+  fn let_statement_recovers() {
+    let allocator = Allocator::new();
+
+    let ast = parse("let x = ¬\nlet b = 8", &allocator);
+    let expected = indoc! {"
+      ├─ Let 'x' =
+      │  ╰─ Invalid
+      ├─ Let 'b' =
+      │  ╰─ Number (8)
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+  }
+
+  #[test]
+  fn expression_statement_recovers() {
+    let allocator = Allocator::new();
+
+    let ast = parse("(5 5)+4\n3", &allocator);
+    let expected = indoc! {"
+      ├─ Group
+      │  ╰─ Number (5)
+      ├─ Number (5)
+      ├─ Invalid
+      ├─ Number (3)
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+  }
+
+  #[test]
+  fn block_expression_recovers() {
+    let allocator = Allocator::new();
+
+    let ast = parse("{5\n¬4784¬}", &allocator);
+    let expected = indoc! {"
+      ├─ Block
+      │  ├─ Number (5)
+      │  ╰─ Invalid
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+
+    let ast = parse("{5\n¬4784¬\n4}", &allocator);
+    let expected = indoc! {"
+      ├─ Block
+      │  ├─ Number (5)
+      │  ├─ Invalid
+      │  ╰─ Number (4)
     "};
     assert!(ast.is_err());
     assert_eq!(ast.to_string(), expected);
