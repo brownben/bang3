@@ -1,5 +1,12 @@
 //! # Parser
-//! Parse source code into an AST
+//! Parse source code into an Abstract Syntax Tree
+//!
+//! A pratt parser, based on [Crafting Interpreters](https://craftinginterpreters.com/parsing-expressions.html).
+//!
+//! Tries to be error tolerant, and recover from errors to continue parsing. If a token
+//! is expected but is not found it will just assume it exists and continue parsing
+//! (adding an error), otherwise if an error is found it will skip to the start of a new
+//! line and try parsing again.
 
 #[cfg(test)]
 mod test;
@@ -31,13 +38,19 @@ impl<'ast> AST<'_, 'ast> {
 
 /// Parse a source code string into an AST
 pub struct Parser<'source, 'ast> {
+  /// The bump allocator to store the AST in
   allocator: &'ast Allocator,
 
+  /// The source code string to parse
   source: &'source str,
+  /// The tokeniser for the source string
   tokeniser: iter::Peekable<Tokeniser<'source>>,
 
+  /// If the last token was a newline, and was skipped over to continue an expression
+  /// Allows for assertion of new line if it was skipped over too optimistically
   skipped_newline: bool,
 
+  /// The AST being built up by the parser
   ast: AST<'source, 'ast>,
 }
 impl<'s, 'ast> Parser<'s, 'ast> {
@@ -50,12 +63,9 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   pub fn new(source: &'s str, allocator: &'ast Allocator) -> Self {
     Self {
       allocator,
-
       source,
       tokeniser: Tokeniser::from(source).peekable(),
-
       skipped_newline: false,
-
       ast: AST::new(allocator),
     }
   }
@@ -70,23 +80,28 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     self.ast
   }
 
+  /// Save an error to the AST
   fn record_error(&mut self, error: ParseError) {
     self.ast.errors.push(error);
   }
 
+  /// Check if the parser has finished parsing the source code
   fn is_finished(&mut self) -> bool {
     self.tokeniser.peek().is_none()
   }
 
+  /// Get the next token from the tokeniser
   fn next_token(&mut self) -> Token {
     self.skipped_newline = false;
     self.tokeniser.next().unwrap_or_default()
   }
 
+  /// Peek at the next token from the tokeniser
   fn peek_token(&mut self) -> Token {
     self.tokeniser.peek().copied().unwrap_or_default()
   }
 
+  /// Peek at the kind of the next token from the tokeniser
   fn peek_token_kind(&mut self) -> TokenKind {
     self
       .tokeniser
@@ -94,6 +109,9 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       .map_or(TokenKind::EndOfFile, |token| token.kind)
   }
 
+  /// Checks if the next token is of the specified kind
+  ///
+  /// If it is not it adds an error, but then parsing can continue assuming it exists
   fn expect(&mut self, kind: TokenKind) -> Option<Token> {
     if self.peek_token_kind() == kind {
       Some(self.next_token())
@@ -108,6 +126,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     }
   }
 
+  /// Checks that a newline token is next, and if not adds an error
   fn expect_newline(&mut self) {
     if self.skipped_newline {
       return;
@@ -128,6 +147,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   }
 
   /// Skip until the specified kind of token occurs, or the end of a line is reached
+  ///
   /// Used to get the parser to a known place where it can resume parsing an expression
   fn resync_to(&mut self, kind: TokenKind) {
     while self.peek_token_kind() != kind
@@ -140,6 +160,9 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     }
   }
 
+  /// Does the next token match the specified kind
+  ///
+  /// If it does return that token, otherwise return None
   fn matches(&mut self, kind: TokenKind) -> Option<Token> {
     if let Some(token) = self.tokeniser.peek()
       && token.kind == kind
@@ -150,17 +173,8 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     }
   }
 
+  /// Skip over any newline tokens
   fn skip_newline(&mut self) {
-    while self
-      .tokeniser
-      .peek()
-      .is_some_and(|t| t.kind == TokenKind::EndOfLine)
-    {
-      self.next_token();
-    }
-  }
-
-  fn skip_maybe_newline(&mut self) {
     while self
       .tokeniser
       .peek()
@@ -171,6 +185,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     }
   }
 
+  /// Allocate an expression into the bump allocator for the AST
   #[allow(clippy::unnecessary_wraps, reason = "is always wrapped at call site")]
   fn allocate_expression<T>(&mut self, x: T) -> ParseResult<Expression<'s, 'ast>>
   where
@@ -180,6 +195,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     Ok(Box::new_in(x, self.allocator).into())
   }
 
+  /// Allocate an statement into the bump allocator for the AST
   fn allocate_statement<T>(&mut self, x: T) -> Statement<'s, 'ast>
   where
     T: 'ast,
@@ -188,16 +204,20 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     Box::new_in(x, self.allocator).into()
   }
 
+  /// Parse an expression
   fn parse_expression(&mut self) -> ParseResult<Expression<'s, 'ast>> {
-    self.parse_expression_inner(ParsePrecedence::Assignment)
+    self.parse_expression_with_precedence(ParsePrecedence::Assignment)
   }
 
+  /// Parse an expression, also checking for a newline at the end
   fn parse_expression_with_newline(&mut self) -> ParseResult<Expression<'s, 'ast>> {
     let mut expression = self.parse_expression()?;
     loop {
-      self.skip_maybe_newline();
+      self.skip_newline();
       match self.peek_token_kind() {
         TokenKind::RightCurly => break, // allow block to end without newline
+
+        // allow pipeline operator to start after a newline - different to other operators
         TokenKind::RightRight => expression = self.pipeline(expression)?,
         _ => break self.expect_newline(),
       }
@@ -206,7 +226,8 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     Ok(expression)
   }
 
-  fn parse_expression_inner(
+  /// Parse an expression up to a given precedence
+  fn parse_expression_with_precedence(
     &mut self,
     precedence: ParsePrecedence,
   ) -> ParseResult<Expression<'s, 'ast>> {
@@ -224,6 +245,9 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     Ok(previous)
   }
 
+  /// Parse a prefix expression
+  ///
+  /// An expression which starts/ makes up the first part of the expression
   fn prefix_expression(&mut self, token: Token) -> ParseResult<Expression<'s, 'ast>> {
     match token.kind {
       TokenKind::True | TokenKind::False | TokenKind::Number | TokenKind::String => {
@@ -250,6 +274,11 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     }
   }
 
+  /// Parse an infix expression
+  ///
+  /// An expression which relies on a previous expression to be complete.
+  /// Passes the previously parsed expression to make up the start of the expression.
+  /// It takes the relevant token as the operator, and the sub-function to parse the rest
   fn infix_expression(
     &mut self,
     lhs: Expression<'s, 'ast>,
@@ -277,6 +306,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     }
   }
 
+  /// Parses a binary expression (mathematical, comparison, logical, and pipeline)
   fn binary(
     &mut self,
     left: Expression<'s, 'ast>,
@@ -303,7 +333,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
     self.skip_newline();
     let precedence = ParsePrecedence::from(token.kind);
-    let right = self.parse_expression_inner(precedence.next())?;
+    let right = self.parse_expression_with_precedence(precedence.next())?;
     let span = left.span().merge(right.span());
 
     self.allocate_expression(Binary {
@@ -314,10 +344,15 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     })
   }
 
+  /// Parses a pipeline expression
+  ///
+  /// This is an infix expression, but is the special case where the operator may be on
+  ///  the next line, which is not allowed for other operators and handled in the
+  ///  [`parse_expression_with_newline`] function.
   fn pipeline(&mut self, left: Expression<'s, 'ast>) -> ParseResult<Expression<'s, 'ast>> {
     let token = self.next_token();
     let precedence = ParsePrecedence::from(token.kind);
-    let right = self.parse_expression_inner(precedence.next())?;
+    let right = self.parse_expression_with_precedence(precedence.next())?;
     let span = left.span().merge(right.span());
 
     self.allocate_expression(Binary {
@@ -328,6 +363,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     })
   }
 
+  /// Parses a block expression (a series of statements in curly braces)
   fn block(&mut self, opening_curly: Token) -> ParseResult<Expression<'s, 'ast>> {
     let mut statements = Vec::with_capacity_in(4, self.allocator);
     let closing_curly = loop {
@@ -354,6 +390,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     self.allocate_expression(Block { statements, span })
   }
 
+  /// Parses a call expression
   fn call(
     &mut self,
     expression: Expression<'s, 'ast>,
@@ -382,6 +419,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     })
   }
 
+  /// Parses a comment expression
   fn comment(
     &mut self,
     expression: Expression<'s, 'ast>,
@@ -398,6 +436,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     })
   }
 
+  /// Parses a function expression
   fn function(&mut self, parameter: Token) -> ParseResult<Expression<'s, 'ast>> {
     let parameter_span = Span::from(parameter);
     let parameter = parameter_span.source_text(self.source);
@@ -413,6 +452,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     })
   }
 
+  /// Parses a group expression (an expression in parentheses)
   fn group(&mut self, opening_paren: Token) -> ParseResult<Expression<'s, 'ast>> {
     self.skip_newline();
     let expression = match self.parse_expression() {
@@ -434,6 +474,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     self.allocate_expression(Group { expression, span })
   }
 
+  /// Parses an if expression
   fn if_(&mut self, if_token: Token) -> ParseResult<Expression<'s, 'ast>> {
     self.expect(TokenKind::LeftParen);
     self.skip_newline();
@@ -443,7 +484,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
     let then = self.parse_expression()?;
 
-    self.skip_maybe_newline();
+    self.skip_newline();
     self.expect(TokenKind::Else);
     let otherwise = self.parse_expression()?;
 
@@ -457,6 +498,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     })
   }
 
+  /// Parses a literal value
   fn literal(&mut self, token: Token) -> ParseResult<Expression<'s, 'ast>> {
     let literal = match token.kind {
       TokenKind::True | TokenKind::False => Self::literal_boolean(token),
@@ -467,6 +509,8 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
     self.allocate_expression(literal)
   }
+
+  /// Parses a boolean literal
   fn literal_boolean(token: Token) -> Literal<'s> {
     let span = Span::from(token);
     let kind = match token.kind {
@@ -478,6 +522,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     Literal { kind, span }
   }
 
+  /// Parses a number literal
   fn literal_number(&mut self, token: Token) -> Literal<'s> {
     let span = Span::from(token);
     let raw = span.source_text(self.source);
@@ -495,6 +540,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     }
   }
 
+  /// Parses a string literal
   fn literal_string(&mut self, token: Token) -> Literal<'s> {
     let span = Span::from(token);
     let full_string = span.source_text(self.source);
@@ -506,6 +552,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     }
   }
 
+  /// Parses a match expression
   fn match_(&mut self, token: Token) -> ParseResult<Expression<'s, 'ast>> {
     let value = self.parse_expression()?;
     let mut cases = Vec::new_in(self.allocator);
@@ -525,7 +572,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
         span,
       });
 
-      self.skip_maybe_newline();
+      self.skip_newline();
       if self.matches(TokenKind::Pipe).is_none() {
         break;
       }
@@ -535,6 +582,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     self.allocate_expression(Match { value, cases, span })
   }
 
+  /// Parses a pattern in a match expression
   fn pattern(&mut self) -> ParseResult<Pattern<'s, 'ast>> {
     let token = self.next_token();
     let pattern = match token.kind {
@@ -556,6 +604,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     self.pattern_range(Some(pattern), range_has_end)
   }
 
+  /// Parses a range pattern
   fn pattern_range(
     &mut self,
     start: Option<Pattern<'s, 'ast>>,
@@ -576,13 +625,14 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     Ok(Pattern::Range(Box::new_in(pattern, self.allocator)))
   }
 
+  /// Parses a unary operator expression (negation, not)
   fn unary(&mut self, token: Token) -> ParseResult<Expression<'s, 'ast>> {
     let operator = match token.kind {
       TokenKind::Bang => UnaryOperator::Not,
       TokenKind::Minus => UnaryOperator::Minus,
       _ => unreachable!("only unary operators are passed"),
     };
-    let expression = self.parse_expression_inner(ParsePrecedence::Unary)?;
+    let expression = self.parse_expression_with_precedence(ParsePrecedence::Unary)?;
     let span = Span::from(token).merge(expression.span());
 
     self.allocate_expression(Unary {
@@ -592,6 +642,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     })
   }
 
+  /// Wraps a identifier token into a variable expression
   fn variable(&mut self, token: Token) -> Variable<'s> {
     let span = Span::from(token);
 
@@ -601,6 +652,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     }
   }
 
+  /// Parses a statement
   fn parse_statement(&mut self) -> Statement<'s, 'ast> {
     self.skip_newline();
 
@@ -611,6 +663,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     }
   }
 
+  /// Parses a comment statement (a commnent alone on a line)
   fn comment_statement(&mut self) -> Statement<'s, 'ast> {
     let span = Span::from(self.next_token());
     let text = &span.source_text(self.source)[2..];
@@ -619,6 +672,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     self.allocate_statement(CommentStmt { text, span })
   }
 
+  /// Parses a let variable declaration
   fn declaration_statement(&mut self) -> Statement<'s, 'ast> {
     let let_token = self.next_token();
 
@@ -652,6 +706,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     })
   }
 
+  /// Parses an expression on its own line
   fn expression_statement(&mut self) -> Statement<'s, 'ast> {
     let expression = match self.parse_expression_with_newline() {
       Ok(expression) => expression,
@@ -666,7 +721,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   }
 }
 
-/// An error from parsing the source code
+/// An error which arose during parsing
 #[derive(Clone, Copy, Debug)]
 pub enum ParseError {
   /// Expected a token of a certain kind

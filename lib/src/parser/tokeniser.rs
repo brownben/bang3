@@ -1,29 +1,35 @@
 use crate::ast::Span;
 use std::{fmt, iter};
 
-/// Gets tokens from a string of source code. Is an `Iterator` of `Token`s
+/// Convert a string of source code into an [Iterator] of [Token]s
 pub struct Tokeniser<'source> {
+  /// The source code to tokenise
   source: &'source [u8],
+  /// The current position in the source code
   position: usize,
-  line: u16,
 }
 impl<'source> From<&'source str> for Tokeniser<'source> {
+  /// Create a new [Tokeniser] from a source code string
+  ///
+  /// # Panics
+  /// Panics if the length of the source code is greater than `u32::MAX`
   fn from(value: &'source str) -> Self {
     assert!(value.len() < u32::MAX as usize);
 
     Self {
       source: value.as_ref(),
       position: 0,
-      line: 1,
     }
   }
 }
 impl<'source> Tokeniser<'source> {
+  /// Has the end of the source code been reached?
   fn is_end(&self, position: usize) -> bool {
     position >= self.source.len()
   }
 
-  fn get_next_token(&mut self) -> (TokenKind, TokenLength) {
+  /// Get the next token from the source code
+  fn get_next_token(&mut self) -> (TokenKind, usize) {
     if self.is_end(self.position) {
       return (TokenKind::EndOfFile, 0);
     }
@@ -37,10 +43,7 @@ impl<'source> Tokeniser<'source> {
         self.position += 1;
         self.get_next_token()
       }
-      b'\n' => {
-        self.line += 1;
-        (TokenKind::EndOfLine, 1)
-      }
+      b'\n' => (TokenKind::EndOfLine, 1),
       b'/' if matches!(next_character, Some(b'/')) => self.comment(),
 
       // Values
@@ -91,7 +94,8 @@ impl<'source> Tokeniser<'source> {
     }
   }
 
-  fn comment(&self) -> (TokenKind, TokenLength) {
+  /// Skip to the end of a comment token (a newline)
+  fn comment(&self) -> (TokenKind, usize) {
     let length = self.source[self.position..]
       .iter()
       .take_while(|c| **c != b'\n')
@@ -100,7 +104,8 @@ impl<'source> Tokeniser<'source> {
     (TokenKind::Comment, length)
   }
 
-  fn string(&mut self, quote: u8) -> (TokenKind, TokenLength) {
+  /// Go to the end of a string token, the clsoing quote
+  fn string(&mut self, quote: u8) -> (TokenKind, usize) {
     let mut pos = self.position + 1;
 
     loop {
@@ -110,15 +115,12 @@ impl<'source> Tokeniser<'source> {
         break (TokenKind::String, pos - self.position + 1);
       }
 
-      if self.source[pos] == b'\n' {
-        self.line += 1;
-      }
-
       pos += 1;
     }
   }
 
-  fn number(&self) -> (TokenKind, TokenLength) {
+  /// Get a number token, with possible decimal part and numeric separators
+  fn number(&self) -> (TokenKind, usize) {
     let mut position = self.position + 1;
 
     // Match numbers before the decimal point
@@ -144,7 +146,8 @@ impl<'source> Tokeniser<'source> {
     (TokenKind::Number, position - self.position)
   }
 
-  fn identifier(&self) -> (TokenKind, TokenLength) {
+  /// Get an identifier token, a sequence of [a-zA-Z0-9_]
+  fn identifier(&self) -> (TokenKind, usize) {
     let mut position = self.position;
 
     while !self.is_end(position + 1)
@@ -158,7 +161,8 @@ impl<'source> Tokeniser<'source> {
     (self.identifier_type(length), length)
   }
 
-  fn identifier_type(&self, length: TokenLength) -> TokenKind {
+  /// Determines the type of the identifier, is it a keyword or a standard identifier
+  fn identifier_type(&self, length: usize) -> TokenKind {
     match self.source[self.position] {
       b'a' if self.is_keyword(length, "and") => TokenKind::And,
       b'e' if self.is_keyword(length, "else") => TokenKind::Else,
@@ -172,7 +176,8 @@ impl<'source> Tokeniser<'source> {
     }
   }
 
-  fn is_keyword(&self, length: TokenLength, keyword: &'static str) -> bool {
+  /// Checks if the source of the current token is equal to a keyword
+  fn is_keyword(&self, length: usize, keyword: &'static str) -> bool {
     let end = self.position + length;
     &self.source[self.position..end] == keyword.as_bytes()
   }
@@ -191,16 +196,16 @@ impl Iterator for Tokeniser<'_> {
 
     Some(Token {
       kind,
-
-      #[allow(clippy::cast_possible_truncation, reason = "source.len() < u32::MAX")]
-      start: start as u32,
+      start: u32::try_from(start).unwrap(),
       length: u16::try_from(self.position - start).unwrap(),
     })
   }
 }
 impl iter::FusedIterator for Tokeniser<'_> {}
 
-/// A token of source code, indicating it's type and location
+/// A Token of source code, a lexeme of the language
+///
+/// With the type of token, start position and length of the token in the source code
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Token {
   pub kind: TokenKind,
@@ -216,67 +221,104 @@ impl From<Token> for Span {
   }
 }
 
-type TokenLength = usize;
-
 /// The type of a token
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
 pub enum TokenKind {
   // Brackets
+  /// `(`
   LeftParen,
+  /// `)`
   RightParen,
+  /// `{`
   LeftCurly,
+  /// `}`
   RightCurly,
 
   // Operators
+  /// `-`
   Minus,
+  /// `+`
   Plus,
+  /// `*`
   Slash,
+  /// `*`
   Star,
+  /// `%`
   Percent,
+  /// `++`
   PlusPlus,
+  /// `!`
   Bang,
+  /// `and` or `&&`
   And,
+  /// `or` or `||`
   Or,
 
   // Functions
+  /// `>>`
   RightRight,
+  /// `=>`
   FatRightArrow,
 
   // Comparators
+  /// `!=`
   BangEqual,
+  /// `=`
   Equal,
+  /// `==`
   EqualEqual,
+  /// `>`
   Greater,
+  /// `>=`
   GreaterEqual,
+  /// `<`
   Less,
+  /// `<=`
   LessEqual,
 
   // Values
+  /// A identifier for a variable, a sequence of [a-zA-Z0-9_]
   Identifier,
+  /// A number, with possible decimal part and numeric separators
   Number,
+  /// A string, any characters between `'`, `"`, or `` ` ``
   String,
 
   // Keywords
+  /// `else`
   Else,
+  /// `false`
   False,
+  /// `if`
   If,
+  /// `let`
   Let,
+  /// `match`
   Match,
+  /// `true`
   True,
 
   // Pattern
+  /// `|`
   Pipe,
+  /// `->`
   RightArrow,
+  /// `..`
   DotDot,
 
   // Whitespace + Comments
+  // A comment, consisting of `//` then any number of characters before a newline
   Comment,
+  /// The end of a line, indicating a `\n`
   EndOfLine,
+  /// A token to indicate the end of the file
   EndOfFile,
 
   // Error
+  /// An unknown character, not known to fit in a [`TokenKind`]
   #[default]
   Unknown,
+  /// A string where the end of the file has been reached, thus unterminated
   UnterminatedString,
 }
 impl fmt::Display for TokenKind {
