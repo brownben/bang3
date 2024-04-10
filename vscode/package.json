@@ -1,0 +1,40 @@
+{
+  "name": "bang",
+  "displayName": "Bang",
+  "description": "My Language",
+  "publisher": "Ben Brown",
+  "icon": "./icons/logo.png",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.88.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "bang",
+        "extensions": [
+          ".bang"
+        ],
+        "aliases": [
+          "Bang",
+          "bang"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/logo.svg",
+          "dark": "./icons/logo.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "bang",
+        "scopeName": "source.bang",
+        "path": "./syntaxes/bang.tmLanguage.json"
+      }
+    ]
+  }
+}
