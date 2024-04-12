@@ -1,11 +1,8 @@
-use super::{
-  bytecode::{Chunk, ConstantValue, OpCode},
-  value,
-};
+use super::bytecode::{Chunk, ConstantValue, OpCode};
 use crate::{
   allocator::{Allocator, Vec},
   ast::{expression::*, statement::*, GetSpan, Span},
-  collections::SmallVec,
+  collections::{SmallVec, String},
   parser::AST,
 };
 use std::{error, fmt, mem};
@@ -14,6 +11,7 @@ pub struct Compiler<'s, 'a> {
   allocator: &'a Allocator,
 
   chunk: Chunk,
+  chunk_stack: Vec<'a, Chunk>,
 
   scope_depth: u8,
   locals: Vec<'a, Vec<'a, Local<'s>>>,
@@ -27,7 +25,8 @@ impl<'s, 'a> Compiler<'s, 'a> {
     Self {
       allocator,
 
-      chunk: Chunk::new(),
+      chunk: Chunk::new("main".into()),
+      chunk_stack: Vec::new_in(allocator),
 
       scope_depth: 0,
       locals,
@@ -41,6 +40,23 @@ impl<'s, 'a> Compiler<'s, 'a> {
     self.chunk.add_opcode(OpCode::Halt, Span::default());
     self.chunk.finalize();
     self.chunk
+  }
+
+  fn new_chunk(&mut self, name: String) {
+    let chunk = mem::replace(&mut self.chunk, Chunk::new(name));
+    self.chunk_stack.push(chunk);
+
+    self.begin_scope();
+    self.locals.push(Vec::new_in(self.allocator));
+    self.closures.push(SmallVec::new());
+  }
+  fn finish_chunk(&mut self, span: Span) -> Result<Chunk, CompileError> {
+    self.end_scope(span)?;
+    self.locals.pop();
+
+    let mut chunk = mem::replace(&mut self.chunk, self.chunk_stack.pop().unwrap());
+    chunk.finalize();
+    Ok(chunk)
   }
 
   fn add_constant(&mut self, value: ConstantValue, span: Span) -> Result<(), CompileError> {
@@ -288,21 +304,15 @@ impl<'s> Compile<'s> for Comment<'s, '_> {
 }
 impl<'s> Compile<'s> for Function<'s, '_> {
   fn compile(&self, compiler: &mut Compiler<'s, '_>) -> Result<(), CompileError> {
-    let constant_position = compiler.add_jump(OpCode::ConstantLong, self.span);
-    let jump_position = compiler.add_jump(OpCode::Jump, self.span);
-
-    let start = compiler.chunk.len();
-    compiler.begin_scope();
-    compiler.locals.push(Vec::new_in(compiler.allocator));
-    compiler.closures.push(SmallVec::new());
+    let name = self.name.unwrap_or("").into();
+    compiler.new_chunk(name);
 
     compiler.define_variable(self.parameter, self.span)?;
     self.body.compile(compiler)?;
     compiler.chunk.add_opcode(OpCode::Return, self.span);
 
-    compiler.end_scope(self.span)?;
-    compiler.locals.pop();
-    compiler.patch_jump(jump_position)?;
+    let function_chunk = compiler.finish_chunk(self.span)?;
+    compiler.add_constant(function_chunk.into(), self.span)?;
 
     let upvalues = compiler.closures.pop().unwrap();
     if !upvalues.is_empty() {
@@ -324,15 +334,6 @@ impl<'s> Compile<'s> for Function<'s, '_> {
       } else {
         return Err(CompileError::TooManyClosures);
       }
-    }
-
-    let name = self.name.unwrap_or("").into();
-    let function_value = value::Function::new(name, start);
-    let constant_value = compiler.chunk.add_constant(function_value.into());
-    if let Ok(value) = u16::try_from(constant_value) {
-      compiler.chunk.replace_long_value(constant_position, value);
-    } else {
-      return Err(CompileError::TooManyConstants);
     }
 
     Ok(())

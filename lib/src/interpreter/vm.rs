@@ -12,6 +12,7 @@ use std::{error, fmt, ptr};
 struct CallFrame {
   ip: usize,
   offset: usize,
+  chunk: *const Chunk,
   upvalues: SmallVec<[Value; 4]>,
 }
 
@@ -77,10 +78,17 @@ impl VM {
     unsafe { self.frames.last().unwrap_unchecked() }
   }
   #[inline]
-  fn push_frame(&mut self, ip: usize, offset: usize, upvalues: SmallVec<[Value; 4]>) {
+  fn push_frame(
+    &mut self,
+    ip: usize,
+    offset: usize,
+    chunk: *const Chunk,
+    upvalues: SmallVec<[Value; 4]>,
+  ) {
     self.frames.push(CallFrame {
       ip,
       offset,
+      chunk,
       upvalues,
     });
   }
@@ -100,6 +108,7 @@ impl VM {
   pub fn run(&mut self, chunk: &Chunk) -> Result<(), RuntimeError> {
     let mut ip = 0;
     let mut offset = 0;
+    let mut chunk = chunk;
 
     let error = loop {
       let instruction = chunk.get(ip);
@@ -216,17 +225,23 @@ impl VM {
           let callee = self.get_stack_value(self.stack.len() - 2);
 
           if callee.is_function() {
-            self.push_frame(ip, offset, SmallVec::new());
-            ip = callee.as_function().start - 1;
+            self.push_frame(ip, offset, chunk, SmallVec::new());
+
+            ip = 0;
             offset = self.stack.len() - 1;
+            chunk = unsafe { &*callee.as_function().get_pointer() };
           } else if callee.is_closure() {
             let closure = callee.as_closure();
-            self.push_frame(ip, offset, closure.upvalues.clone());
-            ip = closure.function().start - 1;
+            self.push_frame(ip, offset, chunk, closure.upvalues.clone());
+
+            ip = 0;
             offset = self.stack.len() - 1;
+            chunk = unsafe { &*closure.function().get_pointer() };
           } else {
             break Some(ErrorKind::NotCallable(callee.get_type()));
           }
+
+          continue; // skip the ip increment, as we're jumping to a new chunk
         }
         OpCode::Return => {
           let result = self.pop();
@@ -236,6 +251,7 @@ impl VM {
           let frame = self.pop_frame();
           ip = frame.ip;
           offset = frame.offset;
+          chunk = unsafe { &*frame.chunk };
         }
 
         // Closures

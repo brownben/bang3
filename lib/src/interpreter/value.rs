@@ -1,4 +1,7 @@
-use crate::collections::{SmallVec, String};
+use crate::{
+  collections::{SmallVec, String},
+  Chunk,
+};
 use std::{cell::RefCell, fmt, mem, ptr, rc::Rc};
 
 /// A value on the stack of the interpreter.
@@ -108,11 +111,11 @@ impl Value {
   /// Panics if the [Value] is not a [Function].
   /// Use [`Value::is_function`] to check if it is a function.
   #[must_use]
-  pub(crate) fn as_function(&self) -> &Function {
+  pub(crate) fn as_function(&self) -> &Chunk {
     debug_assert!(self.is_function());
 
     let pointer = self.0.map_addr(|ptr| ptr & FROM_POINTER);
-    unsafe { &*pointer.cast::<Function>() }
+    unsafe { &*pointer.cast::<Chunk>() }
   }
 
   /// Is the [Value] allocated?
@@ -287,7 +290,7 @@ impl fmt::Debug for Value {
       Self(NULL) => write!(f, "null"),
       a if a.is_number() => write!(f, "{}", a.as_number()),
       a if a.is_string() => write!(f, "{}", a.as_string()),
-      a if a.is_function() => write!(f, "{}", a.as_function()),
+      a if a.is_function() => write!(f, "<function {}>", a.as_function().name()),
       a if a.is_object() => write!(f, "{}", a.as_object()),
       a if a.is_allocated() => write!(f, "<allocated {:?}>", a.as_allocated().borrow()),
       _ => unreachable!(),
@@ -327,8 +330,8 @@ impl From<*const String> for Value {
     )
   }
 }
-impl From<*const Function> for Value {
-  fn from(value: *const Function) -> Self {
+impl From<*const Chunk> for Value {
+  fn from(value: *const Chunk) -> Self {
     Self(value.map_addr(|ptr| ptr | TO_POINTER | FUNCTION).cast())
   }
 }
@@ -385,50 +388,27 @@ impl From<Closure> for Object {
   }
 }
 
-/// Represents a Function
-///
-/// Only valid for the [Chunk], which it was generated for.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Function {
-  pub(crate) name: String,
-  pub(crate) start: usize,
-}
-impl Function {
-  pub fn new(name: String, start: usize) -> Self {
-    Self { name, start }
-  }
-}
-impl fmt::Display for Function {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    if self.name.is_empty() {
-      write!(f, "<function>")
-    } else {
-      write!(f, "<function {}>", self.name)
-    }
-  }
-}
-
 /// Represents a Closure
 ///
 /// A function which has captured variables from the surrounding scope.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Closure {
-  func: *const Function,
+  func: *const Chunk,
   pub(crate) upvalues: SmallVec<[Value; 4]>,
 }
 impl Closure {
-  pub fn new(func: *const Function, upvalues: SmallVec<[Value; 4]>) -> Self {
+  pub fn new(func: *const Chunk, upvalues: SmallVec<[Value; 4]>) -> Self {
     Self { func, upvalues }
   }
 
   #[inline]
-  pub fn function(&self) -> &Function {
+  pub fn function(&self) -> &Chunk {
     unsafe { &*self.func }
   }
 }
 impl fmt::Display for Closure {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "<closure {}>", self.function())
+    write!(f, "<closure {}>", self.function().name())
   }
 }
 
@@ -459,7 +439,7 @@ mod test {
   // Check that the alignment is greater than 8, so we can use the last 3 bits
   const _OBJECT_ALIGNMENT_ASSERT: () = assert!(std::mem::align_of::<Object>() >= 8);
   const _STRING_ALIGNMENT_ASSERT: () = assert!(std::mem::align_of::<String>() >= 8);
-  const _FUNCTION_ALIGNMENT_ASSERT: () = assert!(std::mem::align_of::<Function>() >= 8);
+  const _FUNCTION_ALIGNMENT_ASSERT: () = assert!(std::mem::align_of::<Chunk>() >= 8);
 
   #[test]
   fn boolean() {
@@ -582,7 +562,7 @@ mod test {
 
   #[test]
   fn function() {
-    let function = Function::new("".into(), 0);
+    let function = Chunk::new("".into());
     let function = Value::from(ptr::from_ref(&function));
     assert!(!function.is_number());
     assert!(!function.is_constant_string());
@@ -607,7 +587,7 @@ mod test {
     assert_eq!(Value::from("").is_falsy(), true);
     assert_eq!(Value::from("hello").is_falsy(), false);
 
-    let function = Function::new("".into(), 0);
+    let function = Chunk::new("".into());
     assert_eq!(Value::from(ptr::from_ref(&function)).is_falsy(), false);
   }
 

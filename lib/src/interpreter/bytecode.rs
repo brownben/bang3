@@ -1,22 +1,27 @@
-use crate::{ast::Span, collections::String, interpreter::value::Function};
-use std::{fmt, mem};
+use crate::{ast::Span, collections::String};
+use std::{fmt, mem, ptr};
 
 /// A chunk of bytecode
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Chunk {
+  name: String,
   code: Vec<u8>,
-  constants: Vec<ConstantValue>,
+  pub(crate) constants: Vec<ConstantValue>,
   strings: Vec<String>,
   debug_info: DebugInfo,
 }
 impl Chunk {
-  pub(crate) fn new() -> Self {
+  pub(crate) fn new(name: String) -> Self {
     Self {
+      name,
       code: Vec::with_capacity(512),
       constants: Vec::with_capacity(32),
       strings: Vec::with_capacity(16),
       debug_info: DebugInfo::new(),
     }
+  }
+  pub(crate) fn name(&self) -> &str {
+    &self.name
   }
   pub(crate) fn finalize(&mut self) {
     self.debug_info.finalize();
@@ -117,6 +122,10 @@ impl Chunk {
   pub(crate) fn get_span(&self, opcode_position: usize) -> Span {
     self.debug_info.get(opcode_position)
   }
+
+  pub(crate) fn get_pointer(&self) -> *const Self {
+    ptr::from_ref::<Self>(self)
+  }
 }
 
 #[repr(u8)]
@@ -203,10 +212,10 @@ impl From<u8> for OpCode {
 }
 
 /// A constant value which is stored in a [Chunk]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone)]
 pub enum ConstantValue {
   String(crate::collections::String),
-  Function(Function),
+  Function(Chunk),
 }
 impl From<&str> for ConstantValue {
   fn from(value: &str) -> Self {
@@ -218,9 +227,25 @@ impl From<String> for ConstantValue {
     Self::String(value)
   }
 }
-impl From<Function> for ConstantValue {
-  fn from(value: Function) -> Self {
+impl From<Chunk> for ConstantValue {
+  fn from(value: Chunk) -> Self {
     Self::Function(value)
+  }
+}
+impl PartialEq<ConstantValue> for ConstantValue {
+  fn eq(&self, other: &ConstantValue) -> bool {
+    match (self, other) {
+      (Self::String(a), Self::String(b)) => a == b,
+      _ => false,
+    }
+  }
+}
+impl fmt::Debug for ConstantValue {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::String(value) => write!(f, "'{value:?}'"),
+      Self::Function(func) => write!(f, "<function {}>", func.name),
+    }
   }
 }
 
@@ -279,7 +304,7 @@ impl DebugInfo {
 
 impl fmt::Display for Chunk {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    writeln!(f, "      ╭─[Bytecode]")?;
+    writeln!(f, "      ╭─[Bytecode: {}]", self.name)?;
 
     let mut position: usize = 0;
     while position < self.len() {
