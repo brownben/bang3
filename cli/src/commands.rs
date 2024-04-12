@@ -43,8 +43,13 @@ fn parse<'s, 'a>(
   }
 }
 
-fn compile(filename: &str, source: &str, ast: &AST) -> Result<bang::Chunk, ()> {
-  match bang::compile(ast) {
+fn compile(
+  filename: &str,
+  source: &str,
+  ast: &AST,
+  allocator: &Allocator,
+) -> Result<bang::Chunk, ()> {
+  match bang::compile(ast, allocator) {
     Ok(chunk) => Ok(chunk),
     Err(error) => {
       eprintln!("{}", Message::from(&error));
@@ -60,7 +65,7 @@ pub fn run(filename: &str) -> Result<(), ()> {
   let allocator = Allocator::new();
   let source = read_file(filename)?;
   let ast = parse(filename, &source, &allocator)?;
-  let chunk = compile(filename, &source, &ast)?;
+  let chunk = compile(filename, &source, &ast, &allocator)?;
 
   let mut vm = bang::VM::new();
   if let Err(error) = vm.run(&chunk) {
@@ -144,7 +149,7 @@ pub fn print_chunk(filename: &str) -> Result<(), ()> {
   let allocator = Allocator::new();
   let source = read_file(filename)?;
   let ast = parse(filename, &source, &allocator)?;
-  let chunk = compile(filename, &source, &ast)?;
+  let chunk = compile(filename, &source, &ast, &allocator)?;
 
   print!("{chunk}");
 

@@ -3,27 +3,35 @@ use super::{
   value,
 };
 use crate::{
+  allocator::{Allocator, Vec},
   ast::{expression::*, statement::*, GetSpan, Span},
   collections::SmallVec,
   parser::AST,
 };
 use std::{error, fmt, mem};
 
-pub struct Compiler<'s> {
+pub struct Compiler<'s, 'a> {
+  allocator: &'a Allocator,
+
   chunk: Chunk,
 
   scope_depth: u8,
-  locals: Vec<Vec<Local<'s>>>,
-  closures: Vec<SmallVec<[(u8, VariableStatus); 8]>>,
+  locals: Vec<'a, Vec<'a, Local<'s>>>,
+  closures: Vec<'a, SmallVec<[(u8, VariableStatus); 8]>>,
 }
-impl<'s> Compiler<'s> {
-  pub fn new() -> Self {
+impl<'s, 'a> Compiler<'s, 'a> {
+  pub fn new(allocator: &'a Allocator) -> Self {
+    let mut locals = Vec::new_in(allocator);
+    locals.push(Vec::new_in(allocator));
+
     Self {
+      allocator,
+
       chunk: Chunk::new(),
 
       scope_depth: 0,
-      locals: vec![Vec::new()],
-      closures: Vec::new(),
+      locals,
+      closures: Vec::new_in(allocator),
     }
   }
   pub fn compile(&mut self, ast: &AST<'s, '_>) -> Result<(), CompileError> {
@@ -103,7 +111,7 @@ impl<'s> Compiler<'s> {
 
     Ok(())
   }
-  fn function_locals(&mut self) -> &mut Vec<Local<'s>> {
+  fn function_locals(&mut self) -> &mut Vec<'a, Local<'s>> {
     self.locals.last_mut().unwrap()
   }
   fn define_variable(&mut self, name: &'s str, span: Span) -> Result<(), CompileError> {
@@ -142,11 +150,11 @@ enum VariableStatus {
 }
 
 trait Compile<'s> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError>;
+  fn compile(&self, compiler: &mut Compiler<'s, '_>) -> Result<(), CompileError>;
 }
 
 impl<'s> Compile<'s> for AST<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+  fn compile(&self, compiler: &mut Compiler<'s, '_>) -> Result<(), CompileError> {
     for statement in &self.statements {
       statement.compile(compiler)?;
 
@@ -161,7 +169,7 @@ impl<'s> Compile<'s> for AST<'s, '_> {
 }
 
 impl<'s> Compile<'s> for Expression<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+  fn compile(&self, compiler: &mut Compiler<'s, '_>) -> Result<(), CompileError> {
     match self {
       Expression::Binary(binary) => binary.compile(compiler),
       Expression::Block(block) => block.compile(compiler),
@@ -179,7 +187,7 @@ impl<'s> Compile<'s> for Expression<'s, '_> {
   }
 }
 impl<'s> Compile<'s> for Binary<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+  fn compile(&self, compiler: &mut Compiler<'s, '_>) -> Result<(), CompileError> {
     match self.operator {
       BinaryOperator::And => {
         self.left.compile(compiler)?;
@@ -241,7 +249,7 @@ impl<'s> Compile<'s> for Binary<'s, '_> {
   }
 }
 impl<'s> Compile<'s> for Block<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+  fn compile(&self, compiler: &mut Compiler<'s, '_>) -> Result<(), CompileError> {
     compiler.begin_scope();
 
     let (last, rest) = self.statements.split_last().unwrap();
@@ -262,7 +270,7 @@ impl<'s> Compile<'s> for Block<'s, '_> {
   }
 }
 impl<'s> Compile<'s> for Call<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+  fn compile(&self, compiler: &mut Compiler<'s, '_>) -> Result<(), CompileError> {
     self.expression.compile(compiler)?;
     if let Some(argument) = &self.argument {
       argument.compile(compiler)?;
@@ -274,18 +282,18 @@ impl<'s> Compile<'s> for Call<'s, '_> {
   }
 }
 impl<'s> Compile<'s> for Comment<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+  fn compile(&self, compiler: &mut Compiler<'s, '_>) -> Result<(), CompileError> {
     self.expression.compile(compiler)
   }
 }
 impl<'s> Compile<'s> for Function<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+  fn compile(&self, compiler: &mut Compiler<'s, '_>) -> Result<(), CompileError> {
     let constant_position = compiler.add_jump(OpCode::ConstantLong, self.span);
     let jump_position = compiler.add_jump(OpCode::Jump, self.span);
 
     let start = compiler.chunk.len();
     compiler.begin_scope();
-    compiler.locals.push(Vec::new());
+    compiler.locals.push(Vec::new_in(compiler.allocator));
     compiler.closures.push(SmallVec::new());
 
     compiler.define_variable(self.parameter, self.span)?;
@@ -331,12 +339,12 @@ impl<'s> Compile<'s> for Function<'s, '_> {
   }
 }
 impl<'s> Compile<'s> for Group<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+  fn compile(&self, compiler: &mut Compiler<'s, '_>) -> Result<(), CompileError> {
     self.expression.compile(compiler)
   }
 }
 impl<'s> Compile<'s> for If<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+  fn compile(&self, compiler: &mut Compiler<'s, '_>) -> Result<(), CompileError> {
     self.condition.compile(compiler)?;
     let jump_to_else = compiler.add_jump(OpCode::JumpIfFalse, self.span);
 
@@ -354,7 +362,7 @@ impl<'s> Compile<'s> for If<'s, '_> {
   }
 }
 impl<'s> Compile<'s> for Literal<'s> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+  fn compile(&self, compiler: &mut Compiler<'s, '_>) -> Result<(), CompileError> {
     match self.kind {
       LiteralKind::Boolean(true) => compiler.chunk.add_opcode(OpCode::True, self.span),
       LiteralKind::Boolean(false) => compiler.chunk.add_opcode(OpCode::False, self.span),
@@ -366,7 +374,7 @@ impl<'s> Compile<'s> for Literal<'s> {
   }
 }
 impl<'s> Compile<'s> for Match<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+  fn compile(&self, compiler: &mut Compiler<'s, '_>) -> Result<(), CompileError> {
     let is_exhaustive = self
       .cases
       .iter()
@@ -374,7 +382,7 @@ impl<'s> Compile<'s> for Match<'s, '_> {
 
     self.value.compile(compiler)?;
 
-    let mut case_end_jumps = Vec::new();
+    let mut case_end_jumps = Vec::new_in(compiler.allocator);
     for case in &self.cases {
       match &case.pattern {
         Pattern::Identifier(variable) => {
@@ -456,7 +464,7 @@ impl<'s> Compile<'s> for Match<'s, '_> {
   }
 }
 impl<'s> Compile<'s> for Unary<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+  fn compile(&self, compiler: &mut Compiler<'s, '_>) -> Result<(), CompileError> {
     self.expression.compile(compiler)?;
 
     compiler.chunk.add_opcode(
@@ -471,7 +479,7 @@ impl<'s> Compile<'s> for Unary<'s, '_> {
   }
 }
 impl<'s> Compile<'s> for Variable<'s> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+  fn compile(&self, compiler: &mut Compiler<'s, '_>) -> Result<(), CompileError> {
     // See if the variable is local to the current function
     if let Some(local_position) = compiler
       .function_locals()
@@ -544,7 +552,7 @@ impl<'s> Compile<'s> for Variable<'s> {
 }
 
 impl<'s> Compile<'s> for Statement<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+  fn compile(&self, compiler: &mut Compiler<'s, '_>) -> Result<(), CompileError> {
     match self {
       Statement::Comment(_) => Ok(()),
       Statement::Expression(expression) => expression.compile(compiler),
@@ -553,7 +561,7 @@ impl<'s> Compile<'s> for Statement<'s, '_> {
   }
 }
 impl<'s> Compile<'s> for Let<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+  fn compile(&self, compiler: &mut Compiler<'s, '_>) -> Result<(), CompileError> {
     self.expression.compile(compiler)?;
     compiler.define_variable(self.identifier, self.span)
   }

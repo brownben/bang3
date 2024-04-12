@@ -59,13 +59,16 @@ pub use parser::{ParseError, AST};
 /// let allocator = Allocator::new();
 /// let source = "5 + 3";
 /// let ast = parse(source, &allocator);
-/// let chunk = bang::compile(&ast).unwrap();
+/// let chunk = bang::compile(&ast, &allocator).unwrap();
 /// ```
 ///
 /// # Errors
 /// If there is a problem constructing the bytecode
-pub fn compile<'s: 'a, 'a>(ast: &AST<'s, '_>) -> Result<Chunk, CompileError> {
-  let mut compiler = interpreter::Compiler::new();
+pub fn compile<'s: 'a, 'a>(
+  ast: &AST<'s, '_>,
+  allocator: &Allocator,
+) -> Result<Chunk, CompileError> {
+  let mut compiler = interpreter::Compiler::new(allocator);
   compiler.compile(ast)?;
   let chunk = compiler.finish();
   Ok(chunk)
