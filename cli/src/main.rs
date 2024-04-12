@@ -1,11 +1,12 @@
 //! # Bang - My Language
 // CLI to access the language, and associated tools like the linter and formatter.
 
-use clap::{Args, Parser, Subcommand};
-use std::process;
-
 mod commands;
 mod diagnostics;
+
+use clap::{Args, Parser, Subcommand};
+use commands::CommandStatus;
+use std::process;
 
 #[derive(Parser)]
 #[clap(name = "bang", version)]
@@ -90,7 +91,8 @@ fn main() -> process::ExitCode {
   };
 
   match result {
-    Ok(()) => process::ExitCode::SUCCESS,
-    Err(()) => process::ExitCode::FAILURE,
+    Ok(CommandStatus::Success) => process::ExitCode::from(0),
+    Ok(CommandStatus::Failure) => process::ExitCode::from(1),
+    Err(()) => process::ExitCode::from(2),
   }
 }

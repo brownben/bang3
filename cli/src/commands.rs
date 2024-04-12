@@ -4,6 +4,13 @@ use anstream::{eprintln, println};
 use bang::{Allocator, GetSpan, Span, AST};
 use std::fs;
 
+pub enum CommandStatus {
+  /// Command was successful, no errors or warnings occurred
+  Success,
+  /// Command was successful, but warnings occurred
+  Failure,
+}
+
 fn read_file(filename: &str) -> Result<String, ()> {
   match fs::read_to_string(filename) {
     Ok(file) if !file.is_empty() => Ok(file),
@@ -18,10 +25,7 @@ fn read_file(filename: &str) -> Result<String, ()> {
         Ok(file)
       }
     }
-    Err(_) => {
-      eprintln!("{}", Message::error("File not found"));
-      Err(())
-    }
+    Err(_) => Err(eprintln!("{}", Message::error("File not found"))),
   }
 }
 
@@ -61,7 +65,7 @@ fn compile(
   }
 }
 
-pub fn run(filename: &str) -> Result<(), ()> {
+pub fn run(filename: &str) -> Result<CommandStatus, ()> {
   let allocator = Allocator::new();
   let source = read_file(filename)?;
   let ast = parse(filename, &source, &allocator)?;
@@ -74,10 +78,10 @@ pub fn run(filename: &str) -> Result<(), ()> {
     return Err(());
   }
 
-  Ok(())
+  Ok(CommandStatus::Success)
 }
 
-pub fn format(options: &FormatOptions) -> Result<(), ()> {
+pub fn format(options: &FormatOptions) -> Result<CommandStatus, ()> {
   let config = bang::FormatterConfig {
     print_width: options.config_print_width,
     single_quotes: options.config_single_quote,
@@ -91,23 +95,23 @@ pub fn format(options: &FormatOptions) -> Result<(), ()> {
 
   if options.dryrun {
     println!("{formatted_source}");
-    return Ok(());
+    return Ok(CommandStatus::Success);
   }
 
   if options.check && formatted_source != source {
     eprintln!("{}", Message::error("File is not formatted"));
-    Err(())?;
+    return Ok(CommandStatus::Failure);
   }
 
   if formatted_source != source && fs::write(&options.file, formatted_source).is_err() {
     eprintln!("{}", Message::error("Problem writing to file"));
-    Err(())?;
+    return Err(());
   };
 
-  Ok(())
+  Ok(CommandStatus::Success)
 }
 
-pub fn lint(filename: &str) -> Result<(), ()> {
+pub fn lint(filename: &str) -> Result<CommandStatus, ()> {
   let allocator = Allocator::new();
   let source = read_file(filename)?;
   let ast = parse(filename, &source, &allocator)?;
@@ -118,10 +122,14 @@ pub fn lint(filename: &str) -> Result<(), ()> {
     println!("{}", CodeFrame::new(filename, &source, diagnostic.span));
   }
 
-  Ok(())
+  if diagnostics.is_empty() {
+    Ok(CommandStatus::Success)
+  } else {
+    Ok(CommandStatus::Failure)
+  }
 }
 
-pub fn typecheck(filename: &str) -> Result<(), ()> {
+pub fn typecheck(filename: &str) -> Result<CommandStatus, ()> {
   let allocator = Allocator::new();
   let source = read_file(filename)?;
   let ast = parse(filename, &source, &allocator)?;
@@ -132,20 +140,24 @@ pub fn typecheck(filename: &str) -> Result<(), ()> {
     println!("{}", CodeFrame::new(filename, &source, error.span()));
   }
 
-  Ok(())
+  if errors.is_empty() {
+    Ok(CommandStatus::Success)
+  } else {
+    Ok(CommandStatus::Failure)
+  }
 }
 
-pub fn print_ast(filename: &str) -> Result<(), ()> {
+pub fn print_ast(filename: &str) -> Result<CommandStatus, ()> {
   let allocator = Allocator::new();
   let source = read_file(filename)?;
   let ast = parse(filename, &source, &allocator)?;
 
   print!("{ast}");
 
-  Ok(())
+  Ok(CommandStatus::Success)
 }
 
-pub fn print_chunk(filename: &str) -> Result<(), ()> {
+pub fn print_chunk(filename: &str) -> Result<CommandStatus, ()> {
   let allocator = Allocator::new();
   let source = read_file(filename)?;
   let ast = parse(filename, &source, &allocator)?;
@@ -153,5 +165,5 @@ pub fn print_chunk(filename: &str) -> Result<(), ()> {
 
   print!("{chunk}");
 
-  Ok(())
+  Ok(CommandStatus::Success)
 }
