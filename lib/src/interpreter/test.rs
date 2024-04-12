@@ -29,7 +29,7 @@ fn run(source: &str) -> Result<VM, Error> {
 macro assert_variable($vm:expr; $name:ident, $value:expr) {{
   let vm = $vm.as_ref().unwrap();
   let value = vm.get_global(stringify!($name)).unwrap();
-  assert_eq!(value, Value::from($value));
+  assert_eq!(*value, Value::from($value));
 }}
 
 #[test]

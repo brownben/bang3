@@ -8,7 +8,7 @@ use crate::{
 };
 use std::{error, fmt, ptr};
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct CallFrame {
   ip: usize,
   offset: usize,
@@ -35,8 +35,12 @@ impl VM {
 
   /// Get the value of a global variable
   #[must_use]
-  pub fn get_global(&self, name: &str) -> Option<Value> {
-    self.globals.get(name).cloned()
+  pub fn get_global(&self, name: &str) -> Option<&Value> {
+    self.globals.get(name)
+  }
+  /// Set the value of a global variable
+  pub fn set_global(&mut self, name: impl Into<String>, value: impl Into<Value>) {
+    self.globals.insert(name.into(), value.into());
   }
 
   #[inline]
