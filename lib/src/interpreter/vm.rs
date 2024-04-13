@@ -201,6 +201,8 @@ impl VM {
 
           if value.is_constant_string() {
             value = Value::from(Object::from(value.as_string().clone()));
+          } else if value.is_constant_function() {
+            value = Value::from(Object::from(value.as_function().clone()));
           }
 
           self.globals.insert(string, value);
@@ -251,6 +253,7 @@ impl VM {
           let frame = self.pop_frame();
           ip = frame.ip;
           offset = frame.offset;
+          // SAFETY: callee stays on stack, so call stack reference will always exist
           chunk = unsafe { &*frame.chunk };
         }
 

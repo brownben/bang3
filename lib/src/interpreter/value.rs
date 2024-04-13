@@ -100,22 +100,58 @@ impl Value {
     unsafe { &*pointer.cast::<String>() }
   }
 
-  /// Is the [Value] a [Function]?
+  /// Is the [Value] a constant function stored in the bytecode?
   #[must_use]
-  pub(crate) fn is_function(&self) -> bool {
-    (self.0.addr() & TO_POINTER) == TO_POINTER && self.0.addr() & TAG == FUNCTION
+  pub(crate) fn is_constant_function(&self) -> bool {
+    (self.0.addr() & TO_POINTER) == TO_POINTER && self.0.addr() & TAG == CONSTANT_FUNCTION
   }
-  /// View the [Value] as a [Function]
+  /// View the [Value] as a constant function, from the bytecode
   ///
   /// # Panics
-  /// Panics if the [Value] is not a [Function].
+  /// Panics if the [Value] is not a constant function.
+  /// Use [`Value::is_constant_function`] to check if it is a constant function.
+  #[must_use]
+  pub(crate) fn as_constant_function(&self) -> &Chunk {
+    debug_assert!(self.is_constant_function());
+
+    let pointer = self.0.map_addr(|ptr| ptr & FROM_POINTER);
+    unsafe { &*pointer.cast::<Chunk>() }
+  }
+
+  /// Is the [Value] a function?
+  ///
+  /// It can either be a heap allocated function or a constant function
+  #[must_use]
+  pub(crate) fn is_function(&self) -> bool {
+    if self.is_constant_function() {
+      return true;
+    }
+
+    if self.is_object() {
+      return matches!(self.as_object(), Object::Function(_));
+    }
+
+    false
+  }
+
+  /// View the [Value] as a function
+  ///
+  /// # Panics
+  /// Panics if the [Value] is not a function.
   /// Use [`Value::is_function`] to check if it is a function.
   #[must_use]
   pub(crate) fn as_function(&self) -> &Chunk {
     debug_assert!(self.is_function());
 
-    let pointer = self.0.map_addr(|ptr| ptr & FROM_POINTER);
-    unsafe { &*pointer.cast::<Chunk>() }
+    if self.is_constant_function() {
+      self.as_constant_function()
+    } else if self.is_object()
+      && let Object::Function(f) = self.as_object()
+    {
+      return f;
+    } else {
+      panic!()
+    }
   }
 
   /// Is the [Value] allocated?
@@ -290,7 +326,7 @@ impl fmt::Debug for Value {
       Self(NULL) => write!(f, "null"),
       a if a.is_number() => write!(f, "{}", a.as_number()),
       a if a.is_string() => write!(f, "{}", a.as_string()),
-      a if a.is_function() => write!(f, "<function {}>", a.as_function().name()),
+      a if a.is_function() => a.as_function().display(f),
       a if a.is_object() => write!(f, "{}", a.as_object()),
       a if a.is_allocated() => write!(f, "<allocated {:?}>", a.as_allocated().borrow()),
       _ => unreachable!(),
@@ -332,7 +368,11 @@ impl From<*const String> for Value {
 }
 impl From<*const Chunk> for Value {
   fn from(value: *const Chunk) -> Self {
-    Self(value.map_addr(|ptr| ptr | TO_POINTER | FUNCTION).cast())
+    Self(
+      value
+        .map_addr(|ptr| ptr | TO_POINTER | CONSTANT_FUNCTION)
+        .cast(),
+    )
   }
 }
 
@@ -340,10 +380,12 @@ impl From<*const Chunk> for Value {
 ///
 /// It can be:
 /// - [String]
+/// - Function (a bytecode [Chunk])
 /// - [Closure]
 #[derive(Clone, Debug, PartialEq)]
 pub enum Object {
   String(String),
+  Function(Chunk),
   Closure(Closure),
 }
 impl Object {
@@ -352,7 +394,7 @@ impl Object {
   pub fn is_falsy(&self) -> bool {
     match self {
       Self::String(string) => string.is_empty(),
-      Self::Closure(_) => false,
+      Self::Function(_) | Self::Closure(_) => false,
     }
   }
 
@@ -360,15 +402,16 @@ impl Object {
   pub fn get_type(&self) -> &'static str {
     match self {
       Self::String(_) => "string",
-      Self::Closure(_) => "function",
+      Self::Function(_) | Self::Closure(_) => "function",
     }
   }
 }
 impl fmt::Display for Object {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Object::String(x) => write!(f, "{x}"),
-      Object::Closure(x) => x.fmt(f),
+      Self::String(x) => x.fmt(f),
+      Self::Function(x) => x.fmt(f),
+      Self::Closure(x) => x.fmt(f),
     }
   }
 }
@@ -380,6 +423,11 @@ impl From<String> for Object {
 impl From<&str> for Object {
   fn from(value: &str) -> Self {
     Self::String(value.into())
+  }
+}
+impl From<Chunk> for Object {
+  fn from(value: Chunk) -> Self {
+    Self::Function(value)
   }
 }
 impl From<Closure> for Object {
@@ -408,7 +456,9 @@ impl Closure {
 }
 impl fmt::Display for Closure {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "<closure {}>", self.function().name())
+    write!(f, "<closure ")?;
+    self.function().display(f)?;
+    write!(f, ">")
   }
 }
 
@@ -422,7 +472,7 @@ const FROM_POINTER: usize = 0x0000_FFFF_FFFF_FFF8;
 const TAG: usize = 0x7;
 const OBJECT: usize = 1;
 const CONSTANT_STRING: usize = 2;
-const FUNCTION: usize = 3;
+const CONSTANT_FUNCTION: usize = 3;
 const ALLOCATED: usize = 4;
 const _SINGLETONS: usize = 7;
 

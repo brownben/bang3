@@ -2,7 +2,7 @@ use crate::{ast::Span, collections::String};
 use std::{fmt, mem, ptr};
 
 /// A chunk of bytecode
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Chunk {
   name: String,
   code: Vec<u8>,
@@ -20,9 +20,7 @@ impl Chunk {
       debug_info: DebugInfo::new(),
     }
   }
-  pub(crate) fn name(&self) -> &str {
-    &self.name
-  }
+
   pub(crate) fn finalize(&mut self) {
     self.debug_info.finalize();
   }
@@ -125,6 +123,14 @@ impl Chunk {
 
   pub(crate) fn get_pointer(&self) -> *const Self {
     ptr::from_ref::<Self>(self)
+  }
+
+  pub(crate) fn display(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    if self.name.is_empty() {
+      f.write_str("<function>")
+    } else {
+      write!(f, "<function {}>", self.name)
+    }
   }
 }
 
@@ -244,12 +250,12 @@ impl fmt::Debug for ConstantValue {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       Self::String(value) => write!(f, "'{value:?}'"),
-      Self::Function(func) => write!(f, "<function {}>", func.name),
+      Self::Function(func) => func.display(f),
     }
   }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 struct DebugInfo {
   spans: Vec<(Span, u16)>,
   last: Span,
