@@ -10,5 +10,5 @@ mod test;
 
 pub use bytecode::Chunk;
 pub use compiler::{CompileError, Compiler};
-pub use value::Value;
+pub use value::{FastNativeFunction, Value};
 pub use vm::{RuntimeError, VM};

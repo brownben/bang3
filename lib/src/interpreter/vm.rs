@@ -239,6 +239,14 @@ impl VM {
             ip = 0;
             offset = self.stack.len() - 1;
             chunk = unsafe { &*closure.function().get_pointer() };
+          } else if callee.is_fast_native_function() {
+            let function = callee.as_fast_native_function();
+            let argument = self.pop();
+
+            let result = (function.func)(argument);
+            self.push(result);
+
+            ip += 1;
           } else {
             break Some(ErrorKind::NotCallable(callee.get_type()));
           }

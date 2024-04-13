@@ -248,6 +248,27 @@ impl Value {
       panic!()
     }
   }
+
+  /// Is the [Value] a [`FastNativeFunction`]?
+  #[must_use]
+  pub(crate) fn is_fast_native_function(&self) -> bool {
+    self.is_object() && matches!(self.as_object(), Object::FastNativeFunction(_))
+  }
+  /// View the [Value] as a [`FastNativeFunction`]
+  ///
+  /// # Panics
+  /// Panics if the [Value] is not a [`FastNativeFunction`].
+  /// Use [`Value::is_fast_native_function`] to check if it is a fast native function.
+  #[must_use]
+  pub(crate) fn as_fast_native_function(&self) -> &FastNativeFunction {
+    debug_assert!(self.is_fast_native_function());
+
+    if let Object::FastNativeFunction(c) = self.as_object() {
+      c
+    } else {
+      panic!()
+    }
+  }
 }
 
 // Methods which work on a generic Value
@@ -386,6 +407,7 @@ impl From<*const Chunk> for Value {
 pub enum Object {
   String(String),
   Function(Chunk),
+  FastNativeFunction(FastNativeFunction),
   Closure(Closure),
 }
 impl Object {
@@ -394,7 +416,7 @@ impl Object {
   pub fn is_falsy(&self) -> bool {
     match self {
       Self::String(string) => string.is_empty(),
-      Self::Function(_) | Self::Closure(_) => false,
+      Self::Function(_) | Self::FastNativeFunction(_) | Self::Closure(_) => false,
     }
   }
 
@@ -402,7 +424,7 @@ impl Object {
   pub fn get_type(&self) -> &'static str {
     match self {
       Self::String(_) => "string",
-      Self::Function(_) | Self::Closure(_) => "function",
+      Self::Function(_) | Self::FastNativeFunction(_) | Self::Closure(_) => "function",
     }
   }
 }
@@ -411,6 +433,7 @@ impl fmt::Display for Object {
     match self {
       Self::String(x) => x.fmt(f),
       Self::Function(x) => x.fmt(f),
+      Self::FastNativeFunction(x) => x.fmt(f),
       Self::Closure(x) => x.fmt(f),
     }
   }
@@ -433,6 +456,11 @@ impl From<Chunk> for Object {
 impl From<Closure> for Object {
   fn from(value: Closure) -> Self {
     Self::Closure(value)
+  }
+}
+impl From<FastNativeFunction> for Object {
+  fn from(value: FastNativeFunction) -> Self {
+    Self::FastNativeFunction(value)
   }
 }
 
@@ -459,6 +487,30 @@ impl fmt::Display for Closure {
     write!(f, "<closure ")?;
     self.function().display(f)?;
     write!(f, ">")
+  }
+}
+
+/// Represents a Fast Native Function
+///
+/// A function which is a native function, and only has access to the parameter
+/// not the wider VM
+#[derive(Clone, Debug, PartialEq)]
+pub struct FastNativeFunction {
+  name: String,
+  pub(crate) func: fn(Value) -> Value,
+}
+impl FastNativeFunction {
+  /// Create a new Fast Native Function
+  pub fn new(name: impl Into<String>, func: fn(Value) -> Value) -> Self {
+    Self {
+      name: name.into(),
+      func,
+    }
+  }
+}
+impl fmt::Display for FastNativeFunction {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "<function {}>", self.name)
   }
 }
 

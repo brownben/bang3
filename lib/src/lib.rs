@@ -73,7 +73,7 @@ pub fn compile<'s: 'a, 'a>(
   let chunk = compiler.finish();
   Ok(chunk)
 }
-pub use interpreter::{Chunk, CompileError, RuntimeError, Value, VM};
+pub use interpreter::{Chunk, CompileError, FastNativeFunction, RuntimeError, Value, VM};
 
 /// Runs the linter against a given AST, returns a list of diagnostics found
 ///

@@ -1,7 +1,7 @@
 use super::diagnostics::{CodeFrame, Message};
 use super::FormatOptions;
 use anstream::{eprintln, println};
-use bang::{Allocator, GetSpan, Span, AST};
+use bang::{Allocator, FastNativeFunction, GetSpan, Span, AST};
 use std::fs;
 
 pub enum CommandStatus {
@@ -72,6 +72,16 @@ pub fn run(filename: &str) -> Result<CommandStatus, ()> {
   let chunk = compile(filename, &source, &ast, &allocator)?;
 
   let mut vm = bang::VM::new();
+
+  // define built-in functions
+  let print_function = FastNativeFunction::new("print", |arg| {
+    println!("{:?}", arg);
+    arg
+  });
+  let type_function = FastNativeFunction::new("type", |arg| arg.get_type().into());
+  vm.set_global("print", print_function);
+  vm.set_global("type", type_function);
+
   if let Err(error) = vm.run(&chunk) {
     eprintln!("{}", Message::from(&error));
     eprintln!("{}", CodeFrame::new(filename, &source, error.span()));

@@ -2,9 +2,9 @@ let fibonacciMatch = n => match n
   | ..2 -> 1
   | n -> fibonacciMatch(n - 1) + fibonacciMatch(n - 2)
 
-let fibonacciIf = n => if (n < 2) { 1 } else {
+let fibonacciIf = n => if (n <= 2) { 1 } else {
   fibonacciIf(n - 1) + fibonacciIf(n - 2)
 }
 
-fibonacciIf(25)
-fibonacciMatch(25)
+print(fibonacciIf(25))
+print(fibonacciMatch(25))
