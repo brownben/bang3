@@ -85,7 +85,8 @@ pub fn format(options: &FormatOptions) -> Result<CommandStatus, ()> {
   let config = bang::FormatterConfig {
     print_width: options.config_print_width,
     single_quotes: options.config_single_quote,
-    indentation: options.config_indent_size,
+    indentation: options.config_indent_size.into(),
+    ..bang::FormatterConfig::default()
   };
 
   let allocator = Allocator::new();

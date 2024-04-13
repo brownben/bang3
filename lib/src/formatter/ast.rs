@@ -8,7 +8,7 @@ impl<'a, 'b> Formattable<'a, 'b> for AST<'a, '_> {
   fn format(&self, f: &Formatter<'a, 'b>) -> IR<'a, 'b> {
     let mut last_line = 0;
     f.concat_iterator(self.statements.iter().map(|statement| {
-      let gap_to_previous = statement.span().start > last_line + 1;
+      let gap_to_previous = statement.span().start > last_line + f.config.line_ending.len();
       last_line = statement.span().end;
 
       if gap_to_previous {

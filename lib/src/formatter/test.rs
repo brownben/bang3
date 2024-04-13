@@ -1,12 +1,16 @@
 use indoc::indoc;
 
-use super::Formatter;
-use crate::{parse, Allocator, FormatterConfig as Config};
+use super::{
+  config::{Config, LineEnding},
+  Formatter,
+};
+use crate::{parse, Allocator};
 
 fn format(source: &str, print_width: u16) -> String {
   let config = Config {
     print_width,
-    ..Default::default()
+    line_ending: LineEnding::LineFeed,
+    ..Config::default()
   };
   let allocator = Allocator::new();
   let ast = parse(source, &allocator);
@@ -27,12 +31,13 @@ fn config_indentation() {
   let ast = parse("(a)", &allocator);
   let mut formatter = Formatter::new(Config::default(), &allocator);
 
+  formatter.config.line_ending = LineEnding::LineFeed;
   formatter.config.print_width = 1;
-  formatter.config.indentation = 2;
+  formatter.config.indentation = 2.into();
   assert_eq!(formatter.print(&ast), "(\n  a\n)\n");
-  formatter.config.indentation = 4;
+  formatter.config.indentation = 4.into();
   assert_eq!(formatter.print(&ast), "(\n    a\n)\n");
-  formatter.config.indentation = 0;
+  formatter.config.indentation = 0.into();
   assert_eq!(formatter.print(&ast), "(\n\ta\n)\n");
 }
 
@@ -42,6 +47,7 @@ fn config_quote() {
   let ast = parse("'string'", &allocator);
   let mut formatter = Formatter::new(Config::default(), &allocator);
 
+  formatter.config.line_ending = LineEnding::LineFeed;
   formatter.config.single_quotes = true;
   assert_eq!(formatter.print(&ast), "'string'\n");
   formatter.config.single_quotes = false;

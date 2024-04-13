@@ -139,9 +139,11 @@ impl<'a, 'b> IR<'a, 'b> {
 
       IR::LineOrSpace if flatten => DisplayIR::Text(" "),
       IR::Line if flatten => DisplayIR::Empty,
-      IR::Line | IR::AlwaysLine | IR::LineOrSpace => {
-        DisplayIR::Line(indentation, config.indentation())
-      }
+      IR::Line | IR::AlwaysLine | IR::LineOrSpace => DisplayIR::Line {
+        depth: indentation,
+        indentation: config.indentation,
+        line_ending: config.line_ending,
+      },
 
       IR::Indent(ir) => ir.display(line_length, indentation + 1, flatten, config, allocator),
       IR::Concat(items) => DisplayIR::Collection({
@@ -195,7 +197,11 @@ impl fmt::Debug for IR<'_, '_> {
 pub enum DisplayIR<'a, 'b> {
   Empty,
   Text(&'a str),
-  Line(u16, config::Indentation),
+  Line {
+    depth: u16,
+    indentation: config::Indentation,
+    line_ending: config::LineEnding,
+  },
   Collection(Vec<'b, DisplayIR<'a, 'b>>),
 }
 impl DisplayIR<'_, '_> {
@@ -208,7 +214,7 @@ impl DisplayIR<'_, '_> {
     };
 
     match self {
-      DisplayIR::Empty | DisplayIR::Line(_, _) => true,
+      DisplayIR::Empty | DisplayIR::Line { .. } => true,
       DisplayIR::Text(text) => size >= i32::try_from(text.len()).unwrap(),
       DisplayIR::Collection(_) => size >= i32::from(self.len()),
     }
@@ -219,10 +225,12 @@ impl DisplayIR<'_, '_> {
     match self {
       DisplayIR::Empty => 0,
       DisplayIR::Text(text) => u16::try_from(text.len()).unwrap(),
-      DisplayIR::Line(depth, indentation) => indentation.len() * depth,
+      DisplayIR::Line {
+        depth, indentation, ..
+      } => indentation.len() * depth,
       DisplayIR::Collection(x) => x
         .iter()
-        .take_while(|x| !matches!(x, DisplayIR::Line(_, _)))
+        .take_while(|x| !matches!(x, DisplayIR::Line { .. }))
         .map(DisplayIR::len)
         .sum(),
     }
@@ -231,10 +239,10 @@ impl DisplayIR<'_, '_> {
   /// Does the current display item end with a line?
   pub fn ends_with_line(&self) -> bool {
     match self {
-      DisplayIR::Line(_, _) => true,
+      DisplayIR::Line { .. } => true,
       DisplayIR::Collection(x) => x
         .last()
-        .map_or(false, |x| matches!(x, DisplayIR::Line(_, _))),
+        .map_or(false, |x| matches!(x, DisplayIR::Line { .. })),
       _ => false,
     }
   }
@@ -244,8 +252,12 @@ impl fmt::Display for DisplayIR<'_, '_> {
     match self {
       Self::Empty => Ok(()),
       Self::Text(text) => write!(f, "{text}"),
-      Self::Line(depth, indentation) => {
-        writeln!(f)?;
+      Self::Line {
+        depth,
+        indentation,
+        line_ending,
+      } => {
+        f.write_str(line_ending.as_str())?;
         (0..*depth).try_for_each(|_| write!(f, "{indentation}"))
       }
       Self::Collection(x) => x.iter().try_for_each(|item| write!(f, "{item}")),

@@ -124,8 +124,10 @@ variable
 
 // variables are dropped at the end of a scope
 let a = 7
+{
   let a = 5
   a // 5
+}
 a // 7
 
 // variables at the top level are global, and have a hash table lookup, whereas all other variables are looked up from the lexical scope

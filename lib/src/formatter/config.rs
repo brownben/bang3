@@ -8,19 +8,17 @@ pub struct Config {
   /// Use single quotes for strings
   pub single_quotes: bool,
   /// The number of spaces to use for indentation, if 0 use tabs
-  pub indentation: u8,
-}
-impl Config {
-  pub(crate) fn indentation(self) -> Indentation {
-    self.indentation.into()
-  }
+  pub indentation: Indentation,
+  /// The line ending to use
+  pub line_ending: LineEnding,
 }
 impl Default for Config {
   fn default() -> Self {
     Self {
       print_width: 80,
       single_quotes: true,
-      indentation: 2,
+      indentation: Indentation::Space(2),
+      line_ending: LineEnding::Native,
     }
   }
 }
@@ -54,6 +52,46 @@ impl fmt::Display for Indentation {
     match self {
       Self::Space(n) => (0..*n).try_for_each(|_| write!(f, " ")),
       Self::Tab => write!(f, "\t"),
+    }
+  }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+pub enum LineEnding {
+  ///  Line Feed only (\n), common on Linux and macOS as well as inside git repos
+  LineFeed,
+
+  /// Carriage Return + Line Feed characters (\r\n), common on Windows
+  CarriageReturnLineFeed,
+
+  /// Line endings will be converted to `\n` on Unix and `\r\n` on Windows.
+  #[default]
+  Native,
+}
+impl LineEnding {
+  #[inline]
+  pub const fn as_str(self) -> &'static str {
+    match self {
+      LineEnding::LineFeed => "\n",
+      LineEnding::CarriageReturnLineFeed => "\r\n",
+
+      #[cfg(not(target_os = "windows"))]
+      LineEnding::Native => "\n",
+      #[cfg(target_os = "windows")]
+      LineEnding::Native => "\r\n",
+    }
+  }
+
+  #[inline]
+  pub const fn len(self) -> u32 {
+    match self {
+      LineEnding::LineFeed => 1,
+      LineEnding::CarriageReturnLineFeed => 2,
+
+      #[cfg(not(target_os = "windows"))]
+      LineEnding::Native => 1,
+      #[cfg(target_os = "windows")]
+      LineEnding::Native => 2,
     }
   }
 }
