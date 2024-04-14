@@ -1,4 +1,4 @@
-use super::{expression::*, statement::*};
+use crate::ast::{expression::*, statement::*};
 
 /// Traverse the AST, visiting all nodes
 pub trait Visitor {

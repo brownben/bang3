@@ -3,15 +3,17 @@
 
 mod helpers;
 mod rules;
+mod visitor;
 
 #[cfg(test)]
 mod test;
 
 use crate::{
-  ast::{Expression, GetSpan, Span, Statement, Visitor},
+  ast::{Expression, GetSpan, Span, Statement},
   parser::AST,
 };
 use std::{error, fmt};
+use visitor::Visitor;
 
 #[derive(Debug, Default)]
 pub struct Linter {

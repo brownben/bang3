@@ -15,6 +15,3 @@ pub use span::{GetSpan, Span};
 
 pub(crate) mod statement;
 pub(crate) use statement::Statement;
-
-mod visitor;
-pub(crate) use visitor::Visitor;
