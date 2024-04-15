@@ -197,13 +197,7 @@ impl VM {
         OpCode::DefineGlobal => {
           let string_position = chunk.get_value(ip + 1);
           let string = chunk.get_string(string_position.into()).clone();
-          let mut value = self.pop();
-
-          if value.is_constant_string() {
-            value = Value::from(Object::from(value.as_string().clone()));
-          } else if value.is_constant_function() {
-            value = Value::from(Object::from(value.as_function().clone()));
-          }
+          let value = self.pop();
 
           self.globals.insert(string, value);
         }
@@ -337,6 +331,15 @@ impl VM {
 
       ip += instruction.length();
     };
+
+    // move constants from the chunk to the heap
+    for value in self.globals.values_mut() {
+      if value.is_constant_string() {
+        *value = Value::from(Object::from(value.as_string().clone()));
+      } else if value.is_constant_function() {
+        *value = Value::from(Object::from(value.as_function().clone()));
+      }
+    }
 
     if let Some(error) = error {
       Err(RuntimeError {
