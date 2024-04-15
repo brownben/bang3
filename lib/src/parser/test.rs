@@ -682,7 +682,11 @@ mod fault_tolerant {
     let ast = parse("(2 /+/ 5)", &allocator);
     let expected = indoc! {"
       ├─ Group
-      │  ╰─ Invalid
+      │  ╰─ Binary (/)
+      │     ├─ Binary (/)
+      │     │  ├─ Number (2)
+      │     │  ╰─ Invalid
+      │     ╰─ Number (5)
     "};
     assert!(ast.is_err());
     assert_eq!(ast.to_string(), expected);
