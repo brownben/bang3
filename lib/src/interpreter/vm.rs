@@ -1,4 +1,5 @@
 use super::{
+  alloc::Heap,
   bytecode::{Chunk, ConstantValue, OpCode},
   value::{Closure, Object, Value},
 };
@@ -6,7 +7,7 @@ use crate::{
   ast::{GetSpan, Span},
   collections::{HashMap, SmallVec, String},
 };
-use std::{error, fmt, ptr};
+use std::{error, fmt, mem, ptr};
 
 #[derive(Debug)]
 struct CallFrame {
@@ -22,6 +23,7 @@ pub struct VM {
   stack: Vec<Value>,
   globals: HashMap<String, Value>,
   frames: Vec<CallFrame>,
+  heap: Heap,
 }
 impl VM {
   /// Create a new VM
@@ -31,6 +33,7 @@ impl VM {
       stack: Vec::with_capacity(512),
       globals: HashMap::default(),
       frames: Vec::with_capacity(16),
+      heap: Heap::new(1024),
     }
   }
 
@@ -262,10 +265,11 @@ impl VM {
         // Closures
         OpCode::Allocate => {
           let index = chunk.get_value(ip + 1);
-          let local = &mut self.stack[offset + usize::from(index)];
-          let allocated = local.clone().allocate();
-          *local = allocated.clone();
-          self.push(allocated);
+          let local = mem::replace(&mut self.stack[offset + usize::from(index)], Value::NULL);
+
+          let value = Value::from(self.heap.allocate(local));
+          self.stack[offset + usize::from(index)] = value.clone();
+          self.push(Value::from(value));
         }
         OpCode::Closure => {
           let upvalue_count = chunk.get_value(ip + 1);
@@ -284,14 +288,14 @@ impl VM {
         OpCode::GetUpvalue => {
           let upvalue = chunk.get_value(ip + 1);
           let address = &self.peek_frame().upvalues[usize::from(upvalue)];
-          let value = address.as_allocated().borrow().clone();
+          let value = address.as_allocated().clone();
 
           self.push(value);
         }
         OpCode::GetAllocatedValue => {
           let slot = chunk.get_value(ip + 1);
           let address = &self.stack[offset + usize::from(slot)];
-          let value = address.as_allocated().borrow().clone();
+          let value = address.as_allocated().clone();
 
           self.push(value);
         }
