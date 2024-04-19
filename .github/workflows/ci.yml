@@ -1,0 +1,42 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install
+        run: |
+          rustup toolchain install nightly
+          rustup override set nightly
+          rustup component add clippy rustfmt
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Build
+        run: cargo build --all
+      - name: Lint
+        run: cargo clippy --all -- -D warnings
+      - name: Test
+        run: cargo test --all --verbose
+
+  miri:
+    name: Miri
+    runs-on: ubuntu-latest
+
+    env:
+      MIRIFLAGS: -Zmiri-strict-provenance -Zmiri-symbolic-alignment-check
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Miri
+        run: |
+          rustup toolchain install nightly --component miri
+          rustup override set nightly
+          cargo miri setup
+      - name: Test
+        run: cargo miri test
