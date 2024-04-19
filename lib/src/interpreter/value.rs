@@ -2,7 +2,7 @@ use crate::{
   collections::{SmallVec, String},
   Chunk,
 };
-use std::{cell::RefCell, fmt, mem, ptr, rc::Rc};
+use std::{fmt, mem, ptr, rc::Rc};
 
 /// A value on the stack of the interpreter.
 ///
@@ -37,11 +37,6 @@ impl Clone for Value {
       let pointer = self.0.map_addr(|ptr| ptr & FROM_POINTER);
 
       unsafe { Rc::increment_strong_count(pointer) };
-    } else if self.is_allocated() {
-      let pointer = self.0.map_addr(|ptr| ptr & FROM_POINTER);
-      let pointer = pointer.cast::<RefCell<Self>>();
-
-      unsafe { Rc::increment_strong_count(pointer) };
     }
 
     Self(self.0)
@@ -51,11 +46,6 @@ impl Drop for Value {
   fn drop(&mut self) {
     if self.is_object() {
       let pointer = self.0.map_addr(|ptr| ptr & FROM_POINTER);
-
-      unsafe { Rc::decrement_strong_count(pointer) };
-    } else if self.is_allocated() {
-      let pointer = self.0.map_addr(|ptr| ptr & FROM_POINTER);
-      let pointer = pointer.cast::<RefCell<Self>>();
 
       unsafe { Rc::decrement_strong_count(pointer) };
     }
@@ -165,14 +155,11 @@ impl Value {
   /// Panics if the [Value] is not an allocated value.
   /// Use [`Value::is_allocated`] to check if it is allocated.
   #[must_use]
-  pub(crate) fn as_allocated(&self) -> Rc<RefCell<Self>> {
+  pub(crate) fn as_allocated(&self) -> &Value {
     debug_assert!(self.is_allocated());
 
     let pointer = self.0.map_addr(|ptr| ptr & FROM_POINTER);
-    let pointer = pointer.cast::<RefCell<Self>>();
-
-    unsafe { Rc::increment_strong_count(pointer) };
-    unsafe { Rc::from_raw(pointer) }
+    unsafe { &*pointer.cast() }
   }
 
   /// Is the [Value] an [Object]?
@@ -304,17 +291,6 @@ impl Value {
       x => x.as_object().get_type(),
     }
   }
-
-  /// Allocate the value to the heap, so it can be accessed as a closure
-  #[must_use]
-  pub(crate) fn allocate(self) -> Self {
-    let memory = Rc::new(RefCell::new(self));
-
-    let pointer = Rc::into_raw(memory);
-    let stored_pointer = pointer.map_addr(|ptr| ptr | TO_POINTER | ALLOCATED);
-
-    Self(stored_pointer.cast::<Object>())
-  }
 }
 impl PartialEq for Value {
   fn eq(&self, other: &Self) -> bool {
@@ -349,7 +325,7 @@ impl fmt::Debug for Value {
       a if a.is_string() => write!(f, "{}", a.as_string()),
       a if a.is_function() => a.as_function().display(f),
       a if a.is_object() => write!(f, "{}", a.as_object()),
-      a if a.is_allocated() => write!(f, "<allocated {:?}>", a.as_allocated().borrow()),
+      a if a.is_allocated() => write!(f, "<allocated {:?}>", a.as_allocated()),
       _ => unreachable!(),
     }
   }
@@ -394,6 +370,16 @@ impl From<*const Chunk> for Value {
         .map_addr(|ptr| ptr | TO_POINTER | CONSTANT_FUNCTION)
         .cast(),
     )
+  }
+}
+impl From<*const Value> for Value {
+  fn from(value: *const Value) -> Self {
+    Self(value.map_addr(|ptr| ptr | TO_POINTER | ALLOCATED).cast())
+  }
+}
+impl From<*mut Value> for Value {
+  fn from(value: *mut Value) -> Self {
+    Self(value.map_addr(|ptr| ptr | TO_POINTER | ALLOCATED).cast())
   }
 }
 
@@ -705,7 +691,7 @@ mod test {
     assert!(!string.is_closure());
     assert_eq!(string, Object::String("hello".into()).into());
 
-    let string = string.allocate();
+    let string = Value::from(ptr::from_ref(&string));
     assert!(!string.is_number());
     assert!(!string.is_constant_string());
     assert!(!string.is_function());
@@ -715,7 +701,7 @@ mod test {
     assert!(!string.is_closure());
 
     assert_eq!(
-      *string.as_allocated().borrow(),
+      *string.as_allocated(),
       Value::from(Object::String("hello".into()))
     );
     assert_eq!(string.as_allocated().clone(), string.as_allocated().clone(),);
