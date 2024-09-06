@@ -367,8 +367,7 @@ impl From<bool> for Value {
 }
 impl From<f64> for Value {
   fn from(value: f64) -> Self {
-    #[allow(clippy::cast_possible_truncation)] // u64 == usize
-    Self(ptr::without_provenance(value.to_bits() as usize))
+    Self(ptr::without_provenance(value.to_bits().try_into().unwrap()))
   }
 }
 impl<T: Into<Object>> From<T> for Value {

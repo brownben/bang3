@@ -3,7 +3,6 @@
 //! My attempt at creating my own language. A strongly typed, functional, bytecode interpreter written.
 
 #![feature(let_chains)]
-#![feature(lint_reasons)]
 #![feature(strict_provenance)]
 #![feature(decl_macro)]
 #![deny(unsafe_code)]
