@@ -355,6 +355,10 @@ impl fmt::Debug for Value {
   }
 }
 
+// As contains [`Rc`] type is not thread safe
+impl !Send for Value {}
+impl !Sync for Value {}
+
 // Wrap raw values into a Value
 impl From<bool> for Value {
   fn from(value: bool) -> Self {

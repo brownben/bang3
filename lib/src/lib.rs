@@ -5,6 +5,7 @@
 #![feature(let_chains)]
 #![feature(strict_provenance)]
 #![feature(decl_macro)]
+#![feature(negative_impls)]
 #![deny(unsafe_code)]
 
 mod ast;
