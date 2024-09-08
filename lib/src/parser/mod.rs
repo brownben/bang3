@@ -133,7 +133,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
     if matches!(
       self.peek_token_kind(),
-      TokenKind::EndOfLine | TokenKind::EndOfFile | TokenKind::Unknown
+      TokenKind::EndOfLine | TokenKind::EndOfFile
     ) {
       self.next_token();
     } else {
@@ -213,6 +213,11 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   /// Parse an expression, also checking for a newline at the end
   fn parse_expression_with_newline(&mut self) -> Expression<'s, 'ast> {
     let mut expression = self.parse_expression();
+
+    if self.error {
+      self.resync_to(TokenKind::EndOfLine);
+    }
+
     loop {
       self.skip_newline();
       match self.peek_token_kind() {

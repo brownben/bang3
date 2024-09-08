@@ -31,6 +31,8 @@ fn unterminated_string() {
 fn unknown_character() {
   let allocator = Allocator::new();
   assert!(parse("¬", &allocator).is_err());
+  assert!(parse("3 $ 4", &allocator).is_err());
+  assert!(parse("3 ¬ 4", &allocator).is_err());
   assert!(parse("🤗", &allocator).is_err());
   assert!(parse(".-2", &allocator).is_err());
   assert!(parse("&", &allocator).is_err());
@@ -581,6 +583,20 @@ mod fault_tolerant {
     "};
     assert!(ast.is_err());
     assert_eq!(ast.to_string(), expected);
+    assert_eq!(ast.errors.len(), 1);
+  }
+
+  #[test]
+  fn let_wrong_identifier() {
+    let allocator = Allocator::new();
+    let ast = parse("let 4 = 5 + 33", &allocator);
+    let expected = indoc! {"
+      ├─ Let '' =
+      │  ╰─ Number (4)
+      ├─ Invalid
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
   }
 
   #[test]
@@ -718,6 +734,14 @@ mod fault_tolerant {
       ├─ Number (5)
       ├─ Invalid
       ├─ Number (3)
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+
+    let ast = parse("3 ¬ 4", &allocator);
+    let expected = indoc! {"
+      ├─ Number (3)
+      ├─ Invalid
     "};
     assert!(ast.is_err());
     assert_eq!(ast.to_string(), expected);
