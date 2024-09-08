@@ -130,7 +130,7 @@ pub fn lint(filename: &str) -> Result<CommandStatus, ()> {
 
   for diagnostic in &diagnostics {
     println!("{}", Message::from(diagnostic));
-    println!("{}", CodeFrame::new(filename, &source, diagnostic.span));
+    println!("{}", CodeFrame::new(filename, &source, diagnostic.span()));
   }
 
   if diagnostics.is_empty() {

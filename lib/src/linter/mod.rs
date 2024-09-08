@@ -76,7 +76,17 @@ pub struct LintDiagnostic {
   /// The help message of the lint rule
   pub message: &'static str,
   /// The span of the source code which triggered this diagnostic
-  pub span: Span,
+  span: Span,
+}
+impl LintDiagnostic {
+  /// The title and message of the lint in a combined string
+  #[must_use]
+  pub fn full_message(&self) -> String {
+    let mut message = self.title.to_owned();
+    message.push('\n');
+    message.push_str(self.message);
+    message
+  }
 }
 impl GetSpan for LintDiagnostic {
   fn span(&self) -> Span {

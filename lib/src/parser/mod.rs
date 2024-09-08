@@ -759,6 +759,15 @@ impl ParseError {
       Self::UnterminatedString(_) => "missing closing quote for string".into(),
     }
   }
+
+  /// The title and message of the lint in a combined string
+  #[must_use]
+  pub fn full_message(&self) -> String {
+    let mut message = self.title();
+    message.push('\n');
+    message.push_str(&self.message());
+    message
+  }
 }
 impl GetSpan for ParseError {
   fn span(&self) -> Span {
