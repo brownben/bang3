@@ -22,7 +22,7 @@ impl LintRule for NoConstantConditions {
     "No Constant Conditions"
   }
   fn message(&self) -> &'static str {
-    "the control flow could be removed, as the condition is always true or false"
+    "the control flow could be removed, as the condition is always the same"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression) {
     if let Expression::If(if_) = &expression
@@ -137,7 +137,7 @@ impl LintRule for NoUnderscoreVariableUse {
     "No `_` Variable Use"
   }
   fn message(&self) -> &'static str {
-    "`_` indicates the variable/ parameter is not used, consider a more descriptive name"
+    "`_` indicates the variable/ parameter is not used, but it has been used"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression) {
     if let Expression::Variable(variable) = &expression
