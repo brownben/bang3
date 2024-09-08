@@ -10,12 +10,12 @@
 //! Based upon the algorithm described by Philip Wadler in [`A prettier printer`](https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf).
 
 mod ast;
-mod config;
+pub mod config;
 #[cfg(test)]
 mod test;
 
-pub use self::config::Config;
 use crate::allocator::{Allocator, Box, Vec};
+use config::Config;
 use std::{fmt, marker, mem};
 
 /// An item which can be formatted

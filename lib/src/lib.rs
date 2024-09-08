@@ -109,7 +109,8 @@ pub fn format(ast: &AST, config: FormatterConfig) -> String {
   let formatter = formatter::Formatter::new(config, &allocator);
   formatter.print(ast)
 }
-pub use formatter::Config as FormatterConfig;
+pub use formatter::config;
+pub use formatter::config::Config as FormatterConfig;
 
 /// Runs the typechecker against a given AST, returns a list of errors found
 ///

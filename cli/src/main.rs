@@ -59,7 +59,7 @@ struct FormatOptions {
   config_print_width: u16,
   /// Indentation size (spaces) to use. If 0 uses tabs
   #[clap(long, default_value_t = 2)]
-  config_indent_size: u8,
+  config_indent_size: u16,
 }
 
 #[derive(Subcommand)]

@@ -1,3 +1,4 @@
+//! The configuration options for the formatter
 use std::fmt;
 
 /// Configuration for the formatter
@@ -26,20 +27,22 @@ impl Default for Config {
 /// The indentation to use when printing
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Indentation {
-  Space(u8),
+  /// Use this number of spaces for indentation
+  Space(u16),
+  /// Use tabs for indentation
   Tab,
 }
 impl Indentation {
   pub(super) fn len(self) -> u16 {
     match self {
-      Self::Space(n) => u16::from(n),
+      Self::Space(n) => n,
       Self::Tab => 2,
     }
   }
 }
-impl From<u8> for Indentation {
+impl From<u16> for Indentation {
   /// The number of spaces to use for indentation. If 0 use tabs.
-  fn from(n: u8) -> Self {
+  fn from(n: u16) -> Self {
     if n == 0 {
       Self::Tab
     } else {
@@ -56,6 +59,7 @@ impl fmt::Display for Indentation {
   }
 }
 
+/// The type of line endings to use for the file
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
 pub enum LineEnding {
   ///  Line Feed only (\n), common on Linux and macOS as well as inside git repos
@@ -70,7 +74,7 @@ pub enum LineEnding {
 }
 impl LineEnding {
   #[inline]
-  pub const fn as_str(self) -> &'static str {
+  pub(super) const fn as_str(self) -> &'static str {
     match self {
       LineEnding::LineFeed => "\n",
       LineEnding::CarriageReturnLineFeed => "\r\n",
@@ -83,7 +87,7 @@ impl LineEnding {
   }
 
   #[inline]
-  pub const fn len(self) -> u32 {
+  pub(super) const fn len(self) -> u32 {
     match self {
       LineEnding::LineFeed => 1,
       LineEnding::CarriageReturnLineFeed => 2,
