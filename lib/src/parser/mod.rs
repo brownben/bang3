@@ -454,7 +454,10 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
     self.allocate_expression(Function {
       name: None,
-      parameter,
+      parameter: Variable {
+        name: parameter,
+        span: parameter_span,
+      },
       body,
       span,
     })
@@ -678,10 +681,11 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   fn declaration_statement(&mut self) -> Statement<'s, 'ast> {
     let let_token = self.next_token();
 
-    let identifier = self
+    let identifier_span = self
       .expect(TokenKind::Identifier)
-      .map(|token| Span::from(token).source_text(self.source))
+      .map(Span::from)
       .unwrap_or_default();
+    let identifier = identifier_span.source_text(self.source);
 
     self.expect(TokenKind::Equal);
 
@@ -696,7 +700,10 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     }
 
     self.allocate_statement(Let {
-      identifier,
+      identifier: Variable {
+        name: identifier,
+        span: identifier_span,
+      },
       expression,
       span,
     })

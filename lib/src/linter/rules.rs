@@ -70,7 +70,7 @@ impl LintRule for NoSelfAssign {
   fn visit_statement(&self, context: &mut Context, expression: &Statement) {
     if let Statement::Let(let_) = &expression
       && let Expression::Variable(variable) = &let_.expression.unwrap()
-      && let_.identifier == variable.name
+      && let_.identifier.name == variable.name
     {
       context.add_diagnostic(&Self, let_.span());
     }

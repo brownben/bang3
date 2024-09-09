@@ -97,7 +97,7 @@ pub struct Comment<'source, 'ast> {
 #[derive(Debug)]
 pub struct Function<'source, 'ast> {
   pub name: Option<&'source str>,
-  pub parameter: &'source str,
+  pub parameter: Variable<'source>,
   pub body: Expression<'source, 'ast>,
   pub span: Span,
 }

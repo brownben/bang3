@@ -307,7 +307,7 @@ impl<'s> Compile<'s> for Function<'s, '_> {
     let name = self.name.unwrap_or("").into();
     compiler.new_chunk(name);
 
-    compiler.define_variable(self.parameter, self.span)?;
+    compiler.define_variable(self.parameter.name, self.span)?;
     self.body.compile(compiler)?;
     compiler.chunk.add_opcode(OpCode::Return, self.span);
 
@@ -564,7 +564,7 @@ impl<'s> Compile<'s> for Statement<'s, '_> {
 impl<'s> Compile<'s> for Let<'s, '_> {
   fn compile(&self, compiler: &mut Compiler<'s, '_>) -> Result<(), CompileError> {
     self.expression.compile(compiler)?;
-    compiler.define_variable(self.identifier, self.span)
+    compiler.define_variable(self.identifier.name, self.span)
   }
 }
 

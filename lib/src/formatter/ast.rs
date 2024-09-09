@@ -96,7 +96,7 @@ impl<'a, 'b> Formattable<'a, 'b> for Comment<'a, '_> {
 impl<'a, 'b> Formattable<'a, 'b> for Function<'a, '_> {
   fn format(&self, f: &Formatter<'a, 'b>) -> IR<'a, 'b> {
     f.concat([
-      IR::Text(self.parameter),
+      IR::Text(self.parameter.name),
       IR::Text(" => "),
       self.body.format(f),
     ])
@@ -216,7 +216,7 @@ impl<'a, 'b> Formattable<'a, 'b> for Let<'a, '_> {
   fn format(&self, f: &Formatter<'a, 'b>) -> IR<'a, 'b> {
     f.concat([
       IR::Text("let "),
-      IR::Text(self.identifier),
+      IR::Text(self.identifier.name),
       IR::Text(" = "),
       self.expression.format(f),
     ])

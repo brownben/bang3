@@ -372,7 +372,7 @@ impl TypecheckExpression for Function<'_, '_> {
 
     // define the parameter
     let parameter_type = t.new_type();
-    t.add_variable(self.parameter.to_string(), parameter_type.clone());
+    t.add_variable(self.parameter.name.to_string(), parameter_type.clone());
 
     let func_type = FunctionType {
       parameter: parameter_type.clone(),
@@ -526,7 +526,7 @@ impl Typecheck for Let<'_, '_> {
   fn typecheck(&self, t: &mut Typechecker) -> Type {
     let type_ = self.expression.typecheck(t);
     let type_ = t.record_error(type_);
-    t.add_variable(self.identifier.to_string(), type_);
+    t.add_variable(self.identifier.name.to_string(), type_);
     Type::Unknown
   }
 }

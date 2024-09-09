@@ -150,7 +150,7 @@ impl ASTEquality for Call<'_, '_> {
 }
 impl ASTEquality for Function<'_, '_> {
   fn equals(&self, other: &Self) -> bool {
-    self.parameter == other.parameter && self.body.equals(&other.body)
+    self.parameter.equals(&other.parameter) && self.body.equals(&other.body)
   }
 }
 impl ASTEquality for If<'_, '_> {
@@ -208,7 +208,7 @@ impl ASTEquality for Variable<'_> {
 
 impl ASTEquality for Let<'_, '_> {
   fn equals(&self, other: &Self) -> bool {
-    self.identifier == other.identifier && self.expression.equals(&other.expression)
+    self.identifier.equals(&other.identifier) && self.expression.equals(&other.expression)
   }
 }
 

@@ -1,5 +1,5 @@
 use super::{
-  expression::Expression,
+  expression::{Expression, Variable},
   span::{GetSpan, Span},
 };
 use crate::allocator::Box;
@@ -19,7 +19,7 @@ pub struct CommentStmt<'source> {
 
 #[derive(Debug)]
 pub struct Let<'source, 'ast> {
-  pub identifier: &'source str,
+  pub identifier: Variable<'source>,
   pub expression: Expression<'source, 'ast>,
   pub span: Span,
 }
