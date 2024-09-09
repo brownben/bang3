@@ -34,6 +34,12 @@ impl<'ast> AST<'_, 'ast> {
       errors: Vec::new_in(allocator),
     }
   }
+
+  /// Is the parsed AST valid, or does it contain errors
+  #[must_use]
+  pub fn is_valid(&self) -> bool {
+    self.errors.is_empty()
+  }
 }
 
 /// Parse a source code string into an AST

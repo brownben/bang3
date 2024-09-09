@@ -1,7 +1,7 @@
 use super::diagnostics::{CodeFrame, Message};
 use super::FormatOptions;
 use anstream::{eprintln, println};
-use bang::{Allocator, FastNativeFunction, GetSpan, Span, AST};
+use bang::{Allocator, FastNativeFunction, GetSpan, LanguageServer, Span, AST};
 use std::fs;
 
 pub enum CommandStatus {
@@ -36,7 +36,7 @@ fn parse<'s, 'a>(
 ) -> Result<AST<'s, 'a>, ()> {
   let ast = bang::parse(source, allocator);
 
-  if ast.errors.is_empty() {
+  if ast.is_valid() {
     Ok(ast)
   } else {
     for error in ast.errors {
@@ -177,4 +177,10 @@ pub fn print_chunk(filename: &str) -> Result<CommandStatus, ()> {
   print!("{chunk}");
 
   Ok(CommandStatus::Success)
+}
+
+pub fn language_server() -> CommandStatus {
+  LanguageServer::new().run();
+
+  CommandStatus::Success
 }

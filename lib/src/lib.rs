@@ -12,6 +12,7 @@ mod ast;
 mod formatter;
 mod interpreter;
 mod linter;
+mod lsp;
 mod parser;
 mod typechecker;
 
@@ -127,3 +128,5 @@ pub fn typecheck(ast: &AST) -> Vec<TypeError> {
   typechecker::Typechecker::new().check(ast)
 }
 pub use typechecker::TypeError;
+
+pub use lsp::LanguageServer;

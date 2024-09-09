@@ -8,6 +8,8 @@ type FilePosition = u32;
 type LineNumber = usize;
 
 /// Index for looking up the line number from source positions
+///
+/// Line numbers given start at 1
 #[must_use]
 #[derive(Debug)]
 pub struct LineIndex {
@@ -57,6 +59,30 @@ impl LineIndex {
     }
   }
 
+  /// Get the line and character offset for the start of a `Span`
+  #[must_use]
+  pub fn get_offset(&self, span: Span) -> (LineNumber, u32) {
+    let line = self.get_line(span);
+    let character = span.start - self.line_starts[line - 1];
+
+    (line, character)
+  }
+
+  /// Get the line and character offset for the end of a `Span`
+  #[must_use]
+  pub fn get_final_offset(&self, span: Span) -> (LineNumber, u32) {
+    let line = self.get_final_line(span);
+    let character = span.end - self.line_starts[line - 1];
+
+    (line, character)
+  }
+
+  /// Change a line number and a character into a byte offset
+  #[must_use]
+  pub fn to_offset(&self, line: LineNumber, character: u32) -> u32 {
+    self.line_starts[line] + character
+  }
+
   /// Get a `Span` for a given line number
   ///
   /// # Panics
@@ -66,5 +92,13 @@ impl LineIndex {
     let end = *self.line_starts.get(line).unwrap_or(&self.file_length);
 
     Span::new(start, end)
+  }
+
+  /// Get a `Span` for the entire file
+  pub fn get_file_span(&self) -> Span {
+    Span {
+      start: 0,
+      end: self.file_length,
+    }
   }
 }

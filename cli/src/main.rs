@@ -38,6 +38,9 @@ enum App {
     #[command(subcommand)]
     command: PrintCommand,
   },
+
+  /// Run the language server
+  Lsp,
 }
 
 #[derive(Args)]
@@ -88,6 +91,7 @@ fn main() -> process::ExitCode {
       PrintCommand::Ast { file } => commands::print_ast(&file),
       PrintCommand::Bytecode { file } => commands::print_chunk(&file),
     },
+    App::Lsp => Ok(commands::language_server()),
   };
 
   match result {
