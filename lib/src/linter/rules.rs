@@ -119,7 +119,7 @@ impl LintRule for NoTodoComments {
     if let Expression::Comment(comment) = &expression
       && comment.text.trim().starts_with("TODO:")
     {
-      context.add_diagnostic(&Self, comment.span());
+      context.add_diagnostic(&Self, comment.message_span);
     }
   }
   fn visit_statement(&self, context: &mut Context, statement: &Statement) {

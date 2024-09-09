@@ -90,6 +90,7 @@ pub struct Call<'source, 'ast> {
 pub struct Comment<'source, 'ast> {
   pub expression: Expression<'source, 'ast>,
   pub text: &'source str,
+  pub message_span: Span,
   pub span: Span,
 }
 

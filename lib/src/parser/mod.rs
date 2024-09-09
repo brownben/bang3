@@ -426,14 +426,15 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
   /// Parses a comment expression
   fn comment(&mut self, expression: Expression<'s, 'ast>, comment: Token) -> Expression<'s, 'ast> {
-    let comment_span = Span::from(comment);
-    let text = &comment_span.source_text(self.source)[2..];
-    let span = expression.span().merge(comment_span);
+    let span = Span::from(comment);
+    let text = &span.source_text(self.source)[2..];
+    let expression_span = expression.span().merge(span);
 
     self.allocate_expression(Comment {
       expression,
       text,
-      span,
+      message_span: span,
+      span: expression_span,
     })
   }
 
