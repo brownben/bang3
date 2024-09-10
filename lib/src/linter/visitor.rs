@@ -57,9 +57,13 @@ pub trait Visitor {
   }
   fn visit_match(&mut self, match_: &Match) {
     self.visit_expression(&match_.value);
+
     for case in &match_.cases {
-      self.visit_expression(&case.expression);
+      self.visit_match_case(case);
     }
+  }
+  fn visit_match_case(&mut self, case: &MatchCase) {
+    self.visit_expression(&case.expression);
   }
   fn visit_unary(&mut self, unary: &Unary) {
     self.visit_expression(&unary.expression);

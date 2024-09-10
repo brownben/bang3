@@ -64,6 +64,19 @@ impl Visitor for Variables {
     }
   }
 
+  fn visit_match_case(&mut self, case: &expression::MatchCase) {
+    // Match case is not an expression or statement, but we still need to visit it as it has its own scope
+
+    if let expression::Pattern::Identifier(identifier) = &case.pattern {
+      self.start_scope();
+      self.add_variable(identifier, case.span());
+      self.visit_expression(&case.expression);
+      self.end_scope(case.span());
+    } else {
+      self.visit_expression(&case.expression);
+    }
+  }
+
   fn enter_statement(&mut self, stmt: &crate::ast::Statement) {
     if let Statement::Let(let_) = stmt {
       self.add_variable(&let_.identifier, let_.span());
