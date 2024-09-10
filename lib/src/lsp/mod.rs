@@ -94,6 +94,9 @@ impl LanguageServer {
       definition_provider: Some(lsp_types::OneOf::Left(true)),
       references_provider: Some(lsp_types::OneOf::Left(true)),
 
+      // Rename
+      rename_provider: Some(lsp_types::OneOf::Left(true)),
+
       // Doesn't provide all capabilities
       ..Default::default()
     }

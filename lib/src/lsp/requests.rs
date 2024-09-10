@@ -1,6 +1,7 @@
 use super::documents::{Document, DocumentIndex};
 use crate::{GetSpan, LineIndex};
 use lsp_types as lsp;
+use std::{collections::HashMap, iter};
 
 pub fn handle(
   request: lsp_server::Request,
@@ -44,7 +45,14 @@ pub fn handle(
 
       Some(lsp_server::Response::new_ok(request_id, result))
     }
+    Rename::METHOD => {
+      let (request_id, params) = get_params::<Rename>(request);
+      let file = files.get(&params.text_document_position.text_document.uri);
+      let position = params.text_document_position.position;
+      let result = rename(file, position, &params.new_name);
 
+      Some(lsp_server::Response::new_ok(request_id, result))
+    }
     request => {
       eprintln!("Unknown Request:\n\t{request:?}");
 
@@ -110,7 +118,7 @@ fn goto_definition(file: &Document, position: lsp::Position) -> Option<lsp::Loca
     .filter(|variable| variable.is_active(position))
     .find(|variable| variable.used.iter().any(|used| used.contains(position)))?;
 
-  Some(lsp_types::Location::new(
+  Some(lsp::Location::new(
     file.id.clone(),
     file.line_index.lsp_range_from_span(declaration.span()),
   ))
@@ -130,13 +138,39 @@ fn get_references(file: &Document, position: lsp::Position) -> Option<Vec<lsp::L
   let references = declaration
     .used
     .iter()
-    .map(|span| lsp_types::Location {
+    .map(|span| lsp::Location {
       uri: file.id.clone(),
       range: file.line_index.lsp_range_from_span(*span),
     })
     .collect();
 
   Some(references)
+}
+
+fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::WorkspaceEdit {
+  let position = file.line_index.span_from_lsp_position(position);
+
+  let allocator = crate::Allocator::new();
+  let ast = crate::parse(&file.source, &allocator);
+  let variables = crate::linter::Variables::from(&ast);
+
+  let Some(declaration) = variables
+    .defined()
+    .filter(|variable| variable.is_active(position))
+    .find(|variable| variable.used.iter().any(|used| used.contains(position)))
+  else {
+    return lsp::WorkspaceEdit::default();
+  };
+
+  let text_edits = iter::once(&declaration.span())
+    .chain(declaration.used.iter())
+    .map(|span| lsp::TextEdit {
+      range: file.line_index.lsp_range_from_span(*span),
+      new_text: new_name.to_owned(),
+    })
+    .collect();
+
+  lsp::WorkspaceEdit::new(HashMap::from([(file.id.clone(), text_edits)]))
 }
 
 fn diagnostic_from_parse_error(error: crate::ParseError, lines: &LineIndex) -> lsp::Diagnostic {
@@ -166,7 +200,7 @@ fn diagnostic_from_lint(lint: crate::LintDiagnostic, lines: &LineIndex) -> lsp::
   }
 }
 
-fn get_params<R: lsp_types::request::Request>(
+fn get_params<R: lsp::request::Request>(
   request: lsp_server::Request,
 ) -> (lsp_server::RequestId, R::Params) {
   request.extract(R::METHOD).unwrap()
