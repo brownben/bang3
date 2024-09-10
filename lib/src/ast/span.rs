@@ -49,6 +49,11 @@ impl Span {
 
     &source_text[start..end]
   }
+
+  /// Check if a `Span` contains another `Span`
+  pub fn contains(self, other: Self) -> bool {
+    self.start <= other.start && self.end >= other.end
+  }
 }
 
 #[allow(clippy::module_name_repetitions)]

@@ -59,27 +59,9 @@ impl LineIndex {
     }
   }
 
-  /// Get the line and character offset for the start of a `Span`
-  #[must_use]
-  pub fn get_offset(&self, span: Span) -> (LineNumber, u32) {
-    let line = self.get_line(span);
-    let character = span.start - self.line_starts[line - 1];
-
-    (line, character)
-  }
-
-  /// Get the line and character offset for the end of a `Span`
-  #[must_use]
-  pub fn get_final_offset(&self, span: Span) -> (LineNumber, u32) {
-    let line = self.get_final_line(span);
-    let character = span.end - self.line_starts[line - 1];
-
-    (line, character)
-  }
-
   /// Change a line number and a character into a byte offset
   #[must_use]
-  pub fn to_offset(&self, line: LineNumber, character: u32) -> u32 {
+  fn to_offset(&self, line: LineNumber, character: u32) -> u32 {
     self.line_starts[line] + character
   }
 
@@ -100,5 +82,28 @@ impl LineIndex {
       start: 0,
       end: self.file_length,
     }
+  }
+
+  pub(crate) fn span_from_lsp_position(&self, position: lsp_types::Position) -> Span {
+    let start_line = position.line.try_into().unwrap();
+    let start = self.to_offset(start_line, position.character);
+
+    Span {
+      start,
+      end: start + 1,
+    }
+  }
+
+  pub(crate) fn lsp_range_from_span(&self, span: Span) -> lsp_types::Range {
+    let start_line = self.get_line(span) - 1;
+    let start_char = span.start - self.line_starts[start_line];
+
+    let end_line = self.get_final_line(span) - 1;
+    let end_char = span.end - self.line_starts[end_line];
+
+    let start = lsp_types::Position::new(start_line.try_into().unwrap(), start_char);
+    let end = lsp_types::Position::new(end_line.try_into().unwrap(), end_char);
+
+    lsp_types::Range::new(start, end)
   }
 }

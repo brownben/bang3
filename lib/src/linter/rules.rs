@@ -195,7 +195,7 @@ impl LintRule for NoUnusedVariables {
   }
 
   fn visit_variables(&self, context: &mut Context, variables: &Variables) {
-    for variable in variables.defined_variables() {
+    for variable in variables.defined() {
       if !variable.name.starts_with('_') && !variable.is_used() {
         context.add_diagnostic(&Self, variable.span());
       }

@@ -89,6 +89,11 @@ impl LanguageServer {
       // Provides formatter
       document_formatting_provider: Some(lsp_types::OneOf::Left(true)),
 
+      // Go to definition
+      declaration_provider: Some(lsp_types::DeclarationCapability::Simple(true)),
+      definition_provider: Some(lsp_types::OneOf::Left(true)),
+      references_provider: Some(lsp_types::OneOf::Left(true)),
+
       // Doesn't provide all capabilities
       ..Default::default()
     }

@@ -42,7 +42,7 @@ impl Variables {
       .find_map(|scope| scope.iter_mut().find(|var| var.name == name))
   }
 
-  pub fn defined_variables(&self) -> impl Iterator<Item = &Variable> {
+  pub fn defined(&self) -> impl Iterator<Item = &Variable> {
     self.finished.iter()
   }
 }
@@ -84,7 +84,7 @@ impl From<&AST<'_, '_>> for Variables {
     for statement in &ast.statements {
       variables.visit_statement(statement);
     }
-    variables.end_scope(Span::default());
+    variables.end_scope(ast.statements.last().map(GetSpan::span).unwrap_or_default());
 
     variables
   }
@@ -95,12 +95,16 @@ impl From<&AST<'_, '_>> for Variables {
 pub(crate) struct Variable {
   pub name: String,
   defined: Span,
-  used: Vec<Span>,
+  pub used: Vec<Span>,
   active: Span,
 }
 impl Variable {
   pub fn is_used(&self) -> bool {
     !self.used.is_empty()
+  }
+
+  pub fn is_active(&self, position: Span) -> bool {
+    self.active.contains(position)
   }
 }
 impl GetSpan for Variable {

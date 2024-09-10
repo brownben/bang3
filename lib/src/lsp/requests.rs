@@ -1,5 +1,5 @@
 use super::documents::{Document, DocumentIndex};
-use crate::{GetSpan, LineIndex, Span};
+use crate::{GetSpan, LineIndex};
 use lsp_types as lsp;
 
 pub fn handle(
@@ -23,6 +23,28 @@ pub fn handle(
 
       Some(lsp_server::Response::new_ok(request_id, result))
     }
+    GotoDeclaration::METHOD => {
+      let (request_id, params) = get_params::<GotoDeclaration>(request);
+      let file = files.get(&params.text_document_position_params.text_document.uri);
+      let result = goto_definition(file, params.text_document_position_params.position);
+
+      Some(lsp_server::Response::new_ok(request_id, result))
+    }
+    GotoDefinition::METHOD => {
+      let (request_id, params) = get_params::<GotoDefinition>(request);
+      let file = files.get(&params.text_document_position_params.text_document.uri);
+      let result = goto_definition(file, params.text_document_position_params.position);
+
+      Some(lsp_server::Response::new_ok(request_id, result))
+    }
+    References::METHOD => {
+      let (request_id, params) = get_params::<References>(request);
+      let file = files.get(&params.text_document_position.text_document.uri);
+      let result = get_references(file, params.text_document_position.position);
+
+      Some(lsp_server::Response::new_ok(request_id, result))
+    }
+
     request => {
       eprintln!("Unknown Request:\n\t{request:?}");
 
@@ -71,19 +93,50 @@ fn format_file(file: &Document) -> Option<Vec<lsp::TextEdit>> {
   let new_line_index = LineIndex::from_source(&new_text);
 
   Some(vec![lsp::TextEdit {
-    range: range_from_span(new_line_index.get_file_span(), &new_line_index),
+    range: new_line_index.lsp_range_from_span(new_line_index.get_file_span()),
     new_text,
   }])
 }
 
-fn range_from_span(span: Span, line_index: &LineIndex) -> lsp::Range {
-  let (start_line, start_char) = line_index.get_offset(span);
-  let (end_line, end_char) = line_index.get_final_offset(span);
+fn goto_definition(file: &Document, position: lsp::Position) -> Option<lsp::Location> {
+  let position = file.line_index.span_from_lsp_position(position);
 
-  let start = lsp::Position::new(u32::try_from(start_line).unwrap() - 1, start_char);
-  let end = lsp::Position::new(u32::try_from(end_line).unwrap() - 1, end_char);
+  let allocator = crate::Allocator::new();
+  let ast = crate::parse(&file.source, &allocator);
+  let variables = crate::linter::Variables::from(&ast);
 
-  lsp::Range::new(start, end)
+  let declaration = variables
+    .defined()
+    .filter(|variable| variable.is_active(position))
+    .find(|variable| variable.used.iter().any(|used| used.contains(position)))?;
+
+  Some(lsp_types::Location::new(
+    file.id.clone(),
+    file.line_index.lsp_range_from_span(declaration.span()),
+  ))
+}
+
+fn get_references(file: &Document, position: lsp::Position) -> Option<Vec<lsp::Location>> {
+  let position = file.line_index.span_from_lsp_position(position);
+
+  let allocator = crate::Allocator::new();
+  let ast = crate::parse(&file.source, &allocator);
+  let variables = crate::linter::Variables::from(&ast);
+
+  let declaration = variables
+    .defined()
+    .find(|variable| variable.span().contains(position))?;
+
+  let references = declaration
+    .used
+    .iter()
+    .map(|span| lsp_types::Location {
+      uri: file.id.clone(),
+      range: file.line_index.lsp_range_from_span(*span),
+    })
+    .collect();
+
+  Some(references)
 }
 
 fn diagnostic_from_parse_error(error: crate::ParseError, lines: &LineIndex) -> lsp::Diagnostic {
@@ -91,7 +144,7 @@ fn diagnostic_from_parse_error(error: crate::ParseError, lines: &LineIndex) -> l
     severity: Some(lsp::DiagnosticSeverity::ERROR),
     source: Some("Syntax Error".into()),
     message: error.full_message(),
-    range: range_from_span(error.span(), lines),
+    range: lines.lsp_range_from_span(error.span()),
     ..Default::default()
   }
 }
@@ -101,7 +154,14 @@ fn diagnostic_from_lint(lint: crate::LintDiagnostic, lines: &LineIndex) -> lsp::
     severity: Some(lsp::DiagnosticSeverity::WARNING),
     source: Some("Lint".into()),
     message: lint.full_message(),
-    range: range_from_span(lint.span(), lines),
+    range: lines.lsp_range_from_span(lint.span()),
+    tags: {
+      if lint.title == "No Unused Variables" {
+        Some(vec![lsp::DiagnosticTag::UNNECESSARY])
+      } else {
+        None
+      }
+    },
     ..Default::default()
   }
 }

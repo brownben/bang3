@@ -8,7 +8,7 @@ pub struct DocumentIndex {
 }
 impl DocumentIndex {
   pub fn open(&mut self, id: FileIdentfier, source: String) {
-    self.files.insert(id, Document::new(source));
+    self.files.insert(id.clone(), Document::new(id, source));
   }
   pub fn get(&mut self, id: &FileIdentfier) -> &mut Document {
     self.files.get_mut(id).expect("file to be open")
@@ -19,14 +19,19 @@ impl DocumentIndex {
 }
 
 pub struct Document {
+  pub id: FileIdentfier,
   pub source: String,
   pub line_index: LineIndex,
 }
 impl Document {
-  fn new(source: String) -> Self {
+  fn new(id: FileIdentfier, source: String) -> Self {
     let line_index = LineIndex::from_source(&source);
 
-    Self { source, line_index }
+    Self {
+      id,
+      source,
+      line_index,
+    }
   }
 
   pub fn update(&mut self, new_source: String) {

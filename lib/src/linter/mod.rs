@@ -15,7 +15,7 @@ use crate::{
 };
 use std::{error, fmt};
 
-use variables::Variables;
+pub(crate) use variables::Variables;
 use visitor::Visitor;
 
 #[derive(Debug, Default)]
