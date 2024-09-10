@@ -95,15 +95,21 @@ fn block() {
   assert_format!("{ a }", "{\n  a\n}", 2);
   assert_format!("{ a }", "{\n  a\n}", 4);
   assert_format!("{ a }", "{ a }", 6);
+  assert_format!("{{ a }}", "{ a }", 6);
+  assert_format!("{{ a }}", "{\n  a\n}", 2);
 
   assert_format!("{ a\n b }", "{\n  a\n  b\n}", 6);
   assert_format!("{let a=false\n a+b}", "{\n  let a = false\n  a + b\n}", 6);
+  assert_format!("{{let a=false\n a+b}}", "{\n  let a = false\n  a + b\n}", 6);
 }
 
 #[test]
 fn call() {
   assert_format!("function(a)", "function(a)", 25);
   assert_format!("function(a)", "function(\n  a\n)", 8);
+  assert_format!("function((a))", "function(a)", 25);
+  assert_format!("function(((a)))", "function(a)", 25);
+  assert_format!("function(((a)))", "function(\n  a\n)", 8);
 }
 
 #[test]
@@ -137,11 +143,14 @@ fn group() {
   assert_format!("(   a)", "(a)", 25);
   assert_format!("(   a   )", "(a)", 25);
   assert_format!("(a)", "(\n  a\n)", 1);
+  assert_format!("((a))", "(a)", 25);
+  assert_format!("(((a)))", "(a)", 25);
 }
 
 #[test]
 fn group_with_forced_line() {
   assert_format!("({ a\n b })", "({\n  a\n  b\n})", 6);
+  assert_format!("(({ a\n b }))", "({\n  a\n  b\n})", 6);
   assert_format!(
     "({let a=false\n a+b})",
     "({\n  let a = false\n  a + b\n})",
@@ -163,6 +172,8 @@ fn if_() {
     "if (true != false) 6 else 7",
     25
   );
+  assert_format!("if ((true)) false else 7", "if (true) false else 7", 25);
+  assert_format!("if (({(true)})) false else 7", "if (true) false else 7", 25);
 }
 
 #[test]

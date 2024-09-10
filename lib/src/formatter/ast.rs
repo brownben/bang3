@@ -58,6 +58,13 @@ impl<'a, 'b> Formattable<'a, 'b> for Binary<'a, '_> {
 }
 impl<'a, 'b> Formattable<'a, 'b> for Block<'a, '_> {
   fn format(&self, f: &Formatter<'a, 'b>) -> IR<'a, 'b> {
+    if self.statements.len() == 1
+      && let Statement::Expression(expression) = &self.statements[0]
+      && let Expression::Block(block) = expression.as_ref()
+    {
+      return block.format(f);
+    }
+
     let line = if self.statements.len() > 1 {
       IR::AlwaysLine
     } else {
@@ -75,13 +82,17 @@ impl<'a, 'b> Formattable<'a, 'b> for Block<'a, '_> {
 }
 impl<'a, 'b> Formattable<'a, 'b> for Call<'a, '_> {
   fn format(&self, f: &Formatter<'a, 'b>) -> IR<'a, 'b> {
-    f.group([
-      self.expression.format(f),
-      IR::Text("("),
-      f.indent([IR::Line, self.argument.format(f)]),
-      IR::Line,
-      IR::Text(")"),
-    ])
+    if let Some(argument) = &self.argument {
+      f.group([
+        self.expression.format(f),
+        IR::Text("("),
+        f.indent([IR::Line, argument.unwrap().format(f)]),
+        IR::Line,
+        IR::Text(")"),
+      ])
+    } else {
+      f.concat([self.expression.format(f), IR::Text("()")])
+    }
   }
 }
 impl<'a, 'b> Formattable<'a, 'b> for Comment<'a, '_> {
@@ -108,6 +119,10 @@ impl<'a, 'b> Formattable<'a, 'b> for Group<'a, '_> {
       return f.concat([IR::Text("("), self.expression.format(f), IR::Text(")")]);
     }
 
+    if let Expression::Group(group) = &self.expression {
+      return group.format(f);
+    }
+
     f.group([
       IR::Text("("),
       f.indent([IR::Line, self.expression.format(f)]),
@@ -121,7 +136,7 @@ impl<'a, 'b> Formattable<'a, 'b> for If<'a, '_> {
     f.concat([
       f.group([
         IR::Text("if ("),
-        f.indent([IR::Line, self.condition.format(f)]),
+        f.indent([IR::Line, self.condition.unwrap().format(f)]),
         IR::Line,
         IR::Text(") "),
       ]),

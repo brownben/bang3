@@ -21,6 +21,27 @@ pub enum Expression<'source, 'ast> {
   Invalid,
 }
 
+impl Expression<'_, '_> {
+  /// Extract a single expression from a group or block
+  pub fn unwrap(&self) -> &Self {
+    match self {
+      Self::Comment(comment) => comment.expression.unwrap(),
+      Self::Group(group) => group.expression.unwrap(),
+      Self::Block(block) => {
+        if block.statements.len() == 1
+          && let Some(statement) = block.statements.first()
+          && let Statement::Expression(expression) = statement
+        {
+          expression.unwrap()
+        } else {
+          self
+        }
+      }
+      _ => self,
+    }
+  }
+}
+
 #[derive(Debug)]
 pub struct Binary<'source, 'ast> {
   pub left: Expression<'source, 'ast>,

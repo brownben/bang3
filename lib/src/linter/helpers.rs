@@ -1,26 +1,6 @@
 //! Helpers to simplify the definitions of lint rules
 use crate::ast::{expression::*, statement::*};
 
-impl Expression<'_, '_> {
-  pub fn unwrap(&self) -> &Self {
-    match self {
-      Self::Comment(comment) => comment.expression.unwrap(),
-      Self::Group(group) => group.expression.unwrap(),
-      Self::Block(block) => {
-        if block.statements.len() == 1
-          && let Some(statement) = block.statements.first()
-          && let Statement::Expression(expression) = statement
-        {
-          expression.unwrap()
-        } else {
-          self
-        }
-      }
-      _ => self,
-    }
-  }
-}
-
 pub(super) trait IsConstant {
   fn is_constant(&self) -> bool;
 }
