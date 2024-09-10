@@ -30,6 +30,17 @@ impl Span {
     }
   }
 
+  /// Combine two `Span`s into one
+  pub fn merge_end(self, other: Self) -> Self {
+    if self == Self::default() {
+      other
+    } else if other == Self::default() {
+      self
+    } else {
+      Self::new(self.start, self.end)
+    }
+  }
+
   /// Get the source text for a `Span` from a source string
   #[must_use]
   pub fn source_text(self, source_text: &str) -> &str {

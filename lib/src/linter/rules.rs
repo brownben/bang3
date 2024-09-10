@@ -1,11 +1,11 @@
 //! Definitions of the lint rules
 use super::{
   helpers::{ASTEquality, IsConstant},
-  Context, LintRule,
+  Context, LintRule, Variables,
 };
 use crate::ast::{expression::*, statement::*, GetSpan};
 
-pub const RULES: [&dyn LintRule; 8] = [
+pub const RULES: [&dyn LintRule; 9] = [
   &NoConstantConditions,
   &NoNegativeZero,
   &NoSelfAssign,
@@ -14,6 +14,7 @@ pub const RULES: [&dyn LintRule; 8] = [
   &NoUnderscoreVariableUse,
   &NoUselessMatch,
   &NoYodaComparison,
+  &NoUnusedVariables,
 ];
 
 pub struct NoConstantConditions;
@@ -184,4 +185,20 @@ impl LintRule for NoYodaComparison {
   }
 }
 
-// TODO: No Unused Variables
+pub struct NoUnusedVariables;
+impl LintRule for NoUnusedVariables {
+  fn name(&self) -> &'static str {
+    "No Unused Variables"
+  }
+  fn message(&self) -> &'static str {
+    "variable is declared but never used. if this is intentional prefix with a underscore"
+  }
+
+  fn visit_variables(&self, context: &mut Context, variables: &Variables) {
+    for variable in variables.defined_variables() {
+      if !variable.name.starts_with('_') && !variable.is_used() {
+        context.add_diagnostic(&Self, variable.span());
+      }
+    }
+  }
+}

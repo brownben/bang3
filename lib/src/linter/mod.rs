@@ -3,6 +3,7 @@
 
 mod helpers;
 mod rules;
+mod variables;
 mod visitor;
 
 #[cfg(test)]
@@ -13,6 +14,8 @@ use crate::{
   parser::AST,
 };
 use std::{error, fmt};
+
+use variables::Variables;
 use visitor::Visitor;
 
 #[derive(Debug, Default)]
@@ -27,6 +30,11 @@ impl Linter {
   pub fn check(mut self, ast: &AST) -> Vec<LintDiagnostic> {
     for statement in &ast.statements {
       self.visit_statement(statement);
+    }
+
+    let variables = Variables::from(ast);
+    for rule in rules::RULES {
+      rule.visit_variables(&mut self.context, &variables);
     }
 
     self.context.diagnostics
@@ -52,6 +60,8 @@ trait LintRule {
 
   fn visit_expression(&self, _: &mut Context, _: &Expression) {}
   fn visit_statement(&self, _: &mut Context, _: &Statement) {}
+
+  fn visit_variables(&self, _: &mut Context, _: &Variables) {}
 }
 
 #[derive(Debug, Default)]

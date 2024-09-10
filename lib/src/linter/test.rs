@@ -1,4 +1,5 @@
 use crate::{lint as lint_ast, parse, Allocator};
+use indoc::indoc;
 
 fn lint(source: &str) -> Result<(), ()> {
   let allocator = Allocator::new();
@@ -37,13 +38,13 @@ fn no_negative_zero() {
 
 #[test]
 fn no_self_assign() {
-  assert!(lint("let x = x").is_err());
-  assert!(lint("let var = (var)").is_err());
-  assert!(lint("let bla = bla // bla").is_err());
-  assert!(lint("let a = { a }").is_err());
+  assert!(lint("let x = x\n x").is_err());
+  assert!(lint("let var = (var)\n var").is_err());
+  assert!(lint("let bla = bla // bla\n bla").is_err());
+  assert!(lint("let a = { a }\na").is_err());
 
-  assert!(lint("let x = 7").is_ok());
-  assert!(lint("let y = x").is_ok());
+  assert!(lint("let x = 7\n x").is_ok());
+  assert!(lint("let y = x\n y").is_ok());
 }
 
 #[test]
@@ -107,4 +108,38 @@ fn no_yoda_comparison() {
   assert!(lint("x != 7").is_ok());
   assert!(lint("7 < x").is_ok());
   assert!(lint("x > 7").is_ok());
+}
+
+#[test]
+fn no_unused_variables() {
+  assert!(lint("let a = 5").is_err());
+  assert!(lint("let _a = 5").is_ok());
+  assert!(lint("let a = 5\na").is_ok());
+
+  let source = indoc! {"
+    let a = 5
+    {
+      let b = a
+      b + 5
+    }"
+  };
+  assert!(lint(source).is_ok());
+
+  let source = indoc! {"
+    let a = 5
+    {
+      let b = 4
+      b + 5
+    }"
+  };
+  assert!(lint(source).is_err());
+
+  let source = indoc! {"
+    let _a = 5
+    {
+      let a = 4
+      a + 5
+    }"
+  };
+  assert!(lint(source).is_ok());
 }
