@@ -189,6 +189,14 @@ impl<'a, 'b> Formattable<'a, 'b> for PatternRange<'a, '_> {
 }
 impl<'a, 'b> Formattable<'a, 'b> for Unary<'a, '_> {
   fn format(&self, f: &Formatter<'a, 'b>) -> IR<'a, 'b> {
+    if let Expression::Unary(unary2) = &self.expression
+      && self.operator == unary2.operator
+      && let Expression::Unary(unary3) = &unary2.expression
+      && unary2.operator == unary3.operator
+    {
+      return unary3.format(f);
+    }
+
     f.concat([IR::Text(self.operator.as_str()), self.expression.format(f)])
   }
 }

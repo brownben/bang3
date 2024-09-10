@@ -239,5 +239,14 @@ fn match_and_comment() {
 #[test]
 fn unary() {
   assert_format!("!true", "!true", 25);
+  assert_format!("!!true", "!!true", 25);
+  assert_format!("!!!true", "!true", 25);
+  assert_format!("!!!!true", "!!true", 25);
+  assert_format!("!!!!!true", "!true", 25);
+
   assert_format!("!    false", "!false", 25);
+
+  assert_format!("- 4", "-4", 25);
+  assert_format!(" --3", "--3", 25);
+  assert_format!("---89", "-89", 25);
 }
