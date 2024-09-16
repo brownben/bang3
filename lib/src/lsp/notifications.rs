@@ -25,7 +25,7 @@ pub fn handle(notification: lsp_server::Notification, documents: &mut DocumentIn
       }
     }
 
-    _ => eprintln!("Unknown Notification:\n\t{notification:?}"),
+    _ => eprintln!("Unknown Notification: {notification:?}"),
   };
 }
 

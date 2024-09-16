@@ -2,7 +2,7 @@
   "name": "bang",
   "displayName": "Bang",
   "description": "My Language",
-  "publisher": "Ben Brown",
+  "publisher": "brownben",
   "icon": "./icons/logo.png",
   "version": "0.0.1",
   "engines": {
@@ -29,6 +29,19 @@
         }
       }
     ],
+    "configuration": {
+      "properties": {
+        "bang.server.path": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "scope": "machine-overridable",
+          "default": null,
+          "markdownDescription": "Path to bang executable (points to `bang` in path as default)."
+        }
+      }
+    },
     "grammars": [
       {
         "language": "bang",
@@ -36,5 +49,21 @@
         "path": "./syntaxes/bang.tmLanguage.json"
       }
     ]
+  },
+  "main": "./dist/extension.js",
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.1",
+    "@types/node": "^22.5.5",
+    "@types/vscode": "^1.93.0",
+    "typescript": "^5.6.2"
+  },
+  "scripts": {
+    "lint": "biome lint --write",
+    "format": "biome format --write",
+    "check": "biome check",
+    "build": "tsc"
   }
 }

@@ -54,7 +54,7 @@ pub fn handle(
       Some(lsp_server::Response::new_ok(request_id, result))
     }
     request => {
-      eprintln!("Unknown Request:\n\t{request:?}");
+      eprintln!("Unknown Request: {request:?}");
 
       None
     }

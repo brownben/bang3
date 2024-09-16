@@ -35,12 +35,12 @@ impl LanguageServer {
   /// # Panics
   /// If problem clearing up threads.
   pub fn run(mut self) {
-    eprintln!("== Starting Bang Language Server");
+    eprintln!("Bang Language Server Running");
 
     self.main_loop();
     self.connection_threads.join().unwrap();
 
-    eprintln!("== Shutting Down Bang Language Server");
+    eprintln!("Stopping Bang Language Server");
   }
 
   fn main_loop(&mut self) {
@@ -61,7 +61,7 @@ impl LanguageServer {
           notifications::handle(notification, &mut self.files);
         }
         Message::Response(response) => {
-          eprintln!("Unknown Response:\n\t{response:?}");
+          eprintln!("Unknown Response: {response:?}");
         }
       }
     }
