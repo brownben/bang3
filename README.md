@@ -68,6 +68,7 @@ I have been inspired by/ used the following guides/ projects when creating Bang.
 - [Oxc Performance Guide](https://oxc-project.github.io/docs/learn/performance.html)
 - [Printing Trees in Rust](https://www.georgevreilly.com/blog/2023/01/24/TreeInRust2PrintingTrees.html)
 - [Fault Tolerant Parsing](https://chevrotain.io/docs/tutorial/step4_fault_tolerance.html) from Chevrotain
+- [Alkyne GC](https://mcyoung.xyz/2022/06/07/alkyne-gc/) by Miguel Young de la Sota
 
 ### Looking for an older version?
 

@@ -1,0 +1,10 @@
+[package]
+name = "bang-gc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mmap-rs = "0.6.1"
+
+[lints]
+workspace = true
