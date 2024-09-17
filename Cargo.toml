@@ -1,5 +1,13 @@
 [workspace]
-members = ["cli", "lib"]
+members = [
+  "crates/cli",
+  "crates/formatter",
+  "crates/interpreter",
+  "crates/linter",
+  "crates/lsp",
+  "crates/parser",
+  "crates/typechecker"
+]
 resolver = "2"
 
 [workspace.lints]

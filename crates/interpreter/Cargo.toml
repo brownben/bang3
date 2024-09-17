@@ -1,0 +1,17 @@
+[package]
+name = "bang-interpreter"
+version = "3.0.0"
+edition = "2021"
+
+[dependencies]
+bang-parser = { path = "../parser" }
+
+rustc-hash = "2.0.0"
+smallvec = "1.13.2"
+smartstring = "1.0.1"
+
+[dev-dependencies]
+indoc = "2.0.4"
+
+[lints]
+workspace = true
