@@ -10,7 +10,7 @@ impl AST<'_, '_> {
   }
 }
 
-fn parse_to_string<'s, 'ast>(source: &'s str) -> String {
+fn parse_to_string(source: &str) -> String {
   let allocator = Allocator::new();
   let ast = parse(source, &allocator);
   ast.to_string()

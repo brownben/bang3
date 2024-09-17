@@ -31,6 +31,7 @@ Commands:
   lint       Checks for lint warnings
   typecheck  Checks the file for type errors
   print      Prints debugging information
+  lsp        Run the language server
   help       Print this message or the help of the given subcommand(s)
 
 Options:

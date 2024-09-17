@@ -114,7 +114,7 @@ fn call() {
   assert!(has_type_error("let a = x => x + 1\na(-false)"));
   assert!(has_type_error("false()"));
   assert!(has_type_error("4.5()"));
-  assert!(has_type_error("(-false)()"))
+  assert!(has_type_error("(-false)()"));
 }
 
 #[test]

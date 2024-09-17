@@ -582,7 +582,7 @@ mod test {
       assert!(!num.is_string());
       assert!(!num.is_closure());
 
-      assert_eq!(num.as_number(), number)
+      assert_eq!(num.as_number(), number);
     }
 
     let num = Value::from(f64::NAN);
@@ -603,6 +603,7 @@ mod test {
     assert!(!num.is_object());
     assert!(!num.is_string());
     assert!(!num.is_closure());
+
     assert_eq!(num.as_number(), f64::INFINITY);
 
     let num = Value::from(f64::asin(55.0));
@@ -680,20 +681,20 @@ mod test {
 
   #[test]
   fn is_falsy() {
-    assert_eq!(Value::TRUE.is_falsy(), false);
-    assert_eq!(Value::FALSE.is_falsy(), true);
-    assert_eq!(Value::NULL.is_falsy(), true);
+    assert!(!Value::TRUE.is_falsy());
+    assert!(Value::FALSE.is_falsy());
+    assert!(Value::NULL.is_falsy());
 
-    assert_eq!(Value::from(0.0).is_falsy(), true);
-    assert_eq!(Value::from(-0.0).is_falsy(), true);
-    assert_eq!(Value::from(0.01).is_falsy(), false);
-    assert_eq!(Value::from(123.0).is_falsy(), false);
+    assert!(Value::from(0.0).is_falsy());
+    assert!(Value::from(-0.0).is_falsy());
+    assert!(!Value::from(0.01).is_falsy());
+    assert!(!Value::from(123.0).is_falsy());
 
-    assert_eq!(Value::from("").is_falsy(), true);
-    assert_eq!(Value::from("hello").is_falsy(), false);
+    assert!(Value::from("").is_falsy());
+    assert!(!Value::from("hello").is_falsy());
 
     let function = Chunk::new("".into());
-    assert_eq!(Value::from(ptr::from_ref(&function)).is_falsy(), false);
+    assert!(!Value::from(ptr::from_ref(&function)).is_falsy());
   }
 
   #[test]
