@@ -21,7 +21,7 @@ impl From<crate::RuntimeError> for Error {
 fn run(source: &str) -> Result<VM, Error> {
   let allocator = Allocator::new();
   let ast = parse(source, &allocator);
-  let chunk = compile(&ast, &allocator)?;
+  let chunk = compile(&ast)?;
   let mut vm = VM::new();
   vm.run(&chunk)?;
   Ok(vm)

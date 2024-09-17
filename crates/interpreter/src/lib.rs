@@ -30,16 +30,13 @@ mod test;
 /// let allocator = Allocator::new();
 /// let source = "5 + 3";
 /// let ast = parse(source, &allocator);
-/// let chunk = bang_interpreter::compile(&ast, &allocator).unwrap();
+/// let chunk = bang_interpreter::compile(&ast).unwrap();
 /// ```
 ///
 /// # Errors
 /// If there is a problem constructing the bytecode
-pub fn compile<'s: 'a, 'a>(
-  ast: &bang_parser::AST<'s, '_>,
-  allocator: &bang_parser::Allocator,
-) -> Result<Chunk, CompileError> {
-  let mut compiler = compiler::Compiler::new(allocator);
+pub fn compile(ast: &bang_parser::AST<'_, '_>) -> Result<Chunk, CompileError> {
+  let mut compiler = compiler::Compiler::new();
   compiler.compile(ast)?;
   let chunk = compiler.finish();
   Ok(chunk)
