@@ -5,7 +5,7 @@ use super::{
 };
 use bang_parser::ast::{expression::*, statement::*, GetSpan};
 
-pub const RULES: [&dyn LintRule; 9] = [
+pub const RULES: [&dyn LintRule; 10] = [
   &NoConstantConditions,
   &NoNegativeZero,
   &NoSelfAssign,
@@ -15,6 +15,7 @@ pub const RULES: [&dyn LintRule; 9] = [
   &NoUselessMatch,
   &NoYodaComparison,
   &NoUnusedVariables,
+  &NoUnneccessaryClosures,
 ];
 
 pub struct NoConstantConditions;
@@ -198,6 +199,33 @@ impl LintRule for NoUnusedVariables {
     for variable in variables.defined() {
       if !variable.name.starts_with('_') && !variable.is_used() {
         context.add_diagnostic(&Self, variable.span());
+      }
+    }
+  }
+}
+
+pub struct NoUnneccessaryClosures;
+impl LintRule for NoUnneccessaryClosures {
+  fn name(&self) -> &'static str {
+    "No Unneccessary Closures"
+  }
+  fn message(&self) -> &'static str {
+    "function could just be passed directly, without being wrapped in another function"
+  }
+
+  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+    if let Expression::Function(function) = &expression
+      && let Expression::Call(call) = &function.body.unwrap()
+    {
+      if let Some(argument) = &call.argument
+        && let Expression::Variable(variable) = argument.unwrap()
+        && variable.name == function.parameter.name
+      {
+        context.add_diagnostic(&Self, function.span());
+      }
+
+      if call.argument.is_none() && function.parameter.name.starts_with('_') {
+        context.add_diagnostic(&Self, function.span());
       }
     }
   }

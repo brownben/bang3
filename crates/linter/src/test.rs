@@ -144,3 +144,17 @@ fn no_unused_variables() {
   };
   assert!(lint(source).is_ok());
 }
+
+#[test]
+fn no_unnecessary_closures() {
+  assert!(lint("x => y(x)").is_err());
+  assert!(lint("x => { y(x) }").is_err());
+  assert!(lint("x => y((x))").is_err());
+  assert!(lint("add => y(add)").is_err());
+  assert!(lint("add => another(add)").is_err());
+  assert!(lint("_ => another()").is_err());
+
+  assert!(lint("x => y(x + 1)").is_ok());
+  assert!(lint("x => y(x) + 1").is_ok());
+  assert!(lint("a => another() + a").is_ok());
+}
