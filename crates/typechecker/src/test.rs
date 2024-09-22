@@ -1,13 +1,17 @@
-use super::{FunctionType, Primitive, Type, Typecheck, Typechecker};
-use crate::typecheck;
+use crate::{typecheck, Typechecker};
+
 use bang_parser::{parse, Allocator};
 use indoc::indoc;
 
-fn synthesize(source: &str) -> Type {
+fn synthesize(source: &str) -> String {
   let allocator = Allocator::new();
   let ast = parse(source, &allocator);
-  let mut typechecker = Typechecker::new();
-  ast.typecheck(&mut typechecker)
+
+  let mut checker = Typechecker::new();
+  let result = checker.check_ast(&ast);
+
+  assert!(checker.problems.is_empty());
+  checker.types.type_to_string(result)
 }
 
 fn has_type_error(source: &str) -> bool {
@@ -19,27 +23,27 @@ fn has_type_error(source: &str) -> bool {
 
 #[test]
 fn binary_operators() {
-  assert_eq!(synthesize("1 + 2"), Primitive::Number.into());
-  assert_eq!(synthesize("1 - 2"), Primitive::Number.into());
+  assert_eq!(synthesize("1 + 2"), "number");
+  assert_eq!(synthesize("1 - 2"), "number");
   assert!(has_type_error("1 * false"));
   assert!(has_type_error("'' / false"));
   assert!(has_type_error("-false / false"));
   assert!(has_type_error("false / -false"));
 
-  assert_eq!(synthesize("'str' ++ \"str\""), Primitive::String.into());
+  assert_eq!(synthesize("'str' ++ \"str\""), "string");
   assert!(has_type_error("7 ++ \"str\""));
 }
 
 #[test]
 fn binary_comparators() {
-  assert_eq!(synthesize("1 == 2"), Primitive::Boolean.into());
-  assert_eq!(synthesize("1 != 2"), Primitive::Boolean.into());
-  assert_eq!(synthesize("false != true"), Primitive::Boolean.into());
+  assert_eq!(synthesize("1 == 2"), "boolean");
+  assert_eq!(synthesize("1 != 2"), "boolean");
+  assert_eq!(synthesize("false != true"), "boolean");
   assert!(has_type_error("1 == false"));
 
-  assert_eq!(synthesize("1 < 2"), Primitive::Boolean.into());
-  assert_eq!(synthesize("1 <= 2"), Primitive::Boolean.into());
-  assert_eq!(synthesize("'string' > 'str'"), Primitive::Boolean.into());
+  assert_eq!(synthesize("1 < 2"), "boolean");
+  assert_eq!(synthesize("1 <= 2"), "boolean");
+  assert_eq!(synthesize("'string' > 'str'"), "boolean");
   assert!(has_type_error("1 < false"));
   assert!(has_type_error("1 < 'str'"));
   assert!(has_type_error("'str' > false"));
@@ -47,19 +51,13 @@ fn binary_comparators() {
 
 #[test]
 fn binary_logical_operators() {
-  assert_eq!(synthesize("1 and 2"), Primitive::Number.into());
-  assert_eq!(synthesize("false and true"), Primitive::False.into());
-  assert_eq!(synthesize("false and 1"), Primitive::False.into());
-  assert_eq!(synthesize("true and 1"), Primitive::Number.into());
-  assert_eq!(synthesize("(_ => 0) and 1"), Primitive::Number.into());
-  assert!(!has_type_error("x => x and 1"));
-  assert!(has_type_error("1 and false"));
+  assert_eq!(synthesize("1 and 2"), "number");
+  assert_eq!(synthesize("false and true"), "boolean");
+  assert_eq!(synthesize("1 or 2"), "number");
+  assert_eq!(synthesize("false or true"), "boolean");
+  assert_eq!(synthesize("x => x or 1"), "(number -> number)");
 
-  assert_eq!(synthesize("1 or 2"), Primitive::Number.into());
-  assert_eq!(synthesize("false or true"), Primitive::True.into());
-  assert_eq!(synthesize("false or 1"), Primitive::Number.into());
-  assert_eq!(synthesize("true or 1"), Primitive::True.into());
-  assert!(!has_type_error("x => x or 1"));
+  assert!(has_type_error("1 and false"));
   assert!(has_type_error("1 or false"));
 }
 
@@ -71,12 +69,12 @@ fn binary_pipeline() {
 
     5 >> addSeven >> multiplyByTwo
   "};
-  assert_eq!(synthesize(source), Primitive::Number.into());
+  assert_eq!(synthesize(source), "number");
 }
 
 #[test]
 fn block() {
-  assert_eq!(synthesize("{\n1\ntrue\n}"), Primitive::True.into());
+  assert_eq!(synthesize("{\n1\ntrue\n}"), "boolean");
 }
 
 #[test]
@@ -85,7 +83,7 @@ fn call() {
     let a = x => x + 7
     a(5)
   "};
-  assert_eq!(synthesize(standard_function), Primitive::Number.into());
+  assert_eq!(synthesize(standard_function), "number");
 
   let no_parameter_when_required = indoc! {"
     let a = x => x + 1
@@ -97,19 +95,13 @@ fn call() {
     let a = _ => 7
     a()
   "};
-  assert_eq!(
-    synthesize(no_parameter_no_argument),
-    Primitive::Number.into()
-  );
+  assert_eq!(synthesize(no_parameter_no_argument), "number");
 
   let no_parameter_with_argument = indoc! {"
     let a = _ => 7
     a(55)
   "};
-  assert_eq!(
-    synthesize(no_parameter_with_argument),
-    Primitive::Number.into()
-  );
+  assert_eq!(synthesize(no_parameter_with_argument), "number");
 
   assert!(has_type_error("let a = x => x + 1\na(-false)"));
   assert!(has_type_error("false()"));
@@ -119,22 +111,13 @@ fn call() {
 
 #[test]
 fn functions() {
-  assert_eq!(
-    synthesize("a => a"),
-    FunctionType {
-      parameter: Type::Existential(0),
-      return_type: Type::Existential(0)
-    }
-    .into()
-  );
-
   let source = indoc! {"
     let a = x => x + 1
     let b = x => x + 2
 
     a == b
   "};
-  assert_eq!(synthesize(source), Primitive::Boolean.into());
+  assert_eq!(synthesize(source), "boolean");
 
   let source = indoc! {"
     let a = x => x + 1
@@ -147,17 +130,14 @@ fn functions() {
 
 #[test]
 fn groups_and_comments() {
-  assert_eq!(synthesize("(true)"), Primitive::True.into());
-  assert_eq!(synthesize("(false)"), Primitive::False.into());
-  assert_eq!(synthesize("0 // comment"), Primitive::Number.into());
+  assert_eq!(synthesize("(true)"), "boolean");
+  assert_eq!(synthesize("(false)"), "boolean");
+  assert_eq!(synthesize("0 // comment"), "number");
 }
 
 #[test]
 fn if_() {
-  assert_eq!(
-    synthesize("if (1 > 4) false else true"),
-    Primitive::Boolean.into()
-  );
+  assert_eq!(synthesize("if (1 > 4) false else true"), "boolean");
 
   assert!(has_type_error("if (1) false else 7"));
   assert!(has_type_error("if (1) 5 else 'str'"));
@@ -168,26 +148,26 @@ fn if_() {
 
 #[test]
 fn literals() {
-  assert_eq!(synthesize("true").to_string(), "true");
-  assert_eq!(synthesize("false"), Primitive::False.into());
+  assert_eq!(synthesize("true"), "boolean");
+  assert_eq!(synthesize("false"), "boolean");
 
-  assert_eq!(synthesize("0"), Primitive::Number.into());
-  assert_eq!(synthesize("0.02"), Primitive::Number.into());
-  assert_eq!(synthesize("2"), Primitive::Number.into());
-  assert_eq!(synthesize("2.4"), Primitive::Number.into());
-  assert_eq!(synthesize("2455.12"), Primitive::Number.into());
+  assert_eq!(synthesize("0"), "number");
+  assert_eq!(synthesize("0.02"), "number");
+  assert_eq!(synthesize("2"), "number");
+  assert_eq!(synthesize("2.4"), "number");
+  assert_eq!(synthesize("2455.12"), "number");
 
-  assert_eq!(synthesize("\"hello\""), Primitive::String.into());
-  assert_eq!(synthesize("'world'"), Primitive::String.into());
+  assert_eq!(synthesize("\"hello\""), "string");
+  assert_eq!(synthesize("'world'"), "string");
 }
 
 #[test]
 fn match_() {
   let source = "match 1 + 5 | 1 -> true | _ -> false";
-  assert_eq!(synthesize(source), Primitive::Boolean.into());
+  assert_eq!(synthesize(source), "boolean");
 
   let source = "match 2 > 4 | true -> 1 | false -> 3";
-  assert_eq!(synthesize(source), Primitive::Number.into());
+  assert_eq!(synthesize(source), "number");
 
   let source = "match 1 | true -> true | _ -> false";
   assert!(has_type_error(source));
@@ -195,11 +175,11 @@ fn match_() {
   let source = "match 1 ++ 5 | 1 -> true | 2 -> false";
   assert!(has_type_error(source));
 
-  let source = "match 2 | ..1 -> true | 1.. -> false";
-  assert_eq!(synthesize(source), Primitive::Boolean.into());
+  let source = "match 2 | ..1 -> true | 1.. -> false | _ -> false";
+  assert_eq!(synthesize(source), "boolean");
 
-  let source = "match 2 | ..0 -> 2 | 0..1 -> 1 | 1.. -> 0";
-  assert_eq!(synthesize(source), Primitive::Number.into());
+  let source = "match 2 | ..0 -> 2 | 0..1 -> 1 | 1.. -> 0 | _ -> 5";
+  assert_eq!(synthesize(source), "number");
 
   let source = "match 'string' | ..0 -> 2 | 0..1 -> 1 | 1.. -> 0";
   assert!(has_type_error(source));
@@ -223,10 +203,10 @@ fn match_() {
 #[test]
 fn match_exhaustiveness() {
   let source = "match 4 > 5 | true -> 1 | false -> 3";
-  assert_eq!(synthesize(source), Primitive::Number.into());
+  assert_eq!(synthesize(source), "number");
 
   let source = "match 4 > 5 | true -> 1 | _ -> 3";
-  assert_eq!(synthesize(source), Primitive::Number.into());
+  assert_eq!(synthesize(source), "number");
 
   let no_false = "match 4 > 5 | true -> 1";
   assert!(has_type_error(no_false));
@@ -243,10 +223,7 @@ fn match_exhaustiveness() {
   assert!(has_type_error(arms_after_catch_all));
 
   let function_needs_catch_all = "match (_ => 7) | _ -> 3";
-  assert_eq!(
-    synthesize(function_needs_catch_all),
-    Primitive::Number.into()
-  );
+  assert_eq!(synthesize(function_needs_catch_all), "number");
 
   let extra_catch_all = "match 4 > 5 | _ -> 5 | true -> 1 | false -> 3";
   assert!(has_type_error(extra_catch_all));
@@ -254,13 +231,13 @@ fn match_exhaustiveness() {
 
 #[test]
 fn unary() {
-  assert_eq!(synthesize("!true"), Primitive::False.into());
-  assert_eq!(synthesize("!false").to_string(), "true");
-  assert_eq!(synthesize("!'string'"), Primitive::Boolean.into());
-  assert_eq!(synthesize("!0"), Primitive::Boolean.into());
+  assert_eq!(synthesize("!true"), "boolean");
+  assert_eq!(synthesize("!false"), "boolean");
+  assert_eq!(synthesize("!'string'"), "boolean");
+  assert_eq!(synthesize("!0"), "boolean");
 
-  assert_eq!(synthesize("-0"), Primitive::Number.into());
-  assert_eq!(synthesize("-2.4"), Primitive::Number.into());
+  assert_eq!(synthesize("-0"), "number");
+  assert_eq!(synthesize("-2.4"), "number");
   assert!(has_type_error("-true"));
   assert!(has_type_error("-'hello'"));
   assert!(has_type_error("!-'hello'"));
@@ -272,14 +249,14 @@ fn variables() {
     let a = 1
     a
   "};
-  assert_eq!(synthesize(source), Primitive::Number.into());
+  assert_eq!(synthesize(source), "number");
 
   let source = indoc! {"
     let a = 1
     let b = a
     b
   "};
-  assert_eq!(synthesize(source), Primitive::Number.into());
+  assert_eq!(synthesize(source), "number");
 
   let source = indoc! {"
     let a = 'string'
@@ -288,9 +265,10 @@ fn variables() {
       // comment
       a
     }
+    a
     b
   "};
-  assert_eq!(synthesize(source), Primitive::Number.into());
+  assert_eq!(synthesize(source), "number");
 
   assert!(has_type_error("unknownVariable"));
   assert!(has_type_error("let a = 7\nunknownVariable"));
@@ -303,30 +281,79 @@ fn recursive() {
       | ..2 -> 1
       | n -> fibonacciMatch(n - 1) + fibonacciMatch(n - 2)
 
-    fibonacciMatch
+    fibonacciMatch(4)
   "};
-  assert_eq!(
-    synthesize(fibonacci_match),
-    FunctionType {
-      parameter: Primitive::Number.into(),
-      return_type: Primitive::Number.into()
-    }
-    .into()
-  );
+  assert_eq!(synthesize(fibonacci_match), "number");
 
   let fibonacci_if = indoc! {"
     let fibonacciIf = n => if (n < 2) { 1 } else {
       fibonacciIf(n - 1) + fibonacciIf(n - 2)
     }
 
-    fibonacciIf
+    fibonacciIf(4)
   "};
-  assert_eq!(
-    synthesize(fibonacci_if),
-    FunctionType {
-      parameter: Primitive::Number.into(),
-      return_type: Primitive::Number.into()
-    }
-    .into()
-  );
+  assert_eq!(synthesize(fibonacci_if), "number");
+}
+
+#[test]
+fn no_unused_variables() {
+  assert!(has_type_error("let a = 5"));
+  assert!(!has_type_error("let _a = 5"));
+  assert!(!has_type_error("let a = 5\na"));
+
+  let source = indoc! {"
+    let a = 5
+    {
+      let b = a
+      b + 5
+    }"
+  };
+  assert!(!has_type_error(source));
+
+  let source = indoc! {"
+    let a = 5
+    {
+      let b = 4
+      b + 5
+    }"
+  };
+  assert!(has_type_error(source));
+
+  let source = indoc! {"
+    let _a = 5
+    {
+      let a = 4
+      a + 5
+    }"
+  };
+  assert!(!has_type_error(source));
+}
+
+#[test]
+fn identity_function() {
+  let source = indoc! {"
+    let identity = x => x
+
+    identity(5) == 5
+  "};
+  assert_eq!(synthesize(source), "boolean");
+
+  let source = indoc! {"
+    let identity = x => x
+
+    let a = identity(5)
+    let b = identity(false)
+
+    a == b
+  "};
+  assert!(has_type_error(source));
+
+  let source = indoc! {"
+    let identity = x => x
+
+    let _a = identity(5)
+
+    identity(false)
+  "};
+  assert_eq!(synthesize(source), "boolean");
 }

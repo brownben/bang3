@@ -77,7 +77,11 @@ impl From<&bang_typechecker::TypeError> for Message {
     Self {
       title: error.title().to_string(),
       body: error.message(),
-      severity: Severity::Error,
+      severity: if error.is_warning() {
+        Severity::Warning
+      } else {
+        Severity::Error
+      },
     }
   }
 }

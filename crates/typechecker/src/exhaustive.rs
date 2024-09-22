@@ -1,4 +1,4 @@
-use super::{Primitive, Type};
+use super::Type;
 use bang_parser::{
   ast::expression::{LiteralKind, MatchCase, Pattern},
   Span,
@@ -7,16 +7,12 @@ use std::fmt;
 
 /// Checks if a match expressions arms are exhaustive
 pub fn check(value: &Type, cases: &[MatchCase]) -> Result {
-  match value {
-    Type::Function(_) | Type::Unknown | Type::Existential(_) => has_catch_all(cases),
-    Type::Primitive(primitive) => match primitive {
-      Primitive::Boolean | Primitive::True | Primitive::False => boolean(cases),
-      Primitive::Number | Primitive::String => {
-        // TODO: handle all numbers/ range case coverage
-        has_catch_all(cases)
-      }
-    },
+  if let Type::Boolean = value {
+    return boolean(cases);
   }
+
+  // TODO: handle all numbers/ range case coverage
+  has_catch_all(cases)
 }
 
 /// Simple check that
@@ -60,7 +56,7 @@ fn boolean(cases: &[MatchCase]) -> Result {
     (true, true) => Result::UnreachableCases(unused_cases),
     (false, true) => Result::MissingCases(vec![MissingPattern::Boolean(true)]),
     (true, false) => Result::MissingCases(vec![MissingPattern::Boolean(false)]),
-    (false, false) => unreachable!("must be single arm, or pattern will have errored"),
+    (false, false) => unreachable!("must have at least one arm"),
   }
 }
 
