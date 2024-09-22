@@ -670,7 +670,11 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       .expect(TokenKind::Identifier)
       .map(Span::from)
       .unwrap_or_default();
-    let identifier = identifier_span.source_text(self.source);
+    let identifier_text = identifier_span.source_text(self.source);
+    let identifier = Variable {
+      name: identifier_text,
+      span: identifier_span,
+    };
 
     self.expect(TokenKind::Equal);
 
@@ -681,14 +685,11 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     let span = Span::from(let_token).merge(expression.span());
 
     if let Expression::Function(ref mut function) = &mut expression {
-      function.name = Some(identifier);
+      function.name = Some(identifier.clone());
     }
 
     self.allocate_statement(Let {
-      identifier: Variable {
-        name: identifier,
-        span: identifier_span,
-      },
+      identifier,
       expression,
       span,
     })

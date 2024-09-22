@@ -119,7 +119,7 @@ pub struct Comment<'source, 'ast> {
 
 #[derive(Debug)]
 pub struct Function<'source, 'ast> {
-  pub name: Option<&'source str>,
+  pub name: Option<Variable<'source>>,
   pub parameter: Variable<'source>,
   pub body: Expression<'source, 'ast>,
   pub span: Span,
@@ -214,7 +214,7 @@ impl fmt::Display for UnaryOperator {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Variable<'source> {
   pub name: &'source str,
   pub span: Span,

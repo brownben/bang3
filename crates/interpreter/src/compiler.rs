@@ -299,7 +299,7 @@ impl<'s> Compile<'s> for Comment<'s, '_> {
 }
 impl<'s> Compile<'s> for Function<'s, '_> {
   fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
-    let name = self.name.unwrap_or("").into();
+    let name = self.name.as_ref().map_or("", |var| var.name).into();
     compiler.new_chunk(name);
 
     compiler.define_variable(self.parameter.name, self.span)?;

@@ -102,8 +102,8 @@ impl PrettyPrint for Function<'_, '_> {
   fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
     let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
     write!(f, "{prefix}{connector}Function")?;
-    if let Some(name) = self.name {
-      write!(f, " ({name})")?;
+    if let Some(name) = &self.name {
+      write!(f, " ({})", name.name)?;
     }
     writeln!(f, ": {} =>", self.parameter.name)?;
 
