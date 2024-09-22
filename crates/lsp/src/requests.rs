@@ -1,10 +1,11 @@
 use super::documents::{Document, DocumentIndex};
+use super::locations::{lsp_range_from_span, span_from_lsp_position};
 use lsp_types as lsp;
 use std::{collections::HashMap, iter};
 
 use bang_formatter::{format, FormatterConfig};
 use bang_linter::{lint, LintDiagnostic};
-use bang_parser::{parse, Allocator, GetSpan, LineIndex, ParseError, Span};
+use bang_parser::{parse, Allocator, GetSpan, ParseError};
 use bang_typechecker::{get_enviroment, typecheck, TypeError};
 
 pub fn handle(
@@ -69,32 +70,32 @@ fn file_diagnostics(file: &Document) -> lsp::DocumentDiagnosticReport {
   let allocator = Allocator::new();
   let ast = parse(&file.source, &allocator);
 
-  let lints = if ast.errors.is_empty() {
-    let lints = lint(&ast);
-    let type_problems = typecheck(&ast);
+  let mut diagnostics = Vec::new();
 
-    type_problems
-      .iter()
-      .map(|error| diagnostic_from_type_error(error, &file.line_index))
-      .chain(
-        lints
-          .iter()
-          .map(|lint| diagnostic_from_lint(lint, &file.line_index)),
-      )
-      .collect()
+  if ast.errors.is_empty() {
+    let lints = lint(&ast);
+    diagnostics.extend(lints.iter().map(|lint| diagnostic_from_lint(lint, file)));
+
+    let type_problems = typecheck(&ast);
+    diagnostics.extend(
+      type_problems
+        .iter()
+        .map(|error| diagnostic_from_type_error(error, file)),
+    );
   } else {
-    ast
-      .errors
-      .iter()
-      .map(|error| diagnostic_from_parse_error(error, &file.line_index))
-      .collect()
-  };
+    diagnostics.extend(
+      ast
+        .errors
+        .iter()
+        .map(|error| diagnostic_from_parse_error(error, file)),
+    );
+  }
 
   lsp::DocumentDiagnosticReport::Full(lsp::RelatedFullDocumentDiagnosticReport {
     related_documents: None,
     full_document_diagnostic_report: lsp::FullDocumentDiagnosticReport {
       result_id: None,
-      items: lints,
+      items: diagnostics,
     },
   })
 }
@@ -110,16 +111,15 @@ fn format_file(file: &Document) -> Option<Vec<lsp::TextEdit>> {
 
   let config = FormatterConfig::default(); // TODO: request parameter options
   let new_text = format(&ast, config);
-  let new_line_index = LineIndex::from_source(&new_text);
 
   Some(vec![lsp::TextEdit {
-    range: lsp_range_from_span(&new_line_index, new_line_index.get_file_span()),
+    range: lsp_range_from_span(file.line_index.get_file_span(), file),
     new_text,
   }])
 }
 
 fn goto_definition(file: &Document, position: lsp::Position) -> Option<lsp::Location> {
-  let position = span_from_lsp_position(&file.line_index, position);
+  let position = span_from_lsp_position(position, file);
 
   let allocator = Allocator::new();
   let ast = parse(&file.source, &allocator);
@@ -132,12 +132,12 @@ fn goto_definition(file: &Document, position: lsp::Position) -> Option<lsp::Loca
 
   Some(lsp::Location::new(
     file.id.clone(),
-    lsp_range_from_span(&file.line_index, declaration.span()),
+    lsp_range_from_span(declaration.span(), file),
   ))
 }
 
 fn get_references(file: &Document, position: lsp::Position) -> Option<Vec<lsp::Location>> {
-  let position = span_from_lsp_position(&file.line_index, position);
+  let position = span_from_lsp_position(position, file);
 
   let allocator = Allocator::new();
   let ast = parse(&file.source, &allocator);
@@ -150,17 +150,14 @@ fn get_references(file: &Document, position: lsp::Position) -> Option<Vec<lsp::L
   let references = declaration
     .used
     .iter()
-    .map(|span| lsp::Location {
-      uri: file.id.clone(),
-      range: lsp_range_from_span(&file.line_index, *span),
-    })
+    .map(|span| lsp::Location::new(file.id.clone(), lsp_range_from_span(*span, file)))
     .collect();
 
   Some(references)
 }
 
 fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::WorkspaceEdit {
-  let position = span_from_lsp_position(&file.line_index, position);
+  let position = span_from_lsp_position(position, file);
 
   let allocator = Allocator::new();
   let ast = parse(&file.source, &allocator);
@@ -177,7 +174,7 @@ fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::Work
   let text_edits = iter::once(&declaration.span())
     .chain(declaration.used.iter())
     .map(|span| lsp::TextEdit {
-      range: lsp_range_from_span(&file.line_index, *span),
+      range: lsp_range_from_span(*span, file),
       new_text: new_name.to_owned(),
     })
     .collect();
@@ -185,22 +182,24 @@ fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::Work
   lsp::WorkspaceEdit::new(HashMap::from([(file.id.clone(), text_edits)]))
 }
 
-fn diagnostic_from_parse_error(error: &ParseError, lines: &LineIndex) -> lsp::Diagnostic {
+fn diagnostic_from_parse_error(error: &ParseError, file: &Document) -> lsp::Diagnostic {
   lsp::Diagnostic {
     severity: Some(lsp::DiagnosticSeverity::ERROR),
     source: Some("Syntax Error".into()),
     message: error.full_message(),
-    range: lsp_range_from_span(lines, error.span()),
+    range: lsp_range_from_span(error.span(), file),
+
     ..Default::default()
   }
 }
 
-fn diagnostic_from_lint(lint: &LintDiagnostic, lines: &LineIndex) -> lsp::Diagnostic {
+fn diagnostic_from_lint(lint: &LintDiagnostic, file: &Document) -> lsp::Diagnostic {
   lsp::Diagnostic {
     severity: Some(lsp::DiagnosticSeverity::WARNING),
     source: Some("Lint".into()),
     message: lint.full_message(),
-    range: lsp_range_from_span(lines, lint.span()),
+    range: lsp_range_from_span(lint.span(), file),
+
     tags: {
       if lint.title == "No Unused Variables" {
         Some(vec![lsp::DiagnosticTag::UNNECESSARY])
@@ -212,7 +211,7 @@ fn diagnostic_from_lint(lint: &LintDiagnostic, lines: &LineIndex) -> lsp::Diagno
   }
 }
 
-fn diagnostic_from_type_error(type_error: &TypeError, lines: &LineIndex) -> lsp::Diagnostic {
+fn diagnostic_from_type_error(type_error: &TypeError, file: &Document) -> lsp::Diagnostic {
   lsp::Diagnostic {
     severity: if type_error.is_warning() {
       Some(lsp::DiagnosticSeverity::WARNING)
@@ -221,7 +220,7 @@ fn diagnostic_from_type_error(type_error: &TypeError, lines: &LineIndex) -> lsp:
     },
     source: Some("Type Error".into()),
     message: type_error.full_message(),
-    range: lsp_range_from_span(lines, type_error.span()),
+    range: lsp_range_from_span(type_error.span(), file),
     tags: {
       if type_error.is_warning() {
         Some(vec![lsp::DiagnosticTag::UNNECESSARY])
@@ -237,27 +236,4 @@ fn get_params<R: lsp::request::Request>(
   request: lsp_server::Request,
 ) -> (lsp_server::RequestId, R::Params) {
   request.extract(R::METHOD).unwrap()
-}
-
-fn span_from_lsp_position(line_index: &LineIndex, position: lsp_types::Position) -> Span {
-  let start_line = position.line.try_into().unwrap();
-  let start = line_index.to_offset(start_line, position.character);
-
-  Span {
-    start,
-    end: start + 1,
-  }
-}
-
-fn lsp_range_from_span(line_index: &LineIndex, span: Span) -> lsp_types::Range {
-  let start_line = line_index.get_line(span) - 1;
-  let start_char = span.start - line_index.get_line_start(start_line);
-
-  let end_line = line_index.get_final_line(span) - 1;
-  let end_char = span.end - line_index.get_line_start(end_line);
-
-  let start = lsp_types::Position::new(start_line.try_into().unwrap(), start_char);
-  let end = lsp_types::Position::new(end_line.try_into().unwrap(), end_char);
-
-  lsp_types::Range::new(start, end)
 }

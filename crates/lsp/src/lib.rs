@@ -5,6 +5,7 @@
 #![deny(unsafe_code)]
 
 mod documents;
+mod locations;
 mod notifications;
 mod requests;
 

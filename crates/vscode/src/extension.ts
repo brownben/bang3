@@ -10,6 +10,7 @@ let client: LanguageClient
 
 export function activate(_context: ExtensionContext) {
   let outputChannel = window.createOutputChannel(EXTENSION_NAME, { log: true })
+  outputChannel.clear()
 
   let config = workspace.getConfiguration('bang')
   let serverPath = config.get<string>('server.path') ?? 'bang'

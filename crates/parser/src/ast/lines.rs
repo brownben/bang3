@@ -15,6 +15,7 @@ type LineNumber = usize;
 pub struct LineIndex {
   line_starts: Vec<FilePosition>,
   file_length: FilePosition,
+  pub is_ascii: bool,
 }
 impl LineIndex {
   /// Create a new `LineIndex` from a source string.
@@ -26,6 +27,7 @@ impl LineIndex {
   pub fn from_source(source: &str) -> Self {
     assert!(source.len() < u32::MAX as usize);
 
+    let mut is_ascii = true;
     let mut line_starts = Vec::with_capacity(source.len() / 50);
     line_starts.push(0);
 
@@ -33,11 +35,16 @@ impl LineIndex {
       if *character == b'\n' {
         line_starts.push(index as FilePosition + 1);
       }
+
+      if !character.is_ascii() {
+        is_ascii = false;
+      }
     }
 
     Self {
       line_starts,
       file_length: source.len() as FilePosition,
+      is_ascii,
     }
   }
 
