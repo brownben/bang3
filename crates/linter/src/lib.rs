@@ -13,13 +13,10 @@ use std::{error, fmt};
 
 mod helpers;
 mod rules;
-mod variables;
 mod visitor;
 
 #[cfg(test)]
 mod test;
-
-pub use variables::Variables;
 use visitor::Visitor;
 
 /// Runs the linter against a given AST, returns a list of diagnostics found
@@ -52,11 +49,6 @@ impl Linter {
       self.visit_statement(statement);
     }
 
-    let variables = Variables::from(ast);
-    for rule in rules::RULES {
-      rule.visit_variables(&mut self.context, &variables);
-    }
-
     self.context.diagnostics
   }
 }
@@ -80,8 +72,6 @@ trait LintRule {
 
   fn visit_expression(&self, _: &mut Context, _: &Expression) {}
   fn visit_statement(&self, _: &mut Context, _: &Statement) {}
-
-  fn visit_variables(&self, _: &mut Context, _: &Variables) {}
 }
 
 #[derive(Debug, Default)]
@@ -99,7 +89,7 @@ impl Context {
 }
 
 /// A diagnostic warning found by the linter
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct LintDiagnostic {
   /// The name of the lint rule which triggered this diagnostic
   pub title: &'static str,

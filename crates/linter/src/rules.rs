@@ -1,11 +1,11 @@
 //! Definitions of the lint rules
 use super::{
   helpers::{ASTEquality, IsConstant},
-  Context, LintRule, Variables,
+  Context, LintRule,
 };
 use bang_parser::ast::{expression::*, statement::*, GetSpan};
 
-pub const RULES: [&dyn LintRule; 10] = [
+pub const RULES: [&dyn LintRule; 9] = [
   &NoConstantConditions,
   &NoNegativeZero,
   &NoSelfAssign,
@@ -14,7 +14,6 @@ pub const RULES: [&dyn LintRule; 10] = [
   &NoUnderscoreVariableUse,
   &NoUselessMatch,
   &NoYodaComparison,
-  &NoUnusedVariables,
   &NoUnneccessaryClosures,
 ];
 
@@ -182,24 +181,6 @@ impl LintRule for NoYodaComparison {
       && let Expression::Literal(_) = binary.left.unwrap()
     {
       context.add_diagnostic(&Self, binary.span());
-    }
-  }
-}
-
-pub struct NoUnusedVariables;
-impl LintRule for NoUnusedVariables {
-  fn name(&self) -> &'static str {
-    "No Unused Variables"
-  }
-  fn message(&self) -> &'static str {
-    "variable is declared but never used. if this is intentional prefix with a underscore"
-  }
-
-  fn visit_variables(&self, context: &mut Context, variables: &Variables) {
-    for variable in variables.defined() {
-      if !variable.name.starts_with('_') && !variable.is_used() {
-        context.add_diagnostic(&Self, variable.span());
-      }
     }
   }
 }

@@ -6,8 +6,5 @@ edition = "2021"
 [dependencies]
 bang-parser = { path = "../parser" }
 
-[dev-dependencies]
-indoc = "2.0.4"
-
 [lints]
 workspace = true
