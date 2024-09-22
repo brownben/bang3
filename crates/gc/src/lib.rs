@@ -47,7 +47,7 @@
 #![no_std]
 #![feature(strict_provenance)]
 
-use core::{fmt, marker::PhantomData, num::NonZero, ops, panic};
+use core::{fmt, marker::PhantomData, mem, num::NonZero, ops, panic};
 
 mod pages;
 use pages::{BlockClass, PageDescriptor, PageDescriptorRef, PageList};
@@ -57,10 +57,10 @@ const HEAP_SIZE: usize = 4 * 1024 * 1024 * 1024;
 const _ASSERT_SIZE: () = assert!(HEAP_SIZE == (u32::MAX as usize) + 1);
 
 /// The length of a page - 4KB
-const PAGE_SIZE: usize = 4 * 1024;
+pub const PAGE_SIZE: usize = 4 * 1024;
 
 /// The number of pages in the heap
-const PAGE_COUNT: usize = HEAP_SIZE / (PAGE_SIZE + PageDescriptor::SIZE);
+pub const PAGE_COUNT: usize = HEAP_SIZE / (PAGE_SIZE + PageDescriptor::SIZE);
 
 /// The number of pages required to hold the page descriptors
 const PD_PAGES: usize = bytes_to_pages(PAGE_COUNT * PageDescriptor::SIZE);
@@ -69,7 +69,7 @@ const PD_PAGES: usize = bytes_to_pages(PAGE_COUNT * PageDescriptor::SIZE);
 const PD_SECTION_SIZE: usize = PD_PAGES * PAGE_SIZE;
 
 /// The largest allocation we can allocate
-const MAX_REAM_SIZE: usize = (u16::MAX as usize + 1) * PAGE_SIZE;
+pub const MAX_REAM_SIZE: usize = (u16::MAX as usize + 1) * PAGE_SIZE;
 
 const fn bytes_to_pages(n: usize) -> usize {
   if n % PAGE_SIZE != 0 {
@@ -79,9 +79,29 @@ const fn bytes_to_pages(n: usize) -> usize {
   }
 }
 
+/// The size of the heap to provision
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum HeapSize {
+  /// The standard full 4GB heap
+  #[default]
+  Standard,
+  /// A small heap, with a maximum size of a ream (256MB)
+  /// Primariliy for testing, and creating many heaps at once
+  Small,
+}
+impl HeapSize {
+  fn bytes(self) -> usize {
+    match self {
+      HeapSize::Standard => HEAP_SIZE,
+      HeapSize::Small => MAX_REAM_SIZE,
+    }
+  }
+}
+
 /// A heap.
 ///
 /// Manages a garbage-collected heap
+#[derive(Debug)]
 pub struct Heap {
   raw: RawMemory,
 
@@ -90,6 +110,9 @@ pub struct Heap {
   size_class_lists: [PageList; BlockClass::SMALL_CLASS_COUNT],
 
   full_list: PageList,
+  full_list_len: usize,
+
+  is_collecting: bool,
 }
 impl Heap {
   /// Creates a new heap.
@@ -97,8 +120,8 @@ impl Heap {
   /// Requests a 4GB region of memory from `mmap`, and initialises the
   /// garbage collector data structures.
   #[must_use]
-  pub fn new() -> Option<Self> {
-    let mut raw = RawMemory::new()?;
+  pub fn new(size: HeapSize) -> Option<Self> {
+    let mut raw = RawMemory::new(size.bytes())?;
     let base = raw.base();
     let first_ream = raw.materialize_new_ream();
 
@@ -125,6 +148,9 @@ impl Heap {
       ],
 
       full_list: new_page(),
+      full_list_len: 0,
+
+      is_collecting: false,
     };
 
     let (_, actual_first) = first_ream.split(page_count)?;
@@ -140,17 +166,34 @@ impl Heap {
   /// # Panics
   /// The function panics if the allocation request is larger than
   /// the largest allocation size ([`MAX_REAM_SIZE`]).
-  pub fn alloc(&mut self, bytes: usize) -> Gc<u8> {
+  pub fn allocate_bytes(&mut self, bytes: usize) -> Gc<u8> {
+    debug_assert!(!self.is_collecting);
+
     if bytes <= PAGE_SIZE {
       let class = BlockClass::get(bytes);
       self.alloc_small(class)
     } else if bytes <= MAX_REAM_SIZE {
       let ream = self.alloc_ream(bytes);
       self.full_list.push(ream);
+      self.full_list_len += 1;
       ream.data_pointer()
     } else {
       panic!("unreasonable allocation request: {bytes} bytes");
     }
+  }
+
+  /// Allocates a type to the heap, and returns a virtual pointer to the allocated memory.
+  ///
+  /// # Panics
+  /// The function panics if the allocation request is larger than
+  /// the largest allocation size ([`MAX_REAM_SIZE`]).
+  pub fn allocate<T: Sized>(&mut self, value: T) -> Gc<T> {
+    debug_assert!(!self.is_collecting);
+
+    let allocation_size = mem::size_of::<T>();
+    let pointer = self.allocate_bytes(allocation_size).cast();
+    self[pointer] = value;
+    pointer
   }
 
   /// Allocates a ream with enough pages to hold `bytes` bytes.
@@ -186,6 +229,7 @@ impl Heap {
 
     if page.is_full() {
       self.full_list.push(page);
+      self.full_list_len += 1;
     }
 
     page.data_pointer().add(idx * class.block_size())
@@ -203,6 +247,12 @@ impl Heap {
     page
   }
 
+  fn get_page(&self, index: usize) -> PageDescriptorRef {
+    debug_assert!(index < self.raw.page_count);
+
+    PageDescriptorRef::from_index(index, self.raw.base())
+  }
+
   /// Begins a garbage collection, clearing the `gc_bits` of all used pages.
   ///
   /// # Safety
@@ -211,6 +261,8 @@ impl Heap {
   ///  [`Heap::finish_gc()`] need to be used to return it to a usable state. Using
   /// alloc before garbage collection is finished is forbidden.
   pub fn start_gc(&mut self) {
+    self.is_collecting = true;
+
     for mut page in self.full_list.iter() {
       page.set_empty();
     }
@@ -223,14 +275,18 @@ impl Heap {
   }
 
   /// Marks a pointer as used, as part of garbage collection
-  pub fn mark(&mut self, ptr: Gc<u8>) {
-    PageDescriptorRef::from_index(ptr.page_index(), self.raw.base()).mark(ptr.block_index());
+  pub fn mark<T>(&self, ptr: Gc<T>) {
+    debug_assert!(self.is_collecting);
+
+    self.get_page(ptr.page_index()).mark(ptr.block_index());
   }
 
   /// Finishes a garbage collection
   ///
   /// Returns all unused pages to the appropriate free lists.
   pub fn finish_gc(&mut self) {
+    debug_assert!(self.is_collecting);
+
     for page in self.full_list.iter() {
       if page.is_empty() {
         if page.pages() > 0 {
@@ -253,34 +309,56 @@ impl Heap {
         }
       }
     }
+
+    self.full_list_len = self.full_list.iter().count();
+    self.is_collecting = false;
+  }
+
+  /// Returns the number of full pages on the heap.
+  ///
+  /// Is incorrect during garbage collection
+  #[must_use]
+  pub fn full_page_count(&self) -> usize {
+    self.full_list_len
   }
 }
 impl<T> ops::Index<Gc<T>> for Heap {
   type Output = T;
 
   fn index(&self, index: Gc<T>) -> &Self::Output {
+    let page = self.get_page(index.page_index());
+    let is_block_allocated = page.is_block_allocated(index.block_index());
+    debug_assert!(self.is_collecting || is_block_allocated, "use after free");
+
     unsafe { &*self.raw.base().add(index.addr()).cast() }
   }
 }
 impl<T> ops::IndexMut<Gc<T>> for Heap {
   fn index_mut(&mut self, index: Gc<T>) -> &mut Self::Output {
+    let page = self.get_page(index.page_index());
+    let is_block_allocated = page.is_block_allocated(index.block_index());
+    debug_assert!(self.is_collecting || is_block_allocated, "use after free");
+
     unsafe { &mut *self.raw.base().add(index.addr()).cast() }
   }
 }
-impl fmt::Debug for Heap {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "Heap({:x?})", self.raw.base())
-  }
-}
+
+#[derive(Debug)]
 struct RawMemory {
   mmap: mmap_rs::MmapMut,
   used_pages: usize,
+
+  page_count: usize,
 }
 impl RawMemory {
-  fn new() -> Option<Self> {
+  fn new(heap_size: usize) -> Option<Self> {
+    let page_count = heap_size / (PAGE_SIZE + PageDescriptor::SIZE);
+
     Some(Self {
-      mmap: mmap_rs::MmapOptions::new(HEAP_SIZE).ok()?.map_mut().ok()?,
+      mmap: mmap_rs::MmapOptions::new(heap_size).ok()?.map_mut().ok()?,
       used_pages: 0,
+
+      page_count,
     })
   }
 
@@ -291,7 +369,7 @@ impl RawMemory {
 
   /// Creates a new maximum-size ream by creating pages for it.
   fn materialize_new_ream(&mut self) -> PageDescriptorRef {
-    assert!(self.used_pages < PAGE_COUNT, "Ran out of pages");
+    assert!(self.used_pages < self.page_count, "Ran out of pages");
 
     let pages = self.used_pages;
     self.used_pages += u16::MAX as usize;
@@ -304,7 +382,7 @@ impl RawMemory {
 
 /// A virtual pointer to a memory allocation on the garbage collected heap.
 #[must_use]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 pub struct Gc<T> {
   value: NonZero<u32>,
   _type: PhantomData<T>,
@@ -356,6 +434,12 @@ impl<T> Gc<T> {
     }
   }
 }
+impl<T> Clone for Gc<T> {
+  fn clone(&self) -> Self {
+    *self
+  }
+}
+impl<T> Copy for Gc<T> {}
 impl<T> fmt::Debug for Gc<T> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "Gc({:x?})", self.value.get())

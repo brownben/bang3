@@ -225,6 +225,14 @@ impl PageDescriptorRef {
     *gc_bits |= 1u64 << idx;
     idx
   }
+
+  pub fn is_block_allocated(&self, block_index: usize) -> bool {
+    let block_index = block_index / self.as_ref().class.block_size();
+    let gc_bits = self.as_ref().gc_bits;
+    let block_mask = 1u64 << block_index;
+
+    (gc_bits & block_mask) == block_mask
+  }
 }
 impl AsRef<PageDescriptor> for PageDescriptorRef {
   fn as_ref(&self) -> &PageDescriptor {
@@ -243,6 +251,7 @@ impl fmt::Debug for PageDescriptorRef {
 }
 
 /// An intrusively linked list of page descriptors, for use in free lists
+#[derive(Debug)]
 pub struct PageList {
   /// The root of the list, a page which is only used to be the root of the list
   root: PageDescriptorRef,
