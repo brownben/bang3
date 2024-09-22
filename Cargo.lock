@@ -113,6 +113,7 @@ dependencies = [
  "bang-formatter",
  "bang-linter",
  "bang-parser",
+ "bang-typechecker",
  "lsp-server",
  "lsp-types",
  "serde_json",

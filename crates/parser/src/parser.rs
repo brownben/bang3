@@ -705,7 +705,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 }
 
 /// An error which arose during parsing
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum ParseError {
   /// Expected a token of a certain kind
   Expected {

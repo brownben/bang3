@@ -5,6 +5,7 @@ use std::{collections::HashMap, iter};
 use bang_formatter::{format, FormatterConfig};
 use bang_linter::{lint, LintDiagnostic};
 use bang_parser::{parse, Allocator, GetSpan, LineIndex, ParseError, Span};
+use bang_typechecker::{get_enviroment, typecheck, TypeError};
 
 pub fn handle(
   request: lsp_server::Request,
@@ -69,15 +70,23 @@ fn file_diagnostics(file: &Document) -> lsp::DocumentDiagnosticReport {
   let ast = parse(&file.source, &allocator);
 
   let lints = if ast.errors.is_empty() {
-    lint(&ast)
+    let lints = lint(&ast);
+    let type_problems = typecheck(&ast);
+
+    type_problems
       .iter()
-      .map(|lint| diagnostic_from_lint(*lint, &file.line_index))
+      .map(|error| diagnostic_from_type_error(error, &file.line_index))
+      .chain(
+        lints
+          .iter()
+          .map(|lint| diagnostic_from_lint(lint, &file.line_index)),
+      )
       .collect()
   } else {
     ast
       .errors
       .iter()
-      .map(|error| diagnostic_from_parse_error(*error, &file.line_index))
+      .map(|error| diagnostic_from_parse_error(error, &file.line_index))
       .collect()
   };
 
@@ -114,10 +123,10 @@ fn goto_definition(file: &Document, position: lsp::Position) -> Option<lsp::Loca
 
   let allocator = Allocator::new();
   let ast = parse(&file.source, &allocator);
-  let variables = bang_linter::Variables::from(&ast);
+  let variables = get_enviroment(&ast);
 
   let declaration = variables
-    .defined()
+    .defined_variables()
     .filter(|variable| variable.is_active(position))
     .find(|variable| variable.used.iter().any(|used| used.contains(position)))?;
 
@@ -132,10 +141,10 @@ fn get_references(file: &Document, position: lsp::Position) -> Option<Vec<lsp::L
 
   let allocator = Allocator::new();
   let ast = parse(&file.source, &allocator);
-  let variables = bang_linter::Variables::from(&ast);
+  let variables = get_enviroment(&ast);
 
   let declaration = variables
-    .defined()
+    .defined_variables()
     .find(|variable| variable.span().contains(position))?;
 
   let references = declaration
@@ -155,10 +164,10 @@ fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::Work
 
   let allocator = Allocator::new();
   let ast = parse(&file.source, &allocator);
-  let variables = bang_linter::Variables::from(&ast);
+  let variables = get_enviroment(&ast);
 
   let Some(declaration) = variables
-    .defined()
+    .defined_variables()
     .filter(|variable| variable.is_active(position))
     .find(|variable| variable.used.iter().any(|used| used.contains(position)))
   else {
@@ -176,7 +185,7 @@ fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::Work
   lsp::WorkspaceEdit::new(HashMap::from([(file.id.clone(), text_edits)]))
 }
 
-fn diagnostic_from_parse_error(error: ParseError, lines: &LineIndex) -> lsp::Diagnostic {
+fn diagnostic_from_parse_error(error: &ParseError, lines: &LineIndex) -> lsp::Diagnostic {
   lsp::Diagnostic {
     severity: Some(lsp::DiagnosticSeverity::ERROR),
     source: Some("Syntax Error".into()),
@@ -186,7 +195,7 @@ fn diagnostic_from_parse_error(error: ParseError, lines: &LineIndex) -> lsp::Dia
   }
 }
 
-fn diagnostic_from_lint(lint: LintDiagnostic, lines: &LineIndex) -> lsp::Diagnostic {
+fn diagnostic_from_lint(lint: &LintDiagnostic, lines: &LineIndex) -> lsp::Diagnostic {
   lsp::Diagnostic {
     severity: Some(lsp::DiagnosticSeverity::WARNING),
     source: Some("Lint".into()),
@@ -194,6 +203,27 @@ fn diagnostic_from_lint(lint: LintDiagnostic, lines: &LineIndex) -> lsp::Diagnos
     range: lsp_range_from_span(lines, lint.span()),
     tags: {
       if lint.title == "No Unused Variables" {
+        Some(vec![lsp::DiagnosticTag::UNNECESSARY])
+      } else {
+        None
+      }
+    },
+    ..Default::default()
+  }
+}
+
+fn diagnostic_from_type_error(type_error: &TypeError, lines: &LineIndex) -> lsp::Diagnostic {
+  lsp::Diagnostic {
+    severity: if type_error.is_warning() {
+      Some(lsp::DiagnosticSeverity::WARNING)
+    } else {
+      Some(lsp::DiagnosticSeverity::ERROR)
+    },
+    source: Some("Type Error".into()),
+    message: type_error.full_message(),
+    range: lsp_range_from_span(lines, type_error.span()),
+    tags: {
+      if type_error.is_warning() {
         Some(vec![lsp::DiagnosticTag::UNNECESSARY])
       } else {
         None
