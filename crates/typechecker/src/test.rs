@@ -357,3 +357,15 @@ fn identity_function() {
   "};
   assert_eq!(synthesize(source), "boolean");
 }
+
+#[test]
+fn builtin_functions() {
+  let source = indoc! {"
+    let identity = x => x
+    let toString = _ => ''
+
+    identity == print
+    toString == type
+  "};
+  assert_eq!(synthesize(source), "boolean");
+}

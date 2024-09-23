@@ -278,7 +278,7 @@ pub struct TypeVarRef(u32);
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct TypeScheme {
-  number_quantified_vars: u32,
+  pub(crate) number_quantified_vars: u32,
   pub(crate) type_: TypeRef,
 }
 impl TypeScheme {

@@ -11,9 +11,14 @@ pub struct Typechecker {
 }
 impl Typechecker {
   pub fn new() -> Self {
+    let mut types = TypeArena::new();
+    let mut env = Enviroment::new();
+
+    env.define_builtin_variables(&mut types);
+
     Self {
-      types: TypeArena::new(),
-      env: Enviroment::new(),
+      types,
+      env,
       problems: Vec::new(),
     }
   }

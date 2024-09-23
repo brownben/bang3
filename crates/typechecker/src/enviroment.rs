@@ -1,6 +1,6 @@
 //! Tracks variables, their types, and where they are defined and used
 
-use crate::{TypeRef, TypeScheme};
+use crate::{Type, TypeArena, TypeRef, TypeScheme};
 use bang_parser::{ast::expression, GetSpan, Span};
 
 /// Holds variables and where they are defined and used
@@ -8,6 +8,7 @@ use bang_parser::{ast::expression, GetSpan, Span};
 pub struct Enviroment {
   variables: Vec<Variable>,
   finished_variables: Vec<Variable>,
+  builtin_variables: Vec<BuiltinVariable>,
   depth: u32,
 }
 impl Enviroment {
@@ -15,8 +16,31 @@ impl Enviroment {
     Self {
       variables: Vec::new(),
       finished_variables: Vec::new(),
+      builtin_variables: Vec::new(),
       depth: 0,
     }
+  }
+
+  pub(crate) fn define_builtin_variables(&mut self, types: &mut TypeArena) {
+    let generic = types.new_type(Type::Quantified(0));
+
+    let print_function = TypeScheme {
+      number_quantified_vars: 1,
+      type_: types.new_type(Type::Function(generic, generic)),
+    };
+    let type_function = TypeScheme {
+      number_quantified_vars: 1,
+      type_: types.new_type(Type::Function(generic, TypeArena::STRING)),
+    };
+
+    self.builtin_variables.push(BuiltinVariable {
+      name: "print",
+      type_: print_function,
+    });
+    self.builtin_variables.push(BuiltinVariable {
+      name: "type",
+      type_: type_function,
+    });
   }
 
   pub(crate) fn enter_scope(&mut self) {
@@ -58,12 +82,19 @@ impl Enviroment {
   }
 
   pub(crate) fn get_variable(&mut self, identifier: &str) -> Option<TypeScheme> {
-    self
-      .variables
-      .iter_mut()
-      .rev()
-      .find(|variable| variable.name == identifier)
-      .map(|variable| variable.type_)
+    for variable in self.variables.iter().rev() {
+      if variable.name == identifier {
+        return Some(variable.type_);
+      }
+    }
+
+    for variable in &self.builtin_variables {
+      if variable.name == identifier {
+        return Some(variable.type_);
+      }
+    }
+
+    None
   }
 
   pub(crate) fn mark_variable_use(&mut self, identifier: &str, span: Span) {
@@ -125,4 +156,13 @@ impl GetSpan for Variable {
   fn span(&self) -> Span {
     self.defined
   }
+}
+
+/// A variable which is builtin and defined by the runtime
+#[derive(Debug)]
+pub struct BuiltinVariable {
+  /// the identifier of the variable
+  name: &'static str,
+  /// the type of the variable
+  type_: TypeScheme,
 }
