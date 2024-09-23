@@ -3,6 +3,7 @@ use super::{
   value::{Closure, Object, Value},
 };
 use crate::collections::{HashMap, SmallVec, String};
+use bang_gc::{Heap, HeapSize};
 use bang_parser::{GetSpan, Span};
 use std::{error, fmt, ptr};
 
@@ -20,16 +21,30 @@ pub struct VM {
   stack: Vec<Value>,
   globals: HashMap<String, Value>,
   frames: Vec<CallFrame>,
+
+  heap: Heap,
+  gc_threshold: usize,
 }
 impl VM {
   /// Create a new VM
-  #[must_use]
-  pub fn new() -> Self {
-    Self {
+  ///
+  /// # Errors
+  /// Returns an error if the heap could not be initialized
+  pub fn new(heap_size: HeapSize) -> Result<Self, RuntimeError> {
+    let Some(heap) = Heap::new(heap_size) else {
+      return Err(RuntimeError {
+        kind: ErrorKind::OutOfMemory,
+        span: Span::default(),
+      });
+    };
+
+    Ok(Self {
       stack: Vec::with_capacity(512),
+      heap,
       globals: HashMap::default(),
       frames: Vec::with_capacity(16),
-    }
+      gc_threshold: 6,
+    })
   }
 
   /// Get the value of a global variable
@@ -96,6 +111,17 @@ impl VM {
     debug_assert!(!self.frames.is_empty());
 
     unsafe { self.frames.pop().unwrap_unchecked() }
+  }
+
+  #[inline]
+  fn should_garbage_collect(&mut self) -> bool {
+    self.heap.full_page_count() > self.gc_threshold
+  }
+  fn garbage_collect(&mut self) {
+    self.heap.start_gc();
+    self.heap.finish_gc();
+
+    self.gc_threshold = (self.heap.full_page_count() * 2).max(2);
   }
 
   /// Run a chunk of bytecode
@@ -328,6 +354,10 @@ impl VM {
       };
 
       ip += instruction.length();
+
+      if self.should_garbage_collect() {
+        self.garbage_collect();
+      }
     };
 
     // move constants from the chunk to the heap
@@ -347,11 +377,6 @@ impl VM {
     } else {
       Ok(())
     }
-  }
-}
-impl Default for VM {
-  fn default() -> Self {
-    Self::new()
   }
 }
 
@@ -428,6 +453,7 @@ enum ErrorKind {
   UndefinedVariable(std::string::String),
   NotCallable(&'static str),
   NonFunctionClosure,
+  OutOfMemory,
 }
 impl ErrorKind {
   #[must_use]
@@ -437,6 +463,7 @@ impl ErrorKind {
       Self::UndefinedVariable(_) => "Undefined Variable",
       Self::NotCallable(_) => "Not Callable",
       Self::NonFunctionClosure => "Non-Function Closure",
+      Self::OutOfMemory => "Out of Memory",
     }
   }
 
@@ -454,6 +481,7 @@ impl ErrorKind {
         format!("`{type_}` is not callable, only functions are callable")
       }
       Self::NonFunctionClosure => "can only close over functions".into(),
+      Self::OutOfMemory => "could not initialise enough memory for the heap".into(),
     }
   }
 }

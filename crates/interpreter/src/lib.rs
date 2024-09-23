@@ -41,6 +41,7 @@ pub fn compile(ast: &bang_parser::AST<'_, '_>) -> Result<Chunk, CompileError> {
   let chunk = compiler.finish();
   Ok(chunk)
 }
+pub use bang_gc::HeapSize;
 pub use bytecode::Chunk;
 pub use compiler::CompileError;
 pub use value::{FastNativeFunction, Value};

@@ -1,4 +1,4 @@
-use crate::{compile, Value, VM};
+use crate::{compile, HeapSize, Value, VM};
 use bang_parser::{parse, Allocator};
 use indoc::indoc;
 
@@ -22,7 +22,7 @@ fn run(source: &str) -> Result<VM, Error> {
   let allocator = Allocator::new();
   let ast = parse(source, &allocator);
   let chunk = compile(&ast)?;
-  let mut vm = VM::new();
+  let mut vm = VM::new(HeapSize::Small).unwrap();
   vm.run(&chunk)?;
   Ok(vm)
 }

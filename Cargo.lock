@@ -91,6 +91,7 @@ dependencies = [
 name = "bang-interpreter"
 version = "3.0.0"
 dependencies = [
+ "bang-gc",
  "bang-parser",
  "indoc",
  "rustc-hash",

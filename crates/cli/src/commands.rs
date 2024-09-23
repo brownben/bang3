@@ -2,7 +2,7 @@ use super::diagnostics::{CodeFrame, Message};
 use super::FormatOptions;
 
 use bang_formatter::FormatterConfig;
-use bang_interpreter::{FastNativeFunction, VM};
+use bang_interpreter::{FastNativeFunction, HeapSize, VM};
 use bang_lsp::LanguageServer;
 use bang_parser::{Allocator, GetSpan, Span, AST};
 
@@ -71,7 +71,13 @@ pub fn run(filename: &str) -> Result<CommandStatus, ()> {
   let ast = parse(filename, &source, &allocator)?;
   let chunk = compile(filename, &source, &ast)?;
 
-  let mut vm = VM::new();
+  let mut vm = match VM::new(HeapSize::Standard) {
+    Ok(vm) => vm,
+    Err(error) => {
+      eprintln!("{}", Message::from(&error));
+      return Err(());
+    }
+  };
 
   // define built-in functions
   let print_function = FastNativeFunction::new("print", |arg| {
