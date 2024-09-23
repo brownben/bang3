@@ -1,9 +1,9 @@
 use super::bytecode::{Chunk, ConstantValue, OpCode};
-use crate::collections::{SmallVec, String};
 use bang_parser::{
   ast::{expression::*, statement::*},
   GetSpan, Span, AST,
 };
+use smartstring::alias::String as SmartString;
 use std::{error, fmt, mem};
 
 pub struct Compiler<'s> {
@@ -12,7 +12,7 @@ pub struct Compiler<'s> {
 
   scope_depth: u8,
   locals: Vec<Vec<Local<'s>>>,
-  closures: Vec<SmallVec<[(u8, VariableStatus); 8]>>,
+  closures: Vec<Vec<(u8, VariableStatus)>>,
 }
 impl<'s> Compiler<'s> {
   pub fn new() -> Self {
@@ -37,13 +37,13 @@ impl<'s> Compiler<'s> {
     self.chunk
   }
 
-  fn new_chunk(&mut self, name: String) {
+  fn new_chunk(&mut self, name: SmartString) {
     let chunk = mem::replace(&mut self.chunk, Chunk::new(name));
     self.chunk_stack.push(chunk);
 
     self.begin_scope();
     self.locals.push(Vec::new());
-    self.closures.push(SmallVec::new());
+    self.closures.push(Vec::new());
   }
   fn finish_chunk(&mut self, span: Span) -> Result<Chunk, CompileError> {
     self.end_scope(span)?;

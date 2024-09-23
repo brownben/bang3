@@ -1,7 +1,6 @@
-use crate::{
-  collections::{SmallVec, String},
-  Chunk,
-};
+use crate::Chunk;
+use smallvec::SmallVec;
+use smartstring::alias::String as SmartString;
 use std::{cell::RefCell, fmt, mem, ptr, rc::Rc};
 
 /// A value on the stack of the interpreter.
@@ -93,11 +92,11 @@ impl Value {
   /// Panics if the [Value] is not a constant string.
   /// Use [`Value::is_constant_string`] to check if it is a constant string.
   #[must_use]
-  pub(crate) fn as_constant_string(&self) -> &String {
+  pub(crate) fn as_constant_string(&self) -> &SmartString {
     debug_assert!(self.is_constant_string());
 
     let pointer = self.0.map_addr(|ptr| ptr & FROM_POINTER);
-    unsafe { &*pointer.cast::<String>() }
+    unsafe { &*pointer.cast::<SmartString>() }
   }
 
   /// Is the [Value] a constant function stored in the bytecode?
@@ -214,7 +213,7 @@ impl Value {
   /// Panics if the [Value] is not a string.
   /// Use [`Value::is_string`] to check if it is a string.
   #[must_use]
-  pub(crate) fn as_string(&self) -> &String {
+  pub(crate) fn as_string(&self) -> &SmartString {
     debug_assert!(self.is_string());
 
     if self.is_constant_string() {
@@ -381,8 +380,8 @@ impl<T: Into<Object>> From<T> for Value {
     Self(pointer.map_addr(|ptr| ptr | TO_POINTER | OBJECT).cast())
   }
 }
-impl From<*const String> for Value {
-  fn from(value: *const String) -> Self {
+impl From<*const SmartString> for Value {
+  fn from(value: *const SmartString) -> Self {
     Self(
       value
         .map_addr(|ptr| ptr | TO_POINTER | CONSTANT_STRING)
@@ -408,7 +407,7 @@ impl From<*const Chunk> for Value {
 /// - [Closure]
 #[derive(Clone, Debug, PartialEq)]
 pub enum Object {
-  String(String),
+  String(SmartString),
   Function(Chunk),
   FastNativeFunction(FastNativeFunction),
   Closure(Closure),
@@ -441,8 +440,8 @@ impl fmt::Display for Object {
     }
   }
 }
-impl From<String> for Object {
-  fn from(value: String) -> Self {
+impl From<SmartString> for Object {
+  fn from(value: SmartString) -> Self {
     Self::String(value)
   }
 }
@@ -628,7 +627,7 @@ mod test {
     assert!(string.is_string());
     assert!(!string.is_closure());
 
-    let raw_constant_string = String::from("hello");
+    let raw_constant_string = SmartString::from("hello");
     let constant_string = Value::from(ptr::from_ref(&raw_constant_string));
     assert!(!constant_string.is_number());
     assert!(constant_string.is_constant_string());
@@ -639,7 +638,7 @@ mod test {
     assert!(!constant_string.is_closure());
 
     // same length as max inline string length
-    let raw_long_constant_string = String::from("helloworldhelloworld123");
+    let raw_long_constant_string = SmartString::from("helloworldhelloworld123");
     assert!(raw_long_constant_string.is_inline());
     let long_constant = Value::from(ptr::from_ref(&raw_long_constant_string));
     assert!(!long_constant.is_number());

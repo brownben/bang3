@@ -2,9 +2,12 @@ use super::{
   bytecode::{Chunk, ConstantValue, OpCode},
   value::{Closure, Object, Value},
 };
-use crate::collections::{HashMap, SmallVec, String};
 use bang_gc::{Heap, HeapSize};
 use bang_parser::{GetSpan, Span};
+
+use rustc_hash::FxHashMap as HashMap;
+use smallvec::SmallVec;
+use smartstring::alias::String as SmartString;
 use std::{error, fmt, ptr};
 
 #[derive(Debug)]
@@ -19,7 +22,7 @@ struct CallFrame {
 #[derive(Debug)]
 pub struct VM {
   stack: Vec<Value>,
-  globals: HashMap<String, Value>,
+  globals: HashMap<SmartString, Value>,
   frames: Vec<CallFrame>,
 
   heap: Heap,
@@ -53,7 +56,7 @@ impl VM {
     self.globals.get(name)
   }
   /// Set the value of a global variable
-  pub fn set_global(&mut self, name: impl Into<String>, value: impl Into<Value>) {
+  pub fn set_global(&mut self, name: impl Into<SmartString>, value: impl Into<Value>) {
     self.globals.insert(name.into(), value.into());
   }
 

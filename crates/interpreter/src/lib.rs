@@ -12,13 +12,6 @@ mod compiler;
 mod value;
 mod vm;
 
-/// More efficient datastructures than in standard library
-pub(crate) mod collections {
-  pub use rustc_hash::FxHashMap as HashMap;
-  pub use smallvec::SmallVec;
-  pub use smartstring::alias::String;
-}
-
 #[cfg(test)]
 mod test;
 

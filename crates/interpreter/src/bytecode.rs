@@ -1,18 +1,18 @@
-use crate::collections::String;
 use bang_parser::Span;
+use smartstring::alias::String as SmartString;
 use std::{fmt, mem, ptr};
 
 /// A chunk of bytecode
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Chunk {
-  name: String,
+  name: SmartString,
   code: Vec<u8>,
   pub(crate) constants: Vec<ConstantValue>,
-  strings: Vec<String>,
+  strings: Vec<SmartString>,
   debug_info: DebugInfo,
 }
 impl Chunk {
-  pub(crate) fn new(name: String) -> Self {
+  pub(crate) fn new(name: SmartString) -> Self {
     Self {
       name,
       code: Vec::with_capacity(512),
@@ -111,7 +111,7 @@ impl Chunk {
     unsafe { self.constants.get_unchecked(pointer) }
   }
   #[inline]
-  pub(crate) fn get_string(&self, pointer: usize) -> &String {
+  pub(crate) fn get_string(&self, pointer: usize) -> &SmartString {
     // SAFETY: Assume bytecode is valid, so constant exists at pointer
     debug_assert!(pointer < self.strings.len());
 
@@ -221,7 +221,7 @@ impl From<u8> for OpCode {
 /// A constant value which is stored in a [Chunk]
 #[derive(Clone)]
 pub enum ConstantValue {
-  String(crate::collections::String),
+  String(SmartString),
   Function(Chunk),
 }
 impl From<&str> for ConstantValue {
@@ -229,8 +229,8 @@ impl From<&str> for ConstantValue {
     Self::String(value.into())
   }
 }
-impl From<String> for ConstantValue {
-  fn from(value: String) -> Self {
+impl From<SmartString> for ConstantValue {
+  fn from(value: SmartString) -> Self {
     Self::String(value)
   }
 }
