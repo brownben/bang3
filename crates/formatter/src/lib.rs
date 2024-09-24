@@ -3,7 +3,7 @@
 //! A tool to consistently format source code.
 //!
 //! Works in stages:
-//! - Takes the parsed AST and converts it into an intermediate representation ([IR])
+//! - Takes the parsed AST and converts it into an intermediate representation ([`formatter::IR`])
 //! - Then calculates how much of the intermediate representation it can fit in printWidth
 //! - Converts to a second IR which can be directly printed
 //!
