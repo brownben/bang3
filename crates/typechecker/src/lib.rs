@@ -13,7 +13,7 @@ mod types;
 mod test;
 
 use bang_parser::AST;
-pub use enviroment::{Enviroment, Variable};
+pub use enviroment::{Enviroment, Variable, VariableKind};
 pub use error::Problem as TypeError;
 use infer::Typechecker;
 use types::{Type, TypeArena, TypeRef, TypeScheme};
@@ -48,6 +48,7 @@ pub fn get_enviroment(ast: &AST) -> Enviroment {
   let mut checker = Typechecker::new();
 
   checker.check_ast(ast);
+  checker.env.add_static_type_info(&mut checker.types);
 
   checker.env
 }

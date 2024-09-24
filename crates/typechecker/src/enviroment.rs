@@ -28,7 +28,7 @@ impl Enviroment {
       number_quantified_vars: 1,
       type_: types.new_type(Type::Function(generic, generic)),
     };
-    let type_function = TypeScheme {
+    let x_string_function = TypeScheme {
       number_quantified_vars: 1,
       type_: types.new_type(Type::Function(generic, TypeArena::STRING)),
     };
@@ -36,10 +36,17 @@ impl Enviroment {
     self.builtin_variables.push(BuiltinVariable {
       name: "print",
       type_: print_function,
+      type_info: StaticTypeInfo::new_function("(a' -> a')"),
     });
     self.builtin_variables.push(BuiltinVariable {
       name: "type",
-      type_: type_function,
+      type_: x_string_function,
+      type_info: StaticTypeInfo::new_function("(a' -> string)"),
+    });
+    self.builtin_variables.push(BuiltinVariable {
+      name: "toString",
+      type_: x_string_function,
+      type_info: StaticTypeInfo::new_function("(a' -> string)"),
     });
   }
 
@@ -67,6 +74,8 @@ impl Enviroment {
 
       depth: self.depth,
       type_,
+
+      type_info: None,
     });
   }
 
@@ -122,6 +131,18 @@ impl Enviroment {
   pub fn builtin_variables(&self) -> impl Iterator<Item = &BuiltinVariable> {
     self.builtin_variables.iter()
   }
+
+  pub(crate) fn add_static_type_info(&mut self, types: &mut TypeArena) {
+    for variable in &mut self.finished_variables {
+      variable.type_info = Some(StaticTypeInfo {
+        string: types.type_to_string(variable.type_()),
+        kind: match types[variable.type_.type_] {
+          Type::Function(_, _) => VariableKind::Function,
+          _ => VariableKind::Variable,
+        },
+      });
+    }
+  }
 }
 
 /// A variable which is defined and all the times it is used
@@ -140,6 +161,10 @@ pub struct Variable {
   depth: u32,
   /// the type of the variable
   type_: TypeScheme,
+
+  /// the type of the variable, as static independant information
+  /// is not automatically added, using [`Enviroment::add_static_type_info`]
+  pub type_info: Option<StaticTypeInfo>,
 }
 impl Variable {
   /// Checks if the variable is used
@@ -170,4 +195,29 @@ pub struct BuiltinVariable {
   pub name: &'static str,
   /// the type of the variable
   type_: TypeScheme,
+  /// the type of the variable, as static independant information
+  /// is not automatically added, using [`Enviroment::add_static_type_info`]
+  pub type_info: StaticTypeInfo,
+}
+
+#[derive(Debug, Clone)]
+pub struct StaticTypeInfo {
+  pub string: String,
+  pub kind: VariableKind,
+}
+impl StaticTypeInfo {
+  pub fn new_function(string: &str) -> Self {
+    Self {
+      string: string.to_owned(),
+      kind: VariableKind::Function,
+    }
+  }
+}
+/// The type of a variable
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum VariableKind {
+  /// A regular variable
+  Variable,
+  /// A function
+  Function,
 }

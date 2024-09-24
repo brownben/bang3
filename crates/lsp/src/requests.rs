@@ -6,7 +6,7 @@ use std::{collections::HashMap, iter};
 use bang_formatter::{format, FormatterConfig};
 use bang_linter::{lint, LintDiagnostic};
 use bang_parser::{parse, Allocator, GetSpan, ParseError};
-use bang_typechecker::{get_enviroment, typecheck, TypeError};
+use bang_typechecker::{get_enviroment, typecheck, TypeError, VariableKind};
 
 pub fn handle(
   request: lsp_server::Request,
@@ -202,12 +202,33 @@ fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionList 
   let items = variables
     .defined_variables()
     .filter(|var| var.is_active(position))
-    .map(|var| var.name.clone())
-    .chain(variables.builtin_variables().map(|var| var.name.to_owned()))
-    .map(|name| lsp::CompletionItem {
-      label: name,
-      kind: Some(lsp::CompletionItemKind::VARIABLE),
-      ..Default::default()
+    .map(|var| (var.name.clone(), var.type_info.as_ref().unwrap()))
+    .chain(
+      variables
+        .builtin_variables()
+        .map(|var| (var.name.to_owned(), &var.type_info)),
+    )
+    .map(|(name, type_info)| match type_info.kind {
+      VariableKind::Function => lsp::CompletionItem {
+        insert_text: Some(format!("{name}($0)")),
+        insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+        label: name,
+        label_details: Some(lsp::CompletionItemLabelDetails {
+          detail: None,
+          description: Some(type_info.string.clone()),
+        }),
+        kind: Some(lsp::CompletionItemKind::FUNCTION),
+        ..Default::default()
+      },
+      VariableKind::Variable => lsp::CompletionItem {
+        label: name,
+        label_details: Some(lsp::CompletionItemLabelDetails {
+          detail: None,
+          description: Some(type_info.string.clone()),
+        }),
+        kind: Some(lsp::CompletionItemKind::VARIABLE),
+        ..Default::default()
+      },
     })
     .collect();
 
@@ -234,14 +255,6 @@ fn diagnostic_from_lint(lint: &LintDiagnostic, file: &Document) -> lsp::Diagnost
     source: Some("Lint".into()),
     message: lint.full_message(),
     range: lsp_range_from_span(lint.span(), file),
-
-    tags: {
-      if lint.title == "No Unused Variables" {
-        Some(vec![lsp::DiagnosticTag::UNNECESSARY])
-      } else {
-        None
-      }
-    },
     ..Default::default()
   }
 }
