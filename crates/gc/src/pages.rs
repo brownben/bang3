@@ -39,7 +39,7 @@ pub enum BlockClass {
 }
 impl BlockClass {
   pub const SMALL_CLASS_COUNT: usize = 7;
-  const SMALL_CLASSES: [Self; Self::SMALL_CLASS_COUNT] = [
+  pub const SMALL_CLASSES: [Self; Self::SMALL_CLASS_COUNT] = [
     Self::B64,
     Self::B128,
     Self::B256,
@@ -225,13 +225,17 @@ impl PageDescriptorRef {
     *gc_bits |= 1u64 << idx;
     idx
   }
-
+  /// Is the given block allocated?
   pub fn is_block_allocated(&self, block_index: usize) -> bool {
     let block_index = block_index / self.as_ref().class.block_size();
     let gc_bits = self.as_ref().gc_bits;
     let block_mask = 1u64 << block_index;
 
     (gc_bits & block_mask) == block_mask
+  }
+  /// Count the number of allocated blocks in the page
+  pub fn num_allocated_blocks(&self) -> u32 {
+    self.as_ref().gc_bits.count_ones()
   }
 }
 impl AsRef<PageDescriptor> for PageDescriptorRef {

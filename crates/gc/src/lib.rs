@@ -49,6 +49,7 @@
 
 use core::{fmt, marker::PhantomData, mem, num::NonZero, ops, panic};
 
+mod display;
 mod pages;
 use pages::{BlockClass, PageDescriptor, PageDescriptorRef, PageList};
 
@@ -192,6 +193,21 @@ impl Heap {
 
     let allocation_size = mem::size_of::<T>();
     let pointer = self.allocate_bytes(allocation_size).cast();
+    self[pointer] = value;
+    pointer
+  }
+
+  /// Allocates a type to the heap which has been zeroed,
+  /// and returns a virtual pointer to the allocated memory.
+  ///
+  /// # Panics
+  /// The function panics if the allocation request is larger than
+  /// the largest allocation size ([`MAX_REAM_SIZE`]).
+  pub fn allocate_zeroed<T: Sized, const SIZE: usize>(&mut self, value: T) -> Gc<T> {
+    debug_assert!(!self.is_collecting);
+
+    let pointer = self.allocate_bytes(SIZE).cast();
+    self[pointer.cast::<[u8; SIZE]>()].fill(0);
     self[pointer] = value;
     pointer
   }
