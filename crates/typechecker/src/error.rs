@@ -39,6 +39,56 @@ pub enum Problem {
     /// The location of the match statement arm
     span: Span,
   },
+  /// Expected a function, but recieved a non callable type
+  NotCallable {
+    /// The type that was recieved
+    type_: String,
+    /// The location of the error
+    span: Span,
+  },
+  /// Expected function to be called with different argument
+  IncorrectArgument {
+    /// The type that was expected
+    expected: String,
+    /// The type that was recieved
+    given: String,
+    /// The location of the error
+    span: Span,
+  },
+  /// Expected function to be called with an argument
+  MissingArgument {
+    /// The type that was expected
+    expected: String,
+    /// The location of the error
+    span: Span,
+  },
+  /// Expected both arms to return the same type, but they don't
+  IfElseDontMatch {
+    /// The type of the first arm
+    then: String,
+    /// The type of the later arm
+    otherwise: String,
+    /// The location of the later arm
+    span: Span,
+  },
+  /// Expected all arms to return the same type, but they don't
+  MatchCasesDontMatch {
+    /// The type of the first arm
+    first: String,
+    /// The type of the later arm
+    later: String,
+    /// The location of the later arm
+    span: Span,
+  },
+  /// Expected pattern to match value
+  PatternNeverMatches {
+    /// The type of the pattern
+    pattern: String,
+    /// The value of the match
+    value: String,
+    /// The location of the error
+    span: Span,
+  },
 }
 impl Problem {
   /// The title of the error message
@@ -50,6 +100,12 @@ impl Problem {
       Self::UnusedVariable { .. } => "Unused Variable",
       Self::MissingPattern { .. } => "Match Not Exhaustive",
       Self::UnreachableCase { .. } => "Unreachable Case",
+      Self::NotCallable { .. } => "Type Not Callable",
+      Self::IncorrectArgument { .. } => "Incorrect Argument",
+      Self::MissingArgument { .. } => "Missing Argument",
+      Self::IfElseDontMatch { .. } => "If Else Branch Type Mismatch",
+      Self::MatchCasesDontMatch { .. } => "Match Cases Type Mismatch",
+      Self::PatternNeverMatches { .. } => "Pattern Doesn't Match Value",
     }
   }
 
@@ -70,6 +126,28 @@ impl Problem {
       }
       Self::MissingPattern { message, .. } => message.clone(),
       Self::UnreachableCase { .. } => "case is already covered, so is unreachable".to_string(),
+      Self::NotCallable { type_, .. } => {
+        format!("expected a function, `{type_}` is not callable")
+      }
+      Self::IncorrectArgument {
+        expected, given, ..
+      } => {
+        format!("expected function argument to be type `{expected}`, but recieved type `{given}`")
+      }
+      Self::MissingArgument { expected, .. } => {
+        format!("expected to be called with type `{expected}`, but no argument was given")
+      }
+      Self::IfElseDontMatch {
+        then, otherwise, ..
+      } => {
+        format!("expected both arms to have the same type. The if branch has type `{then}`, but the else branch has type `{otherwise}`")
+      }
+      Self::MatchCasesDontMatch { first, later, .. } => {
+        format!("expected all arms to have the same type. The first arm has type `{first}`, but this arm has type `{later}`")
+      }
+      Self::PatternNeverMatches { pattern, value, .. } => {
+        format!("match value is `{value}` which doesn't match pattern of type `{pattern}``")
+      }
     }
   }
 
@@ -85,12 +163,10 @@ impl Problem {
   /// Is this an error or a warning?
   #[must_use]
   pub fn is_warning(&self) -> bool {
-    match self {
-      Self::UndefinedVariable { .. }
-      | Self::ExpectedDifferentType { .. }
-      | Self::MissingPattern { .. } => false,
-      Self::UnusedVariable { .. } | Self::UnreachableCase { .. } => true,
-    }
+    matches!(
+      self,
+      Self::UnusedVariable { .. } | Self::UnreachableCase { .. }
+    )
   }
 }
 impl GetSpan for Problem {
@@ -100,7 +176,13 @@ impl GetSpan for Problem {
       | Self::ExpectedDifferentType { span, .. }
       | Self::UnusedVariable { span, .. }
       | Self::MissingPattern { span, .. }
-      | Self::UnreachableCase { span } => *span,
+      | Self::UnreachableCase { span }
+      | Self::NotCallable { span, .. }
+      | Self::IncorrectArgument { span, .. }
+      | Self::MissingArgument { span, .. }
+      | Self::IfElseDontMatch { span, .. }
+      | Self::MatchCasesDontMatch { span, .. }
+      | Self::PatternNeverMatches { span, .. } => *span,
     }
   }
 }

@@ -12,10 +12,17 @@ impl TypeArena {
   pub const NUMBER: TypeRef = TypeRef(1);
   pub const STRING: TypeRef = TypeRef(2);
   pub const NEVER: TypeRef = TypeRef(3);
+  pub const UNKNOWN: TypeRef = TypeRef(4);
 
   pub fn new() -> Self {
     Self {
-      types: vec![Type::Boolean, Type::Number, Type::String, Type::Never],
+      types: vec![
+        Type::Primitive(Self::BOOLEAN),
+        Type::Primitive(Self::NUMBER),
+        Type::Primitive(Self::STRING),
+        Type::Primitive(Self::NEVER),
+        Type::Primitive(Self::UNKNOWN),
+      ],
       type_vars: Vec::new(),
     }
   }
@@ -42,9 +49,10 @@ impl TypeArena {
     &mut self.type_vars[usize::try_from(type_var_ref.0).unwrap()]
   }
 
-  pub fn unify(&mut self, a: TypeRef, b: TypeRef, span: Span) -> Result<(), TypeError> {
+  /// Asserts that type `a` is applicable to type `b`
+  pub fn assert_type(&mut self, a: TypeRef, b: TypeRef, span: Span) -> Result<(), TypeError> {
     self
-      .unify_inner(a, b)
+      .unify(a, b)
       .map_err(|()| TypeError::ExpectedDifferentType {
         expected: self.type_to_string(b),
         given: self.type_to_string(a),
@@ -52,19 +60,17 @@ impl TypeArena {
       })
   }
 
-  fn unify_inner(&mut self, a: TypeRef, b: TypeRef) -> Result<(), ()> {
+  /// Unifies types `a` and `b`, returning `Ok` if they are unifiable
+  pub fn unify(&mut self, a: TypeRef, b: TypeRef) -> Result<(), ()> {
     let a = self.normalize(a);
     let b = self.normalize(b);
 
     match (self[a], self[b]) {
-      (Type::Boolean, Type::Boolean)
-      | (Type::Number, Type::Number)
-      | (Type::String, Type::String)
-      | (Type::Never, Type::Never) => {}
+      (Type::Primitive(a), Type::Primitive(b)) if a == b => {}
 
       (Type::Function(a_param, a_return), Type::Function(b_param, b_return)) => {
-        self.unify_inner(a_param, b_param)?;
-        self.unify_inner(a_return, b_return)?;
+        self.unify(a_param, b_param)?;
+        self.unify(a_return, b_return)?;
       }
 
       (Type::Variable(var1), Type::Variable(var2)) => {
@@ -109,7 +115,7 @@ impl TypeArena {
 
   fn has_quantified_vars(&self, ty: TypeRef) -> bool {
     match self[ty] {
-      Type::Number | Type::String | Type::Boolean | Type::Never | Type::Variable(_) => false,
+      Type::Primitive(_) | Type::Variable(_) => false,
       Type::Function(parameter, return_type) => {
         self.has_quantified_vars(parameter) || self.has_quantified_vars(return_type)
       }
@@ -144,7 +150,7 @@ impl TypeArena {
         self.new_type(Type::Function(parameter, return_type))
       }
       Type::Quantified(idx) => subs[usize::try_from(idx).unwrap()],
-      Type::Number | Type::String | Type::Boolean | Type::Never | Type::Variable(_) => {
+      Type::Primitive(_) | Type::Variable(_) => {
         unreachable!("doesn't contain quantified var");
       }
     }
@@ -169,7 +175,7 @@ impl TypeArena {
   fn type_vars_in(&mut self, ty: TypeRef) -> Box<dyn Iterator<Item = TypeVarRef>> {
     let norm_ty = self.normalize(ty);
     match self[norm_ty] {
-      Type::Number | Type::String | Type::Boolean | Type::Never => Box::new(iter::empty()),
+      Type::Primitive(_) => Box::new(iter::empty()),
       Type::Variable(var) => Box::new(iter::once(var)),
       Type::Function(parameter, return_type) => Box::new(
         self
@@ -184,7 +190,7 @@ impl TypeArena {
     let ty = self.normalize(ty);
 
     match self[ty] {
-      Type::Number | Type::String | Type::Boolean | Type::Never => ty,
+      Type::Primitive(_) => ty,
 
       Type::Function(parameter, return_type) => {
         let parameter = self.replace_type_vars(parameter, subs);
@@ -205,19 +211,22 @@ impl TypeArena {
     let type_ = self[type_ref];
 
     match type_ {
-      Type::Boolean => "boolean".to_owned(),
-      Type::Number => "number".to_owned(),
-      Type::String => "string".to_owned(),
-      Type::Never => "never".to_owned(),
+      Type::Primitive(primitive) => match primitive {
+        TypeArena::BOOLEAN => "boolean".to_owned(),
+        TypeArena::NUMBER => "number".to_owned(),
+        TypeArena::STRING => "string".to_owned(),
+        TypeArena::NEVER => "never".to_owned(),
+        TypeArena::UNKNOWN => "unknown".to_owned(),
+        _ => unreachable!("not a primitive type"),
+      },
       Type::Function(argument, return_type) => {
-        let is_argument_function = matches!(self[argument], Type::Function(_, _));
-        let argument = self.type_to_string(argument);
+        let argument_ = self.type_to_string(argument);
         let return_ = self.type_to_string(return_type);
 
-        if is_argument_function {
-          format!("({argument}) => {return_}")
+        if matches!(self[argument], Type::Function(_, _)) {
+          format!("({argument_}) => {return_}")
         } else {
-          format!("{argument} => {return_}")
+          format!("{argument_} => {return_}")
         }
       }
       Type::Quantified(idx) => format!("{}'", integer_to_identifier(idx)),
@@ -228,6 +237,15 @@ impl TypeArena {
           TypeVarLink::NoLink => format!("{}'", integer_to_identifier(type_var_ref.0)),
         }
       }
+    }
+  }
+
+  /// Returns the parameter of a function type, or None if the type is not a function
+  pub fn function_parameter(&self, type_ref: TypeRef) -> Option<TypeRef> {
+    if let Type::Function(parameter, _) = self[type_ref] {
+      Some(parameter)
+    } else {
+      None
     }
   }
 }
@@ -246,14 +264,8 @@ impl ops::IndexMut<TypeRef> for TypeArena {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Type {
-  /// Primitive `boolean` type (`true` or `false`)
-  Boolean,
-  /// Primitive `number` type
-  Number,
-  /// Primitive `string` type
-  String,
-  /// Never type, arises when an expression is invalid
-  Never,
+  /// A primitive value, e.g. booleans, number, strings
+  Primitive(TypeRef),
   /// Function type, e.g. `(number -> number)`
   Function(TypeRef, TypeRef),
   /// A type variable, e.g. `'a`

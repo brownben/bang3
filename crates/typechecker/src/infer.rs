@@ -67,7 +67,7 @@ impl Typechecker {
           Ok(type_) => type_,
           Err(error) => {
             self.problems.push(error);
-            TypeArena::NEVER
+            TypeArena::UNKNOWN
           }
         };
 
@@ -98,7 +98,7 @@ impl Typechecker {
       Ok(type_) => type_,
       Err(error) => {
         self.problems.push(error);
-        TypeArena::NEVER
+        TypeArena::UNKNOWN
       }
     };
 
@@ -132,7 +132,7 @@ impl InferType for Expression<'_, '_> {
       Expression::Match(match_) => match_.infer(t),
       Expression::Unary(unary) => unary.infer(t),
       Expression::Variable(variable) => variable.infer(t),
-      Expression::Invalid => Ok(TypeArena::NEVER),
+      Expression::Invalid => Ok(TypeArena::UNKNOWN),
     }
   }
 }
@@ -147,38 +147,56 @@ impl InferType for Binary<'_, '_> {
       | BinaryOperator::Multiply
       | BinaryOperator::Divide
       | BinaryOperator::Remainder => {
-        t.types.unify(left, TypeArena::NUMBER, self.left.span())?;
-        t.types.unify(right, TypeArena::NUMBER, self.right.span())?;
+        t.types
+          .assert_type(left, TypeArena::NUMBER, self.left.span())?;
+        t.types
+          .assert_type(right, TypeArena::NUMBER, self.right.span())?;
 
         Ok(TypeArena::NUMBER)
       }
       BinaryOperator::AddString => {
-        t.types.unify(left, TypeArena::STRING, self.left.span())?;
-        t.types.unify(right, TypeArena::STRING, self.right.span())?;
+        t.types
+          .assert_type(left, TypeArena::STRING, self.left.span())?;
+        t.types
+          .assert_type(right, TypeArena::STRING, self.right.span())?;
         Ok(TypeArena::STRING)
       }
       BinaryOperator::NotEqual | BinaryOperator::Equal => {
-        t.types.unify(right, left, self.span())?;
+        t.types.assert_type(right, left, self.right.span())?;
         Ok(TypeArena::BOOLEAN)
       }
       BinaryOperator::Greater
       | BinaryOperator::GreaterEqual
       | BinaryOperator::Less
       | BinaryOperator::LessEqual => {
-        t.types.unify(right, left, self.span())?;
+        t.types.assert_type(right, left, self.right.span())?;
         Ok(TypeArena::BOOLEAN)
       }
       BinaryOperator::And | BinaryOperator::Or => {
-        t.types.unify(right, left, self.span())?;
+        t.types.assert_type(right, left, self.right.span())?;
         Ok(right)
       }
       BinaryOperator::Pipeline => {
         let callee_type = right;
         let argument_type = left;
-        let return_type = t.new_type_var();
 
+        let return_type = t.new_type_var();
         let function_type = t.types.new_type(Type::Function(argument_type, return_type));
-        t.types.unify(function_type, callee_type, self.span())?;
+
+        if t.types.unify(function_type, callee_type).is_err() {
+          let Some(expected) = t.types.function_parameter(callee_type) else {
+            return Err(TypeError::NotCallable {
+              type_: t.types.type_to_string(callee_type),
+              span: self.right.span(),
+            });
+          };
+
+          return Err(TypeError::IncorrectArgument {
+            given: t.types.type_to_string(argument_type),
+            expected: t.types.type_to_string(expected),
+            span: self.left.span(),
+          });
+        }
 
         Ok(return_type)
       }
@@ -208,7 +226,28 @@ impl InferType for Call<'_, '_> {
 
     let return_type = t.new_type_var();
     let function_type = t.types.new_type(Type::Function(argument_type, return_type));
-    t.types.unify(function_type, callee_type, self.span())?;
+
+    if t.types.unify(function_type, callee_type).is_err() {
+      let Some(expected) = t.types.function_parameter(callee_type) else {
+        return Err(TypeError::NotCallable {
+          type_: t.types.type_to_string(callee_type),
+          span: self.expression.span(),
+        });
+      };
+
+      if let Some(argument) = &self.argument {
+        return Err(TypeError::IncorrectArgument {
+          given: t.types.type_to_string(argument_type),
+          expected: t.types.type_to_string(expected),
+          span: argument.span(),
+        });
+      }
+
+      return Err(TypeError::MissingArgument {
+        expected: t.types.type_to_string(expected),
+        span: self.expression.span(),
+      });
+    }
 
     Ok(return_type)
   }
@@ -229,7 +268,7 @@ impl InferType for Function<'_, '_> {
     t.env
       .define_variable(&self.parameter, TypeScheme::monomorphic(parameter));
     let return_type = self.body.infer(t)?;
-    t.types.unify(return_type, expected_return, self.span())?;
+    t.types.unify(return_type, expected_return).unwrap();
 
     t.env.exit_scope(self.span());
 
@@ -248,7 +287,13 @@ impl InferType for If<'_, '_> {
     let then_type = self.then.infer(t)?;
     let else_type = self.otherwise.infer(t)?;
 
-    t.types.unify(then_type, else_type, self.span())?;
+    if t.types.unify(then_type, else_type).is_err() {
+      return Err(TypeError::IfElseDontMatch {
+        then: t.types.type_to_string(then_type),
+        otherwise: t.types.type_to_string(else_type),
+        span: self.otherwise.span(),
+      });
+    }
 
     Ok(then_type)
   }
@@ -272,16 +317,34 @@ impl InferType for Match<'_, '_> {
         Pattern::Identifier(_) => {}
         Pattern::Literal(literal) => {
           let literal = literal.infer(t)?;
-          t.types.unify(literal, value_type, case.span())?;
+          if t.types.unify(literal, value_type).is_err() {
+            return Err(TypeError::PatternNeverMatches {
+              pattern: t.types.type_to_string(literal),
+              value: t.types.type_to_string(value_type),
+              span: case.pattern.span(),
+            });
+          }
         }
         Pattern::Range(range) => {
           if let Some(start) = &range.start {
             let start_type = start.get_range_literal().infer(t)?;
-            t.types.unify(start_type, value_type, case.span())?;
+            if t.types.unify(start_type, value_type).is_err() {
+              return Err(TypeError::PatternNeverMatches {
+                pattern: t.types.type_to_string(start_type),
+                value: t.types.type_to_string(value_type),
+                span: case.pattern.span(),
+              });
+            }
           }
           if let Some(end) = &range.end {
             let end_type = end.get_range_literal().infer(t)?;
-            t.types.unify(end_type, value_type, case.span())?;
+            if t.types.unify(end_type, value_type).is_err() {
+              return Err(TypeError::PatternNeverMatches {
+                pattern: t.types.type_to_string(end_type),
+                value: t.types.type_to_string(value_type),
+                span: case.pattern.span(),
+              });
+            }
           }
         }
       }
@@ -298,7 +361,13 @@ impl InferType for Match<'_, '_> {
       }
 
       let case_type = case.expression.infer(t)?;
-      t.types.unify(case_type, return_type, case.span())?;
+      if t.types.unify(case_type, return_type).is_err() {
+        return Err(TypeError::MatchCasesDontMatch {
+          first: t.types.type_to_string(return_type),
+          later: t.types.type_to_string(case_type),
+          span: case.span(),
+        });
+      }
 
       t.env.exit_scope(self.span());
     }
@@ -331,7 +400,7 @@ impl InferType for Unary<'_, '_> {
     match self.operator {
       UnaryOperator::Not => Ok(TypeArena::BOOLEAN),
       UnaryOperator::Minus => {
-        t.types.unify(left, TypeArena::NUMBER, span)?;
+        t.types.assert_type(left, TypeArena::NUMBER, span)?;
         Ok(TypeArena::NUMBER)
       }
     }

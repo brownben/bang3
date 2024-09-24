@@ -1,4 +1,4 @@
-use super::Type;
+use super::{Type, TypeArena};
 use bang_parser::{
   ast::expression::{LiteralKind, MatchCase, Pattern},
   Span,
@@ -7,7 +7,7 @@ use std::fmt;
 
 /// Checks if a match expressions arms are exhaustive
 pub fn check(value: &Type, cases: &[MatchCase]) -> Result {
-  if let Type::Boolean = value {
+  if let Type::Primitive(TypeArena::BOOLEAN) = value {
     return boolean(cases);
   }
 
