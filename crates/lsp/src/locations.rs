@@ -15,10 +15,7 @@ pub fn span_from_lsp_position(position: lsp_types::Position, file: &Document) ->
     line_start + byte_offset_from_utf16_offset(position.character, line_source)
   };
 
-  Span {
-    start,
-    end: start + 1,
-  }
+  Span { start, end: start }
 }
 
 fn byte_offset_from_utf16_offset(utf16_position: u32, string: &str) -> u32 {

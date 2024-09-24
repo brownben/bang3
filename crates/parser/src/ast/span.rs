@@ -53,7 +53,7 @@ impl Span {
   /// Check if a `Span` contains another `Span`
   #[must_use]
   pub fn contains(self, other: Self) -> bool {
-    self.start <= other.start && self.end >= other.end
+    self.start <= other.start && other.end <= self.end
   }
 }
 

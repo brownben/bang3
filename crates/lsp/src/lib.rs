@@ -104,6 +104,9 @@ impl LanguageServer {
       // Rename
       rename_provider: Some(lsp_types::OneOf::Left(true)),
 
+      // Autocompletion
+      completion_provider: Some(lsp_types::CompletionOptions::default()),
+
       // Doesn't provide all capabilities
       ..Default::default()
     }

@@ -117,6 +117,11 @@ impl Enviroment {
   pub fn defined_variables(&self) -> impl Iterator<Item = &Variable> {
     self.finished_variables.iter()
   }
+
+  /// An iterator over all the builtin variables that are defined
+  pub fn builtin_variables(&self) -> impl Iterator<Item = &BuiltinVariable> {
+    self.builtin_variables.iter()
+  }
 }
 
 /// A variable which is defined and all the times it is used
@@ -125,7 +130,7 @@ pub struct Variable {
   /// the identifier of the variable
   pub name: String,
   /// the span where the variable was defined
-  defined: Span,
+  pub defined: Span,
   /// the spans where the variable was used
   pub used: Vec<Span>,
   /// the span where the variable is active and can be used
@@ -162,7 +167,7 @@ impl GetSpan for Variable {
 #[derive(Debug)]
 pub struct BuiltinVariable {
   /// the identifier of the variable
-  name: &'static str,
+  pub name: &'static str,
   /// the type of the variable
   type_: TypeScheme,
 }

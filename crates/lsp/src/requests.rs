@@ -58,6 +58,14 @@ pub fn handle(
 
       Some(lsp_server::Response::new_ok(request_id, result))
     }
+    Completion::METHOD => {
+      let (request_id, params) = get_params::<Completion>(request);
+      let file = files.get(&params.text_document_position.text_document.uri);
+      let position = params.text_document_position.position;
+      let result = completions(file, position);
+
+      Some(lsp_server::Response::new_ok(request_id, result))
+    }
     request => {
       eprintln!("Unknown Request: {request:?}");
 
@@ -166,7 +174,9 @@ fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::Work
   let Some(declaration) = variables
     .defined_variables()
     .filter(|variable| variable.is_active(position))
-    .find(|variable| variable.used.iter().any(|used| used.contains(position)))
+    .find(|var| {
+      var.defined.contains(position) || var.used.iter().any(|used| used.contains(position))
+    })
   else {
     return lsp::WorkspaceEdit::default();
   };
@@ -180,6 +190,31 @@ fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::Work
     .collect();
 
   lsp::WorkspaceEdit::new(HashMap::from([(file.id.clone(), text_edits)]))
+}
+
+fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionList {
+  let position = span_from_lsp_position(position, file);
+
+  let allocator = Allocator::new();
+  let ast = parse(&file.source, &allocator);
+  let variables = get_enviroment(&ast);
+
+  let items = variables
+    .defined_variables()
+    .filter(|var| var.is_active(position))
+    .map(|var| var.name.clone())
+    .chain(variables.builtin_variables().map(|var| var.name.to_owned()))
+    .map(|name| lsp::CompletionItem {
+      label: name,
+      kind: Some(lsp::CompletionItemKind::VARIABLE),
+      ..Default::default()
+    })
+    .collect();
+
+  lsp::CompletionList {
+    is_incomplete: false,
+    items,
+  }
 }
 
 fn diagnostic_from_parse_error(error: &ParseError, file: &Document) -> lsp::Diagnostic {
