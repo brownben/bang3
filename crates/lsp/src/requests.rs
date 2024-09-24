@@ -199,6 +199,50 @@ fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionList 
   let ast = parse(&file.source, &allocator);
   let variables = get_enviroment(&ast);
 
+  let constant_snippets = [
+    lsp::CompletionItem {
+      label: "true".into(),
+      kind: Some(lsp::CompletionItemKind::VALUE),
+      ..Default::default()
+    },
+    lsp::CompletionItem {
+      label: "false".into(),
+      kind: Some(lsp::CompletionItemKind::VALUE),
+      ..Default::default()
+    },
+    lsp::CompletionItem {
+      label: "and".into(),
+      kind: Some(lsp::CompletionItemKind::VALUE),
+      ..Default::default()
+    },
+    lsp::CompletionItem {
+      label: "or".into(),
+      kind: Some(lsp::CompletionItemKind::OPERATOR),
+      ..Default::default()
+    },
+    lsp::CompletionItem {
+      label: "if".into(),
+      insert_text: Some("if ($1) $2 else $3".to_owned()),
+      insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+      kind: Some(lsp::CompletionItemKind::KEYWORD),
+      ..Default::default()
+    },
+    lsp::CompletionItem {
+      label: "match".into(),
+      insert_text: Some("match $1 | $2 -> $3".to_owned()),
+      insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+      kind: Some(lsp::CompletionItemKind::KEYWORD),
+      ..Default::default()
+    },
+    lsp::CompletionItem {
+      label: "let".into(),
+      insert_text: Some("let $1 = $2".to_owned()),
+      insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+      kind: Some(lsp::CompletionItemKind::KEYWORD),
+      ..Default::default()
+    },
+  ];
+
   let items = variables
     .defined_variables()
     .filter(|var| var.is_active(position))
@@ -230,6 +274,7 @@ fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionList 
         ..Default::default()
       },
     })
+    .chain(constant_snippets)
     .collect();
 
   lsp::CompletionList {
