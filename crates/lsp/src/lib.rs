@@ -107,6 +107,9 @@ impl LanguageServer {
       // Autocompletion
       completion_provider: Some(lsp_types::CompletionOptions::default()),
 
+      // Hover
+      hover_provider: Some(lsp_types::HoverProviderCapability::Simple(true)),
+
       // Doesn't provide all capabilities
       ..Default::default()
     }

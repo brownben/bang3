@@ -55,7 +55,7 @@ fn binary_logical_operators() {
   assert_eq!(synthesize("false and true"), "boolean");
   assert_eq!(synthesize("1 or 2"), "number");
   assert_eq!(synthesize("false or true"), "boolean");
-  assert_eq!(synthesize("x => x or 1"), "(number -> number)");
+  assert_eq!(synthesize("x => x or 1"), "number => number");
 
   assert!(has_type_error("1 and false"));
   assert!(has_type_error("1 or false"));

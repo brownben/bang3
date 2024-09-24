@@ -209,11 +209,17 @@ impl TypeArena {
       Type::Number => "number".to_owned(),
       Type::String => "string".to_owned(),
       Type::Never => "never".to_owned(),
-      Type::Function(argument, return_type) => format!(
-        "({} -> {})",
-        self.type_to_string(argument),
-        self.type_to_string(return_type)
-      ),
+      Type::Function(argument, return_type) => {
+        let is_argument_function = matches!(self[argument], Type::Function(_, _));
+        let argument = self.type_to_string(argument);
+        let return_ = self.type_to_string(return_type);
+
+        if is_argument_function {
+          format!("({argument}) => {return_}")
+        } else {
+          format!("{argument} => {return_}")
+        }
+      }
       Type::Quantified(idx) => format!("{}'", integer_to_identifier(idx)),
       Type::Variable(type_var_ref) => {
         let type_var = self.get_type_var(type_var_ref);

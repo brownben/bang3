@@ -66,6 +66,14 @@ pub fn handle(
 
       Some(lsp_server::Response::new_ok(request_id, result))
     }
+    HoverRequest::METHOD => {
+      let (request_id, params) = get_params::<HoverRequest>(request);
+      let file = files.get(&params.text_document_position_params.text_document.uri);
+      let position = params.text_document_position_params.position;
+      let result = hover(file, position);
+
+      Some(lsp_server::Response::new_ok(request_id, result))
+    }
     request => {
       eprintln!("Unknown Request: {request:?}");
 
@@ -281,6 +289,29 @@ fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionList 
     is_incomplete: false,
     items,
   }
+}
+
+fn hover(file: &Document, position: lsp::Position) -> Option<lsp::Hover> {
+  let position = span_from_lsp_position(position, file);
+
+  let allocator = Allocator::new();
+  let ast = parse(&file.source, &allocator);
+  let variables = get_enviroment(&ast);
+
+  let variable = variables
+    .defined_variables()
+    .filter(|variable| variable.is_active(position))
+    .find(|var| {
+      var.defined.contains(position) || var.used.iter().any(|used| used.contains(position))
+    })?;
+
+  Some(lsp::Hover {
+    contents: lsp::HoverContents::Scalar(lsp::MarkedString::from_language_code(
+      "bang-types".to_owned(),
+      variable.type_info.as_ref().unwrap().string.clone(),
+    )),
+    range: None,
+  })
 }
 
 fn diagnostic_from_parse_error(error: &ParseError, file: &Document) -> lsp::Diagnostic {
