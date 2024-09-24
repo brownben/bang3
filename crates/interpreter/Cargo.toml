@@ -8,11 +8,13 @@ bang-parser = { path = "../parser" }
 bang-gc = { path = "../gc" }
 
 rustc-hash = "2.0.0"
-smallvec = "1.13.2"
 smartstring = "1.0.1"
 
 [dev-dependencies]
 indoc = "2.0.4"
+
+[features]
+gc-stress-test = []
 
 [lints]
 workspace = true

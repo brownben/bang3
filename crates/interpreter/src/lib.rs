@@ -9,6 +9,7 @@
 
 mod bytecode;
 mod compiler;
+mod object;
 mod value;
 mod vm;
 
@@ -37,5 +38,5 @@ pub fn compile(ast: &bang_parser::AST<'_, '_>) -> Result<Chunk, CompileError> {
 pub use bang_gc::HeapSize;
 pub use bytecode::Chunk;
 pub use compiler::CompileError;
-pub use value::{FastNativeFunction, Value};
+pub use value::Value;
 pub use vm::{RuntimeError, VM};

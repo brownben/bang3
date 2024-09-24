@@ -2,7 +2,7 @@ use super::diagnostics::{CodeFrame, Message};
 use super::FormatOptions;
 
 use bang_formatter::FormatterConfig;
-use bang_interpreter::{FastNativeFunction, HeapSize, VM};
+use bang_interpreter::{HeapSize, VM};
 use bang_lsp::LanguageServer;
 use bang_parser::{Allocator, GetSpan, Span, AST};
 
@@ -79,14 +79,7 @@ pub fn run(filename: &str) -> Result<CommandStatus, ()> {
     }
   };
 
-  // define built-in functions
-  let print_function = FastNativeFunction::new("print", |arg| {
-    println!("{:?}", arg);
-    arg
-  });
-  let type_function = FastNativeFunction::new("type", |arg| arg.get_type().into());
-  vm.set_global("print", print_function);
-  vm.set_global("type", type_function);
+  vm.define_builtin_functions();
 
   if let Err(error) = vm.run(&chunk) {
     eprintln!("{}", Message::from(&error));

@@ -1,21 +1,28 @@
 use super::{
   bytecode::{Chunk, ConstantValue, OpCode},
-  value::{Closure, Object, Value},
+  object::{Closure, GcString, NativeFunction, UpvalueList},
+  value::{Type, Value},
 };
-use bang_gc::{Heap, HeapSize};
+use bang_gc::{Gc, Heap, HeapSize};
 use bang_parser::{GetSpan, Span};
 
 use rustc_hash::FxHashMap as HashMap;
-use smallvec::SmallVec;
 use smartstring::alias::String as SmartString;
-use std::{error, fmt, ptr};
+use std::{error, fmt, mem, ptr};
 
 #[derive(Debug)]
 struct CallFrame {
   ip: usize,
   offset: usize,
   chunk: *const Chunk,
-  upvalues: SmallVec<[Value; 4]>,
+  upvalues: Option<Gc<UpvalueList>>,
+}
+impl CallFrame {
+  fn upvalues(&self) -> Gc<UpvalueList> {
+    debug_assert!(self.upvalues.is_some());
+
+    unsafe { self.upvalues.unwrap_unchecked() }
+  }
 }
 
 /// A virtual machine to execute compiled bytecode
@@ -25,7 +32,7 @@ pub struct VM {
   globals: HashMap<SmartString, Value>,
   frames: Vec<CallFrame>,
 
-  heap: Heap,
+  pub(crate) heap: Heap,
   gc_threshold: usize,
 }
 impl VM {
@@ -52,12 +59,37 @@ impl VM {
 
   /// Get the value of a global variable
   #[must_use]
-  pub fn get_global(&self, name: &str) -> Option<&Value> {
-    self.globals.get(name)
+  pub fn get_global(&self, name: &str) -> Option<Value> {
+    self.globals.get(name).copied()
   }
   /// Set the value of a global variable
-  pub fn set_global(&mut self, name: impl Into<SmartString>, value: impl Into<Value>) {
+  pub fn define_global(&mut self, name: impl Into<SmartString>, value: impl Into<Value>) {
     self.globals.insert(name.into(), value.into());
+  }
+  /// Define the builtin functions
+  pub fn define_builtin_functions(&mut self) {
+    let print_function = NativeFunction::new("print", |vm, arg| {
+      println!("{}", arg.display(&vm.heap));
+      arg
+    });
+    let to_string_function = NativeFunction::new("to_string", |vm, arg| {
+      if arg.is_string() {
+        arg
+      } else {
+        let string = arg.display(&vm.heap);
+        allocate_string(&mut vm.heap, &string)
+      }
+    });
+    let type_function = NativeFunction::new("type", |vm, arg| {
+      allocate_string(&mut vm.heap, arg.get_type())
+    });
+
+    let functions = [print_function, to_string_function, type_function];
+    for function in functions {
+      let name = function.name;
+      let allocated = self.heap.allocate(function);
+      self.define_global(name, Value::from_object(allocated, Type::NativeFunction));
+    }
   }
 
   #[inline]
@@ -68,11 +100,11 @@ impl VM {
     unsafe { self.stack.pop().unwrap_unchecked() }
   }
   #[inline]
-  fn peek(&self) -> &Value {
+  fn peek(&self) -> Value {
     // SAFETY: Assume bytecode is valid, so stack is not empty
     debug_assert!(!self.stack.is_empty());
 
-    unsafe { self.stack.last().unwrap_unchecked() }
+    unsafe { *self.stack.last().unwrap_unchecked() }
   }
   #[inline]
   fn push(&mut self, value: Value) {
@@ -83,7 +115,7 @@ impl VM {
     // SAFETY: Assume bytecode is valid, so position exists
     debug_assert!(position < self.stack.len());
 
-    unsafe { self.stack.get_unchecked(position) }.clone()
+    *unsafe { self.stack.get_unchecked(position) }
   }
 
   #[inline]
@@ -99,7 +131,7 @@ impl VM {
     ip: usize,
     offset: usize,
     chunk: *const Chunk,
-    upvalues: SmallVec<[Value; 4]>,
+    upvalues: Option<Gc<UpvalueList>>,
   ) {
     self.frames.push(CallFrame {
       ip,
@@ -118,10 +150,56 @@ impl VM {
 
   #[inline]
   fn should_garbage_collect(&mut self) -> bool {
-    self.heap.full_page_count() > self.gc_threshold
+    #[cfg(feature = "gc-stress-test")]
+    {
+      // Collect garbage after every instruction
+      // Means any problems in the marking will be caught faster
+      true
+    }
+
+    #[cfg(not(feature = "gc-stress-test"))]
+    {
+      self.heap.full_page_count() > self.gc_threshold
+    }
   }
   fn garbage_collect(&mut self) {
+    fn mark_value(heap: &Heap, value: Value) {
+      if value.is_object() {
+        heap.mark(value.as_object::<u8>());
+
+        if value.is_object_type(Type::Allocated) {
+          let allocated_value = heap[value.as_object::<Value>()];
+          mark_value(heap, allocated_value);
+        }
+
+        if value.is_object_type(Type::Closure) {
+          let closure = &heap[value.as_object::<Closure>()];
+          heap.mark(closure.upvalues);
+          for upvalue in heap[closure.upvalues].iter() {
+            mark_value(heap, *upvalue);
+          }
+        }
+      }
+    }
+
     self.heap.start_gc();
+
+    for value in &self.stack {
+      mark_value(&self.heap, *value);
+    }
+    for value in self.globals.values() {
+      mark_value(&self.heap, *value);
+    }
+    for frame in &self.frames {
+      if let Some(upvalues) = frame.upvalues {
+        self.heap.mark(upvalues);
+
+        for upvalue in self.heap[upvalues].iter() {
+          mark_value(&self.heap, *upvalue);
+        }
+      }
+    }
+
     self.heap.finish_gc();
 
     self.gc_threshold = (self.heap.full_page_count() * 2).max(2);
@@ -176,9 +254,15 @@ impl VM {
           let left = self.pop();
 
           if left.is_string() && right.is_string() {
-            let mut new = left.as_string().clone();
-            new.push_str(right.as_string());
-            self.push(new.into());
+            let (left, right) = {
+              let left = left.as_string(&self.heap);
+              let right = right.as_string(&self.heap);
+
+              ((left.as_ptr(), left.len()), (right.as_ptr(), right.len()))
+            };
+
+            let new_string = GcString::concatenate(&mut self.heap, left, right);
+            self.push(new_string);
           } else {
             break Some(ErrorKind::TypeErrorBinary {
               expected: "two strings",
@@ -201,17 +285,17 @@ impl VM {
         }
         OpCode::Not => {
           let value = self.pop();
-          self.push(value.is_falsy().into());
+          self.push(value.is_falsy(&self.heap).into());
         }
 
         // Equalities
         OpCode::Equals => {
           let (right, left) = (self.pop(), self.pop());
-          self.push((left == right).into());
+          self.push(left.equals(right, &self.heap).into());
         }
         OpCode::NotEquals => {
           let (right, left) = (self.pop(), self.pop());
-          self.push((left != right).into());
+          self.push((!left.equals(right, &self.heap)).into());
         }
 
         // Comparisons
@@ -233,7 +317,7 @@ impl VM {
           let string = chunk.get_string(string_position.into());
 
           match self.globals.get(string) {
-            Some(value) => self.push(value.clone()),
+            Some(value) => self.push(*value),
             None => break Some(ErrorKind::UndefinedVariable(string.to_string())),
           }
         }
@@ -248,23 +332,23 @@ impl VM {
           let callee = self.get_stack_value(self.stack.len() - 2);
 
           if callee.is_function() {
-            self.push_frame(ip, offset, chunk, SmallVec::new());
+            self.push_frame(ip, offset, chunk, None);
 
             ip = 0;
             offset = self.stack.len() - 1;
-            chunk = unsafe { &*callee.as_function().get_pointer() };
-          } else if callee.is_closure() {
-            let closure = callee.as_closure();
-            self.push_frame(ip, offset, chunk, closure.upvalues.clone());
+            chunk = unsafe { &*callee.as_function(&self.heap).as_ptr() };
+          } else if callee.is_object_type(Type::Closure) {
+            let upvalues = self.heap[callee.as_object::<Closure>()].upvalues;
+            self.push_frame(ip, offset, chunk, Some(upvalues));
 
             ip = 0;
             offset = self.stack.len() - 1;
-            chunk = unsafe { &*closure.function().get_pointer() };
-          } else if callee.is_fast_native_function() {
-            let function = callee.as_fast_native_function();
+            chunk = unsafe { &*self.heap[callee.as_object::<Closure>()].function().as_ptr() };
+          } else if callee.is_object_type(Type::NativeFunction) {
             let argument = self.pop();
+            let function = &self.heap[callee.as_object::<NativeFunction>()];
 
-            let result = (function.func)(argument);
+            let result = (function.func)(self, argument);
             self.push(result);
 
             ip += 1;
@@ -290,41 +374,44 @@ impl VM {
         OpCode::Allocate => {
           let index = chunk.get_value(ip + 1);
           let local = &mut self.stack[offset + usize::from(index)];
-          let allocated = local.clone().allocate();
-          *local = allocated.clone();
+          let allocated = Value::from_object(self.heap.allocate(*local), Type::Allocated);
+          *local = allocated;
           self.push(allocated);
         }
         OpCode::Closure => {
           let upvalue_count = chunk.get_value(ip + 1);
           let upvalues = self
             .stack
-            .drain((self.stack.len() - usize::from(upvalue_count))..)
-            .collect();
+            .drain((self.stack.len() - usize::from(upvalue_count))..);
+          let upvalue_list = UpvalueList::new(&mut self.heap, upvalue_count, upvalues);
 
           let value = self.pop();
-          if value.is_function() {
-            self.push(Closure::new(ptr::from_ref(value.as_function()), upvalues).into());
-          } else {
+          if !value.is_function() {
             break Some(ErrorKind::NonFunctionClosure);
           }
+
+          let closure = self
+            .heap
+            .allocate(Closure::new(value.as_function(&self.heap), upvalue_list));
+          self.push(Value::from_object(closure, Type::Closure));
         }
         OpCode::GetUpvalue => {
           let upvalue = chunk.get_value(ip + 1);
-          let address = &self.peek_frame().upvalues[usize::from(upvalue)];
-          let value = address.as_allocated().borrow().clone();
+          let address = self.heap[self.peek_frame().upvalues()][upvalue];
+          let value = self.heap[address.as_object::<Value>()];
 
           self.push(value);
         }
         OpCode::GetAllocatedValue => {
           let slot = chunk.get_value(ip + 1);
-          let address = &self.stack[offset + usize::from(slot)];
-          let value = address.as_allocated().borrow().clone();
+          let address = self.stack[offset + usize::from(slot)];
+          let value = self.heap[address.as_object::<Value>()];
 
           self.push(value);
         }
         OpCode::GetAllocatedPointer => {
           let index = chunk.get_value(ip + 1);
-          let allocated = self.peek_frame().upvalues[usize::from(index)].clone();
+          let allocated = self.heap[self.peek_frame().upvalues()][index];
 
           self.push(allocated);
         }
@@ -340,7 +427,7 @@ impl VM {
           self.push(value);
         }
         OpCode::Peek => {
-          let value = self.peek().clone();
+          let value = self.peek();
           self.push(value);
         }
         OpCode::Jump => {
@@ -349,7 +436,7 @@ impl VM {
         }
         OpCode::JumpIfFalse => {
           let jump = chunk.get_long_value(ip + 1);
-          if self.peek().is_falsy() {
+          if self.peek().is_falsy(&self.heap) {
             ip += usize::from(jump);
           }
         }
@@ -366,9 +453,14 @@ impl VM {
     // move constants from the chunk to the heap
     for value in self.globals.values_mut() {
       if value.is_constant_string() {
-        *value = Value::from(Object::from(value.as_string().clone()));
+        *value = allocate_string(&mut self.heap, value.as_constant_string());
       } else if value.is_constant_function() {
-        *value = Value::from(Object::from(value.as_function().clone()));
+        const CHUNK_SIZE: usize = mem::size_of::<Chunk>();
+        let constant_function = value.as_constant_function().clone();
+        let ptr = self
+          .heap
+          .allocate_zeroed::<Chunk, CHUNK_SIZE>(constant_function);
+        *value = Value::from_object(ptr, Type::Function);
       }
     }
 
@@ -403,7 +495,7 @@ macro comparison_operation(($vm:expr, $chunk:expr), $operator:tt) {{
   if left.is_number() && right.is_number() {
     $vm.push(Value::from(left.as_number() $operator right.as_number()));
   } else if left.is_string() && right.is_string() {
-    $vm.push(Value::from(left.as_string() $operator right.as_string()));
+    $vm.push(Value::from(left.as_string(&$vm.heap) $operator right.as_string(&$vm.heap)));
   } else {
     break Some(ErrorKind::TypeErrorBinary {
       expected: "two numbers or two strings",
@@ -411,6 +503,17 @@ macro comparison_operation(($vm:expr, $chunk:expr), $operator:tt) {{
     });
   }
 }}
+
+/// Allocates a string on the heap and returns a `Value` pointing to it.
+pub(crate) fn allocate_string(heap: &mut Heap, value: &str) -> Value {
+  let string_ptr = heap.allocate_bytes(GcString::size(value.len()));
+
+  let string = &mut heap[string_ptr.cast::<GcString>()];
+  string.length = u32::try_from(value.len()).expect("string is allocatable");
+  string.buffer_mut().copy_from_slice(value.as_bytes());
+
+  Value::from_object(string_ptr, Type::String)
+}
 
 /// An error whilst executing bytecode
 #[derive(Debug, Clone)]
@@ -427,7 +530,7 @@ impl RuntimeError {
 
   /// The body of the error message describing what has gone wrong
   #[must_use]
-  pub fn message(&self) -> std::string::String {
+  pub fn message(&self) -> String {
     self.kind.message()
   }
 }
@@ -451,9 +554,9 @@ enum ErrorKind {
   },
   TypeErrorBinary {
     expected: &'static str,
-    got: std::string::String,
+    got: String,
   },
-  UndefinedVariable(std::string::String),
+  UndefinedVariable(String),
   NotCallable(&'static str),
   NonFunctionClosure,
   OutOfMemory,
@@ -471,7 +574,7 @@ impl ErrorKind {
   }
 
   #[must_use]
-  fn message(&self) -> std::string::String {
+  fn message(&self) -> String {
     match self {
       Self::TypeError { expected, got } => format!("expected `{expected}`, got `{got}`"),
       Self::TypeErrorBinary { expected, got } => {

@@ -17,8 +17,10 @@ jobs:
       - name: Format
         run: cargo fmt --all -- --check
       - name: Build
-        run: cargo build --all
+        run: cargo build --workspace
       - name: Lint
-        run: cargo clippy --all -- -D warnings
+        run: cargo clippy --workspace -- -D warnings
       - name: Test
-        run: cargo test --all --verbose
+        run: |
+          cargo test --workspace --verbose
+          cargo test --workspace --verbose --features gc-stress-test

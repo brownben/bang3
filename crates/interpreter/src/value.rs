@@ -1,7 +1,9 @@
-use crate::Chunk;
-use smallvec::SmallVec;
+use crate::object::{self, GcString};
+
+use super::bytecode::Chunk;
+use bang_gc::{Gc, Heap};
 use smartstring::alias::String as SmartString;
-use std::{cell::RefCell, fmt, mem, ptr, rc::Rc};
+use std::{fmt, mem, ptr};
 
 /// A value on the stack of the interpreter.
 ///
@@ -10,16 +12,17 @@ use std::{cell::RefCell, fmt, mem, ptr, rc::Rc};
 /// - False
 /// - Null (only created when an error has occurred)
 /// - Number (f64)
-/// - String (heap allocated or constant from bytecode)
-/// - Function (constant from bytecode)
-/// - Object (heap allocated)
+/// - A heap pointer [`Gc`], and the type of the object
+/// - A static string
+/// - A static function
 ///
 /// It uses NaN boxing and tagged pointers,
 /// to allow us to store all these values within a single pointer.
 ///
 /// It is only valid for the VM for which it was created,
 /// and errors may occur when used outside of it.
-pub struct Value(*const Object);
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Value(*const ());
 impl Value {
   /// Boolean true value
   pub const TRUE: Self = Self(TRUE);
@@ -30,51 +33,19 @@ impl Value {
   /// Created when a value is missing, only accessible when an error has occurred
   pub const NULL: Self = Self(NULL);
 }
-impl Clone for Value {
-  fn clone(&self) -> Self {
-    if self.is_object() {
-      let pointer = self.0.map_addr(|ptr| ptr & FROM_POINTER);
 
-      unsafe { Rc::increment_strong_count(pointer) };
-    } else if self.is_allocated() {
-      let pointer = self.0.map_addr(|ptr| ptr & FROM_POINTER);
-      let pointer = pointer.cast::<RefCell<Self>>();
-
-      unsafe { Rc::increment_strong_count(pointer) };
-    }
-
-    Self(self.0)
-  }
-}
-impl Drop for Value {
-  fn drop(&mut self) {
-    if self.is_object() {
-      let pointer = self.0.map_addr(|ptr| ptr & FROM_POINTER);
-
-      unsafe { Rc::decrement_strong_count(pointer) };
-    } else if self.is_allocated() {
-      let pointer = self.0.map_addr(|ptr| ptr & FROM_POINTER);
-      let pointer = pointer.cast::<RefCell<Self>>();
-
-      unsafe { Rc::decrement_strong_count(pointer) };
-    }
-  }
-}
-
-// Methods to access the underlying data of the Value
+/// Methods to access the underlying data of the Value
 impl Value {
   /// Is the [Value] a number?
   #[must_use]
-  pub(crate) fn is_number(&self) -> bool {
+  pub fn is_number(&self) -> bool {
     (self.0.addr() & IS_NUMBER) != IS_NUMBER
   }
   /// View the [Value] as a number
   ///
-  /// # Panics
-  /// Panics if the [Value] is not a number.
   /// Use [`Value::is_number`] to check if it is a number.
   #[must_use]
-  pub(crate) fn as_number(&self) -> f64 {
+  pub fn as_number(&self) -> f64 {
     debug_assert!(self.is_number());
 
     // SAFETY: All u64 should be valid f64s
@@ -88,8 +59,7 @@ impl Value {
   }
   /// View the [Value] as a constant string, from the bytecode
   ///
-  /// # Panics
-  /// Panics if the [Value] is not a constant string.
+  /// SAFETY: Undefined behaviour if the [Value] is not a constant string.
   /// Use [`Value::is_constant_string`] to check if it is a constant string.
   #[must_use]
   pub(crate) fn as_constant_string(&self) -> &SmartString {
@@ -106,8 +76,7 @@ impl Value {
   }
   /// View the [Value] as a constant function, from the bytecode
   ///
-  /// # Panics
-  /// Panics if the [Value] is not a constant function.
+  /// SAFETY: Undefined behaviour if [Value] is not a constant function.
   /// Use [`Value::is_constant_function`] to check if it is a constant function.
   #[must_use]
   pub(crate) fn as_constant_function(&self) -> &Chunk {
@@ -117,225 +86,89 @@ impl Value {
     unsafe { &*pointer.cast::<Chunk>() }
   }
 
-  /// Is the [Value] a function?
-  ///
-  /// It can either be a heap allocated function or a constant function
+  /// Create a new [Value] from a pointer to the heap
   #[must_use]
-  pub(crate) fn is_function(&self) -> bool {
-    if self.is_constant_function() {
-      return true;
-    }
-
-    if self.is_object() {
-      return matches!(self.as_object(), Object::Function(_));
-    }
-
-    false
+  pub(crate) fn from_object<T>(object: Gc<T>, type_: Type) -> Self {
+    Self(ptr::without_provenance(
+      TO_POINTER | usize::from(type_) << 32 | object.addr() | OBJECT,
+    ))
   }
-
-  /// View the [Value] as a function
-  ///
-  /// # Panics
-  /// Panics if the [Value] is not a function.
-  /// Use [`Value::is_function`] to check if it is a function.
+  /// Is the [Value] a pointer to the heap?
   #[must_use]
-  pub(crate) fn as_function(&self) -> &Chunk {
-    debug_assert!(self.is_function());
-
-    if self.is_constant_function() {
-      self.as_constant_function()
-    } else if self.is_object()
-      && let Object::Function(f) = self.as_object()
-    {
-      return f;
-    } else {
-      panic!()
-    }
-  }
-
-  /// Is the [Value] allocated?
-  #[must_use]
-  pub(crate) fn is_allocated(&self) -> bool {
-    (self.0.addr() & TO_POINTER) == TO_POINTER && self.0.addr() & TAG == ALLOCATED
-  }
-  /// View the [Value] as an allocated value
-  ///
-  /// # Panics
-  /// Panics if the [Value] is not an allocated value.
-  /// Use [`Value::is_allocated`] to check if it is allocated.
-  #[must_use]
-  pub(crate) fn as_allocated(&self) -> Rc<RefCell<Self>> {
-    debug_assert!(self.is_allocated());
-
-    let pointer = self.0.map_addr(|ptr| ptr & FROM_POINTER);
-    let pointer = pointer.cast::<RefCell<Self>>();
-
-    unsafe { Rc::increment_strong_count(pointer) };
-    unsafe { Rc::from_raw(pointer) }
-  }
-
-  /// Is the [Value] an [Object]?
-  #[must_use]
-  pub(crate) fn is_object(&self) -> bool {
+  pub(crate) fn is_object(self) -> bool {
     (self.0.addr() & TO_POINTER) == TO_POINTER && self.0.addr() & TAG == OBJECT
   }
-  /// View the [Value] as an [Object]
-  ///
-  /// # Panics
-  /// Panics if the [Value] is not an [Object].
-  /// Use [`Value::is_object`] to check if it is an object.
+  /// Is the [Value] an object of the given [Type]?
   #[must_use]
-  pub(crate) fn as_object(&self) -> &Object {
+  pub(crate) fn is_object_type(self, type_: Type) -> bool {
+    self.is_object() && self.object_type() == type_
+  }
+  /// Get the [Type] of a pointer to the heap
+  ///
+  /// SAFETY: Undefined behaviour if [Value] is not a pointer to the heap.
+  /// Use [`Value::is_object`] to check if it is a pointer to the heap.
+  #[must_use]
+  pub(crate) fn object_type(self) -> Type {
     debug_assert!(self.is_object());
 
-    let pointer = self.0.map_addr(|ptr| ptr & FROM_POINTER);
-    unsafe { &*pointer }
+    let raw = self.0.addr() & FROM_POINTER;
+    #[expect(
+      clippy::cast_possible_truncation,
+      reason = "we want truncate the address info"
+    )]
+    Type::from((raw >> 32) as u16)
+  }
+  /// View the [Value] as a object
+  ///
+  /// SAFETY: Undefined behaviour if [Value] is not a pointer to the heap.
+  /// Use [`Value::is_object`] to check if it is a pointer to the heap.
+  pub(crate) fn as_object<T>(self) -> Gc<T> {
+    debug_assert!(self.is_object());
+
+    let raw = self.0.addr() & FROM_POINTER;
+    #[expect(
+      clippy::cast_possible_truncation,
+      reason = "we want truncate the type info"
+    )]
+    Gc::new((raw as u32).try_into().unwrap())
   }
 
   /// Is the [Value] a string?
-  ///
-  /// It can either be a heap allocated string or a constant string
   #[must_use]
-  pub(crate) fn is_string(&self) -> bool {
+  pub fn is_string(&self) -> bool {
+    self.is_constant_string() || self.is_object_type(Type::String)
+  }
+  /// View the [Value] as a string.
+  /// It can be a constant string or a string on the heap.
+  ///
+  /// SAFETY: Undefined behaviour if [Value] is not a string
+  /// Use [`Value::is_string`] to check if it is a string
+  #[must_use]
+  pub(crate) fn as_string<'a>(&'a self, heap: &'a Heap) -> &'a str {
     if self.is_constant_string() {
-      return true;
-    }
-
-    if self.is_object() {
-      return matches!(self.as_object(), Object::String(_));
-    }
-
-    false
-  }
-  /// View the [Value] as a string
-  ///
-  /// # Panics
-  /// Panics if the [Value] is not a string.
-  /// Use [`Value::is_string`] to check if it is a string.
-  #[must_use]
-  pub(crate) fn as_string(&self) -> &SmartString {
-    debug_assert!(self.is_string());
-
-    if self.is_constant_string() {
-      self.as_constant_string()
-    } else if self.is_object()
-      && let Object::String(s) = self.as_object()
-    {
-      return s;
+      self.as_constant_string().as_str()
     } else {
-      panic!()
+      heap[self.as_object::<GcString>()].as_str()
     }
   }
 
-  /// Is the [Value] a [Closure]?
+  /// Is the [Value] a function?
   #[must_use]
-  pub(crate) fn is_closure(&self) -> bool {
-    self.is_object() && matches!(self.as_object(), Object::Closure(_))
+  pub fn is_function(&self) -> bool {
+    self.is_constant_function() || self.is_object_type(Type::Function)
   }
-  /// View the [Value] as a [Closure]
+  /// View the [Value] as a function.
+  /// It can be a constant function or a function on the heap.
   ///
-  /// # Panics
-  /// Panics if the [Value] is not a [Closure].
-  /// Use [`Value::is_closure`] to check if it is a closure.
+  /// SAFETY: Undefined behaviour if [Value] is not a function
+  /// Use [`Value::is_function`] to check if it is a function
   #[must_use]
-  pub(crate) fn as_closure(&self) -> &Closure {
-    debug_assert!(self.is_closure());
-
-    if let Object::Closure(c) = self.as_object() {
-      c
+  pub(crate) fn as_function<'a>(&'a self, heap: &'a Heap) -> &'a Chunk {
+    if self.is_constant_function() {
+      self.as_constant_function()
     } else {
-      panic!()
+      &heap[self.as_object::<Chunk>()]
     }
-  }
-
-  /// Is the [Value] a [`FastNativeFunction`]?
-  #[must_use]
-  pub(crate) fn is_fast_native_function(&self) -> bool {
-    self.is_object() && matches!(self.as_object(), Object::FastNativeFunction(_))
-  }
-  /// View the [Value] as a [`FastNativeFunction`]
-  ///
-  /// # Panics
-  /// Panics if the [Value] is not a [`FastNativeFunction`].
-  /// Use [`Value::is_fast_native_function`] to check if it is a fast native function.
-  #[must_use]
-  pub(crate) fn as_fast_native_function(&self) -> &FastNativeFunction {
-    debug_assert!(self.is_fast_native_function());
-
-    if let Object::FastNativeFunction(c) = self.as_object() {
-      c
-    } else {
-      panic!()
-    }
-  }
-}
-
-// Methods which work on a generic Value
-impl Value {
-  /// Check if the current value is falsy
-  /// It is falsy if false, 0, or an empty collection
-  #[inline]
-  #[must_use]
-  pub fn is_falsy(&self) -> bool {
-    debug_assert!(!self.is_allocated()); // Allocated values are never used as a value
-
-    match self {
-      Self(TRUE) => false,
-      Self(FALSE | NULL) => true,
-      x if x.is_number() => (x.as_number() - 0.0).abs() < f64::EPSILON,
-      x if x.is_constant_string() => x.as_constant_string().is_empty(),
-      x if x.is_function() => false,
-      x => x.as_object().is_falsy(),
-    }
-  }
-
-  /// Get the type of the value
-  #[must_use]
-  pub fn get_type(&self) -> &'static str {
-    debug_assert!(!self.is_allocated()); // Allocated values are never used as a value
-
-    match self {
-      Self(TRUE | FALSE) => "boolean",
-      Self(NULL) => "null",
-      x if x.is_number() => "number",
-      x if x.is_string() => "string",
-      x if x.is_function() => "function",
-      x => x.as_object().get_type(),
-    }
-  }
-
-  /// Allocate the value to the heap, so it can be accessed as a closure
-  #[must_use]
-  pub(crate) fn allocate(self) -> Self {
-    let memory = Rc::new(RefCell::new(self));
-
-    let pointer = Rc::into_raw(memory);
-    let stored_pointer = pointer.map_addr(|ptr| ptr | TO_POINTER | ALLOCATED);
-
-    Self(stored_pointer.cast::<Object>())
-  }
-}
-impl PartialEq for Value {
-  fn eq(&self, other: &Self) -> bool {
-    debug_assert!(!self.is_allocated()); // Allocated values are never used as a value
-
-    if self.0 == other.0 {
-      return true;
-    }
-
-    if self.is_number() && other.is_number() {
-      return (self.as_number() - other.as_number()).abs() < f64::EPSILON;
-    }
-
-    if self.is_string() && other.is_string() {
-      return self.as_string() == other.as_string();
-    }
-
-    if !self.is_object() || !other.is_object() {
-      return false;
-    }
-
-    self.as_object() == other.as_object()
   }
 }
 impl fmt::Debug for Value {
@@ -344,19 +177,84 @@ impl fmt::Debug for Value {
       Self(TRUE) => write!(f, "true"),
       Self(FALSE) => write!(f, "false"),
       Self(NULL) => write!(f, "null"),
-      a if a.is_number() => write!(f, "{}", a.as_number()),
-      a if a.is_string() => write!(f, "{}", a.as_string()),
-      a if a.is_function() => a.as_function().display(f),
-      a if a.is_object() => write!(f, "{}", a.as_object()),
-      a if a.is_allocated() => write!(f, "<allocated {:?}>", a.as_allocated().borrow()),
-      _ => unreachable!(),
+      x if x.is_number() => write!(f, "{}", x.as_number()),
+      x if x.is_constant_string() => write!(f, "{}", x.as_constant_string()),
+      x if x.is_constant_function() => f.write_str(&x.as_constant_function().display()),
+      x => write!(f, "{:?}", x.as_object::<()>()),
     }
   }
 }
 
-// As contains [`Rc`] type is not thread safe
-impl !Send for Value {}
-impl !Sync for Value {}
+/// Methods which work on a generic Value
+impl Value {
+  /// Check if two values are equal
+  /// Checks if they point the same place, are equal numbers or are equal strings
+  #[must_use]
+  pub fn equals(self, other: Value, heap: &Heap) -> bool {
+    if self == other {
+      return true;
+    }
+
+    if self.is_number() && other.is_number() {
+      return (self.as_number() - other.as_number()).abs() < f64::EPSILON;
+    }
+
+    if self.is_string() && other.is_string() {
+      return self.as_string(heap) == other.as_string(heap);
+    }
+
+    false
+  }
+
+  /// Check if the current value is falsy
+  /// It is falsy if false, 0, or an empty collection
+  #[inline]
+  #[must_use]
+  pub fn is_falsy(&self, heap: &Heap) -> bool {
+    match self {
+      Self(TRUE) => false,
+      Self(FALSE | NULL) => true,
+      x if x.is_number() => (x.as_number() - 0.0).abs() < f64::EPSILON,
+      x if x.is_string() => x.as_string(heap).is_empty(),
+      x if x.is_constant_function() => false,
+      _ => false, // all other objects are truthy
+    }
+  }
+
+  /// Get the type of the value as a string
+  #[must_use]
+  pub fn get_type(&self) -> &'static str {
+    match self {
+      Self(TRUE | FALSE) => "boolean",
+      Self(NULL) => "null",
+      x if x.is_number() => "number",
+      x if x.is_constant_string() => "string",
+      x if x.is_constant_function() => "function",
+      x => match x.object_type() {
+        Type::String => "string",
+        Type::Closure | Type::Function | Type::NativeFunction => "function",
+        Type::Allocated | Type::UpvalueList => unreachable!("not used as value"),
+      },
+    }
+  }
+
+  /// Get the value as a string
+  #[must_use]
+  pub fn display(&self, heap: &Heap) -> String {
+    match self {
+      Self(TRUE) => "true".to_owned(),
+      Self(FALSE) => "false".to_owned(),
+      Self(NULL) => "null".to_owned(),
+      x if x.is_number() => x.as_number().to_string(),
+      x if x.is_string() => x.as_string(heap).to_owned(),
+      x if x.is_function() => x.as_function(heap).display(),
+      x if x.is_object_type(Type::Closure) => {
+        format!("{}", heap[x.as_object::<object::Closure>()])
+      }
+      _ => unreachable!(),
+    }
+  }
+}
 
 // Wrap raw values into a Value
 impl From<bool> for Value {
@@ -371,13 +269,6 @@ impl From<bool> for Value {
 impl From<f64> for Value {
   fn from(value: f64) -> Self {
     Self(ptr::without_provenance(value.to_bits().try_into().unwrap()))
-  }
-}
-impl<T: Into<Object>> From<T> for Value {
-  fn from(value: T) -> Self {
-    let value = Rc::new(value.into());
-    let pointer = Rc::into_raw(value);
-    Self(pointer.map_addr(|ptr| ptr | TO_POINTER | OBJECT).cast())
   }
 }
 impl From<*const SmartString> for Value {
@@ -399,123 +290,6 @@ impl From<*const Chunk> for Value {
   }
 }
 
-/// An heap allocated object in the interpreter
-///
-/// It can be:
-/// - [String]
-/// - Function (a bytecode [Chunk])
-/// - [Closure]
-#[derive(Clone, Debug, PartialEq)]
-pub enum Object {
-  String(SmartString),
-  Function(Chunk),
-  FastNativeFunction(FastNativeFunction),
-  Closure(Closure),
-}
-impl Object {
-  /// Check if the current object is falsy
-  #[inline]
-  pub fn is_falsy(&self) -> bool {
-    match self {
-      Self::String(string) => string.is_empty(),
-      Self::Function(_) | Self::FastNativeFunction(_) | Self::Closure(_) => false,
-    }
-  }
-
-  /// Get the type of the object
-  pub fn get_type(&self) -> &'static str {
-    match self {
-      Self::String(_) => "string",
-      Self::Function(_) | Self::FastNativeFunction(_) | Self::Closure(_) => "function",
-    }
-  }
-}
-impl fmt::Display for Object {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      Self::String(x) => x.fmt(f),
-      Self::Function(x) => x.fmt(f),
-      Self::FastNativeFunction(x) => x.fmt(f),
-      Self::Closure(x) => x.fmt(f),
-    }
-  }
-}
-impl From<SmartString> for Object {
-  fn from(value: SmartString) -> Self {
-    Self::String(value)
-  }
-}
-impl From<&str> for Object {
-  fn from(value: &str) -> Self {
-    Self::String(value.into())
-  }
-}
-impl From<Chunk> for Object {
-  fn from(value: Chunk) -> Self {
-    Self::Function(value)
-  }
-}
-impl From<Closure> for Object {
-  fn from(value: Closure) -> Self {
-    Self::Closure(value)
-  }
-}
-impl From<FastNativeFunction> for Object {
-  fn from(value: FastNativeFunction) -> Self {
-    Self::FastNativeFunction(value)
-  }
-}
-
-/// Represents a Closure
-///
-/// A function which has captured variables from the surrounding scope.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Closure {
-  func: *const Chunk,
-  pub(crate) upvalues: SmallVec<[Value; 4]>,
-}
-impl Closure {
-  pub fn new(func: *const Chunk, upvalues: SmallVec<[Value; 4]>) -> Self {
-    Self { func, upvalues }
-  }
-
-  #[inline]
-  pub fn function(&self) -> &Chunk {
-    unsafe { &*self.func }
-  }
-}
-impl fmt::Display for Closure {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "<closure ")?;
-    self.function().display(f)?;
-    write!(f, ">")
-  }
-}
-
-/// Represents a Fast Native Function
-///
-/// A function which is a native function, and only has access to the parameter
-/// not the wider VM
-#[derive(Clone, Debug, PartialEq)]
-pub struct FastNativeFunction {
-  name: String,
-  pub(crate) func: fn(Value) -> Value,
-}
-impl FastNativeFunction {
-  /// Create a new Fast Native Function
-  pub fn new(name: impl Into<String>, func: fn(Value) -> Value) -> Self {
-    Self {
-      name: name.into(),
-      func,
-    }
-  }
-}
-impl fmt::Display for FastNativeFunction {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "<function {}>", self.name)
-  }
-}
-
 // To check if a value is a number, or a tagged pointer
 // Sign bit is not set, but all bits of the exponent, and 2 bits of the mantissa are set (so real NaNs can be represented)
 const IS_NUMBER: usize = 0x7FFC_0000_0000_0000;
@@ -527,200 +301,32 @@ const TAG: usize = 0x7;
 const OBJECT: usize = 1;
 const CONSTANT_STRING: usize = 2;
 const CONSTANT_FUNCTION: usize = 3;
-const ALLOCATED: usize = 4;
 const _SINGLETONS: usize = 7;
 
 // Singleton Constants
-pub const TRUE: *const Object = ptr::without_provenance(0xFFFF_0000_0000_0017);
-pub const FALSE: *const Object = ptr::without_provenance(0xFFFF_0000_0000_0027);
-pub const NULL: *const Object = ptr::without_provenance(0xFFFF_0000_0000_0037);
+pub const TRUE: *const () = ptr::without_provenance(0xFFFF_0000_0000_0017);
+pub const FALSE: *const () = ptr::without_provenance(0xFFFF_0000_0000_0027);
+pub const NULL: *const () = ptr::without_provenance(0xFFFF_0000_0000_0037);
 
-#[cfg(test)]
-mod test {
-  use super::*;
-
-  // We store bits at the end of the pointer, to tag different values
-  // Check that the alignment is greater than 8, so we can use the last 3 bits
-  const _OBJECT_ALIGNMENT_ASSERT: () = assert!(std::mem::align_of::<Object>() >= 8);
-  const _STRING_ALIGNMENT_ASSERT: () = assert!(std::mem::align_of::<String>() >= 8);
-  const _FUNCTION_ALIGNMENT_ASSERT: () = assert!(std::mem::align_of::<Chunk>() >= 8);
-
-  #[test]
-  fn boolean() {
-    let true_ = Value::TRUE;
-    assert!(!true_.is_number());
-    assert!(!true_.is_constant_string());
-    assert!(!true_.is_function());
-    assert!(!true_.is_allocated());
-    assert!(!true_.is_object());
-    assert!(!true_.is_string());
-    assert!(!true_.is_closure());
-
-    let false_ = Value::FALSE;
-    assert!(!false_.is_number());
-    assert!(!false_.is_constant_string());
-    assert!(!false_.is_function());
-    assert!(!false_.is_allocated());
-    assert!(!false_.is_object());
-    assert!(!false_.is_string());
-    assert!(!false_.is_closure());
-
-    assert_eq!(true_, Value::from(true));
-    assert_eq!(false_, Value::from(false));
+/// Marker to indicate the type of a garbage collected object
+/// Stored inline with the [Value] for quick access
+#[derive(Copy, Clone, PartialEq, Eq)]
+#[repr(u16)]
+pub enum Type {
+  String,
+  Function,
+  NativeFunction,
+  Closure,
+  Allocated,
+  UpvalueList,
+}
+impl From<u16> for Type {
+  fn from(value: u16) -> Self {
+    unsafe { std::mem::transmute(value) }
   }
-
-  #[test]
-  fn number() {
-    for number in [0.0, 1.0, 2.0, 4.0, 8.0, 123.0, -0.0, -2.0, 123.45] {
-      let num = Value::from(number);
-      assert!(num.is_number());
-      assert!(!num.is_constant_string());
-      assert!(!num.is_function());
-      assert!(!num.is_allocated());
-      assert!(!num.is_object());
-      assert!(!num.is_string());
-      assert!(!num.is_closure());
-
-      assert_eq!(num.as_number(), number);
-    }
-
-    let num = Value::from(f64::NAN);
-    assert!(num.is_number());
-    assert!(!num.is_constant_string());
-    assert!(!num.is_function());
-    assert!(!num.is_allocated());
-    assert!(!num.is_object());
-    assert!(!num.is_string());
-    assert!(!num.is_closure());
-    assert!(num.as_number().is_nan());
-
-    let num = Value::from(f64::INFINITY);
-    assert!(num.is_number());
-    assert!(!num.is_constant_string());
-    assert!(!num.is_function());
-    assert!(!num.is_allocated());
-    assert!(!num.is_object());
-    assert!(!num.is_string());
-    assert!(!num.is_closure());
-
-    assert_eq!(num.as_number(), f64::INFINITY);
-
-    let num = Value::from(f64::asin(55.0));
-    assert!(num.is_number());
-    assert!(!num.is_constant_string());
-    assert!(!num.is_function());
-    assert!(!num.is_allocated());
-    assert!(!num.is_object());
-    assert!(!num.is_string());
-    assert!(!num.is_closure());
-    assert!(num.as_number().is_nan());
-  }
-
-  #[test]
-  fn string() {
-    let string = Value::from("hello");
-    assert!(!string.is_number());
-    assert!(!string.is_constant_string());
-    assert!(!string.is_function());
-    assert!(!string.is_allocated());
-    assert!(string.is_object());
-    assert!(string.is_string());
-    assert!(!string.is_closure());
-
-    let raw_constant_string = SmartString::from("hello");
-    let constant_string = Value::from(ptr::from_ref(&raw_constant_string));
-    assert!(!constant_string.is_number());
-    assert!(constant_string.is_constant_string());
-    assert!(!constant_string.is_function());
-    assert!(!constant_string.is_allocated());
-    assert!(!constant_string.is_object());
-    assert!(constant_string.is_string());
-    assert!(!constant_string.is_closure());
-
-    // same length as max inline string length
-    let raw_long_constant_string = SmartString::from("helloworldhelloworld123");
-    assert!(raw_long_constant_string.is_inline());
-    let long_constant = Value::from(ptr::from_ref(&raw_long_constant_string));
-    assert!(!long_constant.is_number());
-    assert!(long_constant.is_constant_string());
-    assert!(!long_constant.is_function());
-    assert!(!long_constant.is_allocated());
-    assert!(!long_constant.is_object());
-    assert!(long_constant.is_string());
-    assert!(!long_constant.is_closure());
-
-    assert_eq!(string, Object::String("hello".into()).into());
-    assert_eq!(string, constant_string);
-  }
-
-  #[test]
-  fn null() {
-    let null = Value::NULL;
-    assert!(!null.is_number());
-    assert!(!null.is_constant_string());
-    assert!(!null.is_function());
-    assert!(!null.is_allocated());
-    assert!(!null.is_object());
-    assert!(!null.is_closure());
-    assert!(!null.is_string());
-  }
-
-  #[test]
-  fn function() {
-    let function = Chunk::new("".into());
-    let function = Value::from(ptr::from_ref(&function));
-    assert!(!function.is_number());
-    assert!(!function.is_constant_string());
-    assert!(function.is_function());
-    assert!(!function.is_allocated());
-    assert!(!function.is_object());
-    assert!(!function.is_closure());
-    assert!(!function.is_string());
-  }
-
-  #[test]
-  fn is_falsy() {
-    assert!(!Value::TRUE.is_falsy());
-    assert!(Value::FALSE.is_falsy());
-    assert!(Value::NULL.is_falsy());
-
-    assert!(Value::from(0.0).is_falsy());
-    assert!(Value::from(-0.0).is_falsy());
-    assert!(!Value::from(0.01).is_falsy());
-    assert!(!Value::from(123.0).is_falsy());
-
-    assert!(Value::from("").is_falsy());
-    assert!(!Value::from("hello").is_falsy());
-
-    let function = Chunk::new("".into());
-    assert!(!Value::from(ptr::from_ref(&function)).is_falsy());
-  }
-
-  #[test]
-  fn allocate() {
-    let string = Value::from("hello");
-    assert!(!string.is_number());
-    assert!(!string.is_constant_string());
-    assert!(!string.is_function());
-    assert!(!string.is_allocated());
-    assert!(string.is_object());
-    assert!(string.is_string());
-    assert!(!string.is_closure());
-    assert_eq!(string, Object::String("hello".into()).into());
-
-    let string = string.allocate();
-    assert!(!string.is_number());
-    assert!(!string.is_constant_string());
-    assert!(!string.is_function());
-    assert!(string.is_allocated());
-    assert!(!string.is_object());
-    assert!(!string.is_string());
-    assert!(!string.is_closure());
-
-    assert_eq!(
-      *string.as_allocated().borrow(),
-      Value::from(Object::String("hello".into()))
-    );
-    assert_eq!(string.as_allocated().clone(), string.as_allocated().clone(),);
+}
+impl From<Type> for usize {
+  fn from(value: Type) -> Self {
+    usize::from(value as u16)
   }
 }

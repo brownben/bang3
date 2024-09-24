@@ -1,4 +1,4 @@
-use crate::{compile, HeapSize, Value, VM};
+use crate::{compile, vm::allocate_string, HeapSize, Value, VM};
 use bang_parser::{parse, Allocator};
 use indoc::indoc;
 
@@ -27,11 +27,24 @@ fn run(source: &str) -> Result<VM, Error> {
   Ok(vm)
 }
 
-macro assert_variable($vm:expr; $name:ident, $value:expr) {{
-  let vm = $vm.as_ref().unwrap();
-  let value = vm.get_global(stringify!($name)).unwrap();
-  assert_eq!(*value, Value::from($value));
-}}
+macro assert_variable  {
+  ($vm:expr; $name:ident, string $string:literal) => {
+    let vm = $vm.as_mut().unwrap();
+    let value = vm.get_global(stringify!($name)).unwrap();
+    let string = allocate_string(&mut vm.heap, $string);
+    assert!(
+      value.equals(string, &vm.heap),
+      "{} != {}",
+      value.display(&vm.heap),
+      value.display(&vm.heap),
+    );
+  },
+  ($vm:expr; $name:ident, $value:expr) => {
+    let vm = $vm.as_ref().unwrap();
+    let value = vm.get_global(stringify!($name)).unwrap();
+    assert_eq!(value, Value::from($value));
+  }
+}
 
 #[test]
 fn add_numbers() {
@@ -149,7 +162,7 @@ fn negate() {
 
 #[test]
 fn concatenate_strings() {
-  let vm = run(indoc! {"
+  let mut vm = run(indoc! {"
     let a = \"Hello \" ++ \"World\"
     let b = 'Whats Up' ++ `?`
     let c = \"Merged\" ++ 'together'
@@ -157,10 +170,10 @@ fn concatenate_strings() {
     // Keep original strings
     let d = a ++ b
   "});
-  assert_variable!(vm; a, "Hello World");
-  assert_variable!(vm; b, "Whats Up?");
-  assert_variable!(vm; c, "Mergedtogether");
-  assert_variable!(vm; d, "Hello WorldWhats Up?");
+  assert_variable!(vm; a, string "Hello World");
+  assert_variable!(vm; b, string "Whats Up?");
+  assert_variable!(vm; c, string "Mergedtogether");
+  assert_variable!(vm; d, string "Hello WorldWhats Up?");
 
   let numeric_add_for_strings = run(indoc! {"'a' + 'b'"});
   assert!(numeric_add_for_strings.is_err());
@@ -404,7 +417,7 @@ fn greater_than() {
 
 #[test]
 fn and() {
-  let vm = run(indoc! {"
+  let mut vm = run(indoc! {"
     let a = false and true
     let b = false and false
     let c = true and true
@@ -415,7 +428,7 @@ fn and() {
   assert_variable!(vm; b, false);
   assert_variable!(vm; c, true);
   assert_variable!(vm; d, false);
-  assert_variable!(vm; e, "Hello");
+  assert_variable!(vm; e, string "Hello");
 }
 
 #[test]
@@ -614,10 +627,12 @@ fn closures() {
     }
   "});
   assert_variable!(nested_closure; value, 5.0);
+}
 
+#[test]
+fn closure_twice() {
   let two_parameters = run(indoc! {"
     let add = a => b => a + b
-
     let x = add(2)(3)
     let y = add(3.5)(0.25)
   "});

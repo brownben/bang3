@@ -51,9 +51,6 @@ cargo clippy
 # To run the tests:
 cargo test
 
-# To run the tests with Miri:
-cargo miri test
-
 # To build Bang:
 cargo build --release
 ```

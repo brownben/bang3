@@ -122,15 +122,15 @@ impl Chunk {
     self.debug_info.get(opcode_position)
   }
 
-  pub(crate) fn get_pointer(&self) -> *const Self {
+  pub(crate) fn as_ptr(&self) -> *const Self {
     ptr::from_ref::<Self>(self)
   }
 
-  pub(crate) fn display(&self, f: &mut fmt::Formatter) -> fmt::Result {
+  pub(crate) fn display(&self) -> String {
     if self.name.is_empty() {
-      f.write_str("<function>")
+      "<function>".to_owned()
     } else {
-      write!(f, "<function {}>", self.name)
+      format!("<function {}>", self.name)
     }
   }
 }
@@ -251,7 +251,7 @@ impl fmt::Debug for ConstantValue {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       Self::String(value) => write!(f, "'{value:?}'"),
-      Self::Function(func) => func.display(f),
+      Self::Function(func) => f.write_str(&func.display()),
     }
   }
 }
