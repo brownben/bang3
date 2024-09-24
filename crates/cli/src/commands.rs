@@ -4,7 +4,7 @@ use super::FormatOptions;
 use bang_formatter::FormatterConfig;
 use bang_interpreter::{HeapSize, VM};
 use bang_lsp::LanguageServer;
-use bang_parser::{Allocator, GetSpan, Span, AST};
+use bang_parser::{Allocator, GetSpan, LineIndex, Span, AST};
 
 use anstream::{eprintln, println};
 use std::fs;
@@ -84,6 +84,12 @@ pub fn run(filename: &str) -> Result<CommandStatus, ()> {
   if let Err(error) = vm.run(&chunk) {
     eprintln!("{}", Message::from(&error));
     eprintln!("{}", CodeFrame::new(filename, &source, error.span()));
+
+    let line_index = LineIndex::from_source(&source);
+    if let Some(traceback) = error.traceback(&line_index) {
+      eprintln!("\n{traceback}");
+    }
+
     return Err(());
   }
 

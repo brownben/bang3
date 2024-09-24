@@ -4,7 +4,7 @@ use super::{
   value::{Type, Value},
 };
 use bang_gc::{Gc, Heap, HeapSize};
-use bang_parser::{GetSpan, Span};
+use bang_parser::{GetSpan, LineIndex, Span};
 
 use rustc_hash::FxHashMap as HashMap;
 use smartstring::alias::String as SmartString;
@@ -44,7 +44,7 @@ impl VM {
     let Some(heap) = Heap::new(heap_size) else {
       return Err(RuntimeError {
         kind: ErrorKind::OutOfMemory,
-        span: Span::default(),
+        traceback: Vec::new(),
       });
     };
 
@@ -465,9 +465,13 @@ impl VM {
     }
 
     if let Some(error) = error {
+      let traceback = std::iter::once(StackTraceLocation::from_chunk_ip(chunk, ip, offset))
+        .chain(self.frames.iter().rev().map(StackTraceLocation::from_frame))
+        .collect();
+
       Err(RuntimeError {
         kind: error,
-        span: chunk.get_span(ip),
+        traceback,
       })
     } else {
       Ok(())
@@ -519,7 +523,7 @@ pub(crate) fn allocate_string(heap: &mut Heap, value: &str) -> Value {
 #[derive(Debug, Clone)]
 pub struct RuntimeError {
   kind: ErrorKind,
-  span: Span,
+  traceback: Vec<StackTraceLocation>,
 }
 impl RuntimeError {
   /// The title of the error message
@@ -533,10 +537,43 @@ impl RuntimeError {
   pub fn message(&self) -> String {
     self.kind.message()
   }
+
+  /// The traceback of the error
+  #[must_use]
+  pub fn traceback(&self, line_index: &LineIndex) -> Option<String> {
+    use std::fmt::Write;
+
+    if self.traceback.is_empty() {
+      return None;
+    }
+
+    let mut string = String::new();
+
+    for location in &self.traceback {
+      let line = line_index.get_line(location.span);
+      match &location.kind {
+        StackTraceLocationKind::Root => {
+          writeln!(&mut string, "at line {line}").unwrap();
+        }
+        StackTraceLocationKind::Function(name) if name.is_empty() => {
+          writeln!(string, "in anonymous function at line {line}").unwrap();
+        }
+        StackTraceLocationKind::Function(name) => {
+          writeln!(string, "in function '{name}' at line {line}").unwrap();
+        }
+      };
+    }
+
+    Some(string)
+  }
 }
 impl GetSpan for RuntimeError {
   fn span(&self) -> Span {
-    self.span
+    self
+      .traceback
+      .first()
+      .map(GetSpan::span)
+      .unwrap_or_default()
   }
 }
 impl fmt::Display for RuntimeError {
@@ -590,4 +627,38 @@ impl ErrorKind {
       Self::OutOfMemory => "could not initialise enough memory for the heap".into(),
     }
   }
+}
+
+#[derive(Clone, Debug)]
+struct StackTraceLocation {
+  kind: StackTraceLocationKind,
+  span: Span,
+}
+impl StackTraceLocation {
+  fn from_chunk_ip(chunk: &Chunk, ip: usize, offset: usize) -> Self {
+    let span = chunk.get_span(ip);
+
+    let kind = if offset == 0 {
+      StackTraceLocationKind::Root
+    } else {
+      StackTraceLocationKind::Function(chunk.name.clone())
+    };
+
+    StackTraceLocation { kind, span }
+  }
+  fn from_frame(frame: &CallFrame) -> Self {
+    let chunk = unsafe { &*frame.chunk };
+
+    Self::from_chunk_ip(chunk, frame.ip, frame.offset)
+  }
+}
+impl GetSpan for StackTraceLocation {
+  fn span(&self) -> Span {
+    self.span
+  }
+}
+#[derive(Clone, Debug)]
+enum StackTraceLocationKind {
+  Function(SmartString),
+  Root,
 }

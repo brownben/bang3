@@ -5,7 +5,7 @@ use std::{fmt, mem, ptr};
 /// A chunk of bytecode
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Chunk {
-  name: SmartString,
+  pub(crate) name: SmartString,
   code: Vec<u8>,
   pub(crate) constants: Vec<ConstantValue>,
   strings: Vec<SmartString>,
