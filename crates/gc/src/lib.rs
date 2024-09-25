@@ -167,7 +167,7 @@ impl Heap {
   /// # Panics
   /// The function panics if the allocation request is larger than
   /// the largest allocation size ([`MAX_REAM_SIZE`]).
-  pub fn allocate_bytes(&mut self, bytes: usize) -> Gc<u8> {
+  fn allocate_bytes(&mut self, bytes: usize) -> Gc<u8> {
     debug_assert!(!self.is_collecting);
 
     if bytes <= PAGE_SIZE {
@@ -210,6 +210,73 @@ impl Heap {
     self[pointer.cast::<[u8; SIZE]>()].fill(0);
     self[pointer] = value;
     pointer
+  }
+
+  /// Allocates a list of type T to the heap,
+  /// and returns a virtual pointer to the header of the list.
+  ///
+  /// # Panics
+  /// The function panics if the allocation request is larger than
+  /// the largest allocation size ([`MAX_REAM_SIZE`]).
+  pub fn allocate_list_header<T: Sized>(&mut self, length: usize) -> GcList<T> {
+    debug_assert!(!self.is_collecting);
+
+    let pointer: Gc<usize> = self
+      .allocate_bytes(mem::size_of::<usize>() + length * mem::size_of::<T>())
+      .cast();
+    self[pointer] = length;
+
+    GcList::from(pointer)
+  }
+
+  /// Allocates a list of type T to the heap,
+  /// and returns a virtual pointer to the header of the list.
+  ///
+  /// # Panics
+  /// The function panics if the allocation request is larger than
+  /// the largest allocation size ([`MAX_REAM_SIZE`]).
+  pub fn allocate_list<T: Sized>(
+    &mut self,
+    iterator: impl Iterator<Item = T>,
+    length: usize,
+  ) -> GcList<T> {
+    debug_assert!(!self.is_collecting);
+
+    let list: GcList<T> = self.allocate_list_header(length);
+    let buffer = self.get_list_buffer_mut(list);
+
+    for (i, item) in iterator.enumerate() {
+      debug_assert!(i < length);
+      buffer[i] = item;
+    }
+
+    list
+  }
+
+  /// Get the buffer of a list allocated with [`Heap::allocate_list`].
+  #[must_use]
+  pub fn get_list_buffer<T>(&self, pointer: GcList<T>) -> &[T] {
+    let length = self[*pointer];
+    let buffer_ptr = unsafe {
+      pointer
+        .get_pointer(self.raw.base())
+        .add(mem::size_of::<usize>())
+        .cast()
+    };
+
+    unsafe { core::slice::from_raw_parts(buffer_ptr, length) }
+  }
+
+  /// Get the buffer of a list allocated with [`Heap::allocate_list`].
+  #[must_use]
+  pub fn get_list_buffer_mut<T>(&mut self, pointer: GcList<T>) -> &mut [T] {
+    let length = self[*pointer];
+    let buffer_ptr = pointer
+      .add(mem::size_of::<usize>())
+      .get_pointer(self.raw.base())
+      .cast();
+
+    unsafe { core::slice::from_raw_parts_mut(buffer_ptr, length) }
   }
 
   /// Allocates a ream with enough pages to hold `bytes` bytes.
@@ -346,7 +413,7 @@ impl<T> ops::Index<Gc<T>> for Heap {
     let is_block_allocated = page.is_block_allocated(index.block_index());
     debug_assert!(self.is_collecting || is_block_allocated, "use after free");
 
-    unsafe { &*self.raw.base().add(index.addr()).cast() }
+    unsafe { &*index.get_pointer(self.raw.base()).cast() }
   }
 }
 impl<T> ops::IndexMut<Gc<T>> for Heap {
@@ -355,7 +422,7 @@ impl<T> ops::IndexMut<Gc<T>> for Heap {
     let is_block_allocated = page.is_block_allocated(index.block_index());
     debug_assert!(self.is_collecting || is_block_allocated, "use after free");
 
-    unsafe { &mut *self.raw.base().add(index.addr()).cast() }
+    unsafe { &mut *index.get_pointer(self.raw.base()).cast() }
   }
 }
 
@@ -436,6 +503,10 @@ impl<T> Gc<T> {
     }
   }
 
+  fn get_pointer(self, heap_base: *mut u8) -> *mut u8 {
+    unsafe { heap_base.add(self.addr()).cast() }
+  }
+
   /// The index of the block in the page this pointer is to
   fn block_index(self) -> usize {
     self.addr() % PAGE_SIZE
@@ -462,6 +533,43 @@ impl<T> Copy for Gc<T> {}
 impl<T> fmt::Debug for Gc<T> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "Gc({:x?})", self.value.get())
+  }
+}
+
+/// A virtual pointer to a list on the heap
+///
+/// It consists of a header, which stores the size of the list, followed directly
+/// by a series of values all of the same type.
+#[derive(PartialEq, Eq)]
+#[must_use]
+#[repr(transparent)]
+pub struct GcList<T: Sized> {
+  header: Gc<usize>,
+  _inner: PhantomData<T>,
+}
+impl<T> Clone for GcList<T> {
+  fn clone(&self) -> Self {
+    *self
+  }
+}
+impl<T> Copy for GcList<T> {}
+impl<T> fmt::Debug for GcList<T> {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "GcList({:x?})", self.value.get())
+  }
+}
+impl<T> ops::Deref for GcList<T> {
+  type Target = Gc<usize>;
+  fn deref(&self) -> &Self::Target {
+    &self.header
+  }
+}
+impl<T> From<Gc<usize>> for GcList<T> {
+  fn from(value: Gc<usize>) -> Self {
+    Self {
+      header: value,
+      _inner: PhantomData,
+    }
   }
 }
 

@@ -1,6 +1,7 @@
-use crate::object::{self, GcString};
-
-use super::bytecode::Chunk;
+use super::{
+  bytecode::Chunk,
+  object::{BangString, Closure, NativeFunction},
+};
 use bang_gc::{Gc, Heap};
 use smartstring::alias::String as SmartString;
 use std::{fmt, mem, ptr};
@@ -148,7 +149,7 @@ impl Value {
     if self.is_constant_string() {
       self.as_constant_string().as_str()
     } else {
-      heap[self.as_object::<GcString>()].as_str()
+      BangString::from(self.as_object()).as_str(heap)
     }
   }
 
@@ -248,10 +249,10 @@ impl Value {
       x if x.is_string() => x.as_string(heap).to_owned(),
       x if x.is_function() => x.as_function(heap).display(),
       x if x.is_object_type(Type::NativeFunction) => {
-        heap[x.as_object::<object::NativeFunction>()].to_string()
+        heap[x.as_object::<NativeFunction>()].to_string()
       }
       x if x.is_object_type(Type::Closure) => {
-        format!("{}", heap[x.as_object::<object::Closure>()])
+        format!("{}", heap[x.as_object::<Closure>()])
       }
       _ => unreachable!(),
     }

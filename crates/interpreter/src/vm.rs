@@ -1,9 +1,9 @@
 use super::{
   bytecode::{Chunk, ConstantValue, OpCode},
-  object::{Closure, GcString, NativeFunction, UpvalueList},
+  object::{BangString, Closure, NativeFunction},
   value::{Type, Value},
 };
-use bang_gc::{Gc, Heap, HeapSize};
+use bang_gc::{GcList, Heap, HeapSize};
 use bang_parser::{GetSpan, LineIndex, Span};
 
 use rustc_hash::FxHashMap as HashMap;
@@ -15,14 +15,7 @@ struct CallFrame {
   ip: usize,
   offset: usize,
   chunk: *const Chunk,
-  upvalues: Option<Gc<UpvalueList>>,
-}
-impl CallFrame {
-  fn upvalues(&self) -> Gc<UpvalueList> {
-    debug_assert!(self.upvalues.is_some());
-
-    unsafe { self.upvalues.unwrap_unchecked() }
-  }
+  upvalues: Option<GcList<Value>>,
 }
 
 /// A virtual machine to execute compiled bytecode
@@ -119,19 +112,12 @@ impl VM {
   }
 
   #[inline]
-  fn peek_frame(&self) -> &CallFrame {
-    // SAFETY: Assume bytecode is valid, so frames is not empty
-    debug_assert!(!self.frames.is_empty());
-
-    unsafe { self.frames.last().unwrap_unchecked() }
-  }
-  #[inline]
   fn push_frame(
     &mut self,
     ip: usize,
     offset: usize,
     chunk: *const Chunk,
-    upvalues: Option<Gc<UpvalueList>>,
+    upvalues: Option<GcList<Value>>,
   ) {
     self.frames.push(CallFrame {
       ip,
@@ -146,6 +132,21 @@ impl VM {
     debug_assert!(!self.frames.is_empty());
 
     unsafe { self.frames.pop().unwrap_unchecked() }
+  }
+
+  #[inline]
+  fn get_last_frame_upvalues(&self) -> GcList<Value> {
+    // SAFETY: Assume bytecode is valid, so frames is not empty
+    debug_assert!(!self.frames.is_empty());
+
+    unsafe {
+      self
+        .frames
+        .last()
+        .unwrap_unchecked()
+        .upvalues
+        .unwrap_unchecked()
+    }
   }
 
   #[inline]
@@ -174,8 +175,8 @@ impl VM {
 
         if value.is_object_type(Type::Closure) {
           let closure = &heap[value.as_object::<Closure>()];
-          heap.mark(closure.upvalues);
-          for upvalue in heap[closure.upvalues].iter() {
+          heap.mark(*closure.upvalues);
+          for upvalue in heap.get_list_buffer(closure.upvalues) {
             mark_value(heap, *upvalue);
           }
         }
@@ -192,9 +193,9 @@ impl VM {
     }
     for frame in &self.frames {
       if let Some(upvalues) = frame.upvalues {
-        self.heap.mark(upvalues);
+        self.heap.mark(*upvalues);
 
-        for upvalue in self.heap[upvalues].iter() {
+        for upvalue in self.heap.get_list_buffer(upvalues) {
           mark_value(&self.heap, *upvalue);
         }
       }
@@ -261,7 +262,7 @@ impl VM {
               ((left.as_ptr(), left.len()), (right.as_ptr(), right.len()))
             };
 
-            let new_string = GcString::concatenate(&mut self.heap, left, right);
+            let new_string = BangString::concatenate(&mut self.heap, left, right);
             self.push(new_string);
           } else {
             break Some(ErrorKind::TypeErrorBinary {
@@ -383,13 +384,9 @@ impl VM {
           let upvalues = self
             .stack
             .drain((self.stack.len() - usize::from(upvalue_count))..);
-          let upvalue_list = UpvalueList::new(&mut self.heap, upvalue_count, upvalues);
+          let upvalue_list = self.heap.allocate_list(upvalues, upvalue_count.into());
 
-          let value = self.pop();
-          if !value.is_function() {
-            break Some(ErrorKind::NonFunctionClosure);
-          }
-
+          let value = self.pop(); // assume is function, as bytecode is valid
           let closure = self
             .heap
             .allocate(Closure::new(value.as_function(&self.heap), upvalue_list));
@@ -397,7 +394,8 @@ impl VM {
         }
         OpCode::GetUpvalue => {
           let upvalue = chunk.get_value(ip + 1);
-          let address = self.heap[self.peek_frame().upvalues()][upvalue];
+          let address: Value =
+            self.heap.get_list_buffer(self.get_last_frame_upvalues())[usize::from(upvalue)];
           let value = self.heap[address.as_object::<Value>()];
 
           self.push(value);
@@ -411,7 +409,8 @@ impl VM {
         }
         OpCode::GetAllocatedPointer => {
           let index = chunk.get_value(ip + 1);
-          let allocated = self.heap[self.peek_frame().upvalues()][index];
+          let allocated: Value =
+            self.heap.get_list_buffer(self.get_last_frame_upvalues())[usize::from(index)];
 
           self.push(allocated);
         }
@@ -510,13 +509,8 @@ macro comparison_operation(($vm:expr, $chunk:expr), $operator:tt) {{
 
 /// Allocates a string on the heap and returns a `Value` pointing to it.
 pub(crate) fn allocate_string(heap: &mut Heap, value: &str) -> Value {
-  let string_ptr = heap.allocate_bytes(GcString::size(value.len()));
-
-  let string = &mut heap[string_ptr.cast::<GcString>()];
-  string.length = u32::try_from(value.len()).expect("string is allocatable");
-  string.buffer_mut().copy_from_slice(value.as_bytes());
-
-  Value::from_object(string_ptr, Type::String)
+  let string = heap.allocate_list(value.bytes(), value.len());
+  Value::from_object(*string, Type::String)
 }
 
 /// An error whilst executing bytecode
@@ -595,7 +589,6 @@ enum ErrorKind {
   },
   UndefinedVariable(String),
   NotCallable(&'static str),
-  NonFunctionClosure,
   OutOfMemory,
 }
 impl ErrorKind {
@@ -605,7 +598,6 @@ impl ErrorKind {
       Self::TypeError { .. } | Self::TypeErrorBinary { .. } => "Type Error",
       Self::UndefinedVariable(_) => "Undefined Variable",
       Self::NotCallable(_) => "Not Callable",
-      Self::NonFunctionClosure => "Non-Function Closure",
       Self::OutOfMemory => "Out of Memory",
     }
   }
@@ -623,7 +615,6 @@ impl ErrorKind {
       Self::NotCallable(type_) => {
         format!("`{type_}` is not callable, only functions are callable")
       }
-      Self::NonFunctionClosure => "can only close over functions".into(),
       Self::OutOfMemory => "could not initialise enough memory for the heap".into(),
     }
   }

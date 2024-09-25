@@ -35,9 +35,11 @@ macro assert_variable  {
     let string = allocate_string(&mut vm.heap, $string);
     assert!(
       value.equals(string, &vm.heap),
-      "{} != {}",
+      "{} (type {}) != {} (type {})",
       value.display(&vm.heap),
-      value.display(&vm.heap),
+      value.get_type(),
+      string.display(&vm.heap),
+      string.get_type(),
     );
   },
   ($vm:expr; $name:ident, $value:expr) => {
