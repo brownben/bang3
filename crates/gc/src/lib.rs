@@ -179,7 +179,7 @@ impl Heap {
       self.full_list_len += 1;
       ream.data_pointer()
     } else {
-      panic!("unreasonable allocation request: {bytes} bytes");
+      panic!("Allocation Too Large: can't allocate {bytes} bytes");
     }
   }
 
@@ -231,7 +231,7 @@ impl Heap {
       return ream;
     }
 
-    panic!("Ran out of pages");
+    panic!("Out of Memory: could not allocate {bytes} bytes");
   }
 
   /// Allocates a block of size `class`
@@ -305,7 +305,7 @@ impl Heap {
 
     for page in self.full_list.iter() {
       if page.is_empty() {
-        if page.pages() > 0 {
+        if page.is_ream() {
           self.free_ream_list.push(page);
         } else {
           self.free_page_list.push(page);
@@ -385,7 +385,10 @@ impl RawMemory {
 
   /// Creates a new maximum-size ream by creating pages for it.
   fn materialize_new_ream(&mut self) -> PageDescriptorRef {
-    assert!(self.used_pages < self.page_count, "Ran out of pages");
+    assert!(
+      self.used_pages < self.page_count,
+      "Out of Memory: Heap is full"
+    );
 
     let pages = self.used_pages;
     self.used_pages += u16::MAX as usize;

@@ -143,4 +143,6 @@ fn no_erasing_operations() {
   assert!(lint("4 * 5").is_ok());
   assert!(lint("4 / 5").is_ok());
   assert!(lint("1 / 0").is_ok());
+  assert!(lint("1 / ''").is_ok());
+  assert!(lint("1 * (1 - 1)").is_ok());
 }

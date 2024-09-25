@@ -256,11 +256,6 @@ impl ops::Index<TypeRef> for TypeArena {
     &self.types[usize::try_from(index.0).unwrap()]
   }
 }
-impl ops::IndexMut<TypeRef> for TypeArena {
-  fn index_mut(&mut self, index: TypeRef) -> &mut Self::Output {
-    &mut self.types[usize::try_from(index.0).unwrap()]
-  }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Type {

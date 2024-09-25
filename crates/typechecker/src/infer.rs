@@ -55,7 +55,10 @@ impl Typechecker {
       Statement::Comment(_) => {}
       Statement::Expression(expression) => match expression.infer(self) {
         Ok(type_) => return type_,
-        Err(error) => self.problems.push(error),
+        Err(error) => {
+          self.problems.push(error);
+          return TypeArena::UNKNOWN;
+        }
       },
       Statement::Let(let_) => {
         if let Expression::Function(_) = &let_.expression {
@@ -94,13 +97,7 @@ impl Typechecker {
       .define_variable(&let_.identifier, TypeScheme::monomorphic(function_type));
 
     // Infer the function type
-    let expression_type = match let_.expression.infer(self) {
-      Ok(type_) => type_,
-      Err(error) => {
-        self.problems.push(error);
-        TypeArena::UNKNOWN
-      }
-    };
+    let expression_type = let_.expression.infer(self).unwrap();
 
     // Update the variable type to be the inferred type
     self.env.update_variable(
@@ -267,7 +264,7 @@ impl InferType for Function<'_, '_> {
 
     t.env
       .define_variable(&self.parameter, TypeScheme::monomorphic(parameter));
-    let return_type = self.body.infer(t)?;
+    let return_type = self.body.infer(t).unwrap_or(TypeArena::UNKNOWN);
     t.types.unify(return_type, expected_return).unwrap();
 
     t.env.exit_scope(self.span());

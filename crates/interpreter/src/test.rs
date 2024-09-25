@@ -23,6 +23,7 @@ fn run(source: &str) -> Result<VM, Error> {
   let ast = parse(source, &allocator);
   let chunk = compile(&ast)?;
   let mut vm = VM::new(HeapSize::Small).unwrap();
+  vm.define_builtin_functions();
   vm.run(&chunk)?;
   Ok(vm)
 }
@@ -196,6 +197,8 @@ fn not() {
     let f = !0
     let g = !-1
     let h = !3
+    let i = !('' ++ '')
+    let j = !(x => x)
   "});
 
   assert_variable!(vm; a, true);
@@ -206,6 +209,8 @@ fn not() {
   assert_variable!(vm; f, true);
   assert_variable!(vm; g, false);
   assert_variable!(vm; h, false);
+  assert_variable!(vm; i, true);
+  assert_variable!(vm; j, false);
 }
 
 #[test]
@@ -708,4 +713,65 @@ fn fibonacci_match() {
   "});
   assert_variable!(fibonnacci_match; a, 1.0);
   assert_variable!(fibonnacci_match; b, 8.0);
+}
+
+mod builtin_function {
+  use super::{assert_variable, run};
+
+  #[test]
+  fn to_string() {
+    let mut string = run("let a = toString('hello')");
+    assert_variable!(string; a, string "hello");
+
+    let mut number = run("let a = toString(55.2)");
+    assert_variable!(number; a, string "55.2");
+
+    let mut r#false = run("let a = toString(false)");
+    assert_variable!(r#false; a, string "false");
+
+    let mut r#true = run("let a = toString(true)");
+    assert_variable!(r#true; a, string "true");
+
+    let mut builtin_function = run("let a = toString(print)");
+    assert_variable!(builtin_function; a, string "<function print>");
+
+    let mut named_function = run("let identity = x => x\nlet a = toString(identity)");
+    assert_variable!(named_function; a, string "<function identity>");
+
+    let mut anonymous_function = run("let a = toString(x => x)");
+    assert_variable!(anonymous_function; a, string "<function>");
+
+    let mut closure = run("let a = toString((x => _ => x)())");
+    assert_variable!(closure; a, string "<closure <function>>");
+  }
+
+  #[test]
+  fn type_of() {
+    let mut string = run("let a = type('hello')");
+    assert_variable!(string; a, string "string");
+
+    let mut allocated_string = run("let a = type('hello' ++ ' world')");
+    assert_variable!(allocated_string; a, string "string");
+
+    let mut number = run("let a = type(55.2)");
+    assert_variable!(number; a, string "number");
+
+    let mut r#false = run("let a = type(false)");
+    assert_variable!(r#false; a, string "boolean");
+
+    let mut r#true = run("let a = type(true)");
+    assert_variable!(r#true; a, string "boolean");
+
+    let mut builtin_function = run("let a = type(print)");
+    assert_variable!(builtin_function; a, string "function");
+
+    let mut named_function = run("let identity = x => x\nlet a = type(identity)");
+    assert_variable!(named_function; a, string "function");
+
+    let mut anonymous_function = run("let a = type(x => x)");
+    assert_variable!(anonymous_function; a, string "function");
+
+    let mut closure = run("let a = type((x => _ => x)())");
+    assert_variable!(closure; a, string "function");
+  }
 }

@@ -72,7 +72,7 @@ impl VM {
       println!("{}", arg.display(&vm.heap));
       arg
     });
-    let to_string_function = NativeFunction::new("to_string", |vm, arg| {
+    let to_string_function = NativeFunction::new("toString", |vm, arg| {
       if arg.is_string() {
         arg
       } else {

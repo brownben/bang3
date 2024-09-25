@@ -216,7 +216,6 @@ impl Value {
       Self(FALSE | NULL) => true,
       x if x.is_number() => (x.as_number() - 0.0).abs() < f64::EPSILON,
       x if x.is_string() => x.as_string(heap).is_empty(),
-      x if x.is_constant_function() => false,
       _ => false, // all other objects are truthy
     }
   }
@@ -248,6 +247,9 @@ impl Value {
       x if x.is_number() => x.as_number().to_string(),
       x if x.is_string() => x.as_string(heap).to_owned(),
       x if x.is_function() => x.as_function(heap).display(),
+      x if x.is_object_type(Type::NativeFunction) => {
+        heap[x.as_object::<object::NativeFunction>()].to_string()
+      }
       x if x.is_object_type(Type::Closure) => {
         format!("{}", heap[x.as_object::<object::Closure>()])
       }
@@ -310,7 +312,7 @@ pub const NULL: *const () = ptr::without_provenance(0xFFFF_0000_0000_0037);
 
 /// Marker to indicate the type of a garbage collected object
 /// Stored inline with the [Value] for quick access
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 #[repr(u16)]
 pub enum Type {
   String,

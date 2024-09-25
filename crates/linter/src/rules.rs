@@ -224,7 +224,7 @@ impl LintRule for NoUselessIf {
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression) {
     if let Expression::If(if_) = &expression
-      && if_.then.unwrap().equals(&if_.otherwise.unwrap())
+      && if_.then.unwrap().equals(if_.otherwise.unwrap())
     {
       context.add_diagnostic(&Self, if_.span());
     }
@@ -252,14 +252,14 @@ impl LintRule for NoErasingOperations {
 
     if let Expression::Binary(binary) = &expression
       && binary.operator == BinaryOperator::Multiply
-      && (is_zero(&binary.left.unwrap()) || is_zero(&binary.right.unwrap()))
+      && (is_zero(binary.left.unwrap()) || is_zero(binary.right.unwrap()))
     {
       context.add_diagnostic(&Self, binary.span());
     }
 
     if let Expression::Binary(binary) = &expression
       && binary.operator == BinaryOperator::Divide
-      && is_zero(&binary.left.unwrap())
+      && is_zero(binary.left.unwrap())
     {
       context.add_diagnostic(&Self, binary.span());
     }

@@ -103,6 +103,7 @@ fn block() {
 
 #[test]
 fn call() {
+  assert_format!("function()", "function()", 25);
   assert_format!("function(a)", "function(a)", 25);
   assert_format!("function(a)", "function(\n  a\n)", 8);
   assert_format!("function((a))", "function(a)", 25);

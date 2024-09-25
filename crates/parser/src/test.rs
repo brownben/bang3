@@ -613,6 +613,17 @@ mod fault_tolerant {
     "};
     assert!(ast.is_err());
     assert_eq!(ast.to_string(), expected);
+
+    let ast = parse("func(\n", &allocator);
+    let expected = indoc! {"
+      ├─ Call
+      │  ├─ Callee
+      │  │  ╰─ Variable (func)
+      │  ╰─ Argument
+      │     ╰─ Invalid
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
   }
 
   #[test]

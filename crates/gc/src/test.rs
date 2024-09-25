@@ -99,3 +99,146 @@ fn small_heap() {
   allocator.mark(e);
   allocator.finish_gc();
 }
+
+#[test]
+fn fill_pages_with_small_objects_then_gc_all() {
+  let mut allocator = Heap::new(HeapSize::Small).unwrap();
+  for _ in 0..64 {
+    let _ = allocator.allocate_bytes(60);
+  }
+
+  allocator.start_gc();
+  allocator.finish_gc();
+}
+
+#[test]
+fn fill_pages_with_small_objects() {
+  let mut allocator = Heap::new(HeapSize::Small).unwrap();
+  for _ in 0..28 {
+    let _ = allocator.allocate_bytes(60);
+  }
+  let a = allocator.allocate_bytes(60);
+  let b = allocator.allocate_bytes(60);
+  for _ in 0..6 {
+    let _ = allocator.allocate_bytes(60);
+  }
+  let c = allocator.allocate_bytes(60);
+  for _ in 0..3 {
+    let _ = allocator.allocate_bytes(60);
+  }
+  let d = allocator.allocate_bytes(60);
+  for _ in 0..45 {
+    let _ = allocator.allocate_bytes(60);
+  }
+
+  assert_eq!(allocator.size_class_lists[0].iter().count(), 1);
+  assert_eq!(allocator.full_list.iter().count(), 1);
+
+  allocator.start_gc();
+  allocator.mark(a);
+  allocator.mark(b);
+  allocator.mark(c);
+  allocator.mark(d);
+  allocator.finish_gc();
+
+  assert_eq!(allocator.size_class_lists[0].iter().count(), 1);
+  assert_eq!(allocator.full_list.iter().count(), 0);
+
+  for _ in 0..6 {
+    let _ = allocator.allocate_bytes(60);
+  }
+  allocator.start_gc();
+  allocator.mark(a);
+  allocator.mark(b);
+  allocator.mark(c);
+  allocator.mark(d);
+  allocator.finish_gc();
+
+  allocator.start_gc();
+  allocator.finish_gc();
+}
+
+#[test]
+fn fill_page_then_reuse_diff_size() {
+  let mut allocator = Heap::new(HeapSize::Small).unwrap();
+  for _ in 0..70 {
+    let _ = allocator.allocate_bytes(60);
+  }
+  assert_eq!(allocator.size_class_lists[0].iter().count(), 1);
+  assert_eq!(allocator.full_list.iter().count(), 1);
+
+  allocator.start_gc();
+  allocator.finish_gc();
+  assert_eq!(allocator.full_list.iter().count(), 0);
+
+  for _ in 0..32 {
+    let _ = allocator.allocate_bytes(128);
+  }
+  assert_eq!(allocator.full_list.iter().count(), 1);
+
+  allocator.start_gc();
+  allocator.finish_gc();
+  assert_eq!(allocator.full_list.iter().count(), 0);
+}
+
+#[test]
+fn allocate_ream() {
+  let mut allocator = Heap::new(HeapSize::Small).unwrap();
+  let ream = allocator.allocate_bytes(PAGE_SIZE + 1);
+
+  allocator.start_gc();
+  allocator.mark(ream);
+  allocator.finish_gc();
+
+  allocator.start_gc();
+  allocator.finish_gc();
+}
+
+#[test]
+fn allocate_ream_then_reuse_split() {
+  let mut allocator = Heap::new(HeapSize::Small).unwrap();
+  let _ream = allocator.allocate_bytes(PAGE_SIZE + PAGE_SIZE + 1);
+
+  allocator.start_gc();
+  allocator.finish_gc();
+
+  let _ream = allocator.allocate_bytes(PAGE_SIZE + 1);
+
+  allocator.start_gc();
+  allocator.finish_gc();
+}
+
+#[test]
+fn allocate_ream_then_reuse() {
+  let mut allocator = Heap::new(HeapSize::Small).unwrap();
+  let _ream = allocator.allocate_bytes(PAGE_SIZE + 1);
+
+  assert_eq!(allocator.full_list.iter().count(), 1);
+  assert_eq!(allocator.free_ream_list.iter().count(), 1);
+  allocator.start_gc();
+  allocator.finish_gc();
+  assert_eq!(allocator.full_list.iter().count(), 0);
+  assert_eq!(allocator.free_ream_list.iter().count(), 2);
+
+  let _ream = allocator.allocate_bytes(PAGE_SIZE + 1);
+
+  assert_eq!(allocator.full_list.iter().count(), 1);
+  assert_eq!(allocator.free_ream_list.iter().count(), 1);
+  allocator.start_gc();
+  allocator.finish_gc();
+}
+
+#[test]
+fn allocate_ream_then_reuse_too_small() {
+  let mut allocator = Heap::new(HeapSize::Small).unwrap();
+  let _ream = allocator.allocate_bytes(PAGE_SIZE + 1);
+
+  allocator.start_gc();
+  allocator.finish_gc();
+  assert_eq!(allocator.free_ream_list.iter().count(), 2);
+
+  let _ream = allocator.allocate_bytes(PAGE_SIZE * 3);
+
+  assert_eq!(allocator.full_list.iter().count(), 1);
+  assert_eq!(allocator.free_ream_list.iter().count(), 2);
+}

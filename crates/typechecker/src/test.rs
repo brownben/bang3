@@ -9,9 +9,21 @@ fn synthesize(source: &str) -> String {
 
   let mut checker = Typechecker::new();
   let result = checker.check_ast(&ast);
-
   assert!(checker.problems.is_empty());
-  checker.types.type_to_string(result)
+
+  let generalized_type = checker.types.generalize(result, 0).type_;
+  checker.types.type_to_string(generalized_type)
+}
+
+fn synthesize_has_error(source: &str) -> String {
+  let allocator = Allocator::new();
+  let ast = parse(source, &allocator);
+
+  let mut checker = Typechecker::new();
+  let result = checker.check_ast(&ast);
+
+  let generalized_type = checker.types.generalize(result, 0).type_;
+  checker.types.type_to_string(generalized_type)
 }
 
 fn has_type_error(source: &str) -> bool {
@@ -70,6 +82,17 @@ fn binary_pipeline() {
     5 >> addSeven >> multiplyByTwo
   "};
   assert_eq!(synthesize(source), "number");
+
+  let incorrect_arg = indoc! {"
+    let addSeven = x => x + 7
+    let multiplyByTwo = x => x * 2
+
+    'hello' >> addSeven >> multiplyByTwo
+  "};
+  assert!(has_type_error(incorrect_arg));
+
+  let not_callable = "4 >> 5";
+  assert!(has_type_error(not_callable));
 }
 
 #[test]
@@ -103,10 +126,15 @@ fn call() {
   "};
   assert_eq!(synthesize(no_parameter_with_argument), "number");
 
-  assert!(has_type_error("let a = x => x + 1\na(-false)"));
   assert!(has_type_error("false()"));
   assert!(has_type_error("4.5()"));
   assert!(has_type_error("(-false)()"));
+
+  let incorrect_argument = indoc! {"
+    let a = x => x + 1
+    a(false)
+  "};
+  assert!(has_type_error(incorrect_argument));
 }
 
 #[test]
@@ -227,6 +255,9 @@ fn match_exhaustiveness() {
 
   let extra_catch_all = "match 4 > 5 | _ -> 5 | true -> 1 | false -> 3";
   assert!(has_type_error(extra_catch_all));
+
+  let needs_catch_all = "match 555 | 1 -> 1";
+  assert!(has_type_error(needs_catch_all));
 }
 
 #[test]
@@ -368,4 +399,41 @@ fn builtin_functions() {
     toString == type
   "};
   assert_eq!(synthesize(source), "boolean");
+}
+
+#[test]
+fn empty_ast() {
+  assert_eq!(synthesize(""), "never");
+}
+
+#[test]
+fn expression_has_error() {
+  assert_eq!(synthesize_has_error("let a = -false\na"), "unknown");
+  assert_eq!(synthesize_has_error("_ => -false"), "a' => unknown");
+
+  assert_eq!(
+    synthesize_has_error("let a = _ => -false\na"),
+    "a' => unknown"
+  );
+}
+
+#[test]
+fn infer_function() {
+  assert_eq!(synthesize("a => b => a + b"), "number => number => number");
+  assert_eq!(
+    synthesize("a => b => if (a) b else b + 1"),
+    "a' => number => number"
+  );
+  assert_eq!(
+    synthesize("a => b => c => if (a) b else c"),
+    "a' => d' => d' => d'"
+  );
+  assert_eq!(
+    synthesize("let x = (a => b => c => if (a) b() else c + 1)\nx"),
+    "a' => (never => number) => number => number"
+  );
+  assert_eq!(
+    synthesize("let x = (a => b => c => if (a == 1) b(a) else c ++ '')\nx"),
+    "number => (number => string) => string => string"
+  );
 }
