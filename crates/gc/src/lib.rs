@@ -44,7 +44,7 @@
 //!
 //! We do not yet compact consecutive empty pages back into reams.
 
-#![no_std]
+#![cfg_attr(not(feature = "no-mmap"), no_std)]
 #![feature(strict_provenance)]
 
 use core::{fmt, marker::PhantomData, mem, num::NonZero, ops, panic};
@@ -193,21 +193,6 @@ impl Heap {
 
     let allocation_size = mem::size_of::<T>();
     let pointer = self.allocate_bytes(allocation_size).cast();
-    self[pointer] = value;
-    pointer
-  }
-
-  /// Allocates a type to the heap which has been zeroed,
-  /// and returns a virtual pointer to the allocated memory.
-  ///
-  /// # Panics
-  /// The function panics if the allocation request is larger than
-  /// the largest allocation size ([`MAX_REAM_SIZE`]).
-  pub fn allocate_zeroed<T: Sized, const SIZE: usize>(&mut self, value: T) -> Gc<T> {
-    debug_assert!(!self.is_collecting);
-
-    let pointer = self.allocate_bytes(SIZE).cast();
-    self[pointer.cast::<[u8; SIZE]>()].fill(0);
     self[pointer] = value;
     pointer
   }
@@ -428,26 +413,52 @@ impl<T> ops::IndexMut<Gc<T>> for Heap {
 
 #[derive(Debug)]
 struct RawMemory {
+  #[cfg(not(feature = "no-mmap"))]
   mmap: mmap_rs::MmapMut,
-  used_pages: usize,
 
+  #[cfg(feature = "no-mmap")]
+  alloc: *mut u8,
+
+  #[cfg(feature = "no-mmap")]
+  /// we need to keep track of the heap size, to deallocate it later
+  heap_size: usize,
+
+  used_pages: usize,
   page_count: usize,
 }
 impl RawMemory {
+  #[allow(clippy::unnecessary_wraps, reason = "only with no-mmap")]
   fn new(heap_size: usize) -> Option<Self> {
     let page_count = heap_size / (PAGE_SIZE + PageDescriptor::SIZE);
 
     Some(Self {
+      #[cfg(not(feature = "no-mmap"))]
       mmap: mmap_rs::MmapOptions::new(heap_size).ok()?.map_mut().ok()?,
-      used_pages: 0,
 
+      #[cfg(feature = "no-mmap")]
+      alloc: unsafe {
+        let layout = core::alloc::Layout::from_size_align(heap_size, 8).unwrap();
+        std::alloc::alloc_zeroed(layout)
+      },
+      #[cfg(feature = "no-mmap")]
+      heap_size,
+
+      used_pages: 0,
       page_count,
     })
   }
 
   /// The base address of the heap
   fn base(&self) -> *mut u8 {
-    self.mmap.as_ptr().cast_mut()
+    #[cfg(not(feature = "no-mmap"))]
+    {
+      self.mmap.as_ptr().cast_mut()
+    }
+
+    #[cfg(feature = "no-mmap")]
+    {
+      self.alloc
+    }
   }
 
   /// Creates a new maximum-size ream by creating pages for it.
@@ -463,6 +474,15 @@ impl RawMemory {
     let mut ream = PageDescriptorRef::from_index(pages, self.base());
     ream.set_ream(u16::MAX);
     ream
+  }
+}
+#[cfg(feature = "no-mmap")]
+impl Drop for RawMemory {
+  fn drop(&mut self) {
+    unsafe {
+      let layout = core::alloc::Layout::from_size_align(self.heap_size, 8).unwrap();
+      std::alloc::dealloc(self.alloc, layout);
+    }
   }
 }
 
@@ -574,5 +594,4 @@ impl<T> From<Gc<usize>> for GcList<T> {
 }
 
 #[cfg(test)]
-#[cfg_attr(miri, ignore)]
 mod test;

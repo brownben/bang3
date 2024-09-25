@@ -8,7 +8,7 @@ use bang_parser::{GetSpan, LineIndex, Span};
 
 use rustc_hash::FxHashMap as HashMap;
 use smartstring::alias::String as SmartString;
-use std::{error, fmt, mem, ptr};
+use std::{error, fmt, ptr};
 
 #[derive(Debug)]
 struct CallFrame {
@@ -453,14 +453,8 @@ impl VM {
     for value in self.globals.values_mut() {
       if value.is_constant_string() {
         *value = allocate_string(&mut self.heap, value.as_constant_string());
-      } else if value.is_constant_function() {
-        const CHUNK_SIZE: usize = mem::size_of::<Chunk>();
-        let constant_function = value.as_constant_function().clone();
-        let ptr = self
-          .heap
-          .allocate_zeroed::<Chunk, CHUNK_SIZE>(constant_function);
-        *value = Value::from_object(ptr, Type::Function);
       }
+      // TODO: store chunks on the heap, to ensure if they are stored they can be accessed later
     }
 
     if let Some(error) = error {
