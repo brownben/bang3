@@ -123,3 +123,24 @@ fn no_unnecessary_closures() {
   assert!(lint("x => y(x) + 1").is_ok());
   assert!(lint("a => another() + a").is_ok());
 }
+
+#[test]
+fn no_useless_if() {
+  assert!(lint("if (a) pass else pass").is_err());
+  assert!(lint("if (b) 5 else { 5 }").is_err());
+
+  assert!(lint("if (c) pass else other").is_ok());
+}
+
+#[test]
+fn no_erasing_operations() {
+  assert!(lint("5 * 0").is_err());
+  assert!(lint("0 * 555").is_err());
+  assert!(lint("0 / a").is_err());
+  assert!(lint("{ 0 } * 555").is_err());
+  assert!(lint("4 * (0)").is_err());
+
+  assert!(lint("4 * 5").is_ok());
+  assert!(lint("4 / 5").is_ok());
+  assert!(lint("1 / 0").is_ok());
+}

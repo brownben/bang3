@@ -5,7 +5,7 @@ use super::{
 };
 use bang_parser::ast::{expression::*, statement::*, GetSpan};
 
-pub const RULES: [&dyn LintRule; 9] = [
+pub const RULES: [&dyn LintRule; 11] = [
   &NoConstantConditions,
   &NoNegativeZero,
   &NoSelfAssign,
@@ -15,6 +15,8 @@ pub const RULES: [&dyn LintRule; 9] = [
   &NoUselessMatch,
   &NoYodaComparison,
   &NoUnneccessaryClosures,
+  &NoUselessIf,
+  &NoErasingOperations,
 ];
 
 pub struct NoConstantConditions;
@@ -208,6 +210,58 @@ impl LintRule for NoUnneccessaryClosures {
       if call.argument.is_none() && function.parameter.name.starts_with('_') {
         context.add_diagnostic(&Self, function.span());
       }
+    }
+  }
+}
+
+pub struct NoUselessIf;
+impl LintRule for NoUselessIf {
+  fn name(&self) -> &'static str {
+    "No Useless If"
+  }
+  fn message(&self) -> &'static str {
+    "both branches of the if-else are the same, consider removing the if"
+  }
+  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+    if let Expression::If(if_) = &expression
+      && if_.then.unwrap().equals(&if_.otherwise.unwrap())
+    {
+      context.add_diagnostic(&Self, if_.span());
+    }
+  }
+}
+
+pub struct NoErasingOperations;
+impl LintRule for NoErasingOperations {
+  fn name(&self) -> &'static str {
+    "No Erasing Operations"
+  }
+  fn message(&self) -> &'static str {
+    "this operation always returns 0"
+  }
+  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+    fn is_zero(expression: &Expression) -> bool {
+      match expression {
+        Expression::Literal(literal) => match literal.kind {
+          LiteralKind::Number { value, .. } => value == 0.0,
+          _ => false,
+        },
+        _ => false,
+      }
+    }
+
+    if let Expression::Binary(binary) = &expression
+      && binary.operator == BinaryOperator::Multiply
+      && (is_zero(&binary.left.unwrap()) || is_zero(&binary.right.unwrap()))
+    {
+      context.add_diagnostic(&Self, binary.span());
+    }
+
+    if let Expression::Binary(binary) = &expression
+      && binary.operator == BinaryOperator::Divide
+      && is_zero(&binary.left.unwrap())
+    {
+      context.add_diagnostic(&Self, binary.span());
     }
   }
 }
