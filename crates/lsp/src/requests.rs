@@ -220,7 +220,7 @@ fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionList 
     },
     lsp::CompletionItem {
       label: "and".into(),
-      kind: Some(lsp::CompletionItemKind::VALUE),
+      kind: Some(lsp::CompletionItemKind::OPERATOR),
       ..Default::default()
     },
     lsp::CompletionItem {
@@ -262,6 +262,7 @@ fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionList 
     )
     .map(|(name, type_info)| match type_info.kind {
       VariableKind::Function => lsp::CompletionItem {
+        kind: Some(lsp::CompletionItemKind::FUNCTION),
         insert_text: Some(format!("{name}($0)")),
         insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
         label: name,
@@ -269,16 +270,19 @@ fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionList 
           detail: None,
           description: Some(type_info.string.clone()),
         }),
-        kind: Some(lsp::CompletionItemKind::FUNCTION),
         ..Default::default()
       },
       VariableKind::Variable => lsp::CompletionItem {
+        kind: Some(if is_screaming_snake_case(&name) {
+          lsp::CompletionItemKind::VARIABLE
+        } else {
+          lsp::CompletionItemKind::CONSTANT
+        }),
         label: name,
         label_details: Some(lsp::CompletionItemLabelDetails {
           detail: None,
           description: Some(type_info.string.clone()),
         }),
-        kind: Some(lsp::CompletionItemKind::VARIABLE),
         ..Default::default()
       },
     })
@@ -360,4 +364,8 @@ fn get_params<R: lsp::request::Request>(
   request: lsp_server::Request,
 ) -> (lsp_server::RequestId, R::Params) {
   request.extract(R::METHOD).unwrap()
+}
+
+fn is_screaming_snake_case(name: &str) -> bool {
+  name.chars().all(|c| c.is_ascii_uppercase() || c == '_')
 }
