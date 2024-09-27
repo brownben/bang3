@@ -4,7 +4,7 @@ use core::fmt;
 impl fmt::Display for Heap {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     writeln!(f, "  ╭─[Heap]")?;
-    writeln!(f, "  ├─ Base Pointer: {:x?}", self.raw.base())?;
+    writeln!(f, "  ├─ Base Pointer: {:x?}", self.raw.base)?;
     writeln!(f, "  ├─ Is Collecting? {}", self.is_collecting)?;
     writeln!(f, "  │ ")?;
 

@@ -43,4 +43,4 @@ jobs:
         with:
           tool: cargo-nextest
       - name: Test
-        run: cargo miri nextest run -F no-mmap --no-fail-fast
+        run: cargo miri nextest run --no-fail-fast
