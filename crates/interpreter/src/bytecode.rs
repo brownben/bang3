@@ -8,7 +8,7 @@ pub struct Chunk {
   pub(crate) name: SmartString,
   code: Vec<u8>,
   pub(crate) constants: Vec<ConstantValue>,
-  strings: Vec<SmartString>,
+  global_names: Vec<SmartString>,
   debug_info: DebugInfo,
 }
 impl Chunk {
@@ -17,7 +17,7 @@ impl Chunk {
       name,
       code: Vec::with_capacity(512),
       constants: Vec::with_capacity(32),
-      strings: Vec::with_capacity(16),
+      global_names: Vec::with_capacity(16),
       debug_info: DebugInfo::new(),
     }
   }
@@ -61,10 +61,10 @@ impl Chunk {
       constant_position
     }
   }
-  pub(crate) fn add_string(&mut self, string: &str) -> usize {
-    let string_position = self.strings.len();
-    self.strings.push(string.into());
-    string_position
+  pub(crate) fn add_global_name(&mut self, name: &str) -> usize {
+    let name_position = self.global_names.len();
+    self.global_names.push(name.into());
+    name_position
   }
   pub(crate) fn replace_long_value(&mut self, position: usize, value: u16) {
     let [a, b] = u16::to_le_bytes(value);
@@ -111,11 +111,11 @@ impl Chunk {
     unsafe { self.constants.get_unchecked(pointer) }
   }
   #[inline]
-  pub(crate) fn get_string(&self, pointer: usize) -> &SmartString {
+  pub(crate) fn get_global_name(&self, pointer: usize) -> &SmartString {
     // SAFETY: Assume bytecode is valid, so constant exists at pointer
-    debug_assert!(pointer < self.strings.len());
+    debug_assert!(pointer < self.global_names.len());
 
-    unsafe { self.strings.get_unchecked(pointer) }
+    unsafe { self.global_names.get_unchecked(pointer) }
   }
 
   pub(crate) fn get_span(&self, opcode_position: usize) -> Span {
@@ -332,14 +332,14 @@ impl fmt::Display for Chunk {
           write!(f, "Number {number:?}")
         }
         OpCode::DefineGlobal => {
-          let string_location = self.get_value(position + 1);
-          let string = self.get_string(string_location.into());
-          write!(f, "DefineGlobal '{string}' ({string_location})")
+          let name_location = self.get_value(position + 1);
+          let name = self.get_global_name(name_location.into());
+          write!(f, "DefineGlobal '{name}' ({name_location})")
         }
         OpCode::GetGlobal => {
-          let string_location = self.get_value(position + 1);
-          let string = self.get_string(string_location.into());
-          write!(f, "GetGlobal '{string}' ({string_location})")
+          let name_location = self.get_value(position + 1);
+          let name = self.get_global_name(name_location.into());
+          write!(f, "GetGlobal '{name}' ({name_location})")
         }
         OpCode::GetLocal => {
           let local_position = self.get_value(position + 1);

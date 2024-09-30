@@ -307,19 +307,19 @@ impl VM {
 
         // Variables
         OpCode::DefineGlobal => {
-          let string_position = chunk.get_value(ip + 1);
-          let string = chunk.get_string(string_position.into()).clone();
+          let name_position = chunk.get_value(ip + 1);
+          let name = chunk.get_global_name(name_position.into()).clone();
           let value = self.pop();
 
-          self.globals.insert(string, value);
+          self.globals.insert(name, value);
         }
         OpCode::GetGlobal => {
-          let string_position = chunk.get_value(ip + 1);
-          let string = chunk.get_string(string_position.into());
+          let name_position = chunk.get_value(ip + 1);
+          let name = chunk.get_global_name(name_position.into());
 
-          match self.globals.get(string) {
+          match self.globals.get(name) {
             Some(value) => self.push(*value),
-            None => break Some(ErrorKind::UndefinedVariable(string.to_string())),
+            None => break Some(ErrorKind::UndefinedVariable(name.to_string())),
           }
         }
         OpCode::GetLocal => {
