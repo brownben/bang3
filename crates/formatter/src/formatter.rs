@@ -140,8 +140,8 @@ impl<'a, 'b> IR<'a, 'b> {
         for ir in items {
           let ir = ir.display(line_length, indentation, flatten, config, allocator);
 
-          if ir.ends_with_line() {
-            line_length = 0;
+          if ir.contains_line() {
+            line_length = ir.end_len();
           } else {
             line_length += ir.len();
           }
@@ -223,14 +223,29 @@ impl DisplayIR<'_, '_> {
     }
   }
 
-  /// Does the current display item end with a line?
-  pub fn ends_with_line(&self) -> bool {
+  /// The length of the display item on the final line
+  pub fn end_len(&self) -> u16 {
+    match self {
+      DisplayIR::Empty => 0,
+      DisplayIR::Text(text) => u16::try_from(text.len()).unwrap(),
+      DisplayIR::Line {
+        depth, indentation, ..
+      } => indentation.len() * depth,
+      DisplayIR::Collection(x) => x
+        .iter()
+        .rev()
+        .take_while(|x| !x.contains_line())
+        .map(DisplayIR::end_len)
+        .sum(),
+    }
+  }
+
+  /// Does the current display item contain a line?
+  fn contains_line(&self) -> bool {
     match self {
       DisplayIR::Line { .. } => true,
-      DisplayIR::Collection(x) => x
-        .last()
-        .map_or(false, |x| matches!(x, DisplayIR::Line { .. })),
-      _ => false,
+      DisplayIR::Collection(x) => x.iter().any(DisplayIR::contains_line),
+      DisplayIR::Empty | DisplayIR::Text(_) => false,
     }
   }
 }

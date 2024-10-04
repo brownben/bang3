@@ -173,6 +173,13 @@ fn if_() {
   );
   assert_format!("if ((true)) false else 7", "if (true) false else 7", 25);
   assert_format!("if (({(true)})) false else 7", "if (true) false else 7", 25);
+
+  let source = indoc! {"
+    let _z = if (a) b else {
+      aReallyReallyLongMethod()
+    }
+  "};
+  assert_format!(source, source, 30);
 }
 
 #[test]
@@ -259,4 +266,28 @@ fn unary() {
   assert_format!("- 4", "-4", 25);
   assert_format!(" --3", "--3", 25);
   assert_format!("---89", "-89", 25);
+}
+
+#[test]
+fn expression_break_line() {
+  let source = indoc! {"
+    print(
+      worlddddddddddddddddddd
+    ) + print(5)
+  "};
+  assert_format!(source, source, 25);
+
+  let source = indoc! {"
+    print(hello) + type(
+      world
+    ) - (5)
+  "};
+  assert_format!(source, source, 25);
+
+  let source = indoc! {"
+    print(hello) + type(
+      world
+    ) - function(5)
+  "};
+  assert_format!(source, source, 25);
 }
