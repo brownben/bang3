@@ -22,7 +22,7 @@ impl<'source> From<&'source str> for Tokeniser<'source> {
     }
   }
 }
-impl<'source> Tokeniser<'source> {
+impl Tokeniser<'_> {
   /// Has the end of the source code been reached?
   fn is_end(&self, position: usize) -> bool {
     position >= self.source.len()

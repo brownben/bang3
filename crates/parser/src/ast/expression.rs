@@ -169,7 +169,7 @@ pub enum Pattern<'source, 'ast> {
   Literal(Literal<'source>),
   Range(Box<'ast, PatternRange<'source, 'ast>>),
 }
-impl<'source, 'ast> Pattern<'source, 'ast> {
+impl<'source> Pattern<'source, '_> {
   /// Get a literal from a Pattern as part of a range
   ///
   /// # Panics
