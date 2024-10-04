@@ -122,17 +122,18 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       return;
     }
 
-    if matches!(
-      self.peek_token_kind(),
-      TokenKind::EndOfLine | TokenKind::EndOfFile
-    ) {
-      self.next_token();
-    } else {
-      let error = ParseError::Expected {
-        expected: TokenKind::EndOfLine,
-        recieved: self.peek_token(),
-      };
-      self.ast.errors.push(error);
+    match self.peek_token_kind() {
+      TokenKind::EndOfLine | TokenKind::EndOfFile => {
+        self.next_token();
+      }
+      TokenKind::Unknown => {}
+      _ => {
+        let error = ParseError::Expected {
+          expected: TokenKind::EndOfLine,
+          recieved: self.peek_token(),
+        };
+        self.ast.errors.push(error);
+      }
     }
   }
 

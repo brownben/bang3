@@ -1,4 +1,4 @@
-use crate::{parse, Allocator, AST};
+use crate::{parse, Allocator, GetSpan, AST};
 use indoc::indoc;
 
 impl AST<'_, '_> {
@@ -781,4 +781,25 @@ mod fault_tolerant {
     assert!(ast.is_err());
     assert_eq!(ast.to_string(), expected);
   }
+}
+
+#[test]
+fn multibyte_utf8_characters() {
+  let allocator = Allocator::new();
+
+  let two_byte_a = "a ± b";
+  let error_span = parse(two_byte_a, &allocator).errors.first().unwrap().span();
+  assert_eq!(error_span.source_text(two_byte_a), "±");
+
+  let two_byte_b = "a © b";
+  let error_span = parse(two_byte_b, &allocator).errors.first().unwrap().span();
+  assert_eq!(error_span.source_text(two_byte_b), "©");
+
+  let three_byte = "c ࠀ b";
+  let error_span = parse(three_byte, &allocator).errors.first().unwrap().span();
+  assert_eq!(error_span.source_text(three_byte), "ࠀ");
+
+  let four_byte = "d 🌈 b";
+  let error_span = parse(four_byte, &allocator).errors.first().unwrap().span();
+  assert_eq!(error_span.source_text(four_byte), "🌈");
 }

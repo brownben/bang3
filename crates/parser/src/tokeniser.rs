@@ -90,6 +90,9 @@ impl Tokeniser<'_> {
       b'>' => (TokenKind::Greater, 1),
 
       // Unknown character
+      x if (x & 0b1111_0000) == 0b1111_0000 => (TokenKind::Unknown, 4),
+      x if (x & 0b1110_0000) == 0b1110_0000 => (TokenKind::Unknown, 3),
+      x if (x & 0b1100_0000) == 0b1100_0000 => (TokenKind::Unknown, 2),
       _ => (TokenKind::Unknown, 1),
     }
   }
