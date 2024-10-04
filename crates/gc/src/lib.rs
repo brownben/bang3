@@ -427,7 +427,7 @@ impl RawMemory {
     Some(Self {
       base: unsafe {
         let layout = alloc::Layout::from_size_align(heap_size, 8).unwrap();
-        alloc::alloc_zeroed(layout)
+        alloc::alloc(layout)
       },
 
       heap_size,
@@ -447,7 +447,7 @@ impl RawMemory {
     self.used_pages += u16::MAX as usize;
 
     let mut ream = PageDescriptorRef::from_index(pages, self.base);
-    ream.set_ream(u16::MAX);
+    ream.set_ream(u16::MAX, true);
     ream
   }
 }

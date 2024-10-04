@@ -158,10 +158,15 @@ impl PageDescriptorRef {
     self.as_ref().len + 1
   }
   /// Set the page to be a ream of size `size` pages
-  pub fn set_ream(&mut self, size: u16) {
+  pub fn set_ream(&mut self, size: u16, unlink: bool) {
     let ream = self.as_mut();
     ream.class = BlockClass::Ream;
     ream.len = size - 1;
+    if unlink {
+      ream.prev = None;
+      ream.next = None;
+      ream.gc_bits = 0;
+    }
   }
   /// Split a ream into two, with the first one of size `prefix_size` pages
   pub fn split(
@@ -175,9 +180,9 @@ impl PageDescriptorRef {
       Ordering::Equal => Some((self, None)),
       Ordering::Greater => {
         let mut suffix = self.offset(isize::try_from(prefix_size).unwrap());
-        suffix.set_ream(self.pages() - prefix_size);
+        suffix.set_ream(self.pages() - prefix_size, true);
 
-        self.set_ream(prefix_size);
+        self.set_ream(prefix_size, false);
         Some((self, Some(suffix)))
       }
     }
@@ -262,9 +267,12 @@ pub struct PageList {
 }
 impl PageList {
   pub fn new(root_index: u16, allocator_base: *mut u8) -> Self {
-    Self {
-      root: PageDescriptorRef::new(PdPointer::from_index(root_index.into()), allocator_base),
-    }
+    let mut root = PageDescriptorRef::new(PdPointer::from_index(root_index.into()), allocator_base);
+
+    root.as_mut().next = None;
+    root.as_mut().prev = None;
+
+    Self { root }
   }
 
   /// Add a page to the list
