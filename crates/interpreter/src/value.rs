@@ -333,3 +333,123 @@ impl From<Type> for usize {
     usize::from(value as u16)
   }
 }
+
+#[cfg(test)]
+mod test {
+  use super::*;
+
+  // We store bits at the end of the pointer, to tag different values
+  // Check that the alignment is greater than 8, so we can use the last 3 bits
+  const _STRING_ALIGNMENT_ASSERT: () = assert!(mem::align_of::<SmartString>() >= 8);
+  const _FUNCTION_ALIGNMENT_ASSERT: () = assert!(mem::align_of::<Chunk>() >= 8);
+
+  #[test]
+  fn boolean() {
+    let true_ = Value::TRUE;
+    assert!(!true_.is_number());
+    assert!(!true_.is_constant_string());
+    assert!(!true_.is_function());
+    assert!(!true_.is_object());
+    assert!(!true_.is_string());
+
+    let false_ = Value::FALSE;
+    assert!(!false_.is_number());
+    assert!(!false_.is_constant_string());
+    assert!(!false_.is_function());
+    assert!(!false_.is_object());
+    assert!(!false_.is_string());
+
+    assert_eq!(true_, Value::from(true));
+    assert_eq!(false_, Value::from(false));
+  }
+
+  #[test]
+  fn null() {
+    let null = Value::NULL;
+    assert!(!null.is_number());
+    assert!(!null.is_constant_string());
+    assert!(!null.is_function());
+    assert!(!null.is_object());
+    assert!(!null.is_string());
+  }
+
+  #[test]
+  fn number() {
+    for number in [0.0, 1.0, 2.0, 4.0, 8.0, 123.0, -0.0, -2.0, 123.45] {
+      let num = Value::from(number);
+      assert!(num.is_number());
+      assert!(!num.is_constant_string());
+      assert!(!num.is_function());
+      assert!(!num.is_object());
+      assert!(!num.is_string());
+
+      assert_eq!(num.as_number(), number);
+    }
+
+    let num = Value::from(f64::NAN);
+    assert!(num.is_number());
+    assert!(!num.is_constant_string());
+    assert!(!num.is_function());
+    assert!(!num.is_object());
+    assert!(!num.is_string());
+    assert!(num.as_number().is_nan());
+
+    let num = Value::from(f64::INFINITY);
+    assert!(num.is_number());
+    assert!(!num.is_constant_string());
+    assert!(!num.is_function());
+    assert!(!num.is_object());
+    assert!(!num.is_string());
+
+    assert_eq!(num.as_number(), f64::INFINITY);
+
+    let num = Value::from(-f64::INFINITY);
+    assert!(num.is_number());
+    assert!(!num.is_constant_string());
+    assert!(!num.is_function());
+    assert!(!num.is_object());
+    assert!(!num.is_string());
+
+    assert_eq!(num.as_number(), -f64::INFINITY);
+
+    let num = Value::from(f64::asin(55.0));
+    assert!(num.is_number());
+    assert!(!num.is_constant_string());
+    assert!(!num.is_function());
+    assert!(!num.is_object());
+    assert!(!num.is_string());
+    assert!(num.as_number().is_nan());
+  }
+
+  #[test]
+  fn constant_string() {
+    let raw_constant_string = SmartString::from("hello");
+    let constant_string = Value::from(ptr::from_ref(&raw_constant_string));
+    assert!(!constant_string.is_number());
+    assert!(constant_string.is_constant_string());
+    assert!(!constant_string.is_function());
+    assert!(!constant_string.is_object());
+    assert!(constant_string.is_string());
+
+    // same length as max inline string length
+    let raw_long_constant_string = SmartString::from("helloworldhelloworld123");
+    assert!(raw_long_constant_string.is_inline());
+    let long_constant = Value::from(ptr::from_ref(&raw_long_constant_string));
+    assert!(!long_constant.is_number());
+    assert!(long_constant.is_constant_string());
+    assert!(!long_constant.is_function());
+    assert!(!long_constant.is_object());
+    assert!(long_constant.is_string());
+  }
+
+  #[test]
+  fn constant_function() {
+    let function = Chunk::new("".into());
+    let function = Value::from(ptr::from_ref(&function));
+    assert!(!function.is_number());
+    assert!(!function.is_constant_string());
+    assert!(function.is_function());
+    assert!(!function.is_object());
+    assert!(!function.is_string());
+  }
+}
