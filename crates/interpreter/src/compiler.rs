@@ -186,6 +186,7 @@ impl<'s> Compile<'s> for Expression<'s, '_> {
       Expression::Block(block) => block.compile(compiler),
       Expression::Call(call) => call.compile(compiler),
       Expression::Comment(comment) => comment.compile(compiler),
+      Expression::FormatString(format_string) => format_string.compile(compiler),
       Expression::Function(function) => function.compile(compiler),
       Expression::Group(group) => group.compile(compiler),
       Expression::If(if_) => if_.compile(compiler),
@@ -295,6 +296,22 @@ impl<'s> Compile<'s> for Call<'s, '_> {
 impl<'s> Compile<'s> for Comment<'s, '_> {
   fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
     self.expression.compile(compiler)
+  }
+}
+impl<'s> Compile<'s> for FormatString<'s, '_> {
+  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+    compiler.add_constant(self.strings[0].string.into(), self.strings[0].span)?;
+    for (index, expr) in self.expressions.iter().enumerate() {
+      expr.compile(compiler)?;
+      compiler.chunk.add_opcode(OpCode::ToString, expr.span());
+      compiler.chunk.add_opcode(OpCode::AddString, expr.span());
+
+      let string = &self.strings[index + 1];
+      compiler.add_constant(string.string.into(), string.span)?;
+      compiler.chunk.add_opcode(OpCode::AddString, string.span);
+    }
+
+    Ok(())
   }
 }
 impl<'s> Compile<'s> for Function<'s, '_> {

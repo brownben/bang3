@@ -27,6 +27,7 @@ impl<'a, 'b> Formattable<'a, 'b> for Expression<'a, '_> {
       Expression::Block(block) => block.format(f),
       Expression::Call(call) => call.format(f),
       Expression::Comment(comment) => comment.format(f),
+      Expression::FormatString(format_string) => format_string.format(f),
       Expression::Function(function) => function.format(f),
       Expression::Group(group) => group.format(f),
       Expression::If(if_) => if_.format(f),
@@ -101,6 +102,25 @@ impl<'a, 'b> Formattable<'a, 'b> for Comment<'a, '_> {
       self.expression.format(f),
       IR::Text(" // "),
       IR::Text(self.text.trim()),
+    ])
+  }
+}
+impl<'a, 'b> Formattable<'a, 'b> for FormatString<'a, '_> {
+  fn format(&self, f: &Formatter<'a, 'b>) -> IR<'a, 'b> {
+    f.concat([
+      IR::Text("`"),
+      f.concat_iterator(self.strings.iter().zip(self.expressions.iter()).map(
+        |(string, expression)| {
+          f.concat([
+            IR::Text(string.string),
+            IR::Text("{"),
+            expression.format(f),
+            IR::Text("}"),
+          ])
+        },
+      )),
+      IR::Text(self.strings.last().unwrap().string),
+      IR::Text("`"),
     ])
   }
 }

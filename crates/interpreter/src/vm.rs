@@ -65,19 +65,11 @@ impl VM {
       println!("{}", arg.display(&vm.heap));
       arg
     });
-    let to_string_function = NativeFunction::new("toString", |vm, arg| {
-      if arg.is_string() {
-        arg
-      } else {
-        let string = arg.display(&vm.heap);
-        allocate_string(&mut vm.heap, &string)
-      }
-    });
     let type_function = NativeFunction::new("type", |vm, arg| {
       allocate_string(&mut vm.heap, arg.get_type())
     });
 
-    let functions = [print_function, to_string_function, type_function];
+    let functions = [print_function, type_function];
     for function in functions {
       let name = function.name;
       let allocated = self.heap.allocate(function);
@@ -250,6 +242,8 @@ impl VM {
         OpCode::Multiply => numeric_operation!((self, chunk), *),
         OpCode::Divide => numeric_operation!((self, chunk), /),
         OpCode::Remainder => numeric_operation!((self, chunk), %),
+
+        // String Operations
         OpCode::AddString => {
           let right = self.pop();
           let left = self.pop();
@@ -270,6 +264,17 @@ impl VM {
               got: format!("a {} and a {}", left.get_type(), right.get_type()),
             });
           }
+        }
+        OpCode::ToString => {
+          let value = self.pop();
+
+          let string = if value.is_string() {
+            value
+          } else {
+            let string = value.display(&self.heap);
+            allocate_string(&mut self.heap, &string)
+          };
+          self.push(string);
         }
 
         // Unary Operations

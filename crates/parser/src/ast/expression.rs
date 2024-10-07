@@ -11,6 +11,7 @@ pub enum Expression<'source, 'ast> {
   Block(Box<'ast, Block<'source, 'ast>>),
   Call(Box<'ast, Call<'source, 'ast>>),
   Comment(Box<'ast, Comment<'source, 'ast>>),
+  FormatString(Box<'ast, FormatString<'source, 'ast>>),
   Function(Box<'ast, Function<'source, 'ast>>),
   Group(Box<'ast, Group<'source, 'ast>>),
   If(Box<'ast, If<'source, 'ast>>),
@@ -114,6 +115,18 @@ pub struct Comment<'source, 'ast> {
   pub expression: Expression<'source, 'ast>,
   pub text: &'source str,
   pub message_span: Span,
+  pub span: Span,
+}
+
+#[derive(Debug)]
+pub struct FormatString<'source, 'ast> {
+  pub strings: Vec<'ast, StringPart<'source>>,
+  pub expressions: Vec<'ast, Expression<'source, 'ast>>,
+  pub span: Span,
+}
+#[derive(Debug)]
+pub struct StringPart<'source> {
+  pub string: &'source str,
   pub span: Span,
 }
 
@@ -240,6 +253,11 @@ impl<'s, 'ast> From<Box<'ast, Comment<'s, 'ast>>> for Expression<'s, 'ast> {
     Self::Comment(value)
   }
 }
+impl<'s, 'ast> From<Box<'ast, FormatString<'s, 'ast>>> for Expression<'s, 'ast> {
+  fn from(value: Box<'ast, FormatString<'s, 'ast>>) -> Self {
+    Self::FormatString(value)
+  }
+}
 impl<'s, 'ast> From<Box<'ast, Function<'s, 'ast>>> for Expression<'s, 'ast> {
   fn from(value: Box<'ast, Function<'s, 'ast>>) -> Self {
     Self::Function(value)
@@ -284,6 +302,7 @@ impl GetSpan for Expression<'_, '_> {
       Self::Call(x) => x.span(),
       Self::Comment(x) => x.span(),
       Self::Function(x) => x.span(),
+      Self::FormatString(x) => x.span(),
       Self::Group(x) => x.span(),
       Self::If(x) => x.span(),
       Self::Literal(x) => x.span(),
@@ -315,6 +334,11 @@ impl GetSpan for Call<'_, '_> {
   }
 }
 impl GetSpan for Function<'_, '_> {
+  fn span(&self) -> Span {
+    self.span
+  }
+}
+impl GetSpan for FormatString<'_, '_> {
   fn span(&self) -> Span {
     self.span
   }

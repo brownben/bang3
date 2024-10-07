@@ -717,35 +717,45 @@ fn fibonacci_match() {
   assert_variable!(fibonnacci_match; b, 8.0);
 }
 
+#[test]
+fn format_string() {
+  let mut vm = run(indoc! {"
+    let a = `hello {55}`
+    let b = `there were {33 + 25} people`
+    let c = `i can quote {true} or {false}`
+    let d = `nested stuff: {{55} + 1 }`
+    let e = `{`{55}`}`
+  "});
+  assert_variable!(vm; a, string "hello 55");
+  assert_variable!(vm; b, string "there were 58 people");
+  assert_variable!(vm; c, string "i can quote true or false");
+  assert_variable!(vm; d, string "nested stuff: 56");
+  assert_variable!(vm; e, string "55");
+
+  let mut vm = run(indoc! {"
+    let a = `{'hello'}`
+    let b = `{55.2}`
+    let c = `{false}`
+    let d = `{true}`
+    let e = `{print}`
+
+    let identity = x => x
+    let f = `{identity}`
+    let g = `{x => x}`
+    let h = `{(x => _ => x)()}`
+  "});
+  assert_variable!(vm; a, string "hello");
+  assert_variable!(vm; b, string "55.2");
+  assert_variable!(vm; c, string "false");
+  assert_variable!(vm; d, string "true");
+  assert_variable!(vm; e, string "<function print>");
+  assert_variable!(vm; f, string "<function identity>");
+  assert_variable!(vm; g, string "<function>");
+  assert_variable!(vm; h, string "<closure <function>>");
+}
+
 mod builtin_function {
   use super::{assert_variable, run};
-
-  #[test]
-  fn to_string() {
-    let mut string = run("let a = toString('hello')");
-    assert_variable!(string; a, string "hello");
-
-    let mut number = run("let a = toString(55.2)");
-    assert_variable!(number; a, string "55.2");
-
-    let mut r#false = run("let a = toString(false)");
-    assert_variable!(r#false; a, string "false");
-
-    let mut r#true = run("let a = toString(true)");
-    assert_variable!(r#true; a, string "true");
-
-    let mut builtin_function = run("let a = toString(print)");
-    assert_variable!(builtin_function; a, string "<function print>");
-
-    let mut named_function = run("let identity = x => x\nlet a = toString(identity)");
-    assert_variable!(named_function; a, string "<function identity>");
-
-    let mut anonymous_function = run("let a = toString(x => x)");
-    assert_variable!(anonymous_function; a, string "<function>");
-
-    let mut closure = run("let a = toString((x => _ => x)())");
-    assert_variable!(closure; a, string "<closure <function>>");
-  }
 
   #[test]
   fn type_of() {

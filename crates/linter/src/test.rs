@@ -146,3 +146,14 @@ fn no_erasing_operations() {
   assert!(lint("1 / ''").is_ok());
   assert!(lint("1 * (1 - 1)").is_ok());
 }
+
+#[test]
+fn no_constant_string_in_format_string() {
+  assert!(lint("`hello {'world'}`").is_err());
+  assert!(lint("`{'world'} hello`").is_err());
+  assert!(lint("`{'world'}`").is_err());
+  assert!(lint("`hello {'world'}!`").is_err());
+
+  assert!(lint("hello {5}!").is_ok());
+  assert!(lint("hello {'x' ++ a}!").is_ok());
+}

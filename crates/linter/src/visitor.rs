@@ -16,6 +16,7 @@ pub trait Visitor {
       Expression::Block(x) => self.visit_block(x),
       Expression::Call(x) => self.visit_call(x),
       Expression::Comment(x) => self.visit_comment(x),
+      Expression::FormatString(x) => self.visit_format_string(x),
       Expression::Function(x) => self.visit_function(x),
       Expression::Group(x) => self.visit_group(x),
       Expression::If(x) => self.visit_if(x),
@@ -43,6 +44,11 @@ pub trait Visitor {
   }
   fn visit_comment(&mut self, comment: &Comment) {
     self.visit_expression(&comment.expression);
+  }
+  fn visit_format_string(&mut self, format_string: &FormatString) {
+    for expression in &format_string.expressions {
+      self.visit_expression(expression);
+    }
   }
   fn visit_function(&mut self, function: &Function) {
     self.visit_expression(&function.body);

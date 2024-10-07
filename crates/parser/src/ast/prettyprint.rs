@@ -32,6 +32,7 @@ impl PrettyPrint for Expression<'_, '_> {
       Self::Block(x) => x.pretty(f, prefix, last),
       Self::Call(x) => x.pretty(f, prefix, last),
       Self::Comment(x) => x.pretty(f, prefix, last),
+      Self::FormatString(x) => x.pretty(f, prefix, last),
       Self::Function(x) => x.pretty(f, prefix, last),
       Self::Group(x) => x.pretty(f, prefix, last),
       Self::If(x) => x.pretty(f, prefix, last),
@@ -96,6 +97,26 @@ impl PrettyPrint for Comment<'_, '_> {
 
     let new_prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
     self.expression.pretty(f, &new_prefix, true)
+  }
+}
+impl PrettyPrint for FormatString<'_, '_> {
+  fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
+    let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
+    writeln!(f, "{prefix}{connector}Format String")?;
+
+    let prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
+
+    for (expression, string) in self.expressions.iter().zip(self.strings.iter()) {
+      writeln!(f, "{prefix}{OTHER_ENTRY}'{}'", string.string)?;
+      expression.pretty(f, &prefix, false)?;
+    }
+    writeln!(
+      f,
+      "{prefix}{FINAL_ENTRY}'{}'",
+      self.strings.last().unwrap().string
+    )?;
+
+    Ok(())
   }
 }
 impl PrettyPrint for Function<'_, '_> {

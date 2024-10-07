@@ -5,29 +5,37 @@
 
   "patterns": [
     {
-      "include": "#comments"
-    },
-    {
-      "include": "#keywords"
-    },
-    {
-      "include": "#operators"
-    },
-    {
-      "include": "#strings"
-    },
-    {
-      "include": "#numbers"
-    },
-    {
-      "include": "#variables"
-    },
-    {
-      "include": "#punctuation"
+      "include": "#expression"
     }
   ],
 
   "repository": {
+    "expression": {
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#keywords"
+        },
+        {
+          "include": "#operators"
+        },
+        {
+          "include": "#strings"
+        },
+        {
+          "include": "#numbers"
+        },
+        {
+          "include": "#variables"
+        },
+        {
+          "include": "#punctuation"
+        }
+      ]
+    },
+
     "comments": {
       "name": "comment.line.bang",
       "match": "(//).*$",
@@ -103,7 +111,19 @@
         {
           "name": "string.quoted.backtick.bang",
           "begin": "`",
-          "end": "`"
+          "end": "`",
+          "patterns": [
+            {
+              "begin": "{",
+              "end": "}",
+              "name": "meta.interpolation.bang",
+              "patterns": [
+                {
+                  "include": "#expression"
+                }
+              ]
+            }
+          ]
         }
       ]
     },

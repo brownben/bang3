@@ -12,8 +12,8 @@
 // ==========================
 
 'They can have single quotes'
-"or they can have double quotes"
-`or even backticks`
+'or they can have double quotes'
+'or even backticks'
 'they
   can
     even
@@ -21,11 +21,20 @@
     multiple
   lines'
 
-'hello' == "hello" // true
-'cat' > 'bat'      // true
-'he' ++ 'llo'      // 'hello'
-(!"")              // true
-(!'stuff')         // false
+'hello' == 'hello' // true
+
+'cat' > 'bat' // true
+
+'he' ++ 'llo' // 'hello'
+
+(!'') // true
+
+(!'stuff') // false
+
+// with backticks, you can use {} to interpolate variables
+`hello {55} people` // 'hello 55 people'
+
+`hello {{ 55 }} people` // 'hello 55 people' you can even nest blocks inside
 
 // Numbers
 // ==========================
@@ -37,19 +46,29 @@
 -5.63
 .25
 
-2.5 + 1.2   // 3.7
-5 - 2       // 3
-5.2 / 2     // 2.6
-8 * 3       // 24
-2.5 == 2.5  // true
-2.5 != 2.5  // false
-5 > 3       // true
-5 >= 3      // true
-5 < 7       // true
-5 <= 5      // true
-(!0)        // true
-(!1)        // false
+2.5 + 1.2 // 3.7
 
+5 - 2 // 3
+
+5.2 / 2 // 2.6
+
+8 * 3 // 24
+
+2.5 == 2.5 // true
+
+2.5 != 2.5 // false
+
+5 > 3 // true
+
+5 >= 3 // true
+
+5 < 7 // true
+
+5 <= 5 // true
+
+(!0) // true
+
+(!1) // false
 
 // Booleans
 // ==========================
@@ -57,9 +76,9 @@
 true
 false
 
-(!true)       // false
-true != false // true
+(!true) // false
 
+true != false // true
 
 // Functions
 // ==========================
@@ -73,11 +92,12 @@ x => 3 + 5
 (_ => 3) != (_ => 3)
 
 // Are always truthy
-(!!(_ => 3))   // true
+(!!(_ => 3)) // true
 
 // Functions are called with brackets, and always have an argument
-(_ => 3)()       // 3
-(x => x + 3)(4)  // 7
+(_ => 3)() // 3
+
+(x => x + 3)(4) // 7
 
 // store a function in a variable
 let addThree = x => x + 3
@@ -89,25 +109,39 @@ addThree(4) // 7
 
 // And. Short circuiting operator, returning the first falsey value. The word form is prefered over &&.
 
-true and 2       // 2
-2 && true        // true
-"hello" and 77   // 77
-0 and 77         // 77
-2 and "hello"    // 'hello'
-"hello" && 77    // 77
-0 && 77          // 77
-2 && "hello"     // 'hello
-(a => a + 1) && "hello"  // 'hello'
-false and false  // false
-false and true   // false
-false and 77     // false
+true and 2 // 2
+
+2 and true // true
+
+'hello' and 77 // 77
+
+0 and 77 // 77
+
+2 and 'hello' // 'hello'
+
+'hello' and 77 // 77
+
+0 and 77 // 77
+
+2 and 'hello' // 'hello
+
+(a => a + 1) and 'hello' // 'hello'
+
+false and false // false
+
+false and true // false
+
+false and 77 // false
 
 // Or. Short circuiting operator, returning the first truthy value. The word form is prefered over ||.
 
-(a => a + 1) || "hello" // '<function>'
-false or false   // false
-false or true    // true
-false or 77      // 77
+(a => a + 1) or 'hello' // '<function>'
+
+false or false // false
+
+false or true // true
+
+false or 77 // 77
 
 // ==========================
 // Variables
@@ -138,9 +172,9 @@ a // 7
 
 // Passes the value on the left as the first argument to the function on the right.
 
-25 >> type         // 'number'
-25 >> type >> type // 'string'
+25 >> type // 'number'
 
+25 >> type >> type // 'string'
 
 // ==========================
 // Control Flow
@@ -163,7 +197,10 @@ match x
 // you can match on literal values, on a range, or catch all
 
 // Or we can write them on a line
-match value | true -> 4 | false -> 1 | x -> x + 2
+match value
+  | true -> 4
+  | false -> 1
+  | x -> x + 2
 
 // ==========================
 // Comments

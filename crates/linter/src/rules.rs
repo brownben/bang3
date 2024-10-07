@@ -5,7 +5,7 @@ use super::{
 };
 use bang_parser::ast::{expression::*, statement::*, GetSpan};
 
-pub const RULES: [&dyn LintRule; 11] = [
+pub const RULES: [&dyn LintRule; 12] = [
   &NoConstantConditions,
   &NoNegativeZero,
   &NoSelfAssign,
@@ -17,6 +17,7 @@ pub const RULES: [&dyn LintRule; 11] = [
   &NoUnneccessaryClosures,
   &NoUselessIf,
   &NoErasingOperations,
+  &NoConstantStringsInFormatString,
 ];
 
 pub struct NoConstantConditions;
@@ -262,6 +263,27 @@ impl LintRule for NoErasingOperations {
       && is_zero(binary.left.unwrap())
     {
       context.add_diagnostic(&Self, binary.span());
+    }
+  }
+}
+
+pub struct NoConstantStringsInFormatString;
+impl LintRule for NoConstantStringsInFormatString {
+  fn name(&self) -> &'static str {
+    "No Constant Strings in Format Strings"
+  }
+  fn message(&self) -> &'static str {
+    "can be combined with the rest of the string"
+  }
+  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+    if let Expression::FormatString(format_string) = &expression {
+      for expression in &format_string.expressions {
+        if let Expression::Literal(literal) = &expression
+          && let LiteralKind::String { .. } = literal.kind
+        {
+          context.add_diagnostic(&Self, literal.span());
+        }
+      }
     }
   }
 }

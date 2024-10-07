@@ -539,6 +539,90 @@ fn pipeline_can_break_lines() {
   assert_eq!(ast, expected);
 }
 
+#[test]
+fn format_string() {
+  let skip_no_format = parse_to_string("`standard string`");
+  let expected = indoc! {"
+    ├─ String 'standard string'
+  "};
+  assert_eq!(skip_no_format, expected);
+
+  let standard_string = parse_to_string("'standard {string}}'");
+  let expected = indoc! {"
+    ├─ String 'standard {string}}'
+  "};
+  assert_eq!(standard_string, expected);
+
+  let one_field = parse_to_string("`hello {5} people`");
+  let expected = indoc! {"
+    ├─ Format String
+    │  ├─ 'hello '
+    │  ├─ Number (5)
+    │  ╰─ ' people'
+  "};
+  assert_eq!(one_field, expected);
+
+  let no_front_padding = parse_to_string("`{  5 } people`");
+  let expected = indoc! {"
+    ├─ Format String
+    │  ├─ ''
+    │  ├─ Number (5)
+    │  ╰─ ' people'
+  "};
+  assert_eq!(no_front_padding, expected);
+
+  let no_end_padding = parse_to_string("`hello {5  }`");
+  let expected = indoc! {"
+    ├─ Format String
+    │  ├─ 'hello '
+    │  ├─ Number (5)
+    │  ╰─ ''
+  "};
+  assert_eq!(no_end_padding, expected);
+
+  let with_group = parse_to_string("`hello {(5)}`");
+  let expected = indoc! {"
+    ├─ Format String
+    │  ├─ 'hello '
+    │  ├─ Group
+    │  │  ╰─ Number (5)
+    │  ╰─ ''
+  "};
+  assert_eq!(with_group, expected);
+
+  let with_block = parse_to_string("`hello {{5}}`");
+  let expected = indoc! {"
+    ├─ Format String
+    │  ├─ 'hello '
+    │  ├─ Block
+    │  │  ╰─ Number (5)
+    │  ╰─ ''
+  "};
+  assert_eq!(with_block, expected);
+
+  let two_fields = parse_to_string("`hello {5} + {1} people`");
+  let expected = indoc! {"
+    ├─ Format String
+    │  ├─ 'hello '
+    │  ├─ Number (5)
+    │  ├─ ' + '
+    │  ├─ Number (1)
+    │  ╰─ ' people'
+  "};
+  assert_eq!(two_fields, expected);
+
+  let allocator = Allocator::new();
+
+  let unterminated = parse("`hello {5} + {1} peop", &allocator);
+  assert!(unterminated.is_err());
+
+  let no_expression = parse("`hello {}`", &allocator);
+  assert!(no_expression.is_err());
+
+  let missing_end_curly = parse("`hello {5 `", &allocator);
+  assert!(missing_end_curly.is_err());
+}
+
 mod fault_tolerant {
   use super::{parse, Allocator};
   use indoc::indoc;

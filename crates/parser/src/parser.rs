@@ -258,6 +258,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       TokenKind::True | TokenKind::False | TokenKind::Number | TokenKind::String => {
         Ok(self.literal(token))
       }
+      TokenKind::FormatStringStart => self.format_string(token),
       TokenKind::Identifier if self.matches(TokenKind::FatRightArrow).is_some() => {
         Ok(self.function(token))
       }
@@ -541,6 +542,59 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       kind: LiteralKind::String(string_without_quotes),
       span,
     }
+  }
+
+  fn format_string(&mut self, token: Token) -> ParseResult<Expression<'s, 'ast>> {
+    let mut strings = Vec::new_in(self.allocator);
+    let mut expressions = Vec::new_in(self.allocator);
+
+    let full_start_text = Span::from(token).source_text(self.source);
+    strings.push(StringPart {
+      string: &full_start_text[1..(full_start_text.len() - 1)],
+      span: Span::from(token),
+    });
+
+    let end_token = loop {
+      expressions.push(self.parse_expression());
+
+      match self.peek_token_kind() {
+        TokenKind::FormatStringPart => {
+          let span = Span::from(self.next_token());
+          let part = span.source_text(self.source);
+          strings.push(StringPart {
+            string: &part[1..(part.len() - 1)],
+            span,
+          });
+        }
+        TokenKind::FormatStringEnd => {
+          let token = self.next_token();
+          let part = Span::from(token).source_text(self.source);
+          if !part.ends_with('`') {
+            return Err(ParseError::UnterminatedString(token));
+          }
+
+          strings.push(StringPart {
+            string: &part[1..part.len() - 1],
+            span: token.into(),
+          });
+
+          break token;
+        }
+        _ => {
+          return Err(ParseError::Expected {
+            expected: TokenKind::FormatStringPart,
+            recieved: self.next_token(),
+          })
+        }
+      }
+    };
+
+    let span = Span::from(token).merge(end_token.into());
+    Ok(self.allocate_expression(FormatString {
+      strings,
+      expressions,
+      span,
+    }))
   }
 
   /// Parses a match expression

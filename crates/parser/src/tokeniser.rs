@@ -7,6 +7,8 @@ pub struct Tokeniser<'source> {
   source: &'source [u8],
   /// The current position in the source code
   position: usize,
+  /// The stack of curly braces, used to check if it is for a format string or block
+  curly_stack: Vec<BlockLocation>,
 }
 impl<'source> From<&'source str> for Tokeniser<'source> {
   /// Create a new [Tokeniser] from a source code string
@@ -19,6 +21,7 @@ impl<'source> From<&'source str> for Tokeniser<'source> {
     Self {
       source: value.as_ref(),
       position: 0,
+      curly_stack: Vec::with_capacity(8),
     }
   }
 }
@@ -55,8 +58,19 @@ impl Tokeniser<'_> {
       // Brackets + Separators
       b'(' => (TokenKind::LeftParen, 1),
       b')' => (TokenKind::RightParen, 1),
-      b'{' => (TokenKind::LeftCurly, 1),
-      b'}' => (TokenKind::RightCurly, 1),
+      b'{' => {
+        if !self.curly_stack.is_empty() {
+          self.curly_stack.push(BlockLocation::Block);
+        }
+        (TokenKind::LeftCurly, 1)
+      }
+      b'}' => {
+        if let Some(BlockLocation::FormatStringExpression) = self.curly_stack.pop() {
+          self.format_string()
+        } else {
+          (TokenKind::RightCurly, 1)
+        }
+      }
 
       // Logical Operators
       b'&' if matches!(next_character, Some(b'&')) => (TokenKind::And, 2),
@@ -107,7 +121,7 @@ impl Tokeniser<'_> {
     (TokenKind::Comment, length)
   }
 
-  /// Go to the end of a string token, the clsoing quote
+  /// Go to the end of a string token, the closing quote
   fn string(&mut self, quote: u8) -> (TokenKind, usize) {
     let mut pos = self.position + 1;
 
@@ -116,6 +130,26 @@ impl Tokeniser<'_> {
         break (TokenKind::UnterminatedString, pos - self.position);
       } else if self.source[pos] == quote {
         break (TokenKind::String, pos - self.position + 1);
+      } else if quote == b'`' && self.source[pos] == b'{' {
+        self.curly_stack.push(BlockLocation::FormatStringExpression);
+        break (TokenKind::FormatStringStart, pos - self.position + 1);
+      }
+
+      pos += 1;
+    }
+  }
+
+  fn format_string(&mut self) -> (TokenKind, usize) {
+    let mut pos = self.position + 1;
+
+    loop {
+      if self.is_end(pos) {
+        break (TokenKind::FormatStringEnd, pos - self.position);
+      } else if self.source[pos] == b'`' {
+        break (TokenKind::FormatStringEnd, pos - self.position + 1);
+      } else if self.source.get(pos + 1) == Some(&b'{') {
+        self.curly_stack.push(BlockLocation::FormatStringExpression);
+        break (TokenKind::FormatStringPart, pos - self.position + 2);
       }
 
       pos += 1;
@@ -287,6 +321,14 @@ pub enum TokenKind {
   /// A string, any characters between `'`, `"`, or `` ` ``
   String,
 
+  // Format String
+  /// The first string section of a format string "\`hello {"
+  FormatStringStart,
+  /// A string section between expressions "} stuff {"
+  FormatStringPart,
+  /// The last string section of a format string "} world\`"
+  FormatStringEnd,
+
   // Keywords
   /// `else`
   Else,
@@ -378,6 +420,11 @@ impl fmt::Display for TokenKind {
       Self::Number => write!(f, "Number"),
       Self::String => write!(f, "String"),
 
+      // Format String
+      Self::FormatStringStart => write!(f, "Format String Start"),
+      Self::FormatStringPart => write!(f, "Format String Part"),
+      Self::FormatStringEnd => write!(f, "Format String End"),
+
       // Keywords
       Self::Else => write!(f, "else"),
       Self::False => write!(f, "false"),
@@ -401,4 +448,11 @@ impl fmt::Display for TokenKind {
       Self::UnterminatedString => write!(f, "Unterminated String"),
     }
   }
+}
+
+/// Track if a `{}` belongs to a format string or a block
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum BlockLocation {
+  FormatStringExpression,
+  Block,
 }

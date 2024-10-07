@@ -43,11 +43,6 @@ impl Enviroment {
       type_: x_string_function,
       type_info: StaticTypeInfo::new_function("(a' -> string)"),
     });
-    self.builtin_variables.push(BuiltinVariable {
-      name: "toString",
-      type_: x_string_function,
-      type_info: StaticTypeInfo::new_function("(a' -> string)"),
-    });
   }
 
   pub(crate) fn enter_scope(&mut self) {

@@ -122,6 +122,7 @@ impl InferType for Expression<'_, '_> {
       Expression::Block(block) => block.infer(t),
       Expression::Call(call) => call.infer(t),
       Expression::Comment(comment) => comment.infer(t),
+      Expression::FormatString(format_string) => format_string.infer(t),
       Expression::Function(function) => function.infer(t),
       Expression::Group(group) => group.infer(t),
       Expression::If(if_) => if_.infer(t),
@@ -252,6 +253,15 @@ impl InferType for Call<'_, '_> {
 impl InferType for Comment<'_, '_> {
   fn infer(&self, t: &mut Typechecker) -> Result<TypeRef, TypeError> {
     self.expression.infer(t)
+  }
+}
+impl InferType for FormatString<'_, '_> {
+  fn infer(&self, t: &mut Typechecker) -> Result<TypeRef, TypeError> {
+    for expression in &self.expressions {
+      expression.infer(t)?;
+    }
+
+    Ok(TypeArena::STRING)
   }
 }
 impl InferType for Function<'_, '_> {

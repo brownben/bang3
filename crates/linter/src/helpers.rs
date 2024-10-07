@@ -14,6 +14,7 @@ impl IsConstant for Expression<'_, '_> {
       Self::Block(x) => x.is_constant(),
       Self::Comment(x) => x.is_constant(),
       Self::Group(x) => x.is_constant(),
+      Self::FormatString(x) => x.is_constant(),
       Self::If(x) => x.is_constant(),
       Self::Match(x) => x.is_constant(),
       Self::Unary(x) => x.is_constant(),
@@ -43,6 +44,11 @@ impl IsConstant for Block<'_, '_> {
 impl IsConstant for Comment<'_, '_> {
   fn is_constant(&self) -> bool {
     self.expression.is_constant()
+  }
+}
+impl IsConstant for FormatString<'_, '_> {
+  fn is_constant(&self) -> bool {
+    self.expressions.iter().all(Expression::is_constant)
   }
 }
 impl IsConstant for Group<'_, '_> {

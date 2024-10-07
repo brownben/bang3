@@ -393,10 +393,10 @@ fn identity_function() {
 fn builtin_functions() {
   let source = indoc! {"
     let identity = x => x
-    let toString = _ => ''
+    let emptyString = _ => ''
 
     identity == print
-    toString == type
+    emptyString == type
   "};
   assert_eq!(synthesize(source), "boolean");
 }
@@ -436,4 +436,12 @@ fn infer_function() {
     synthesize("let x = (a => b => c => if (a == 1) b(a) else c ++ '')\nx"),
     "number => (number => string) => string => string"
   );
+}
+
+#[test]
+fn format_string() {
+  let different_fields = "`{5} {false} {'string'}`";
+  assert_eq!(synthesize(different_fields), "string");
+
+  assert!(has_type_error("`{5 + false}`"));
 }

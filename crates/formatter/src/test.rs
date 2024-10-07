@@ -291,3 +291,16 @@ fn expression_break_line() {
   "};
   assert_format!(source, source, 25);
 }
+
+#[test]
+fn format_string() {
+  assert_format!("`hello {7}`", "`hello {7}`", 50);
+  assert_format!("`hello {   7 }`", "`hello {7}`", 50);
+  assert_format!("`hello {3 + 1} world`", "`hello {3 + 1} world`", 50);
+  assert_format!("`{7} world'`", "`{7} world'`", 50);
+  assert_format!(
+    "`hello {7} world {false}!`",
+    "`hello {7} world {false}!`",
+    50
+  );
+}

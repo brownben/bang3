@@ -153,7 +153,10 @@ pub enum OpCode {
   Divide,
   Remainder,
   Negate,
+
+  // String Operations
   AddString,
+  ToString,
 
   // Equalities
   Not,
