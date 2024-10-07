@@ -324,6 +324,22 @@ pub enum TokenKind {
   /// A string where the end of the file has been reached, thus unterminated
   UnterminatedString,
 }
+impl TokenKind {
+  pub fn has_fixed_length(self) -> bool {
+    !matches!(
+      self,
+      Self::Comment
+        | Self::Unknown
+        | Self::UnterminatedString
+        | Self::Identifier
+        | Self::Number
+        | Self::String
+        | Self::FormatStringStart
+        | Self::FormatStringPart
+        | Self::FormatStringEnd
+    )
+  }
+}
 impl fmt::Display for TokenKind {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {

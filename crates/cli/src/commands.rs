@@ -4,7 +4,7 @@ use super::FormatOptions;
 use bang_formatter::FormatterConfig;
 use bang_interpreter::{HeapSize, VM};
 use bang_lsp::LanguageServer;
-use bang_parser::{Allocator, GetSpan, LineIndex, Span, AST};
+use bang_parser::{tokenise, Allocator, GetSpan, LineIndex, Span, AST};
 
 use anstream::{eprintln, println};
 use std::fs;
@@ -163,12 +163,30 @@ pub fn typecheck(filename: &str) -> Result<CommandStatus, ()> {
   }
 }
 
+pub fn print_tokens(filename: &str) -> Result<CommandStatus, ()> {
+  let source = read_file(filename)?;
+
+  println!("    ╭─[Tokens: {filename}]");
+  for token in tokenise(&source) {
+    print!("{:>3} │ {}", token.start, token.kind);
+    if !token.kind.has_fixed_length() {
+      print!(" (length: {})", token.length);
+    }
+    println!();
+  }
+  println!("────╯");
+
+  Ok(CommandStatus::Success)
+}
+
 pub fn print_ast(filename: &str) -> Result<CommandStatus, ()> {
   let allocator = Allocator::new();
   let source = read_file(filename)?;
   let ast = parse(filename, &source, &allocator)?;
 
+  println!("╭─[Abstract Syntax Tree: {filename}]");
   print!("{ast}");
+  println!("╯");
 
   Ok(CommandStatus::Success)
 }

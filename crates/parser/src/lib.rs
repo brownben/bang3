@@ -41,6 +41,11 @@ pub fn parse<'source, 'ast>(
 pub use ast::{GetSpan, LineIndex, Span};
 pub use parser::{ParseError, AST};
 
+/// Get the tokens from a source code string
+pub fn tokenise(source: &str) -> impl Iterator<Item = tokeniser::Token> + '_ {
+  tokeniser::Tokeniser::from(source)
+}
+
 /// Bump allocator for the AST
 pub mod allocator {
   /// Arena allocator

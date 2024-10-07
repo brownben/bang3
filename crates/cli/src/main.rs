@@ -70,6 +70,11 @@ struct FormatOptions {
 
 #[derive(Subcommand)]
 enum PrintCommand {
+  /// Displays the tokens in the file
+  Tokens {
+    /// The file to print
+    file: String,
+  },
   /// Displays the Abstract Syntax Tree
   Ast {
     /// The file to print
@@ -91,6 +96,7 @@ fn main() -> process::ExitCode {
     App::Lint { file } => commands::lint(&file),
     App::Typecheck { file } => commands::typecheck(&file),
     App::Print { command } => match command {
+      PrintCommand::Tokens { file } => commands::print_tokens(&file),
       PrintCommand::Ast { file } => commands::print_ast(&file),
       PrintCommand::Bytecode { file } => commands::print_chunk(&file),
     },
