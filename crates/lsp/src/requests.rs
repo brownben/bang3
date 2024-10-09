@@ -1,14 +1,18 @@
+#![allow(clippy::module_name_repetitions)]
+
 use super::documents::DocumentIndex;
 use lsp_types as lsp;
 
 mod completions;
 mod diagnostics;
 mod format;
+mod symbols;
 mod variables;
 
 use completions::completions;
 use diagnostics::file_diagnostics;
 use format::format_file;
+use symbols::document_symbols;
 use variables::{get_references, goto_definition, hover, rename};
 
 pub fn handle(
@@ -74,6 +78,13 @@ pub fn handle(
       let file = files.get(&params.text_document_position_params.text_document.uri);
       let position = params.text_document_position_params.position;
       let result = hover(file, position);
+
+      Some(lsp_server::Response::new_ok(request_id, result))
+    }
+    DocumentSymbolRequest::METHOD => {
+      let (request_id, params) = get_params::<DocumentSymbolRequest>(request);
+      let file = files.get(&params.text_document.uri);
+      let result = document_symbols(file);
 
       Some(lsp_server::Response::new_ok(request_id, result))
     }

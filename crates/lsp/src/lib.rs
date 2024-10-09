@@ -110,6 +110,9 @@ impl LanguageServer {
       // Hover
       hover_provider: Some(lsp_types::HoverProviderCapability::Simple(true)),
 
+      // Document Symbols
+      document_symbol_provider: Some(lsp_types::OneOf::Left(true)),
+
       // Doesn't provide all capabilities
       ..Default::default()
     }

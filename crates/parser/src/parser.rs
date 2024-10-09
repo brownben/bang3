@@ -738,7 +738,9 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     self.resync_to(TokenKind::EndOfLine);
     self.expect_newline();
 
-    let span = Span::from(let_token).merge(expression.span());
+    let span = Span::from(let_token)
+      .merge(identifier_span)
+      .merge(expression.span());
 
     if let Expression::Function(ref mut function) = &mut expression {
       function.name = Some(identifier.clone());
