@@ -736,11 +736,19 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
     let mut expression = self.parse_expression_with_newline();
     self.resync_to(TokenKind::EndOfLine);
-    self.expect_newline();
 
     let span = Span::from(let_token)
       .merge(identifier_span)
       .merge(expression.span());
+
+    if self.peek_token_kind() == TokenKind::RightCurly {
+      self
+        .ast
+        .errors
+        .push(ParseError::BlockMustEndWithExpression(span));
+    } else {
+      self.expect_newline();
+    }
 
     if let Expression::Function(ref mut function) = &mut expression {
       function.name = Some(identifier.clone());
@@ -782,6 +790,8 @@ pub enum ParseError {
   UnknownCharacter(Token),
   /// Unterminated String Literal
   UnterminatedString(Token),
+  /// Block must end with expression
+  BlockMustEndWithExpression(Span),
 }
 impl ParseError {
   /// The title of the error message
@@ -794,6 +804,7 @@ impl ParseError {
       Self::ExpectedPatternRangeEnd(_) => "Expected End of Pattern Range".into(),
       Self::UnknownCharacter(_) => "Unknown Character".into(),
       Self::UnterminatedString(_) => "Unterminated String".into(),
+      Self::BlockMustEndWithExpression(_) => "Block Must End With Expression".into(),
     }
   }
 
@@ -815,6 +826,10 @@ impl ParseError {
       }
       Self::UnknownCharacter(_) => "got unknown character".into(),
       Self::UnterminatedString(_) => "missing closing quote for string".into(),
+      Self::BlockMustEndWithExpression(_) => {
+        "a block must return a value, so must end with an expression rather than a declaration"
+          .into()
+      }
     }
   }
 
@@ -836,6 +851,7 @@ impl GetSpan for ParseError {
       | Self::ExpectedPatternRangeEnd(token)
       | Self::UnknownCharacter(token)
       | Self::UnterminatedString(token) => token,
+      Self::BlockMustEndWithExpression(span) => return *span,
     };
 
     Span::from(*token)

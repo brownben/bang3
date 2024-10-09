@@ -623,7 +623,7 @@ impl CompileError {
       Self::TooManyClosures => "the maximum no. of closures has been reached (256)",
       Self::TooManyLocalVariables => "more than 256 local variables have been defined",
       Self::BlockMustEndWithExpression(_) => {
-        "a blocks must return a value, so must end with an expression"
+        "a block must return a value, so must end with an expression"
       }
       Self::InvalidAST => "the AST contains an error, see errors from parser",
     }
