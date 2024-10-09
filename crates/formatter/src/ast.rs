@@ -66,11 +66,12 @@ impl<'a, 'b> Formattable<'a, 'b> for Block<'a, '_> {
       return block.format(f);
     }
 
-    let line = if self.statements.len() > 1 {
-      IR::AlwaysLine
-    } else {
-      IR::LineOrSpace
-    };
+    let line =
+      if self.statements.len() > 1 || matches!(self.statements.first(), Some(Statement::Let(_))) {
+        IR::AlwaysLine
+      } else {
+        IR::LineOrSpace
+      };
     let statements = f.concat_iterator(
       self
         .statements

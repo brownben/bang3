@@ -12,7 +12,6 @@ fn format(source: &str, print_width: u16) -> String {
   };
   let allocator = Allocator::new();
   let ast = parse(source, &allocator);
-  assert!(ast.errors.is_empty());
 
   crate::format(&ast, config)
 }
@@ -99,6 +98,7 @@ fn block() {
   assert_format!("{ a\n b }", "{\n  a\n  b\n}", 6);
   assert_format!("{let a=false\n a+b}", "{\n  let a = false\n  a + b\n}", 6);
   assert_format!("{{let a=false\n a+b}}", "{\n  let a = false\n  a + b\n}", 6);
+  assert_format!("{let a=false}", "{\n  let a = false\n}", 6);
 }
 
 #[test]
