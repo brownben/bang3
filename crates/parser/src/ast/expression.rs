@@ -19,7 +19,7 @@ pub enum Expression<'source, 'ast> {
   Match(Box<'ast, Match<'source, 'ast>>),
   Unary(Box<'ast, Unary<'source, 'ast>>),
   Variable(Box<'ast, Variable<'source>>),
-  Invalid,
+  Invalid(Span),
 }
 
 impl Expression<'_, '_> {
@@ -309,7 +309,7 @@ impl GetSpan for Expression<'_, '_> {
       Self::Match(x) => x.span(),
       Self::Unary(x) => x.span(),
       Self::Variable(x) => x.span(),
-      Self::Invalid => Span::default(),
+      Self::Invalid(span) => *span,
     }
   }
 }

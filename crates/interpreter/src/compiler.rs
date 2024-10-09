@@ -194,7 +194,7 @@ impl<'s> Compile<'s> for Expression<'s, '_> {
       Expression::Match(match_) => match_.compile(compiler),
       Expression::Unary(unary) => unary.compile(compiler),
       Expression::Variable(variable) => variable.compile(compiler),
-      Expression::Invalid => Err(CompileError::InvalidAST),
+      Expression::Invalid(_) => Err(CompileError::InvalidAST),
     }
   }
 }

@@ -233,9 +233,10 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     let mut previous = match self.prefix_expression(token) {
       Ok(expression) => expression,
       Err(error) => {
+        let span = Span::from(token).merge(error.span());
         self.error = true;
         self.ast.errors.push(error);
-        return Expression::Invalid;
+        return Expression::Invalid(span);
       }
     };
 

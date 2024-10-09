@@ -8,7 +8,7 @@ pub(super) trait IsConstant {
 impl IsConstant for Expression<'_, '_> {
   fn is_constant(&self) -> bool {
     match self {
-      Self::Call(_) | Self::Variable(_) | Self::Invalid => false,
+      Self::Call(_) | Self::Variable(_) | Self::Invalid(_) => false,
       Self::Function(_) | Self::Literal(_) => true,
       Self::Binary(x) => x.is_constant(),
       Self::Block(x) => x.is_constant(),

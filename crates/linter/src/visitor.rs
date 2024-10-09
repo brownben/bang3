@@ -22,7 +22,7 @@ pub trait Visitor {
       Expression::If(x) => self.visit_if(x),
       Expression::Match(x) => self.visit_match(x),
       Expression::Unary(x) => self.visit_unary(x),
-      Expression::Literal(_) | Expression::Variable(_) | Expression::Invalid => {}
+      Expression::Literal(_) | Expression::Variable(_) | Expression::Invalid(_) => {}
     }
 
     self.exit_expression(expression);

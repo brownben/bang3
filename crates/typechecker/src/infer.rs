@@ -130,7 +130,7 @@ impl InferType for Expression<'_, '_> {
       Expression::Match(match_) => match_.infer(t),
       Expression::Unary(unary) => unary.infer(t),
       Expression::Variable(variable) => variable.infer(t),
-      Expression::Invalid => Ok(TypeArena::UNKNOWN),
+      Expression::Invalid(_) => Ok(TypeArena::UNKNOWN),
     }
   }
 }
