@@ -7,18 +7,48 @@
 mod commands;
 mod diagnostics;
 
+use clap::builder::styling::{AnsiColor, Style, Styles};
 use clap::{Args, Parser, Subcommand};
 use commands::CommandStatus;
+use owo_colors::*;
 use std::process;
 
+const STYLES: Styles = Styles::styled()
+  .usage(Style::new().italic())
+  .header(AnsiColor::BrightYellow.on_default().bold());
+
+fn coloured_header() -> String {
+  format!(
+    "{} ({})",
+    "Bang!".fg::<owo_colors::colors::css::Orange>().bold(),
+    "v3.0.0".italic()
+  )
+}
+
+fn about() -> String {
+  format!(
+    "{}\nMy language - a strongly typed, functional, bytecode interpreter.",
+    coloured_header()
+  )
+}
+
 #[derive(Parser)]
-#[clap(name = "bang", version)]
+#[clap(
+  name = "bang",
+  version,
+  about = about(),
+  styles = STYLES,
+  disable_help_subcommand = true,
+)]
 enum App {
-  /// Runs a file
+  /// Runs a Bang program
   Run {
     /// The file to run
     file: String,
   },
+
+  /// Start an interactive Read-Eval-Print Loop (REPL)
+  Repl,
 
   /// Formats source files
   #[clap(alias = "fmt")]
@@ -92,6 +122,7 @@ fn main() -> process::ExitCode {
 
   let result = match args {
     App::Run { file } => commands::run(&file),
+    App::Repl => commands::repl(),
     App::Format(options) => commands::format(&options),
     App::Lint { file } => commands::lint(&file),
     App::Typecheck { file } => commands::typecheck(&file),

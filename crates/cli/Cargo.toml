@@ -14,6 +14,7 @@ bang-typechecker = { path = "../typechecker" }
 anstream = "0.6.4"
 clap = { version = "4.4.8", features = ["derive"] }
 owo-colors = "4.1.0"
+rustyline = "14.0.0"
 
 [lints]
 workspace = true
