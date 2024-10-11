@@ -14,7 +14,7 @@ pub struct Compiler<'s> {
   closures: Vec<Vec<(u8, VariableStatus)>>,
 }
 impl<'s> Compiler<'s> {
-  pub fn new() -> Self {
+  fn new() -> Self {
     let mut locals = Vec::with_capacity(8);
     locals.push(Vec::new());
 
@@ -27,12 +27,30 @@ impl<'s> Compiler<'s> {
       closures: Vec::with_capacity(8),
     }
   }
-  pub fn compile(&mut self, ast: &AST<'s, '_>) -> Result<(), CompileError> {
-    ast.compile(self)
-  }
-  pub fn finish(mut self) -> Chunk {
+  fn finish(mut self) -> Chunk {
     self.chunk.add_opcode(OpCode::Halt, Span::default());
     self.chunk.finalize()
+  }
+
+  pub fn compile(ast: &AST<'s, '_>) -> Result<Chunk, CompileError> {
+    let mut compiler = Compiler::new();
+
+    for statement in &ast.statements {
+      statement.compile(&mut compiler)?;
+
+      match statement {
+        Statement::Expression(_) => compiler.chunk.add_opcode(OpCode::Pop, statement.span()),
+        Statement::Comment(_) | Statement::Let(_) => {}
+      }
+    }
+
+    Ok(compiler.finish())
+  }
+  pub fn compile_expression(expression: &Expression<'s, '_>) -> Result<Chunk, CompileError> {
+    let mut compiler = Compiler::new();
+    expression.compile(&mut compiler)?;
+    compiler.chunk.add_opcode(OpCode::Return, expression.span());
+    Ok(compiler.finish())
   }
 
   fn new_chunk(&mut self, name: &'s str) {
@@ -163,21 +181,6 @@ enum VariableStatus {
 
 trait Compile<'s> {
   fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError>;
-}
-
-impl<'s> Compile<'s> for AST<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
-    for statement in &self.statements {
-      statement.compile(compiler)?;
-
-      match statement {
-        Statement::Expression(_) => compiler.chunk.add_opcode(OpCode::Pop, statement.span()),
-        Statement::Comment(_) | Statement::Let(_) => {}
-      }
-    }
-
-    Ok(())
-  }
 }
 
 impl<'s> Compile<'s> for Expression<'s, '_> {

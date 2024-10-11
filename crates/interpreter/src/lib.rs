@@ -30,11 +30,21 @@ mod test;
 /// # Errors
 /// If there is a problem constructing the bytecode
 pub fn compile(ast: &bang_parser::AST<'_, '_>) -> Result<Chunk, CompileError> {
-  let mut compiler = compiler::Compiler::new();
-  compiler.compile(ast)?;
-  let chunk = compiler.finish();
-  Ok(chunk)
+  compiler::Compiler::compile(ast)
 }
+
+/// Compile an expression into a bytecode chunk, which returns the value of the expression
+///
+/// Useful for a REPL or other interactive environments where you want to evaluate an expression
+///
+/// # Errors
+/// If there is a problem constructing the bytecode
+pub fn compile_expression(
+  expression: &bang_parser::ast::Expression,
+) -> Result<Chunk, CompileError> {
+  compiler::Compiler::compile_expression(expression)
+}
+
 pub use bang_gc::HeapSize;
 pub use bytecode::{Chunk, ChunkBuilder, OpCode};
 pub use compiler::CompileError;
