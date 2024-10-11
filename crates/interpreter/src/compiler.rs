@@ -1,14 +1,13 @@
-use super::bytecode::{Chunk, ConstantValue, OpCode};
+use super::bytecode::{Chunk, ChunkBuilder, ConstantValue, OpCode};
 use bang_parser::{
   ast::{expression::*, statement::*},
   GetSpan, Span, AST,
 };
-use smartstring::alias::String as SmartString;
 use std::{error, fmt, mem};
 
 pub struct Compiler<'s> {
-  chunk: Chunk,
-  chunk_stack: Vec<Chunk>,
+  chunk: ChunkBuilder<'s>,
+  chunk_stack: Vec<ChunkBuilder<'s>>,
 
   scope_depth: u8,
   locals: Vec<Vec<Local<'s>>>,
@@ -20,7 +19,7 @@ impl<'s> Compiler<'s> {
     locals.push(Vec::new());
 
     Self {
-      chunk: Chunk::new("main".into()),
+      chunk: ChunkBuilder::new("main"),
       chunk_stack: Vec::with_capacity(2),
 
       scope_depth: 0,
@@ -33,12 +32,11 @@ impl<'s> Compiler<'s> {
   }
   pub fn finish(mut self) -> Chunk {
     self.chunk.add_opcode(OpCode::Halt, Span::default());
-    self.chunk.finalize();
-    self.chunk
+    self.chunk.finalize()
   }
 
-  fn new_chunk(&mut self, name: SmartString) {
-    let chunk = mem::replace(&mut self.chunk, Chunk::new(name));
+  fn new_chunk(&mut self, name: &'s str) {
+    let chunk = mem::replace(&mut self.chunk, ChunkBuilder::new(name));
     self.chunk_stack.push(chunk);
 
     self.begin_scope();
@@ -49,12 +47,15 @@ impl<'s> Compiler<'s> {
     self.end_scope(span)?;
     self.locals.pop();
 
-    let mut chunk = mem::replace(&mut self.chunk, self.chunk_stack.pop().unwrap());
-    chunk.finalize();
-    Ok(chunk)
+    let chunk = mem::replace(&mut self.chunk, self.chunk_stack.pop().unwrap());
+    Ok(chunk.finalize())
   }
 
-  fn add_constant(&mut self, value: ConstantValue, span: Span) -> Result<(), CompileError> {
+  fn add_constant(
+    &mut self,
+    value: impl Into<ConstantValue>,
+    span: Span,
+  ) -> Result<(), CompileError> {
     let constant_position = self.chunk.add_constant(value);
 
     if let Ok(constant_position) = u8::try_from(constant_position) {
@@ -69,7 +70,7 @@ impl<'s> Compiler<'s> {
 
     Ok(())
   }
-  fn add_global_name(&mut self, string: &str, span: Span) -> Result<(), CompileError> {
+  fn add_global_name(&mut self, string: &'s str, span: Span) -> Result<(), CompileError> {
     let string_position = self.chunk.add_global_name(string);
 
     if let Ok(string_position) = u8::try_from(string_position) {
@@ -300,14 +301,14 @@ impl<'s> Compile<'s> for Comment<'s, '_> {
 }
 impl<'s> Compile<'s> for FormatString<'s, '_> {
   fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
-    compiler.add_constant(self.strings[0].string.into(), self.strings[0].span)?;
+    compiler.add_constant(self.strings[0].string, self.strings[0].span)?;
     for (index, expr) in self.expressions.iter().enumerate() {
       expr.compile(compiler)?;
       compiler.chunk.add_opcode(OpCode::ToString, expr.span());
       compiler.chunk.add_opcode(OpCode::AddString, expr.span());
 
       let string = &self.strings[index + 1];
-      compiler.add_constant(string.string.into(), string.span)?;
+      compiler.add_constant(string.string, string.span)?;
       compiler.chunk.add_opcode(OpCode::AddString, string.span);
     }
 
@@ -316,7 +317,7 @@ impl<'s> Compile<'s> for FormatString<'s, '_> {
 }
 impl<'s> Compile<'s> for Function<'s, '_> {
   fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
-    let name = self.name.as_ref().map_or("", |var| var.name).into();
+    let name = self.name.as_ref().map_or("", |var| var.name);
     compiler.new_chunk(name);
 
     compiler.define_variable(self.parameter.name, self.span)?;
@@ -324,7 +325,7 @@ impl<'s> Compile<'s> for Function<'s, '_> {
     compiler.chunk.add_opcode(OpCode::Return, self.span);
 
     let function_chunk = compiler.finish_chunk(self.span)?;
-    compiler.add_constant(function_chunk.into(), self.span)?;
+    compiler.add_constant(function_chunk, self.span)?;
 
     let upvalues = compiler.closures.pop().unwrap();
     if !upvalues.is_empty() {
@@ -380,7 +381,7 @@ impl<'s> Compile<'s> for Literal<'s> {
       LiteralKind::Boolean(true) => compiler.chunk.add_opcode(OpCode::True, self.span),
       LiteralKind::Boolean(false) => compiler.chunk.add_opcode(OpCode::False, self.span),
       LiteralKind::Number { value, .. } => compiler.chunk.add_number(value, self.span),
-      LiteralKind::String(value) => compiler.add_constant(value.into(), self.span)?,
+      LiteralKind::String(value) => compiler.add_constant(value, self.span)?,
     };
 
     Ok(())

@@ -36,7 +36,7 @@ pub fn compile(ast: &bang_parser::AST<'_, '_>) -> Result<Chunk, CompileError> {
   Ok(chunk)
 }
 pub use bang_gc::HeapSize;
-pub use bytecode::Chunk;
+pub use bytecode::{Chunk, ChunkBuilder, OpCode};
 pub use compiler::CompileError;
 pub use value::Value;
 pub use vm::{RuntimeError, VM};

@@ -79,7 +79,6 @@ impl Value {
   ///
   /// SAFETY: Undefined behaviour if [Value] is not a constant function.
   /// Use [`Value::is_constant_function`] to check if it is a constant function.
-  #[must_use]
   pub(crate) fn as_constant_function(&self) -> &Chunk {
     debug_assert!(self.is_constant_function());
 
@@ -163,7 +162,6 @@ impl Value {
   ///
   /// SAFETY: Undefined behaviour if [Value] is not a function
   /// Use [`Value::is_function`] to check if it is a function
-  #[must_use]
   pub(crate) fn as_function<'a>(&'a self, heap: &'a Heap) -> &'a Chunk {
     if self.is_constant_function() {
       self.as_constant_function()
@@ -444,7 +442,7 @@ mod test {
 
   #[test]
   fn constant_function() {
-    let function = Chunk::new("".into());
+    let function = crate::ChunkBuilder::new("".into()).finalize();
     let function = Value::from(ptr::from_ref(&function));
     assert!(!function.is_number());
     assert!(!function.is_constant_string());
