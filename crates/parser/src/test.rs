@@ -675,9 +675,10 @@ mod fault_tolerant {
     let allocator = Allocator::new();
     let ast = parse("let 4 = 5 + 33", &allocator);
     let expected = indoc! {"
-      ├─ Let '' =
-      │  ╰─ Number (4)
-      ├─ Invalid
+      ├─ Let '4' =
+      │  ╰─ Binary (+)
+      │     ├─ Number (5)
+      │     ╰─ Number (33)
     "};
     assert!(ast.is_err());
     assert_eq!(ast.to_string(), expected);

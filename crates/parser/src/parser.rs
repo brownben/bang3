@@ -83,12 +83,20 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   /// Get the next token from the tokeniser
   fn next_token(&mut self) -> Token {
     self.skipped_newline = false;
-    self.tokeniser.next().unwrap_or_default()
+    self.tokeniser.next().unwrap_or_else(|| Token {
+      kind: TokenKind::EndOfFile,
+      start: self.source.len().try_into().unwrap(),
+      length: 0,
+    })
   }
 
   /// Peek at the next token from the tokeniser
   fn peek_token(&mut self) -> Token {
-    self.tokeniser.peek().copied().unwrap_or_default()
+    self.tokeniser.peek().copied().unwrap_or_else(|| Token {
+      kind: TokenKind::EndOfFile,
+      start: self.source.len().try_into().unwrap(),
+      length: 0,
+    })
   }
 
   /// Peek at the kind of the next token from the tokeniser
@@ -722,14 +730,28 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   fn declaration_statement(&mut self) -> Statement<'s, 'ast> {
     let let_token = self.next_token();
 
-    let identifier_span = self
-      .expect(TokenKind::Identifier)
-      .map(Span::from)
-      .unwrap_or_default();
-    let identifier_text = identifier_span.source_text(self.source);
-    let identifier = Variable {
-      name: identifier_text,
-      span: identifier_span,
+    let identifier = if self.peek_token_kind() == TokenKind::Equal {
+      let span = self.peek_token().into();
+      self.ast.errors.push(ParseError::MissingIdentifier(span));
+
+      Variable {
+        name: "",
+        span: Span::default(),
+      }
+    } else {
+      if self.peek_token_kind() != TokenKind::Identifier {
+        let error = ParseError::Expected {
+          expected: TokenKind::Identifier,
+          recieved: self.peek_token(),
+        };
+        self.ast.errors.push(error);
+      }
+
+      let span = Span::from(self.next_token());
+      Variable {
+        name: span.source_text(self.source),
+        span,
+      }
     };
 
     self.expect(TokenKind::Equal);
@@ -738,7 +760,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     self.resync_to(TokenKind::EndOfLine);
 
     let span = Span::from(let_token)
-      .merge(identifier_span)
+      .merge(identifier.span)
       .merge(expression.span());
 
     if self.peek_token_kind() == TokenKind::RightCurly {
@@ -792,6 +814,8 @@ pub enum ParseError {
   UnterminatedString(Token),
   /// Block must end with expression
   BlockMustEndWithExpression(Span),
+  /// Missing Identifier
+  MissingIdentifier(Span),
 }
 impl ParseError {
   /// The title of the error message
@@ -805,6 +829,7 @@ impl ParseError {
       Self::UnknownCharacter(_) => "Unknown Character".into(),
       Self::UnterminatedString(_) => "Unterminated String".into(),
       Self::BlockMustEndWithExpression(_) => "Block Must End With Expression".into(),
+      Self::MissingIdentifier(_) => "Missing Identifier".into(),
     }
   }
 
@@ -830,6 +855,7 @@ impl ParseError {
         "a block must return a value, so must end with an expression rather than a declaration"
           .into()
       }
+      Self::MissingIdentifier(_) => "expected identifier for variable name".into(),
     }
   }
 
@@ -851,7 +877,7 @@ impl GetSpan for ParseError {
       | Self::ExpectedPatternRangeEnd(token)
       | Self::UnknownCharacter(token)
       | Self::UnterminatedString(token) => token,
-      Self::BlockMustEndWithExpression(span) => return *span,
+      Self::BlockMustEndWithExpression(span) | Self::MissingIdentifier(span) => return *span,
     };
 
     Span::from(*token)
