@@ -7,7 +7,6 @@ use bang_lsp::LanguageServer;
 use bang_parser::{tokenise, Allocator, GetSpan, LineIndex, Span, AST};
 
 use anstream::{eprintln, println};
-use owo_colors::OwoColorize;
 use std::fs;
 
 pub enum CommandStatus {
@@ -216,45 +215,5 @@ pub fn language_server() -> CommandStatus {
   CommandStatus::Success
 }
 
-pub fn repl() -> Result<CommandStatus, ()> {
-  println!("{}", super::coloured_header());
-  println!("{}", "exit using ctrl+d, or ctrl+c".dimmed());
-
-  let mut vm = match VM::new(HeapSize::Standard) {
-    Ok(vm) => vm,
-    Err(error) => {
-      eprintln!("{}", Message::from(&error));
-      return Err(());
-    }
-  };
-  vm.define_builtin_functions();
-
-  let mut rl = rustyline::DefaultEditor::new().unwrap();
-  while let Ok(line) = rl.readline(">> ") {
-    rl.add_history_entry(line.as_str()).unwrap();
-
-    let source = if line.trim().starts_with("let") || line.trim().is_empty() {
-      line.clone()
-    } else {
-      format!("print({line})")
-    };
-
-    let allocator = Allocator::new();
-    let ast = bang_parser::parse(&source, &allocator);
-    if !ast.is_valid() {
-      for error in ast.errors {
-        eprintln!("{}", Message::from(&error));
-      }
-      continue;
-    }
-    let Ok(chunk) = compile("REPL", &line, &ast) else {
-      continue;
-    };
-
-    if let Err(error) = vm.run(&chunk) {
-      eprintln!("{}", Message::from(&error));
-    }
-  }
-
-  Ok(CommandStatus::Success)
-}
+mod repl;
+pub use repl::repl;
