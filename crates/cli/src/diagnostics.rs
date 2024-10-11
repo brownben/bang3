@@ -1,5 +1,5 @@
 use bang_parser::{LineIndex, Span};
-use owo_colors::OwoColorize;
+use owo_colors::{OwoColorize, Style};
 use std::fmt;
 
 #[derive(Debug)]
@@ -127,7 +127,8 @@ impl fmt::Display for CodeFrame<'_> {
 
     for line in start_line..=end_line {
       let line_text = self.lines.line_span(line).source_text(self.source);
-      write!(f, "{line:>3} {} {line_text}", "│".dimmed())?;
+      write!(f, "{line:>3} {} ", "│".dimmed())?;
+      highlight_source(f, line_text)?;
       if !line_text.ends_with('\n') {
         writeln!(f)?;
       }
@@ -135,4 +136,37 @@ impl fmt::Display for CodeFrame<'_> {
 
     write!(f, "{}", "────╯".dimmed())
   }
+}
+
+pub fn highlight_source(output: &mut dyn fmt::Write, source: &str) -> fmt::Result {
+  use bang_parser::{tokenise, TokenKind};
+
+  let mut last = 0;
+  for token in tokenise(source) {
+    // if there is a gap between tokens, add spaces for the gap
+    if token.start != last {
+      for _ in 0..(token.start - last) {
+        write!(output, " ").unwrap();
+      }
+    }
+
+    let style = match token.kind {
+      TokenKind::Number | TokenKind::True | TokenKind::False => Style::new().blue(),
+      TokenKind::String
+      | TokenKind::FormatStringStart
+      | TokenKind::FormatStringPart
+      | TokenKind::FormatStringEnd
+      | TokenKind::UnterminatedString => Style::new().green(),
+      TokenKind::Else | TokenKind::If | TokenKind::Match => Style::new().cyan(),
+      TokenKind::Let => Style::new().magenta(),
+      TokenKind::Comment => Style::new().dimmed(),
+      _ => Style::new(),
+    };
+    let token_text = Span::from(token).source_text(source);
+    write!(output, "{}", token_text.style(style))?;
+
+    last = token.start + u32::from(token.length);
+  }
+
+  Ok(())
 }

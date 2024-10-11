@@ -1,5 +1,5 @@
 use super::{compile, parse, CommandStatus};
-use crate::diagnostics::{CodeFrame, Message};
+use crate::diagnostics::{highlight_source, CodeFrame, Message};
 
 use bang_interpreter::{Chunk, ChunkBuilder, HeapSize, OpCode, VM};
 use bang_parser::{ast, tokenise, Allocator, GetSpan, Span, TokenKind};
@@ -19,7 +19,17 @@ impl Highlighter for BangRustyLine {
     prompt: &'p str,
     _default: bool,
   ) -> Cow<'b, str> {
-    Cow::Owned(prompt.yellow().to_string())
+    prompt.yellow().to_string().into()
+  }
+
+  fn highlight<'l>(&self, line: &'l str, _pos: usize) -> Cow<'l, str> {
+    let mut highlighted_source = String::with_capacity(line.len());
+    highlight_source(&mut highlighted_source, line).unwrap();
+    highlighted_source.into()
+  }
+
+  fn highlight_char(&self, _line: &str, _pos: usize, _forced: bool) -> bool {
+    true
   }
 }
 

@@ -382,6 +382,8 @@ impl TokenKind {
         | Self::FormatStringStart
         | Self::FormatStringPart
         | Self::FormatStringEnd
+        | Self::And // can be `&&` or `and`
+        | Self::Or // can be `||` or `or`
     )
   }
 }
