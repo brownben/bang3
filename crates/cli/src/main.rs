@@ -19,9 +19,9 @@ const STYLES: Styles = Styles::styled()
 
 fn coloured_header() -> String {
   format!(
-    "{} ({})",
+    "{} {}",
     "Bang!".fg::<owo_colors::colors::css::Orange>().bold(),
-    "v3.0.0".italic()
+    "(v3.0.0)".italic().dimmed()
   )
 }
 
@@ -72,7 +72,7 @@ enum App {
     command: PrintCommand,
   },
 
-  /// Run the language server
+  /// Run the language server. For editors, not humans.
   Lsp,
 }
 

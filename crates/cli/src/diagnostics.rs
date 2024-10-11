@@ -3,21 +3,28 @@ use owo_colors::OwoColorize;
 use std::fmt;
 
 #[derive(Debug)]
-enum Severity {
+pub enum Severity {
   Error,
   Warning,
 }
 pub struct Message {
-  title: String,
-  body: String,
-  severity: Severity,
+  pub title: String,
+  pub body: String,
+  pub severity: Severity,
 }
 impl Message {
-  pub fn error(message: &str) -> Self {
+  pub fn error(message: String) -> Self {
     Self {
-      title: message.to_owned(),
+      title: message,
       body: String::new(),
       severity: Severity::Error,
+    }
+  }
+  pub fn warning(message: String) -> Self {
+    Self {
+      title: message,
+      body: String::new(),
+      severity: Severity::Warning,
     }
   }
 }

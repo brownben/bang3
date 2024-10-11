@@ -1,4 +1,4 @@
-use super::diagnostics::{CodeFrame, Message};
+use super::diagnostics::{CodeFrame, Message, Severity};
 use super::FormatOptions;
 
 use bang_formatter::FormatterConfig;
@@ -19,19 +19,19 @@ pub enum CommandStatus {
 
 fn read_file(filename: &str) -> Result<String, ()> {
   match fs::read_to_string(filename) {
-    Ok(file) if !file.is_empty() => Ok(file),
-    Ok(file) => {
-      if file.is_empty() {
-        eprintln!("{}", Message::error("File is empty"));
-        Err(())
-      } else if file.bytes().len() > u32::MAX as usize {
-        eprintln!("{}", Message::error("File too large - max size 4GB"));
-        Err(())
-      } else {
-        Ok(file)
-      }
+    Ok(file) if file.is_empty() => {
+      eprintln!("{}", Message::warning(format!("Empty file `{filename}`")));
+      Err(())
     }
-    Err(_) => Err(eprintln!("{}", Message::error("File not found"))),
+    Ok(file) if file.bytes().len() > u32::MAX as usize => {
+      eprintln!("{}", Message::error("File too large - max size 4GB".into()));
+      Err(())
+    }
+    Ok(file) => Ok(file),
+    Err(_) => {
+      eprintln!("{}", Message::error(format!("File not found `{filename}`")));
+      Err(())
+    }
   }
 }
 
@@ -116,12 +116,19 @@ pub fn format(options: &FormatOptions) -> Result<CommandStatus, ()> {
   }
 
   if options.check && formatted_source != source {
-    eprintln!("{}", Message::error("File is not formatted"));
+    eprintln!(
+      "{}",
+      Message {
+        title: "File is not formatted".into(),
+        body: format!("`{}` is not formatted", options.file),
+        severity: Severity::Error,
+      }
+    );
     return Ok(CommandStatus::Failure);
   }
 
   if formatted_source != source && fs::write(&options.file, formatted_source).is_err() {
-    eprintln!("{}", Message::error("Problem writing to file"));
+    eprintln!("{}", Message::error("Problem writing to file".into()));
     return Err(());
   };
 
