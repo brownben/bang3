@@ -260,6 +260,7 @@ impl From<Token> for Span {
 
 /// The type of a token
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum TokenKind {
   // Brackets
   /// `(`
@@ -352,7 +353,7 @@ pub enum TokenKind {
   DotDot,
 
   // Whitespace + Comments
-  // A comment, consisting of `//` then any number of characters before a newline
+  /// A comment, consisting of `//` then any number of characters before a newline
   Comment,
   /// The end of a line, indicating a `\n`
   EndOfLine,
@@ -367,6 +368,8 @@ pub enum TokenKind {
   UnterminatedString,
 }
 impl TokenKind {
+  /// Does the token always have the same length?
+  #[must_use]
   pub fn has_fixed_length(self) -> bool {
     !matches!(
       self,

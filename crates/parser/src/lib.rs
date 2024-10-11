@@ -45,6 +45,7 @@ pub use parser::{ParseError, AST};
 pub fn tokenise(source: &str) -> impl Iterator<Item = tokeniser::Token> + '_ {
   tokeniser::Tokeniser::from(source)
 }
+pub use tokeniser::TokenKind;
 
 /// Bump allocator for the AST
 pub mod allocator {

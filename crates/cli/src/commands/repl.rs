@@ -2,10 +2,44 @@ use super::{compile, parse, CommandStatus};
 use crate::diagnostics::{CodeFrame, Message};
 
 use bang_interpreter::{Chunk, ChunkBuilder, HeapSize, OpCode, VM};
-use bang_parser::{ast, Allocator, GetSpan, Span};
+use bang_parser::{ast, tokenise, Allocator, GetSpan, Span, TokenKind};
 
 use anstream::{eprintln, println};
 use owo_colors::OwoColorize;
+use rustyline::highlight::Highlighter;
+use rustyline::validate::{ValidationContext, ValidationResult, Validator};
+use std::borrow::Cow;
+
+#[derive(rustyline::Helper, rustyline::Completer, rustyline::Hinter)]
+struct BangRustyLine;
+
+impl Highlighter for BangRustyLine {
+  fn highlight_prompt<'b, 's: 'b, 'p: 'b>(
+    &'s self,
+    prompt: &'p str,
+    _default: bool,
+  ) -> Cow<'b, str> {
+    Cow::Owned(prompt.yellow().to_string())
+  }
+}
+
+// Check the input for multiline entry
+// Assumes is multiline if the brackets are not balanced, or if it ends with an unterminated string
+impl Validator for BangRustyLine {
+  fn validate(&self, ctx: &mut ValidationContext) -> rustyline::Result<ValidationResult> {
+    let input = ctx.input();
+
+    if !brackets_approx_balanced(input) {
+      return Ok(ValidationResult::Incomplete);
+    }
+
+    if ends_with_unterminated_string(input) {
+      return Ok(ValidationResult::Incomplete);
+    }
+
+    Ok(ValidationResult::Valid(None))
+  }
+}
 
 pub fn repl() -> Result<CommandStatus, ()> {
   println!("{}", crate::coloured_header());
@@ -20,7 +54,9 @@ pub fn repl() -> Result<CommandStatus, ()> {
   };
   vm.define_builtin_functions();
 
-  let mut rl = rustyline::DefaultEditor::new().unwrap();
+  let mut rl = rustyline::Editor::new().unwrap();
+  rl.set_helper(Some(BangRustyLine));
+
   while let Ok(line) = rl.readline(">> ") {
     rl.add_history_entry(line.as_str()).unwrap();
     _ = run_repl_entry(&mut vm, &line);
@@ -90,5 +126,39 @@ fn compile_expression(
       }
       Err(())
     }
+  }
+}
+
+/// Are all the brackets in the source balanced?
+///
+/// This is not a perfect check that the source brackets are balanced,
+/// but it makes sure that there are the same number of opening and closing brackets.
+fn brackets_approx_balanced(source: &str) -> bool {
+  let mut bracket_count = 0;
+
+  for token in tokenise(source) {
+    match token.kind {
+      TokenKind::LeftCurly | TokenKind::LeftParen | TokenKind::FormatStringStart => {
+        bracket_count += 1;
+      }
+      TokenKind::RightCurly | TokenKind::RightParen | TokenKind::FormatStringEnd => {
+        bracket_count -= 1;
+      }
+      _ => {}
+    }
+  }
+
+  bracket_count < 1
+}
+
+/// Does the source end with a string that is not terminated?
+fn ends_with_unterminated_string(source: &str) -> bool {
+  if let Some(last_token) = tokenise(source).last()
+    && last_token.kind == TokenKind::String
+  {
+    let string = Span::from(last_token).source_text(source).as_bytes();
+    string.first() == string.last()
+  } else {
+    false
   }
 }

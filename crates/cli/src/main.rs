@@ -4,6 +4,8 @@
 //!
 //! Complete with linter, formatter, typechecker, and language server.
 
+#![feature(let_chains)]
+
 mod commands;
 mod diagnostics;
 
