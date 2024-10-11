@@ -386,6 +386,28 @@ impl TokenKind {
         | Self::Or // can be `||` or `or`
     )
   }
+
+  /// Is the token a start of an expression?
+  pub(crate) fn is_expression_start(self) -> bool {
+    matches!(
+      self,
+      TokenKind::True
+        | TokenKind::False
+        | TokenKind::Number
+        | TokenKind::String
+        | TokenKind::FormatStringStart
+        | TokenKind::Identifier
+        | TokenKind::LeftCurly
+        | TokenKind::LeftParen
+        | TokenKind::Minus
+        | TokenKind::Bang
+        | TokenKind::If
+        | TokenKind::Match
+        | TokenKind::UnterminatedString
+        | TokenKind::Let
+        | TokenKind::Comment
+    )
+  }
 }
 impl fmt::Display for TokenKind {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

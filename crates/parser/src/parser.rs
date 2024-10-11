@@ -148,7 +148,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   /// Skip until the specified kind of token occurs, or the end of a line is reached
   ///
   /// Used to get the parser to a known place where it can resume parsing an expression
-  fn resync_to(&mut self, kind: TokenKind) {
+  fn resync_if_error(&mut self, kind: TokenKind) {
     if self.error {
       while self.peek_token_kind() != kind
         && !matches!(
@@ -213,10 +213,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   /// Parse an expression, also checking for a newline at the end
   fn parse_expression_with_newline(&mut self) -> Expression<'s, 'ast> {
     let mut expression = self.parse_expression();
-
-    if self.error {
-      self.resync_to(TokenKind::EndOfLine);
-    }
+    self.resync_if_error(TokenKind::EndOfLine);
 
     loop {
       self.skip_newline();
@@ -225,7 +222,10 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
         // allow pipeline operator to start after a newline - different to other operators
         TokenKind::RightRight => expression = self.pipeline(expression),
-        _ => break self.expect_newline(),
+
+        // if the token isn't the start of an expression, leave it to be parsed into a later error
+        token if token.is_expression_start() => break self.expect_newline(),
+        _ => break,
       }
     }
 
@@ -463,7 +463,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   fn group(&mut self, opening_paren: Token) -> Expression<'s, 'ast> {
     self.skip_newline();
     let expression = self.parse_expression();
-    self.resync_to(TokenKind::RightParen);
+    self.resync_if_error(TokenKind::RightParen);
     self.skip_newline();
 
     let span = if let Some(closing_paren) = self.expect(TokenKind::RightParen) {
@@ -757,7 +757,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     self.expect(TokenKind::Equal);
 
     let mut expression = self.parse_expression_with_newline();
-    self.resync_to(TokenKind::EndOfLine);
+    self.resync_if_error(TokenKind::EndOfLine);
 
     let span = Span::from(let_token)
       .merge(identifier.span)
@@ -786,7 +786,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   /// Parses an expression on its own line
   fn expression_statement(&mut self) -> Statement<'s, 'ast> {
     let expression = self.parse_expression_with_newline();
-    self.resync_to(TokenKind::EndOfLine);
+    self.resync_if_error(TokenKind::EndOfLine);
 
     self.allocate_statement(expression)
   }

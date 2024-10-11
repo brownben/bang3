@@ -875,6 +875,20 @@ mod fault_tolerant {
     assert!(ast.is_err());
     assert_eq!(ast.to_string(), expected);
   }
+
+  #[test]
+  fn looks_like_assignment() {
+    let allocator = Allocator::new();
+
+    let ast = parse("a = 5", &allocator);
+    let expected = indoc! {"
+      ├─ Variable (a)
+      ├─ Invalid
+    "};
+    assert!(ast.is_err());
+    assert!(ast.errors.len() == 1);
+    assert_eq!(ast.to_string(), expected);
+  }
 }
 
 #[test]
