@@ -66,12 +66,14 @@ impl<'a, 'b> Formattable<'a, 'b> for Block<'a, '_> {
       return block.format(f);
     }
 
-    let line =
-      if self.statements.len() > 1 || matches!(self.statements.first(), Some(Statement::Let(_))) {
-        IR::AlwaysLine
-      } else {
-        IR::LineOrSpace
-      };
+    let line = if self.statements.len() == 1
+      && let Some(Statement::Expression(expression)) = self.statements.first()
+      && !matches!(expression.as_ref(), Expression::Comment(_))
+    {
+      IR::LineOrSpace
+    } else {
+      IR::AlwaysLine
+    };
     let statements = f.concat_iterator(
       self
         .statements
@@ -85,10 +87,17 @@ impl<'a, 'b> Formattable<'a, 'b> for Block<'a, '_> {
 impl<'a, 'b> Formattable<'a, 'b> for Call<'a, '_> {
   fn format(&self, f: &Formatter<'a, 'b>) -> IR<'a, 'b> {
     if let Some(argument) = &self.argument {
+      // If it contains a comment, we have to break to preserve the comment.
+      let line = if let Expression::Comment(_) = argument {
+        IR::AlwaysLine
+      } else {
+        IR::Line
+      };
+
       f.group([
         self.expression.format(f),
         IR::Text("("),
-        f.indent([IR::Line, argument.unwrap().format(f)]),
+        f.indent([line, argument.unwrap_groups().format(f)]),
         IR::Line,
         IR::Text(")"),
       ])
@@ -144,9 +153,16 @@ impl<'a, 'b> Formattable<'a, 'b> for Group<'a, '_> {
       return group.format(f);
     }
 
+    // If it contains a comment, we have to break to preserve the comment.
+    let line = if let Expression::Comment(_) = self.expression {
+      IR::AlwaysLine
+    } else {
+      IR::Line
+    };
+
     f.group([
       IR::Text("("),
-      f.indent([IR::Line, self.expression.format(f)]),
+      f.indent([line, self.expression.format(f)]),
       IR::Line,
       IR::Text(")"),
     ])
@@ -154,10 +170,17 @@ impl<'a, 'b> Formattable<'a, 'b> for Group<'a, '_> {
 }
 impl<'a, 'b> Formattable<'a, 'b> for If<'a, '_> {
   fn format(&self, f: &Formatter<'a, 'b>) -> IR<'a, 'b> {
+    // If it contains a comment, we have to break to preserve the comment.
+    let line = if let Expression::Comment(_) = self.condition {
+      IR::AlwaysLine
+    } else {
+      IR::Line
+    };
+
     f.concat([
       f.group([
         IR::Text("if ("),
-        f.indent([IR::Line, self.condition.unwrap().format(f)]),
+        f.indent([line, self.condition.unwrap_groups().format(f)]),
         IR::Line,
         IR::Text(") "),
       ]),

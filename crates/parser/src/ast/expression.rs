@@ -24,10 +24,31 @@ pub enum Expression<'source, 'ast> {
 
 impl Expression<'_, '_> {
   /// Extract a single expression from a group or block
+  ///
+  /// Warning: This effectively discards comments, to keep comments use [`Expression::unwrap_groups`]
   #[must_use]
   pub fn unwrap(&self) -> &Self {
     match self {
       Self::Comment(comment) => comment.expression.unwrap(),
+      Self::Group(group) => group.expression.unwrap(),
+      Self::Block(block) => {
+        if block.statements.len() == 1
+          && let Some(statement) = block.statements.first()
+          && let Statement::Expression(expression) = statement
+        {
+          expression.unwrap()
+        } else {
+          self
+        }
+      }
+      _ => self,
+    }
+  }
+
+  /// Extract a single expression from a group or block
+  #[must_use]
+  pub fn unwrap_groups(&self) -> &Self {
+    match self {
       Self::Group(group) => group.expression.unwrap(),
       Self::Block(block) => {
         if block.statements.len() == 1

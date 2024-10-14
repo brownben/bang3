@@ -244,6 +244,21 @@ fn comment() {
     │  ╰─ Number (5)
   "};
   assert_eq!(ast, expected);
+
+  let comment_in_call = parse_to_string(indoc! {"
+    print(
+      5 // hello world
+    )
+  "});
+  let expected = indoc! {"
+    ├─ Call
+    │  ├─ Callee
+    │  │  ╰─ Variable (print)
+    │  ╰─ Argument
+    │     ╰─ Comment (hello world)
+    │        ╰─ Number (5)
+  "};
+  assert_eq!(comment_in_call, expected);
 }
 
 #[test]

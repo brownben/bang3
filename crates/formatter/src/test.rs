@@ -309,3 +309,34 @@ fn format_string() {
     50
   );
 }
+
+#[test]
+fn comments_in_groups() {
+  let group = indoc! {"
+    (
+      5 // hello world
+    )
+  "};
+  assert_format!(group, group, 80);
+
+  let call = indoc! {"
+    print(
+      5 // hello world
+    )
+  "};
+  assert_format!(call, call, 80);
+
+  let block = indoc! {"
+    {
+      5 // hello world
+    }
+  "};
+  assert_format!(block, block, 80);
+
+  let if_ = indoc! {"
+    if (
+      5 // hello world
+    ) 4 else 7
+  "};
+  assert_format!(if_, if_, 80);
+}
