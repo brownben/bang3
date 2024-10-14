@@ -175,6 +175,7 @@ pub struct Match<'source, 'ast> {
 #[derive(Debug)]
 pub struct MatchCase<'source, 'ast> {
   pub pattern: Pattern<'source, 'ast>,
+  pub guard: Option<Expression<'source, 'ast>>,
   pub expression: Expression<'source, 'ast>,
   pub span: Span,
 }

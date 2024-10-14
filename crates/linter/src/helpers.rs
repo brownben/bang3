@@ -68,7 +68,7 @@ impl IsConstant for Match<'_, '_> {
 }
 impl IsConstant for MatchCase<'_, '_> {
   fn is_constant(&self) -> bool {
-    self.expression.is_constant()
+    self.expression.is_constant() && self.guard.as_ref().map_or(true, IsConstant::is_constant)
   }
 }
 impl IsConstant for Unary<'_, '_> {
@@ -163,7 +163,9 @@ impl ASTEquality for Match<'_, '_> {
 }
 impl ASTEquality for MatchCase<'_, '_> {
   fn equals(&self, other: &Self) -> bool {
-    self.pattern.equals(&other.pattern) && self.expression.equals(&other.expression)
+    self.pattern.equals(&other.pattern)
+      && self.guard.equals(&other.guard)
+      && self.expression.equals(&other.expression)
   }
 }
 impl ASTEquality for Pattern<'_, '_> {

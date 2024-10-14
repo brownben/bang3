@@ -204,6 +204,11 @@ impl<'a, 'b> Formattable<'a, 'b> for MatchCase<'a, '_> {
     f.concat([
       IR::Text("| "),
       self.pattern.format(f),
+      self
+        .guard
+        .as_ref()
+        .map(|guard| f.concat([IR::Text(" if "), guard.format(f)]))
+        .unwrap_or_default(),
       IR::Text(" -> "),
       self.expression.format(f),
     ])

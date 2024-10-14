@@ -717,6 +717,28 @@ fn match_() {
 }
 
 #[test]
+fn match_guards() {
+  let vm = run(indoc! {"
+    let a = match true | true if false -> 1 | false -> 2 | _ -> 3
+    let b = match true | true if true -> 1 | false -> 2 | _ -> 3
+    let c = match 5 | ..6 if false -> 1 | 2..8 if true -> 2 | _ -> 3
+    let d = match 5 | ..6 if true -> 1 | 2..8 if true -> 2 | _ -> 3
+    let e = match 12 | c if c > 3 -> 1 | _ -> 2
+    let f = match 12 | c if c > 15 -> 1 | c if c > 10 -> 2 | _ -> 3
+    let g = match 12 | c if c > 10 -> c | _ -> 3
+    let h = match 12 | c if false -> c | _ -> 3
+  "});
+  assert_variable!(vm; a, 3.0);
+  assert_variable!(vm; b, 1.0);
+  assert_variable!(vm; c, 2.0);
+  assert_variable!(vm; d, 1.0);
+  assert_variable!(vm; e, 1.0);
+  assert_variable!(vm; f, 2.0);
+  assert_variable!(vm; g, 12.0);
+  assert_variable!(vm; h, 3.0);
+}
+
+#[test]
 fn fibonacci_match() {
   let fibonnacci_match = run(indoc! {"
     let fibonnacciMatch = n => match n

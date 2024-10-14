@@ -18,9 +18,11 @@ fn constant_conditions() {
   assert!(lint("if (true) pass else other").is_err());
   assert!(lint("if (4 > 5) pass else other").is_err());
   assert!(lint("match false | _ -> false").is_err());
+  assert!(lint("match x | 1 if false -> false | _ -> true").is_err());
 
   assert!(lint("if (x > 6) pass else other").is_ok());
   assert!(lint("match x | 1 -> false | _ -> true").is_ok());
+  assert!(lint("match x | 1 if a > 4 -> false | _ -> true").is_ok());
   assert!(lint("5 >> 4").is_ok());
 }
 
@@ -90,6 +92,7 @@ fn no_useless_match() {
   assert!(lint("match n | _ -> 3").is_err());
   assert!(lint("match x\n | x -> 3").is_err());
   assert!(lint("match x\n | pattern -> 3").is_err());
+  assert!(lint("match n | _ if x -> 3 | _ -> 4").is_ok());
 
   assert!(lint("match n | 3 -> 3").is_ok());
   assert!(lint("match n | true -> 3 | false -> 4").is_ok());

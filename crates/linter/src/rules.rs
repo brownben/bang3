@@ -35,10 +35,16 @@ impl LintRule for NoConstantConditions {
       context.add_diagnostic(&Self, if_.condition.span());
     }
 
-    if let Expression::Match(match_) = &expression
-      && match_.value.is_constant()
-    {
-      context.add_diagnostic(&Self, match_.value.span());
+    if let Expression::Match(match_) = &expression {
+      if match_.value.is_constant() {
+        context.add_diagnostic(&Self, match_.value.span());
+      }
+
+      for case in match_.cases.iter().flat_map(|case| &case.guard) {
+        if case.is_constant() {
+          context.add_diagnostic(&Self, case.span());
+        }
+      }
     }
   }
 }
@@ -163,6 +169,7 @@ impl LintRule for NoUselessMatch {
   fn visit_expression(&self, context: &mut Context, expression: &Expression) {
     if let Expression::Match(match_) = &expression
       && let Pattern::Identifier(_) = match_.cases[0].pattern
+      && match_.cases[0].guard.is_none()
     {
       context.add_diagnostic(&Self, match_.span());
     }

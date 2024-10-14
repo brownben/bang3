@@ -429,6 +429,37 @@ fn match_() {
 }
 
 #[test]
+fn match_with_guard() {
+  let ast = parse_to_string("match n | 1 if x -> 0");
+  let expected = indoc! {"
+    ├─ Match
+    │  ├─ Variable (n)
+    │  ╰─ Cases:
+    │     ╰─ Pattern ─ 1
+    │        ├─ Guard
+    │        │  ╰─ Variable (x)
+    │        ╰─ Number (0)
+  "};
+  assert_eq!(ast, expected);
+
+  let ast = parse_to_string("match n | 1 if x -> 0 | 2 if y -> 1");
+  let expected = indoc! {"
+    ├─ Match
+    │  ├─ Variable (n)
+    │  ╰─ Cases:
+    │     ├─ Pattern ─ 1
+    │     │  ├─ Guard
+    │     │  │  ╰─ Variable (x)
+    │     │  ╰─ Number (0)
+    │     ╰─ Pattern ─ 2
+    │        ├─ Guard
+    │        │  ╰─ Variable (y)
+    │        ╰─ Number (1)
+  "};
+  assert_eq!(ast, expected);
+}
+
+#[test]
 fn match_missing_parts() {
   let allocator = Allocator::new();
   assert!(parse("match | 1 -> 2", &allocator).is_err());

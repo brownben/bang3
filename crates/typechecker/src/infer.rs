@@ -368,6 +368,11 @@ impl InferType for Match<'_, '_> {
           .define_variable(identifier, TypeScheme::monomorphic(value_type));
       }
 
+      // check the guard is valid, needs the value to be defined
+      if let Some(guard) = &case.guard {
+        guard.infer(t)?;
+      }
+
       let case_type = case.expression.infer(t)?;
       if t.types.unify(case_type, return_type).is_err() {
         return Err(TypeError::MatchCasesDontMatch {

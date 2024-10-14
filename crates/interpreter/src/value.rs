@@ -177,7 +177,7 @@ impl fmt::Debug for Value {
       Self(FALSE) => write!(f, "false"),
       Self(NULL) => write!(f, "null"),
       x if x.is_number() => write!(f, "{}", x.as_number()),
-      x if x.is_constant_string() => write!(f, "{}", x.as_constant_string()),
+      x if x.is_constant_string() => write!(f, "\"{}\"", x.as_constant_string()),
       x if x.is_constant_function() => f.write_str(&x.as_constant_function().display()),
       x => write!(f, "{:?}", x.as_object::<()>()),
     }

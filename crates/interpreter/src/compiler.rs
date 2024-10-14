@@ -396,16 +396,16 @@ impl<'s> Compile<'s> for Match<'s, '_> {
     let is_exhaustive = self
       .cases
       .iter()
-      .any(|case| matches!(case.pattern, Pattern::Identifier(_)));
+      .any(|case| case.guard.is_none() && matches!(case.pattern, Pattern::Identifier(_)));
 
     self.value.compile(compiler)?;
 
     let mut case_end_jumps = Vec::new();
     for case in &self.cases {
-      if let Pattern::Identifier(variable) = &case.pattern {
-        // don't touch the value being matched upon
+      if let Pattern::Identifier(variable) = &case.pattern
+        && case.guard.is_none()
+      {
         compiler.chunk.add_opcode(OpCode::Peek, self.span);
-
         compiler.begin_scope();
         compiler.define_variable(variable.name, variable.span)?;
         case.expression.compile(compiler)?;
@@ -413,8 +413,19 @@ impl<'s> Compile<'s> for Match<'s, '_> {
         break; // optimisation: nothing can match after this
       }
 
+      let mut bound_variable = false;
       match &case.pattern {
-        Pattern::Identifier(_) => unreachable!("handled above"),
+        Pattern::Identifier(variable) => {
+          compiler.begin_scope();
+          compiler.chunk.add_opcode(OpCode::Peek, self.span);
+          compiler.define_variable(variable.name, variable.span)?;
+
+          // This statement is only used when there is a guard
+          // Other guards already have a condition, so we and the guard, to simplify we and with if
+          compiler.chunk.add_opcode(OpCode::True, self.span);
+
+          bound_variable = true;
+        }
         Pattern::Literal(literal) => {
           compiler.chunk.add_opcode(OpCode::Peek, self.span);
           literal.compile(compiler)?;
@@ -449,6 +460,13 @@ impl<'s> Compile<'s> for Match<'s, '_> {
         },
       }
 
+      if let Some(guard) = &case.guard {
+        let jump = compiler.add_jump(OpCode::JumpIfFalse, self.span);
+        compiler.chunk.add_opcode(OpCode::Pop, self.span);
+        guard.compile(compiler)?;
+        compiler.patch_jump(jump)?;
+      }
+
       // If it does, do the expression
       let non_match_jump = compiler.add_jump(OpCode::JumpIfFalse, self.span);
       compiler.chunk.add_opcode(OpCode::Pop, self.span);
@@ -456,6 +474,9 @@ impl<'s> Compile<'s> for Match<'s, '_> {
       case_end_jumps.push(compiler.add_jump(OpCode::Jump, self.span));
 
       // Otherwise skip to the next case
+      if bound_variable {
+        compiler.end_scope(case.span)?;
+      }
       compiler.patch_jump(non_match_jump)?;
       compiler.chunk.add_opcode(OpCode::Pop, self.span);
     }

@@ -261,6 +261,21 @@ fn match_exhaustiveness() {
 }
 
 #[test]
+fn match_exhaustiveness_with_guard() {
+  let missing_possible_true = "match 4 > 5 | true if 3 > 4 -> 1 | false -> 3";
+  assert!(has_type_error(missing_possible_true));
+
+  let missing_possible_false = "match 4 > 5 | true -> 1 | false if 3 > 4 -> 3";
+  assert!(has_type_error(missing_possible_false));
+
+  let with_true_catch_guard = "match 4 > 5 | true if 3 > 4 -> 1 | false -> 3 | _ -> 5";
+  assert_eq!(synthesize(with_true_catch_guard), "number");
+
+  let needs_catch_all = "match 555 | _ if 4 > 5 -> 1";
+  assert!(has_type_error(needs_catch_all));
+}
+
+#[test]
 fn unary() {
   assert_eq!(synthesize("!true"), "boolean");
   assert_eq!(synthesize("!false"), "boolean");

@@ -192,12 +192,21 @@ impl PrettyPrint for Match<'_, '_> {
   }
 }
 impl PrettyPrint for MatchCase<'_, '_> {
-  fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
-    let prefix = format!("{prefix}{FINAL_CHILD}");
+  fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix_raw: &str, last: bool) -> fmt::Result {
+    let prefix = format!("{prefix_raw}{FINAL_CHILD}");
     self.pattern.pretty(f, &prefix, last)?;
 
-    let gap = if last { FINAL_CHILD } else { OTHER_CHILD };
-    self.expression.pretty(f, &format!("{prefix}{gap}"), true)
+    if let Some(guard) = &self.guard {
+      let prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
+      let child_prefix = format!("{prefix}{OTHER_CHILD}");
+
+      writeln!(f, "{prefix}{OTHER_ENTRY}Guard")?;
+      guard.pretty(f, &child_prefix, true)?;
+      self.expression.pretty(f, &prefix, true)
+    } else {
+      let gap = if last { FINAL_CHILD } else { OTHER_CHILD };
+      self.expression.pretty(f, &format!("{prefix}{gap}"), true)
+    }
   }
 }
 impl PrettyPrint for Pattern<'_, '_> {

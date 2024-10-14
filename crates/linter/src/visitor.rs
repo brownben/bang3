@@ -69,6 +69,9 @@ pub trait Visitor {
     }
   }
   fn visit_match_case(&mut self, case: &MatchCase) {
+    if let Some(guard) = &case.guard {
+      self.visit_expression(guard);
+    }
     self.visit_expression(&case.expression);
   }
   fn visit_unary(&mut self, unary: &Unary) {

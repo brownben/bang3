@@ -625,12 +625,14 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
     loop {
       let pattern = self.pattern()?;
+      let guard = self.matches(TokenKind::If).map(|_| self.parse_expression());
       self.expect(TokenKind::RightArrow);
       let expression = self.parse_expression();
       let span = pattern.span().merge(expression.span());
 
       cases.push(MatchCase {
         pattern,
+        guard,
         expression,
         span,
       });
@@ -663,7 +665,8 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       return Ok(pattern);
     }
 
-    let range_has_end = self.peek_token_kind() != TokenKind::RightArrow;
+    let range_has_end =
+      self.peek_token_kind() != TokenKind::RightArrow && self.peek_token_kind() != TokenKind::If;
     self.pattern_range(Some(pattern), range_has_end)
   }
 

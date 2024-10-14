@@ -237,6 +237,11 @@ fn match_() {
     "(\n  match n\n    | ''.. -> a\n    | b -> ''\n)",
     100
   );
+  assert_format!(
+    "(match n | ''.. if x > 5 -> a | b -> '')",
+    "(\n  match n\n    | ''.. if x > 5 -> a\n    | b -> ''\n)",
+    100
+  );
 }
 
 #[test]

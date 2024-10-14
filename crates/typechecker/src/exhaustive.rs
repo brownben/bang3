@@ -19,7 +19,7 @@ pub fn check(value: &Type, cases: &[MatchCase]) -> Result {
 fn has_catch_all(cases: &[MatchCase]) -> Result {
   let position = cases
     .iter()
-    .position(|case| matches!(case.pattern, Pattern::Identifier(_)));
+    .position(|case| case.guard.is_none() && matches!(case.pattern, Pattern::Identifier(_)));
 
   if let Some(position) = position
     && position == cases.len() - 1
@@ -39,12 +39,16 @@ fn boolean(cases: &[MatchCase]) -> Result {
   for case in cases {
     match &case.pattern {
       Pattern::Identifier(_) if !has_true || !has_false => {
-        has_true = true;
-        has_false = true;
+        if case.guard.is_none() {
+          has_true = true;
+          has_false = true;
+        }
       }
       Pattern::Literal(literal) => match literal.kind {
-        LiteralKind::Boolean(true) if !has_true => has_true = true,
-        LiteralKind::Boolean(false) if !has_false => has_false = true,
+        LiteralKind::Boolean(true) if !has_true && case.guard.is_none() => has_true = true,
+        LiteralKind::Boolean(false) if !has_false && case.guard.is_none() => has_false = true,
+        LiteralKind::Boolean(true) if !has_true => {}
+        LiteralKind::Boolean(false) if !has_false => {}
         _ => unused_cases.push(case.span),
       },
       _ => unused_cases.push(case.span),
