@@ -77,7 +77,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
   /// Check if the parser has finished parsing the source code
   fn is_finished(&mut self) -> bool {
-    self.tokeniser.peek().is_none()
+    self.peek_token_kind() == TokenKind::EndOfFile
   }
 
   /// Get the next token from the tokeniser

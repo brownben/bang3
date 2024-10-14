@@ -17,6 +17,14 @@ fn parse_to_string(source: &str) -> String {
 }
 
 #[test]
+fn space_at_end() {
+  let allocator = Allocator::new();
+  assert!(parse("22 + 44 ", &allocator).is_ok());
+  assert!(parse("22 + 44    ", &allocator).is_ok());
+  assert!(parse("22 + 44  \t  ", &allocator).is_ok());
+}
+
+#[test]
 fn unterminated_string() {
   let allocator = Allocator::new();
   assert!(parse("'unterminated string", &allocator).is_err());
