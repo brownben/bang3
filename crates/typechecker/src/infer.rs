@@ -198,6 +198,7 @@ impl InferType for Binary<'_, '_> {
 
         Ok(return_type)
       }
+      BinaryOperator::Invalid => Ok(TypeArena::UNKNOWN),
     }
   }
 }

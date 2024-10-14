@@ -312,7 +312,8 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       | TokenKind::LessEqual
       | TokenKind::And
       | TokenKind::Or
-      | TokenKind::RightRight => self.binary(lhs, token),
+      | TokenKind::RightRight
+      | TokenKind::Equal => self.binary(lhs, token),
       _ => unreachable!("only infix operators are passed"),
     }
   }
@@ -335,8 +336,16 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       TokenKind::And => BinaryOperator::And,
       TokenKind::Or => BinaryOperator::Or,
       TokenKind::RightRight => BinaryOperator::Pipeline,
-      _ => unreachable!("only binary operators are passed"),
+      _ => BinaryOperator::Invalid,
     };
+
+    if token.kind == TokenKind::Equal {
+      let possible_assignment = matches!(left, Expression::Variable(_));
+      self.ast.errors.push(ParseError::NoSingleEqualOperator {
+        token,
+        possible_assignment,
+      });
+    }
 
     self.skip_newline();
     let precedence = ParsePrecedence::from(token.kind);
@@ -816,6 +825,13 @@ pub enum ParseError {
   BlockMustEndWithExpression(Span),
   /// Missing Identifier
   MissingIdentifier(Span),
+  /// No Single Equal Operator
+  NoSingleEqualOperator {
+    /// The equal token
+    token: Token,
+    /// Is the left hand side a possible assignment target
+    possible_assignment: bool,
+  },
 }
 impl ParseError {
   /// The title of the error message
@@ -830,6 +846,7 @@ impl ParseError {
       Self::UnterminatedString(_) => "Unterminated String".into(),
       Self::BlockMustEndWithExpression(_) => "Block Must End With Expression".into(),
       Self::MissingIdentifier(_) => "Missing Identifier".into(),
+      Self::NoSingleEqualOperator { .. } => "No Single Equal Operator".into(),
     }
   }
 
@@ -856,6 +873,12 @@ impl ParseError {
           .into()
       }
       Self::MissingIdentifier(_) => "expected identifier for variable name".into(),
+      Self::NoSingleEqualOperator { possible_assignment: false, .. } => {
+        "a single equal is not an operator. use `==` for equality".into()
+      }
+      Self::NoSingleEqualOperator { possible_assignment: true, .. } => {
+        "a single equal is not an operator. start line with `let` for variable declaration, or use `==` for equality".into()
+      }
     }
   }
 
@@ -876,7 +899,8 @@ impl GetSpan for ParseError {
       | Self::ExpectedPattern(token)
       | Self::ExpectedPatternRangeEnd(token)
       | Self::UnknownCharacter(token)
-      | Self::UnterminatedString(token) => token,
+      | Self::UnterminatedString(token)
+      | Self::NoSingleEqualOperator { token, .. } => token,
       Self::BlockMustEndWithExpression(span) | Self::MissingIdentifier(span) => return *span,
     };
 
@@ -942,6 +966,7 @@ impl From<TokenKind> for ParsePrecedence {
       TokenKind::And => Self::And,
       TokenKind::RightRight => Self::Pipeline,
       TokenKind::Comment => Self::Comment,
+      TokenKind::Equal => Self::Assignment,
       _ => Self::None,
     }
   }

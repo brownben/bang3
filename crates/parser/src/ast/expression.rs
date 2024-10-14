@@ -68,6 +68,7 @@ pub enum BinaryOperator {
   And,
   Or,
   Pipeline,
+  Invalid,
 }
 impl BinaryOperator {
   #[must_use]
@@ -88,6 +89,7 @@ impl BinaryOperator {
       Self::And => "and",
       Self::Or => "or",
       Self::Pipeline => ">>",
+      Self::Invalid => "error",
     }
   }
 }

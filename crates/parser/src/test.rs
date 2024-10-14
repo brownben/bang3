@@ -877,13 +877,38 @@ mod fault_tolerant {
   }
 
   #[test]
-  fn looks_like_assignment() {
+  fn known_token_misused_as_binary_operator() {
+    let allocator = Allocator::new();
+
+    let ast = parse("a -> 5", &allocator);
+    let expected = indoc! {"
+      ├─ Variable (a)
+      ├─ Invalid
+    "};
+    assert!(ast.is_err());
+    assert!(ast.errors.len() == 1);
+    assert_eq!(ast.to_string(), expected);
+  }
+
+  #[test]
+  fn single_equals_as_binary_operator() {
     let allocator = Allocator::new();
 
     let ast = parse("a = 5", &allocator);
     let expected = indoc! {"
-      ├─ Variable (a)
-      ├─ Invalid
+      ├─ Binary (error)
+      │  ├─ Variable (a)
+      │  ╰─ Number (5)
+    "};
+    assert!(ast.is_err());
+    assert!(ast.errors.len() == 1);
+    assert_eq!(ast.to_string(), expected);
+
+    let ast = parse("4 = 5", &allocator);
+    let expected = indoc! {"
+      ├─ Binary (error)
+      │  ├─ Number (4)
+      │  ╰─ Number (5)
     "};
     assert!(ast.is_err());
     assert!(ast.errors.len() == 1);

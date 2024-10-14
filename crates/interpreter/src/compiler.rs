@@ -257,6 +257,7 @@ impl<'s> Compile<'s> for Binary<'s, '_> {
         BinaryOperator::And | BinaryOperator::Or | BinaryOperator::Pipeline => {
           unreachable!("handled above")
         }
+        BinaryOperator::Invalid => unreachable!("invalid ast"),
       },
       self.span,
     );
