@@ -402,81 +402,75 @@ impl<'s> Compile<'s> for Match<'s, '_> {
 
     let mut case_end_jumps = Vec::new();
     for case in &self.cases {
+      if let Pattern::Identifier(variable) = &case.pattern {
+        // don't touch the value being matched upon
+        compiler.chunk.add_opcode(OpCode::Peek, self.span);
+
+        compiler.begin_scope();
+        compiler.define_variable(variable.name, variable.span)?;
+        case.expression.compile(compiler)?;
+        compiler.end_scope(case.span)?; // clears up the value being matched upon
+        break; // optimisation: nothing can match after this
+      }
+
       match &case.pattern {
-        Pattern::Identifier(variable) => {
-          compiler.begin_scope();
-          compiler.define_variable(variable.name, variable.span)?;
-          case.expression.compile(compiler)?;
-          compiler.end_scope(case.span)?; // clears up the value being matched upon
-          break; // optimisation: nothing can match after this
-        }
+        Pattern::Identifier(_) => unreachable!("handled above"),
         Pattern::Literal(literal) => {
-          // Check if the value matches the literal
           compiler.chunk.add_opcode(OpCode::Peek, self.span);
           literal.compile(compiler)?;
           compiler.chunk.add_opcode(OpCode::Equals, self.span);
-
-          // If it does, do the expression
-          let non_match_jump = compiler.add_jump(OpCode::JumpIfFalse, self.span);
-          compiler.chunk.add_opcode(OpCode::Pop, self.span);
-          case.expression.compile(compiler)?;
-          case_end_jumps.push(compiler.add_jump(OpCode::Jump, self.span));
-
-          // Otherwise skip to the next case
-          compiler.patch_jump(non_match_jump)?;
-          compiler.chunk.add_opcode(OpCode::Pop, self.span);
         }
-        Pattern::Range(range) => {
-          // check that the value is within the range
-          match (&range.start, &range.end) {
-            (None, Some(pattern)) => {
-              compiler.chunk.add_opcode(OpCode::Peek, self.span);
-              pattern.get_range_literal().compile(compiler)?;
-              compiler.chunk.add_opcode(OpCode::LessEqual, self.span);
-            }
-            (Some(pattern), None) => {
-              compiler.chunk.add_opcode(OpCode::Peek, self.span);
-              pattern.get_range_literal().compile(compiler)?;
-              compiler.chunk.add_opcode(OpCode::GreaterEqual, self.span);
-            }
-            (Some(greater_than), Some(less_than)) => {
-              compiler.chunk.add_opcode(OpCode::Peek, self.span);
-              greater_than.get_range_literal().compile(compiler)?;
-              compiler.chunk.add_opcode(OpCode::GreaterEqual, self.span);
-
-              let jump = compiler.add_jump(OpCode::JumpIfFalse, self.span);
-              compiler.chunk.add_opcode(OpCode::Pop, self.span);
-
-              compiler.chunk.add_opcode(OpCode::Peek, self.span);
-              less_than.get_range_literal().compile(compiler)?;
-              compiler.chunk.add_opcode(OpCode::LessEqual, self.span);
-
-              compiler.patch_jump(jump)?;
-            }
-            (None, None) => unreachable!("range has bound, checked in parser"),
+        Pattern::Range(range) => match (&range.start, &range.end) {
+          (None, Some(pattern)) => {
+            compiler.chunk.add_opcode(OpCode::Peek, self.span);
+            pattern.get_range_literal().compile(compiler)?;
+            compiler.chunk.add_opcode(OpCode::LessEqual, self.span);
           }
+          (Some(pattern), None) => {
+            compiler.chunk.add_opcode(OpCode::Peek, self.span);
+            pattern.get_range_literal().compile(compiler)?;
+            compiler.chunk.add_opcode(OpCode::GreaterEqual, self.span);
+          }
+          (Some(greater_than), Some(less_than)) => {
+            compiler.chunk.add_opcode(OpCode::Peek, self.span);
+            greater_than.get_range_literal().compile(compiler)?;
+            compiler.chunk.add_opcode(OpCode::GreaterEqual, self.span);
 
-          // If it does, do the expression
-          let non_match_jump = compiler.add_jump(OpCode::JumpIfFalse, self.span);
-          compiler.chunk.add_opcode(OpCode::Pop, self.span);
-          case.expression.compile(compiler)?;
-          case_end_jumps.push(compiler.add_jump(OpCode::Jump, self.span));
+            let jump = compiler.add_jump(OpCode::JumpIfFalse, self.span);
+            compiler.chunk.add_opcode(OpCode::Pop, self.span);
 
-          // Otherwise skip to the next case
-          compiler.patch_jump(non_match_jump)?;
-          compiler.chunk.add_opcode(OpCode::Pop, self.span);
-        }
+            compiler.chunk.add_opcode(OpCode::Peek, self.span);
+            less_than.get_range_literal().compile(compiler)?;
+            compiler.chunk.add_opcode(OpCode::LessEqual, self.span);
+
+            compiler.patch_jump(jump)?;
+          }
+          (None, None) => unreachable!("range has bound, checked in parser"),
+        },
       }
+
+      // If it does, do the expression
+      let non_match_jump = compiler.add_jump(OpCode::JumpIfFalse, self.span);
+      compiler.chunk.add_opcode(OpCode::Pop, self.span);
+      case.expression.compile(compiler)?;
+      case_end_jumps.push(compiler.add_jump(OpCode::Jump, self.span));
+
+      // Otherwise skip to the next case
+      compiler.patch_jump(non_match_jump)?;
+      compiler.chunk.add_opcode(OpCode::Pop, self.span);
     }
 
     if !is_exhaustive {
-      compiler.chunk.add_opcode(OpCode::Pop, self.span);
       compiler.chunk.add_opcode(OpCode::Null, self.span);
     }
 
     for jump in case_end_jumps {
       compiler.patch_jump(jump)?;
     }
+
+    // Remove the value being matched upon
+    compiler.chunk.add_opcode(OpCode::PopBelow, self.span);
+    compiler.chunk.add_value(1, self.span);
 
     Ok(())
   }

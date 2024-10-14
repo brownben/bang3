@@ -702,6 +702,18 @@ fn match_() {
   assert_variable!(both_range; c, 1.0);
   assert_variable!(both_range; d, 1.0);
   assert_variable!(both_range; e, 2.0);
+
+  let literals_cleanedup = run(indoc! {"
+    let a = match false
+      | true -> 1
+      | false -> 2
+
+    let b = {
+      let c = 7
+      c
+    }
+  "});
+  assert_variable!(literals_cleanedup; b, 7.0);
 }
 
 #[test]
