@@ -50,7 +50,7 @@
       "patterns": [
         {
           "name": "keyword.control.bang",
-          "match": "\\b(if|else|match)\\b"
+          "match": "\\b(if|else|match|return)\\b"
         },
         {
           "name": "constant.language.boolean.true.bang",

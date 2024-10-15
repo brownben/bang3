@@ -47,29 +47,32 @@ impl Typechecker {
       }
     }
 
-    result
+    result.expression()
   }
 
-  fn infer_statement(&mut self, statement: &Statement<'_, '_>) -> TypeRef {
+  fn infer_statement(&mut self, statement: &Statement<'_, '_>) -> ExpressionType {
     match statement {
       Statement::Comment(_) => {}
       Statement::Expression(expression) => return expression.infer(self),
       Statement::Let(let_) => {
         if let Expression::Function(_) = &let_.expression {
           self.infer_let_with_function(let_);
-          return TypeArena::NEVER;
+          return TypeArena::NEVER.into();
         }
 
-        let variable_type = let_.expression.infer(self);
+        let variable_type = let_.expression.infer(self).expression();
 
         self.env.define_variable(
           &let_.identifier,
           self.types.generalize(variable_type, self.env.depth()),
         );
       }
+      Statement::Return(return_) => {
+        return ExpressionType::return_(return_.expression.infer(self).expression())
+      }
     };
 
-    TypeArena::NEVER
+    TypeArena::NEVER.into()
   }
 
   /// Infer the type of a let statement with a function
@@ -85,7 +88,7 @@ impl Typechecker {
       .define_variable(&let_.identifier, TypeScheme::monomorphic(function_type));
 
     // Infer the function type
-    let expression_type = let_.expression.infer(self);
+    let expression_type = let_.expression.infer(self).expression();
 
     // Update the variable type to be the inferred type
     self.env.update_variable(
@@ -105,17 +108,62 @@ impl Typechecker {
     }
   }
 
+  fn merge_branches(
+    &mut self,
+    then_type: &ExpressionType,
+    else_type: &ExpressionType,
+    span: Span,
+  ) -> ExpressionType {
+    let expression_type = match (then_type.get_expression(), else_type.get_expression()) {
+      (None, None) => None,
+      (None, Some(ty)) | (Some(ty), None) => Some(ty),
+      (Some(then), Some(else_)) => {
+        if self.types.unify(then, else_).is_err() {
+          self.problems.push(TypeError::BranchesDontMatch {
+            then: self.types.type_to_string(then),
+            otherwise: self.types.type_to_string(else_),
+            span,
+          });
+        };
+        Some(then)
+      }
+    };
+    let return_type = match (then_type.get_return(), else_type.get_return()) {
+      (None, None) => None,
+      (None, Some(ty)) | (Some(ty), None) => Some(ty),
+      (Some(then), Some(else_)) => {
+        if self.types.unify(then, else_).is_err() {
+          self.problems.push(TypeError::BranchesDontMatch {
+            then: self.types.type_to_string(then),
+            otherwise: self.types.type_to_string(else_),
+            span,
+          });
+        };
+        Some(then)
+      }
+    };
+
+    match (expression_type, return_type) {
+      (Some(expression_type), Some(return_type)) => {
+        ExpressionType::Both(expression_type, return_type)
+      }
+      (Some(expression_type), None) => ExpressionType::Expression(expression_type),
+      (None, Some(return_type)) => ExpressionType::Return(return_type),
+      (None, None) => unreachable!(),
+    }
+  }
+
   fn new_type_var(&mut self) -> TypeRef {
     self.types.new_type_var(self.env.depth())
   }
 }
 
 pub(crate) trait InferType {
-  fn infer(&self, t: &mut Typechecker) -> TypeRef;
+  fn infer(&self, t: &mut Typechecker) -> ExpressionType;
 }
 
 impl InferType for Expression<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> TypeRef {
+  fn infer(&self, t: &mut Typechecker) -> ExpressionType {
     match self {
       Expression::Binary(binary) => binary.infer(t),
       Expression::Block(block) => block.infer(t),
@@ -129,15 +177,15 @@ impl InferType for Expression<'_, '_> {
       Expression::Match(match_) => match_.infer(t),
       Expression::Unary(unary) => unary.infer(t),
       Expression::Variable(variable) => variable.infer(t),
-      Expression::Invalid(_) => TypeArena::UNKNOWN,
+      Expression::Invalid(_) => TypeArena::UNKNOWN.into(),
     }
   }
 }
 impl InferType for Binary<'_, '_> {
   #[allow(clippy::match_same_arms)]
-  fn infer(&self, t: &mut Typechecker) -> TypeRef {
-    let left = self.left.infer(t);
-    let right = self.right.infer(t);
+  fn infer(&self, t: &mut Typechecker) -> ExpressionType {
+    let left = self.left.infer(t).expression();
+    let right = self.right.infer(t).expression();
 
     match self.operator {
       BinaryOperator::Add
@@ -148,27 +196,27 @@ impl InferType for Binary<'_, '_> {
         t.assert_type(left, TypeArena::NUMBER, self.left.span());
         t.assert_type(right, TypeArena::NUMBER, self.right.span());
 
-        TypeArena::NUMBER
+        TypeArena::NUMBER.into()
       }
       BinaryOperator::AddString => {
         t.assert_type(left, TypeArena::STRING, self.left.span());
         t.assert_type(right, TypeArena::STRING, self.right.span());
-        TypeArena::STRING
+        TypeArena::STRING.into()
       }
       BinaryOperator::NotEqual | BinaryOperator::Equal => {
         t.assert_type(right, left, self.right.span());
-        TypeArena::BOOLEAN
+        TypeArena::BOOLEAN.into()
       }
       BinaryOperator::Greater
       | BinaryOperator::GreaterEqual
       | BinaryOperator::Less
       | BinaryOperator::LessEqual => {
         t.assert_type(right, left, self.right.span());
-        TypeArena::BOOLEAN
+        TypeArena::BOOLEAN.into()
       }
       BinaryOperator::And | BinaryOperator::Or => {
         t.assert_type(right, left, self.right.span());
-        right
+        right.into()
       }
       BinaryOperator::Pipeline => {
         let callee_type = right;
@@ -193,29 +241,53 @@ impl InferType for Binary<'_, '_> {
           }
         }
 
-        return_type
+        return_type.into()
       }
-      BinaryOperator::Invalid => TypeArena::UNKNOWN,
+      BinaryOperator::Invalid => TypeArena::UNKNOWN.into(),
     }
   }
 }
 impl InferType for Block<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> TypeRef {
+  fn infer(&self, t: &mut Typechecker) -> ExpressionType {
     t.env.enter_scope();
-    let (last_statement, statements) = self.statements.split_last().unwrap();
-    for statement in statements {
-      t.infer_statement(statement);
+
+    let final_statement = self
+      .statements
+      .iter()
+      .position(|statment| matches!(statment, Statement::Return(_)))
+      .or(
+        self
+          .statements
+          .iter()
+          .enumerate()
+          .rev()
+          .find_map(|(id, statment)| matches!(statment, Statement::Expression(_)).then_some(id)),
+      )
+      .expect("block ends with an expression");
+
+    let block_return_type = t.new_type_var();
+    for (id, statement) in self.statements.iter().enumerate() {
+      let statement_type = t.infer_statement(statement);
+
+      if let Some(return_type) = statement_type.get_return() {
+        t.assert_type(return_type, block_return_type, statement.span());
+      }
+
+      if id == final_statement {
+        t.env.exit_scope(self.span());
+        return statement_type;
+      }
     }
-    let return_type = t.infer_statement(last_statement);
+
     t.env.exit_scope(self.span());
-    return_type
+    block_return_type.into()
   }
 }
 impl InferType for Call<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> TypeRef {
-    let callee_type = self.expression.infer(t);
+  fn infer(&self, t: &mut Typechecker) -> ExpressionType {
+    let callee_type = self.expression.infer(t).expression();
     let argument_type = if let Some(argument) = &self.argument {
-      argument.infer(t)
+      argument.infer(t).expression()
     } else {
       TypeArena::NEVER
     };
@@ -241,25 +313,25 @@ impl InferType for Call<'_, '_> {
       }
     }
 
-    return_type
+    return_type.into()
   }
 }
 impl InferType for Comment<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> TypeRef {
+  fn infer(&self, t: &mut Typechecker) -> ExpressionType {
     self.expression.infer(t)
   }
 }
 impl InferType for FormatString<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> TypeRef {
+  fn infer(&self, t: &mut Typechecker) -> ExpressionType {
     for expression in &self.expressions {
       expression.infer(t);
     }
 
-    TypeArena::STRING
+    TypeArena::STRING.into()
   }
 }
 impl InferType for Function<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> TypeRef {
+  fn infer(&self, t: &mut Typechecker) -> ExpressionType {
     t.env.enter_scope();
 
     let parameter = t.new_type_var();
@@ -268,56 +340,55 @@ impl InferType for Function<'_, '_> {
 
     t.env
       .define_variable(&self.parameter, TypeScheme::monomorphic(parameter));
-    let return_type = self.body.infer(t);
+    let return_type = match self.body.infer(t) {
+      ExpressionType::Expression(ty) | ExpressionType::Return(ty) => ty,
+      ExpressionType::Both(expression_type, return_type) => {
+        t.assert_type(expression_type, return_type, self.span());
+        expression_type
+      }
+    };
     t.types.unify(return_type, expected_return).unwrap();
 
     t.env.exit_scope(self.span());
 
-    function_type
+    function_type.into()
   }
 }
 impl InferType for Group<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> TypeRef {
+  fn infer(&self, t: &mut Typechecker) -> ExpressionType {
     self.expression.infer(t)
   }
 }
 impl InferType for If<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> TypeRef {
+  fn infer(&self, t: &mut Typechecker) -> ExpressionType {
     self.condition.infer(t);
 
     let then_type = self.then.infer(t);
     let else_type = self.otherwise.infer(t);
 
-    if t.types.unify(then_type, else_type).is_err() {
-      t.problems.push(TypeError::IfElseDontMatch {
-        then: t.types.type_to_string(then_type),
-        otherwise: t.types.type_to_string(else_type),
-        span: self.otherwise.span(),
-      });
-    }
-
-    then_type
+    t.merge_branches(&then_type, &else_type, self.span())
   }
 }
 impl InferType for Literal<'_> {
-  fn infer(&self, _: &mut Typechecker) -> TypeRef {
+  fn infer(&self, _: &mut Typechecker) -> ExpressionType {
     match self.kind {
       LiteralKind::Boolean(_) => TypeArena::BOOLEAN,
       LiteralKind::Number { .. } => TypeArena::NUMBER,
       LiteralKind::String(_) => TypeArena::STRING,
     }
+    .into()
   }
 }
 impl InferType for Match<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> TypeRef {
-    let value_type = self.value.infer(t);
+  fn infer(&self, t: &mut Typechecker) -> ExpressionType {
+    let value_type = self.value.infer(t).expression();
 
     // check patterns match the value passes
     for case in &self.cases {
       match &case.pattern {
         Pattern::Identifier(_) => {}
         Pattern::Literal(literal) => {
-          let literal = literal.infer(t);
+          let literal = literal.infer(t).expression();
           if t.types.unify(literal, value_type).is_err() {
             t.problems.push(TypeError::PatternNeverMatches {
               pattern: t.types.type_to_string(literal),
@@ -328,7 +399,7 @@ impl InferType for Match<'_, '_> {
         }
         Pattern::Range(range) => {
           if let Some(start) = &range.start {
-            let start_type = start.get_range_literal().infer(t);
+            let start_type = start.get_range_literal().infer(t).expression();
             if t.types.unify(start_type, value_type).is_err() {
               t.problems.push(TypeError::PatternNeverMatches {
                 pattern: t.types.type_to_string(start_type),
@@ -338,7 +409,7 @@ impl InferType for Match<'_, '_> {
             }
           }
           if let Some(end) = &range.end {
-            let end_type = end.get_range_literal().infer(t);
+            let end_type = end.get_range_literal().infer(t).expression();
             if t.types.unify(end_type, value_type).is_err() {
               t.problems.push(TypeError::PatternNeverMatches {
                 pattern: t.types.type_to_string(end_type),
@@ -352,7 +423,7 @@ impl InferType for Match<'_, '_> {
     }
 
     // check all cases return the same type
-    let return_type = t.new_type_var();
+    let mut return_type = t.new_type_var().into();
     for case in &self.cases {
       t.env.enter_scope();
 
@@ -367,13 +438,7 @@ impl InferType for Match<'_, '_> {
       }
 
       let case_type = case.expression.infer(t);
-      if t.types.unify(case_type, return_type).is_err() {
-        t.problems.push(TypeError::MatchCasesDontMatch {
-          first: t.types.type_to_string(return_type),
-          later: t.types.type_to_string(case_type),
-          span: case.span(),
-        });
-      }
+      return_type = t.merge_branches(&return_type, &case_type, self.span());
 
       t.env.exit_scope(self.span());
     }
@@ -399,30 +464,76 @@ impl InferType for Match<'_, '_> {
   }
 }
 impl InferType for Unary<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> TypeRef {
-    let left = self.expression.infer(t);
+  fn infer(&self, t: &mut Typechecker) -> ExpressionType {
+    let left = self.expression.infer(t).expression();
     let span = self.expression.span();
 
     match self.operator {
-      UnaryOperator::Not => TypeArena::BOOLEAN,
+      UnaryOperator::Not => TypeArena::BOOLEAN.into(),
       UnaryOperator::Minus => {
         t.assert_type(left, TypeArena::NUMBER, span);
-        TypeArena::NUMBER
+        TypeArena::NUMBER.into()
       }
     }
   }
 }
 impl InferType for Variable<'_> {
-  fn infer(&self, t: &mut Typechecker) -> TypeRef {
+  fn infer(&self, t: &mut Typechecker) -> ExpressionType {
     if let Some(type_) = t.env.get_variable(self.name) {
       t.env.mark_variable_use(self.name, self.span());
-      t.types.instantiate(type_, t.env.depth())
+      t.types.instantiate(type_, t.env.depth()).into()
     } else {
       t.problems.push(TypeError::UndefinedVariable {
         identifier: self.name.to_owned(),
         span: self.span,
       });
-      TypeArena::UNKNOWN
+      TypeArena::UNKNOWN.into()
     }
+  }
+}
+
+/// The type of an expression
+///
+/// An expression can have a regular expression type,
+/// or it can return a from a function which may have a different type
+pub(crate) enum ExpressionType {
+  Expression(TypeRef),
+  Return(TypeRef),
+  Both(TypeRef, TypeRef),
+}
+impl ExpressionType {
+  /// Create a type which returns a value
+  fn return_(ty: TypeRef) -> Self {
+    Self::Return(ty)
+  }
+
+  /// Get the expression type
+  /// If it doesn't have an expression type, put unknown
+  fn expression(&self) -> TypeRef {
+    match self {
+      Self::Expression(ty) => *ty,
+      Self::Return(_) => TypeArena::UNKNOWN,
+      Self::Both(expression, _) => *expression,
+    }
+  }
+
+  fn get_expression(&self) -> Option<TypeRef> {
+    match self {
+      Self::Expression(ty) => Some(*ty),
+      Self::Return(_) => None,
+      Self::Both(expression, _) => Some(*expression),
+    }
+  }
+  fn get_return(&self) -> Option<TypeRef> {
+    match self {
+      Self::Expression(_) => None,
+      Self::Return(ty) => Some(*ty),
+      Self::Both(_, return_) => Some(*return_),
+    }
+  }
+}
+impl From<TypeRef> for ExpressionType {
+  fn from(ty: TypeRef) -> Self {
+    Self::Expression(ty)
   }
 }

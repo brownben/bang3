@@ -9,6 +9,7 @@ pub enum Statement<'source, 'ast> {
   Comment(Box<'ast, CommentStmt<'source>>),
   Expression(Box<'ast, Expression<'source, 'ast>>),
   Let(Box<'ast, Let<'source, 'ast>>),
+  Return(Box<'ast, Return<'source, 'ast>>),
 }
 
 #[derive(Debug)]
@@ -20,6 +21,12 @@ pub struct CommentStmt<'source> {
 #[derive(Debug)]
 pub struct Let<'source, 'ast> {
   pub identifier: Variable<'source>,
+  pub expression: Expression<'source, 'ast>,
+  pub span: Span,
+}
+
+#[derive(Debug)]
+pub struct Return<'source, 'ast> {
   pub expression: Expression<'source, 'ast>,
   pub span: Span,
 }
@@ -39,6 +46,11 @@ impl<'s, 'ast> From<Box<'ast, Let<'s, 'ast>>> for Statement<'s, 'ast> {
     Self::Let(value)
   }
 }
+impl<'s, 'ast> From<Box<'ast, Return<'s, 'ast>>> for Statement<'s, 'ast> {
+  fn from(value: Box<'ast, Return<'s, 'ast>>) -> Self {
+    Self::Return(value)
+  }
+}
 
 impl GetSpan for Statement<'_, '_> {
   fn span(&self) -> Span {
@@ -46,6 +58,7 @@ impl GetSpan for Statement<'_, '_> {
       Statement::Comment(x) => x.span(),
       Statement::Expression(x) => x.span(),
       Statement::Let(x) => x.span(),
+      Statement::Return(x) => x.span(),
     }
   }
 }
@@ -55,6 +68,11 @@ impl GetSpan for CommentStmt<'_> {
   }
 }
 impl GetSpan for Let<'_, '_> {
+  fn span(&self) -> Span {
+    self.span
+  }
+}
+impl GetSpan for Return<'_, '_> {
   fn span(&self) -> Span {
     self.span
   }

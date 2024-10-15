@@ -266,6 +266,7 @@ impl PrettyPrint for Statement<'_, '_> {
       Self::Comment(x) => x.pretty(f, prefix, last),
       Self::Expression(x) => x.pretty(f, prefix, last),
       Self::Let(x) => x.pretty(f, prefix, last),
+      Self::Return(x) => x.pretty(f, prefix, last),
     }
   }
 }
@@ -279,6 +280,15 @@ impl PrettyPrint for Let<'_, '_> {
   fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
     let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
     writeln!(f, "{prefix}{connector}Let '{}' =", self.identifier.name)?;
+
+    let new_prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
+    self.expression.pretty(f, &new_prefix, true)
+  }
+}
+impl PrettyPrint for Return<'_, '_> {
+  fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
+    let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
+    writeln!(f, "{prefix}{connector}Return")?;
 
     let new_prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
     self.expression.pretty(f, &new_prefix, true)

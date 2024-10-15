@@ -57,6 +57,13 @@ fn diagnostic_from_lint(lint: &LintDiagnostic, file: &Document) -> lsp::Diagnost
     source: Some("Lint".into()),
     message: lint.full_message(),
     range: lsp_range_from_span(lint.span(), file),
+    tags: {
+      if lint.is_unused() {
+        Some(vec![lsp::DiagnosticTag::UNNECESSARY])
+      } else {
+        None
+      }
+    },
     ..Default::default()
   }
 }

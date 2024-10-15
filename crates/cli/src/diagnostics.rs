@@ -157,7 +157,7 @@ pub fn highlight_source(output: &mut dyn fmt::Write, source: &str) -> fmt::Resul
       | TokenKind::FormatStringPart
       | TokenKind::FormatStringEnd
       | TokenKind::UnterminatedString => Style::new().green(),
-      TokenKind::Else | TokenKind::If | TokenKind::Match => Style::new().cyan(),
+      TokenKind::Else | TokenKind::If | TokenKind::Match | TokenKind::Return => Style::new().cyan(),
       TokenKind::Let => Style::new().magenta(),
       TokenKind::Comment => Style::new().dimmed(),
       _ => Style::new(),

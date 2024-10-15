@@ -40,6 +40,8 @@ pub struct Parser<'source, 'ast> {
   /// If the last token was a newline, and was skipped over to continue an expression
   /// Allows for assertion of new line if it was skipped over too optimistically
   skipped_newline: bool,
+  // How many functions are we currently in
+  function_depth: usize,
 
   /// The AST being built up by the parser
   ast: AST<'source, 'ast>,
@@ -60,6 +62,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       source,
       tokeniser: Tokeniser::from(source).peekable(),
       skipped_newline: false,
+      function_depth: 0,
       ast: AST::new(allocator),
       error: false,
     }
@@ -461,7 +464,9 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     let parameter_span = Span::from(parameter);
     let parameter = parameter_span.source_text(self.source);
 
+    self.function_depth += 1;
     let body = self.parse_expression();
+    self.function_depth -= 1;
     let span = parameter_span.merge(body.span());
 
     self.allocate_expression(Function {
@@ -732,6 +737,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     match self.peek_token_kind() {
       TokenKind::Let => self.declaration_statement(),
       TokenKind::Comment => self.comment_statement(),
+      TokenKind::Return => self.return_statement(),
       _ => self.expression_statement(),
     }
   }
@@ -801,6 +807,24 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
     self.allocate_statement(expression)
   }
+
+  /// Parses a return statement
+  fn return_statement(&mut self) -> Statement<'s, 'ast> {
+    let return_token = self.next_token();
+    let expression = self.parse_expression_with_newline();
+    self.resync_if_error(TokenKind::EndOfLine);
+
+    let span = Span::from(return_token).merge(expression.span());
+
+    if self.function_depth == 0 {
+      self
+        .ast
+        .errors
+        .push(ParseError::ReturnOutsideFunction(span));
+    }
+
+    self.allocate_statement(Return { expression, span })
+  }
 }
 
 /// An error which arose during parsing
@@ -834,6 +858,8 @@ pub enum ParseError {
     /// Is the left hand side a possible assignment target
     possible_assignment: bool,
   },
+  /// Return Outside of Function
+  ReturnOutsideFunction(Span),
 }
 impl ParseError {
   /// The title of the error message
@@ -849,6 +875,7 @@ impl ParseError {
       Self::BlockMustEndWithExpression(_) => "Block Must End With Expression".into(),
       Self::MissingIdentifier(_) => "Missing Identifier".into(),
       Self::NoSingleEqualOperator { .. } => "No Single Equal Operator".into(),
+      Self::ReturnOutsideFunction(_) => "Return Outside of Function".into(),
     }
   }
 
@@ -881,6 +908,7 @@ impl ParseError {
       Self::NoSingleEqualOperator { possible_assignment: true, .. } => {
         "a single equal is not an operator. start line with `let` for variable declaration, or use `==` for equality".into()
       }
+      Self::ReturnOutsideFunction(_) => "can only return a value from a function".into(),
     }
   }
 
@@ -903,7 +931,9 @@ impl GetSpan for ParseError {
       | Self::UnknownCharacter(token)
       | Self::UnterminatedString(token)
       | Self::NoSingleEqualOperator { token, .. } => token,
-      Self::BlockMustEndWithExpression(span) | Self::MissingIdentifier(span) => return *span,
+      Self::BlockMustEndWithExpression(span)
+      | Self::MissingIdentifier(span)
+      | Self::ReturnOutsideFunction(span) => return *span,
     };
 
     Span::from(*token)
@@ -979,5 +1009,5 @@ fn ends_with_expression(statements: &[Statement]) -> bool {
     .iter()
     .rev()
     .find(|statement| !matches!(statement, Statement::Comment(_)))
-    .is_some_and(|statement| matches!(statement, Statement::Expression(_)))
+    .is_some_and(|statement| matches!(statement, Statement::Expression(_) | Statement::Return(_)))
 }

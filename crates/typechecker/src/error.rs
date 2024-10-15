@@ -63,20 +63,11 @@ pub enum Problem {
     span: Span,
   },
   /// Expected both arms to return the same type, but they don't
-  IfElseDontMatch {
+  BranchesDontMatch {
     /// The type of the first arm
     then: String,
     /// The type of the later arm
     otherwise: String,
-    /// The location of the later arm
-    span: Span,
-  },
-  /// Expected all arms to return the same type, but they don't
-  MatchCasesDontMatch {
-    /// The type of the first arm
-    first: String,
-    /// The type of the later arm
-    later: String,
     /// The location of the later arm
     span: Span,
   },
@@ -103,8 +94,7 @@ impl Problem {
       Self::NotCallable { .. } => "Type Not Callable",
       Self::IncorrectArgument { .. } => "Incorrect Argument",
       Self::MissingArgument { .. } => "Missing Argument",
-      Self::IfElseDontMatch { .. } => "If Else Branch Type Mismatch",
-      Self::MatchCasesDontMatch { .. } => "Match Cases Type Mismatch",
+      Self::BranchesDontMatch { .. } => "If Else Branch Type Mismatch",
       Self::PatternNeverMatches { .. } => "Pattern Doesn't Match Value",
     }
   }
@@ -137,13 +127,10 @@ impl Problem {
       Self::MissingArgument { expected, .. } => {
         format!("expected to be called with type `{expected}`, but no argument was given")
       }
-      Self::IfElseDontMatch {
+      Self::BranchesDontMatch {
         then, otherwise, ..
       } => {
-        format!("expected both arms to have the same type. The if branch has type `{then}`, but the else branch has type `{otherwise}`")
-      }
-      Self::MatchCasesDontMatch { first, later, .. } => {
-        format!("expected all arms to have the same type. The first arm has type `{first}`, but this arm has type `{later}`")
+        format!("expected both arms to have the same type. The first branch has type `{then}`, but the later branch has type `{otherwise}`")
       }
       Self::PatternNeverMatches { pattern, value, .. } => {
         format!("match value is `{value}` which doesn't match pattern of type `{pattern}``")
@@ -180,8 +167,7 @@ impl GetSpan for Problem {
       | Self::NotCallable { span, .. }
       | Self::IncorrectArgument { span, .. }
       | Self::MissingArgument { span, .. }
-      | Self::IfElseDontMatch { span, .. }
-      | Self::MatchCasesDontMatch { span, .. }
+      | Self::BranchesDontMatch { span, .. }
       | Self::PatternNeverMatches { span, .. } => *span,
     }
   }

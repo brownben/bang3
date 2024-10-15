@@ -57,7 +57,7 @@ pub fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionL
   }
 }
 
-fn constant_snippets() -> [lsp::CompletionItem; 7] {
+fn constant_snippets() -> [lsp::CompletionItem; 8] {
   [
     lsp::CompletionItem {
       label: "true".to_owned(),
@@ -96,6 +96,13 @@ fn constant_snippets() -> [lsp::CompletionItem; 7] {
     lsp::CompletionItem {
       label: "let".to_owned(),
       insert_text: Some("let $1 = $2".to_owned()),
+      insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+      kind: Some(lsp::CompletionItemKind::KEYWORD),
+      ..Default::default()
+    },
+    lsp::CompletionItem {
+      label: "return".to_owned(),
+      insert_text: Some("return $0".to_owned()),
       insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
       kind: Some(lsp::CompletionItemKind::KEYWORD),
       ..Default::default()

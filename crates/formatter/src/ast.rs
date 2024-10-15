@@ -66,11 +66,16 @@ impl<'a, 'b> Formattable<'a, 'b> for Block<'a, '_> {
       return block.format(f);
     }
 
-    let line = if self.statements.len() == 1
-      && let Some(Statement::Expression(expression)) = self.statements.first()
-      && !matches!(expression.as_ref(), Expression::Comment(_))
-    {
-      IR::LineOrSpace
+    let line = if self.statements.len() == 1 {
+      match &self.statements[0] {
+        Statement::Expression(expression) if !matches!(**expression, Expression::Comment(_)) => {
+          IR::LineOrSpace
+        }
+        Statement::Return(return_) if !matches!(return_.expression, Expression::Comment(_)) => {
+          IR::LineOrSpace
+        }
+        _ => IR::AlwaysLine,
+      }
     } else {
       IR::AlwaysLine
     };
@@ -276,6 +281,7 @@ impl<'a, 'b> Formattable<'a, 'b> for Statement<'a, '_> {
       Statement::Comment(comment) => comment.format(f),
       Statement::Expression(expression) => expression.format(f),
       Statement::Let(let_) => let_.format(f),
+      Statement::Return(return_) => return_.format(f),
     }
   }
 }
@@ -292,5 +298,10 @@ impl<'a, 'b> Formattable<'a, 'b> for Let<'a, '_> {
       IR::Text(" = "),
       self.expression.format(f),
     ])
+  }
+}
+impl<'a, 'b> Formattable<'a, 'b> for Return<'a, '_> {
+  fn format(&self, f: &Formatter<'a, 'b>) -> IR<'a, 'b> {
+    f.concat([IR::Text("return "), self.expression.format(f)])
   }
 }

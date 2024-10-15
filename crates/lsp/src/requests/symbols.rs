@@ -54,6 +54,7 @@ fn statement_symbols(
         },
       );
     }
+    Statement::Return(return_) => expression_symbols(&return_.expression, file, symbols),
   }
 }
 

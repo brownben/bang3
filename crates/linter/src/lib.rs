@@ -69,6 +69,9 @@ impl Visitor for Linter {
 trait LintRule {
   fn name(&self) -> &'static str;
   fn message(&self) -> &'static str;
+  fn is_unused(&self) -> bool {
+    false
+  }
 
   fn visit_expression(&self, _: &mut Context, _: &Expression) {}
   fn visit_statement(&self, _: &mut Context, _: &Statement) {}
@@ -83,6 +86,7 @@ impl Context {
     self.diagnostics.push(LintDiagnostic {
       title: rule.name(),
       message: rule.message(),
+      is_unused: rule.is_unused(),
       span,
     });
   }
@@ -95,6 +99,8 @@ pub struct LintDiagnostic {
   pub title: &'static str,
   /// The help message of the lint rule
   pub message: &'static str,
+  /// Whether this diagnostic indicates unused code
+  is_unused: bool,
   /// The span of the source code which triggered this diagnostic
   span: Span,
 }
@@ -106,6 +112,12 @@ impl LintDiagnostic {
     message.push('\n');
     message.push_str(self.message);
     message
+  }
+
+  /// Whether this diagnostic indicates unused code
+  #[must_use]
+  pub fn is_unused(&self) -> bool {
+    self.is_unused
   }
 }
 impl GetSpan for LintDiagnostic {

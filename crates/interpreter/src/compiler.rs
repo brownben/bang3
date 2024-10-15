@@ -40,7 +40,7 @@ impl<'s> Compiler<'s> {
 
       match statement {
         Statement::Expression(_) => compiler.chunk.add_opcode(OpCode::Pop, statement.span()),
-        Statement::Comment(_) | Statement::Let(_) => {}
+        Statement::Comment(_) | Statement::Let(_) | Statement::Return(_) => {}
       }
     }
 
@@ -275,7 +275,7 @@ impl<'s> Compile<'s> for Block<'s, '_> {
 
       match statement {
         Statement::Expression(_) => compiler.chunk.add_opcode(OpCode::Pop, self.span),
-        Statement::Comment(_) | Statement::Let(_) => {}
+        Statement::Comment(_) | Statement::Let(_) | Statement::Return(_) => {}
       }
     }
     last.compile(compiler)?;
@@ -587,6 +587,7 @@ impl<'s> Compile<'s> for Statement<'s, '_> {
       Statement::Comment(_) => Ok(()),
       Statement::Expression(expression) => expression.compile(compiler),
       Statement::Let(let_) => let_.compile(compiler),
+      Statement::Return(return_) => return_.compile(compiler),
     }
   }
 }
@@ -594,6 +595,13 @@ impl<'s> Compile<'s> for Let<'s, '_> {
   fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
     self.expression.compile(compiler)?;
     compiler.define_variable(self.identifier.name, self.span)
+  }
+}
+impl<'s> Compile<'s> for Return<'s, '_> {
+  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+    self.expression.compile(compiler)?;
+    compiler.chunk.add_opcode(OpCode::Return, self.span());
+    Ok(())
   }
 }
 

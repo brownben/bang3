@@ -98,6 +98,8 @@ fn binary_pipeline() {
 #[test]
 fn block() {
   assert_eq!(synthesize("{\n1\ntrue\n}"), "boolean");
+  assert_eq!(synthesize("{\n1\ntrue\n//hello\n}"), "boolean");
+  assert_eq!(synthesize("{\nlet a = 5\ntrue\na\n}"), "number");
 }
 
 #[test]
@@ -461,4 +463,96 @@ fn format_string() {
   assert_eq!(synthesize(different_fields), "string");
 
   assert!(has_type_error("`{5 + false}`"));
+}
+
+#[test]
+fn return_statement() {
+  let simple_return = "a => { return a + 1 }";
+  assert_eq!(synthesize(simple_return), "number => number");
+
+  let returns_in_if = "a => if (a == true) { return 5 } else { return 7 }";
+  assert_eq!(synthesize(returns_in_if), "boolean => number");
+
+  let early_return = "a => if (a == true) { return 5 } else 7";
+  assert_eq!(synthesize(early_return), "boolean => number");
+
+  // returns don't match in an if
+  assert!(has_type_error(
+    "a => if (a == true) { return 5 } else { return false }"
+  ));
+  assert!(has_type_error(
+    "a => if (a == true) { return '' } else { return false }"
+  ));
+  assert!(has_type_error(
+    "a => if (a == true) { '' } else { return false }"
+  ));
+  assert!(has_type_error(
+    "a => if (a == true) { return '' } else false"
+  ));
+}
+
+#[test]
+fn early_returns() {
+  let source = indoc! {"
+    let function = a => {
+      let _a = if (a == true) {
+        return 5
+      } else {
+        false
+      }
+      4
+    }
+    function
+  "};
+  assert_eq!(synthesize(source), "boolean => number");
+
+  let source = indoc! {"
+    let function = a => {
+      let _a = if (a == true) {
+        true
+      } else {
+        return 22
+      }
+      4
+    }
+    function
+  "};
+  assert_eq!(synthesize(source), "boolean => number");
+
+  let source = indoc! {"
+    let function = a => {
+      let _a = if (a == true) {
+        return 5
+      } else {
+        return 4
+      }
+
+      false
+    }
+  "};
+  assert!(has_type_error(source));
+
+  let source = indoc! {"
+    let function = a => {
+      let _a = if (a == true) {
+        return 5
+      } else {
+        return 4
+      }
+
+      a
+    }
+  "};
+  assert!(has_type_error(source));
+
+  let source = indoc! {"
+    let function = a => {
+      let x = match a
+        | true -> { return false }
+        | false -> 4
+      x == 4
+    }
+    function
+  "};
+  assert_eq!(synthesize(source), "boolean => boolean");
 }

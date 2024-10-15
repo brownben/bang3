@@ -681,6 +681,28 @@ fn format_string() {
   assert!(missing_end_curly.is_err());
 }
 
+#[test]
+fn return_statement() {
+  let ast = parse_to_string("_ => { return 4 }");
+  let expected = indoc! {"
+    ├─ Function: _ =>
+    │  ╰─ Block
+    │     ╰─ Return
+    │        ╰─ Number (4)
+  "};
+  assert_eq!(ast, expected);
+
+  let allocator = Allocator::new();
+
+  // outside of a function
+  assert!(parse("return 5", &allocator).is_err());
+  assert!(parse("{ return 5 }", &allocator).is_err());
+
+  // no return value
+  assert!(parse("_ => { return }", &allocator).is_err());
+  assert!(parse("_ => { return & }", &allocator).is_err());
+}
+
 mod fault_tolerant {
   use super::{parse, Allocator};
   use indoc::indoc;

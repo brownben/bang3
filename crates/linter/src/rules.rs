@@ -3,9 +3,9 @@ use super::{
   helpers::{ASTEquality, IsConstant},
   Context, LintRule,
 };
-use bang_parser::ast::{expression::*, statement::*, GetSpan};
+use bang_parser::ast::{expression::*, statement::*, GetSpan, Span};
 
-pub const RULES: [&dyn LintRule; 12] = [
+pub const RULES: [&dyn LintRule; 14] = [
   &NoConstantConditions,
   &NoNegativeZero,
   &NoSelfAssign,
@@ -14,10 +14,12 @@ pub const RULES: [&dyn LintRule; 12] = [
   &NoUnderscoreVariableUse,
   &NoUselessMatch,
   &NoYodaComparison,
-  &NoUnneccessaryClosures,
+  &NoUnnecessaryClosures,
   &NoUselessIf,
   &NoErasingOperations,
   &NoConstantStringsInFormatString,
+  &NoUnnecessaryReturn,
+  &NoUnreachableCode,
 ];
 
 pub struct NoConstantConditions;
@@ -195,10 +197,10 @@ impl LintRule for NoYodaComparison {
   }
 }
 
-pub struct NoUnneccessaryClosures;
-impl LintRule for NoUnneccessaryClosures {
+pub struct NoUnnecessaryClosures;
+impl LintRule for NoUnnecessaryClosures {
   fn name(&self) -> &'static str {
-    "No Unneccessary Closures"
+    "No Unnecessary Closures"
   }
   fn message(&self) -> &'static str {
     "function could just be passed directly, without being wrapped in another function"
@@ -290,6 +292,125 @@ impl LintRule for NoConstantStringsInFormatString {
         {
           context.add_diagnostic(&Self, literal.span());
         }
+      }
+    }
+  }
+}
+
+pub struct NoUnnecessaryReturn;
+impl LintRule for NoUnnecessaryReturn {
+  fn name(&self) -> &'static str {
+    "No Unnecessary Return"
+  }
+  fn message(&self) -> &'static str {
+    "return statement is unnecessary, as a block returns the last expression"
+  }
+  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+    #[allow(clippy::match_same_arms)]
+    fn ends_with_return(expression: &Expression<'_, '_>) -> Option<Span> {
+      match expression {
+        Expression::Block(block) => block
+          .statements
+          .iter()
+          .rev()
+          .find(|statement| !matches!(statement, Statement::Comment(_)))
+          .and_then(|statement| match statement {
+            Statement::Comment(_) => None,
+            Statement::Expression(expression) => ends_with_return(expression),
+            Statement::Return(_) => Some(statement.span()),
+            Statement::Let(_) => unreachable!(),
+          }),
+
+        // Could contain a block with return sensibly at the end
+        Expression::Group(group) => ends_with_return(&group.expression),
+        Expression::If(if_) => ends_with_return(&if_.otherwise).or(ends_with_return(&if_.then)),
+        Expression::Match(match_) => match_
+          .cases
+          .iter()
+          .find_map(|case| ends_with_return(&case.expression)),
+
+        // Can never end with a return
+        Expression::Function(_)
+        | Expression::Literal(_)
+        | Expression::Variable(_)
+        | Expression::Invalid(_) => None,
+
+        // Could feasibly end with a return,
+        // but would be contrived code as would skip the primary operation
+        Expression::Binary(_)
+        | Expression::Comment(_)
+        | Expression::Call(_)
+        | Expression::FormatString(_)
+        | Expression::Unary(_) => None,
+      }
+    }
+
+    if let Expression::Function(function) = &expression {
+      if let Some(return_span) = ends_with_return(&function.body) {
+        context.add_diagnostic(&Self, return_span);
+      }
+    }
+  }
+}
+
+pub struct NoUnreachableCode;
+impl LintRule for NoUnreachableCode {
+  fn name(&self) -> &'static str {
+    "No Unreachable Code"
+  }
+  fn message(&self) -> &'static str {
+    "code after a return will never be executed"
+  }
+  fn is_unused(&self) -> bool {
+    true
+  }
+  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+    fn statement_always_returns(statement: &Statement) -> bool {
+      match statement {
+        Statement::Return(_) => true,
+        Statement::Expression(expression) => always_returns(expression),
+        Statement::Let(_) | Statement::Comment(_) => false,
+      }
+    }
+    fn always_returns(expression: &Expression) -> bool {
+      #[allow(clippy::match_same_arms)]
+      match expression {
+        Expression::Block(block) => block.statements.iter().any(statement_always_returns),
+
+        // Could contain a block with return sensibly at the end
+        Expression::Group(group) => always_returns(&group.expression),
+        Expression::If(if_) => always_returns(&if_.otherwise) && always_returns(&if_.then),
+        Expression::Match(match_) => match_
+          .cases
+          .iter()
+          .all(|case| always_returns(&case.expression)),
+
+        // Can never end with a return
+        Expression::Function(_)
+        | Expression::Literal(_)
+        | Expression::Variable(_)
+        | Expression::Invalid(_) => false,
+
+        // Could feasibly end with a return,
+        // but would be contrived code as would skip the primary operation
+        Expression::Binary(_)
+        | Expression::Comment(_)
+        | Expression::Call(_)
+        | Expression::FormatString(_)
+        | Expression::Unary(_) => false,
+      }
+    }
+
+    if let Expression::Block(block) = expression {
+      let return_index = block.statements.iter().position(statement_always_returns);
+
+      if let Some(return_index) = return_index
+        && return_index < block.statements.len() - 1
+      {
+        let first_unused_statement = &block.statements[return_index + 1];
+        let span = Span::new(first_unused_statement.span().start, block.span.end - 1);
+
+        context.add_diagnostic(&Self, span);
       }
     }
   }

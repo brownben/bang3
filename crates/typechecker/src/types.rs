@@ -240,6 +240,12 @@ impl ops::Index<TypeRef> for TypeArena {
   type Output = Type;
 
   fn index(&self, index: TypeRef) -> &Self::Output {
+    if let Type::Variable(type_var_ref) = self.types[usize::try_from(index.0).unwrap()]
+      && let TypeVarLink::Link(type_ref) = self.get_type_var(type_var_ref).link
+    {
+      return &self[type_ref];
+    }
+
     &self.types[usize::try_from(index.0).unwrap()]
   }
 }

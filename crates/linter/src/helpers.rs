@@ -27,6 +27,7 @@ impl IsConstant for Statement<'_, '_> {
       Self::Comment(_) => true,
       Self::Expression(x) => x.is_constant(),
       Self::Let(x) => x.is_constant(),
+      Self::Return(x) => x.is_constant(),
     }
   }
 }
@@ -82,6 +83,11 @@ impl IsConstant for Let<'_, '_> {
     self.expression.is_constant()
   }
 }
+impl IsConstant for Return<'_, '_> {
+  fn is_constant(&self) -> bool {
+    self.expression.is_constant()
+  }
+}
 
 pub(super) trait ASTEquality {
   fn equals(&self, other: &Self) -> bool;
@@ -112,6 +118,7 @@ impl ASTEquality for Statement<'_, '_> {
       (Self::Comment(_), Self::Comment(_)) => true,
       (Self::Expression(x), Self::Expression(y)) => x.equals(y),
       (Self::Let(x), Self::Let(y)) => x.equals(y),
+      (Self::Return(x), Self::Return(y)) => x.equals(y),
       _ => false,
     }
   }
@@ -226,6 +233,11 @@ impl ASTEquality for Variable<'_> {
 impl ASTEquality for Let<'_, '_> {
   fn equals(&self, other: &Self) -> bool {
     self.identifier.equals(&other.identifier) && self.expression.equals(&other.expression)
+  }
+}
+impl ASTEquality for Return<'_, '_> {
+  fn equals(&self, other: &Self) -> bool {
+    self.expression.equals(&other.expression)
   }
 }
 

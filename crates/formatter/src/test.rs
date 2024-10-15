@@ -340,3 +340,27 @@ fn comments_in_groups() {
   "};
   assert_format!(if_, if_, 80);
 }
+
+#[test]
+fn return_statement() {
+  let code = indoc! {"
+    let function = argument => {
+      let a = if (x > 5) { return argument } else { 0 }
+      a + 1
+    }
+
+    let other = a => {
+      let a = 5
+      return a
+      // comment
+    }
+
+    let function = argument => {
+      let a = if (x > 5) {
+        return argument // a
+      } else { 0 }
+      a + 1
+    }
+  "};
+  assert_format!(code, code, 80);
+}

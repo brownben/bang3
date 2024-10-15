@@ -160,3 +160,63 @@ fn no_constant_string_in_format_string() {
   assert!(lint("hello {5}!").is_ok());
   assert!(lint("hello {'x' ++ a}!").is_ok());
 }
+
+#[test]
+fn no_unnecessary_return() {
+  assert!(lint("_ => { { return 5 } }").is_err());
+  assert!(lint("_ => { return 5 }").is_err());
+  assert!(lint("_ => { 5 }").is_ok());
+
+  assert!(lint("_ => ({ return 5 })").is_err());
+  assert!(lint("_ => ({ 5 })").is_ok());
+
+  assert!(lint("_ => if (a) { return 4 } else { return 8 }").is_err());
+  assert!(lint("_ => if (a) { 4 } else { return 8 }").is_err());
+  assert!(lint("_ => if (a) { return 4 } else { 8 }").is_err());
+  assert!(lint("_ => if (a) { 4 } else { 8 }").is_ok());
+
+  assert!(lint("_ => { return 5\n// some comment  }").is_err());
+  assert!(lint("_ => { 5\n// some comment  }").is_ok());
+
+  assert!(lint("_ => match a | 1 -> { return 5 } | 2 -> 3").is_err());
+  assert!(lint("_ => match a | 1 -> { 5 } | 2 -> 3").is_ok());
+}
+
+#[test]
+fn no_unreachable_code() {
+  assert!(lint(
+    "
+    let function = _ => {
+      if (a) {
+        return 4
+
+        4
+      } else 4
+    }
+    "
+  )
+  .is_err());
+
+  assert!(lint(
+    "
+    let function = _ => {
+      if (a) {
+        return 4
+
+        4
+      } else 4
+    }
+    "
+  )
+  .is_err());
+
+  assert!(lint(
+    "
+    let function = _ => {
+      if (a) { return 4 } else { return 4 }
+      5
+    }
+    "
+  )
+  .is_err());
+}

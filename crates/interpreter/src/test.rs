@@ -782,6 +782,48 @@ fn format_string() {
   assert_variable!(vm; h, string "<closure <function>>");
 }
 
+#[test]
+fn return_statement() {
+  let redundant = run(indoc! {"
+    let a = (_ => { return 5 })()
+    let b = (_ => ({ return 5 }))()
+    let c = (_ => { return 5 + 5 })()
+  "});
+  assert_variable!(redundant; a, 5.0);
+  assert_variable!(redundant; b, 5.0);
+  assert_variable!(redundant; c, 10.0);
+
+  let partial_early_return = run(indoc! {"
+    let a = (_ => if (true) { return 5 } else { 6 })()
+    let b = (_ => if (false) { 5 } else { return 6 })()
+    let c = (_ => if (false) { 5 } else { return 6 })()
+  "});
+  assert_variable!(partial_early_return; a, 5.0);
+  assert_variable!(partial_early_return; b, 6.0);
+  assert_variable!(partial_early_return; c, 6.0);
+
+  let early_return = run(indoc! {"
+    let a = (_ => {
+      let x = if (true) { return 5 } else { 6 }
+      x + 4
+    })()
+
+    let b = (_ => {
+      let x = if (false) { return 5 } else { 6 }
+      x + 4
+    })()
+  "});
+  assert_variable!(early_return; a, 5.0);
+  assert_variable!(early_return; b, 10.0);
+
+  let code_after = run(indoc! {"
+    let a = (_ => { return 5\n 4 })()
+    let b = (_ => ({ return 5 }))()
+    let c = (_ => { return 5 + 5 })()
+  "});
+  assert_variable!(code_after; a, 5.0);
+}
+
 mod builtin_function {
   use super::{assert_variable, run};
 

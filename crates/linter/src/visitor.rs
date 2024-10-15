@@ -85,11 +85,15 @@ pub trait Visitor {
       Statement::Comment(_) => {}
       Statement::Expression(x) => self.visit_expression(x),
       Statement::Let(x) => self.visit_let(x),
+      Statement::Return(x) => self.visit_return(x),
     }
 
     self.exit_statement(statement);
   }
   fn visit_let(&mut self, let_: &Let) {
     self.visit_expression(&let_.expression);
+  }
+  fn visit_return(&mut self, return_: &Return) {
+    self.visit_expression(&return_.expression);
   }
 }
