@@ -172,6 +172,8 @@ fn if_() {
   assert!(has_type_error("if (-false) 5 else 7"));
   assert!(has_type_error("if (false) -false else 7"));
   assert!(has_type_error("if (false) false else -true"));
+  assert!(has_type_error("if (true) { 5 } else { false }"));
+  assert!(has_type_error("a => if (a) { 5 } else { false }"));
 }
 
 #[test]

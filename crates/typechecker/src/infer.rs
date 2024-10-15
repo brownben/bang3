@@ -275,7 +275,13 @@ impl InferType for Function<'_, '_> {
 
     t.env
       .define_variable(&self.parameter, TypeScheme::monomorphic(parameter));
-    let return_type = self.body.infer(t).unwrap_or(TypeArena::UNKNOWN);
+    let return_type = match self.body.infer(t) {
+      Ok(return_type) => return_type,
+      Err(error) => {
+        t.problems.push(error);
+        TypeArena::UNKNOWN
+      }
+    };
     t.types.unify(return_type, expected_return).unwrap();
 
     t.env.exit_scope(self.span());
