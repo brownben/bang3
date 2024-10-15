@@ -92,6 +92,11 @@ impl ASTEquality for Expression<'_, '_> {
     match (self.unwrap(), other.unwrap()) {
       (Self::Binary(x), Self::Binary(y)) => x.equals(y),
       (Self::Block(x), Self::Block(y)) => x.equals(y),
+      (Self::Call(x), Self::Call(y)) => x.equals(y),
+      (Self::Comment(x), Self::Comment(y)) => x.equals(y),
+      // We don't compare functions, as they only have one instance
+      (Self::FormatString(x), Self::FormatString(y)) => x.equals(y),
+      (Self::Group(x), Self::Group(y)) => x.equals(y),
       (Self::If(x), Self::If(y)) => x.equals(y),
       (Self::Literal(x), Self::Literal(y)) => x.equals(y),
       (Self::Match(x), Self::Match(y)) => x.equals(y),
@@ -129,14 +134,38 @@ impl ASTEquality for Block<'_, '_> {
       .all(|x| x)
   }
 }
+impl ASTEquality for Comment<'_, '_> {
+  fn equals(&self, other: &Self) -> bool {
+    self.expression.equals(&other.expression)
+  }
+}
 impl ASTEquality for Call<'_, '_> {
   fn equals(&self, other: &Self) -> bool {
     self.expression.equals(&other.expression) && self.argument.equals(&other.argument)
   }
 }
-impl ASTEquality for Function<'_, '_> {
+impl ASTEquality for FormatString<'_, '_> {
   fn equals(&self, other: &Self) -> bool {
-    self.parameter.equals(&other.parameter) && self.body.equals(&other.body)
+    self
+      .expressions
+      .iter()
+      .zip(other.expressions.iter())
+      .all(|(x, y)| x.equals(y))
+      && self
+        .strings
+        .iter()
+        .zip(other.strings.iter())
+        .all(|(x, y)| x.equals(y))
+  }
+}
+impl ASTEquality for StringPart<'_> {
+  fn equals(&self, other: &Self) -> bool {
+    self.string == other.string
+  }
+}
+impl ASTEquality for Group<'_, '_> {
+  fn equals(&self, other: &Self) -> bool {
+    self.expression.equals(&other.expression)
   }
 }
 impl ASTEquality for If<'_, '_> {
