@@ -1,8 +1,8 @@
 use super::{compile, parse, CommandStatus};
-use crate::diagnostics::{highlight_source, CodeFrame, Message};
+use crate::diagnostics::{highlight_source, Message};
 
 use bang_interpreter::{Chunk, ChunkBuilder, HeapSize, OpCode, VM};
-use bang_parser::{ast, tokenise, Allocator, GetSpan, Span, TokenKind};
+use bang_parser::{ast, tokenise, Allocator, Span, TokenKind};
 
 use anstream::{eprintln, println};
 use owo_colors::OwoColorize;
@@ -81,9 +81,9 @@ fn run_repl_entry(vm: &mut VM, line: &str) -> Result<(), ()> {
 
   // If it is an expression, print the result, else just compile it.
   let chunk = if let Some(ast::Statement::Expression(expression)) = &ast.statements.first() {
-    print_expression_result_function(line, expression)?
+    print_expression_result_function(expression)?
   } else {
-    compile("REPL", line, &ast)?
+    compile(&ast)?
   };
 
   if let Err(error) = vm.run(&chunk) {
@@ -99,11 +99,14 @@ fn run_repl_entry(vm: &mut VM, line: &str) -> Result<(), ()> {
 /// - Get the `print` function from the global scope.
 /// - Call the expression function, to get the result (With null as argument).
 /// - Call the `print` function. (With the result as the argument).
-fn print_expression_result_function(
-  source: &str,
-  expression: &ast::Expression,
-) -> Result<Chunk, ()> {
-  let expression_function = compile_expression(source, expression)?;
+fn print_expression_result_function(expression: &ast::Expression) -> Result<Chunk, ()> {
+  let expression_function = match bang_interpreter::compile_expression(expression) {
+    Ok(chunk) => chunk,
+    Err(error) => {
+      eprintln!("{}", Message::from(&error));
+      return Err(());
+    }
+  };
 
   let mut function = ChunkBuilder::new("REPL");
 
@@ -121,22 +124,6 @@ fn print_expression_result_function(
   function.add_opcode(OpCode::Halt, Span::default());
 
   Ok(function.finalize())
-}
-
-fn compile_expression(
-  source: &str,
-  expression: &ast::Expression,
-) -> Result<bang_interpreter::Chunk, ()> {
-  match bang_interpreter::compile_expression(expression) {
-    Ok(chunk) => Ok(chunk),
-    Err(error) => {
-      eprintln!("{}", Message::from(&error));
-      if error.span() != Span::default() {
-        eprintln!("{}", CodeFrame::new("REPL", source, error.span()));
-      }
-      Err(())
-    }
-  }
 }
 
 /// Are all the brackets in the source balanced?

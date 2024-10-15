@@ -21,6 +21,7 @@ impl From<crate::RuntimeError> for Error {
 fn run(source: &str) -> Result<VM, Error> {
   let allocator = Allocator::new();
   let ast = parse(source, &allocator);
+  assert!(ast.is_valid());
   let chunk = compile(&ast)?;
   let mut vm = VM::new(HeapSize::Small).unwrap();
   vm.define_builtin_functions();
@@ -488,13 +489,6 @@ fn block() {
   assert_variable!(multiple_statements; b, 7.0);
   assert_variable!(multiple_statements; c, 33.0);
   assert_variable!(multiple_statements; d, 2.0);
-
-  let must_end_with_expression = run(indoc! {"
-    let a = {
-      let b = 0
-    }
-  "});
-  assert!(must_end_with_expression.is_err());
 }
 
 #[test]

@@ -180,8 +180,12 @@ fn blocks_incompelete() {
   let allocator = Allocator::new();
   assert!(parse("{let x = 4\nx + 2", &allocator).is_err());
   assert!(parse("{}", &allocator).is_err());
-  assert!(parse("{let a = 1}", &allocator).is_err());
   assert!(parse("{7", &allocator).is_err());
+
+  // must end in expression
+  assert!(parse("{let a = 1}", &allocator).is_err());
+  assert!(parse("{let a = 1\n// comment\n}", &allocator).is_err());
+  assert!(parse("{1\n// comment\n}", &allocator).is_ok());
 }
 
 #[test]

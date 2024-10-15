@@ -4,7 +4,7 @@ use super::FormatOptions;
 use bang_formatter::FormatterConfig;
 use bang_interpreter::{HeapSize, VM};
 use bang_lsp::LanguageServer;
-use bang_parser::{tokenise, Allocator, GetSpan, LineIndex, Span, AST};
+use bang_parser::{tokenise, Allocator, GetSpan, LineIndex, AST};
 
 use anstream::{eprintln, println};
 use std::fs;
@@ -52,14 +52,11 @@ fn parse<'s, 'a>(
   }
 }
 
-fn compile(filename: &str, source: &str, ast: &AST) -> Result<bang_interpreter::Chunk, ()> {
+fn compile(ast: &AST) -> Result<bang_interpreter::Chunk, ()> {
   match bang_interpreter::compile(ast) {
     Ok(chunk) => Ok(chunk),
     Err(error) => {
       eprintln!("{}", Message::from(&error));
-      if error.span() != Span::default() {
-        eprintln!("{}", CodeFrame::new(filename, source, error.span()));
-      }
       Err(())
     }
   }
@@ -69,7 +66,7 @@ pub fn run(filename: &str) -> Result<CommandStatus, ()> {
   let allocator = Allocator::new();
   let source = read_file(filename)?;
   let ast = parse(filename, &source, &allocator)?;
-  let chunk = compile(filename, &source, &ast)?;
+  let chunk = compile(&ast)?;
 
   let mut vm = match VM::new(HeapSize::Standard) {
     Ok(vm) => vm,
@@ -202,7 +199,7 @@ pub fn print_chunk(filename: &str) -> Result<CommandStatus, ()> {
   let allocator = Allocator::new();
   let source = read_file(filename)?;
   let ast = parse(filename, &source, &allocator)?;
-  let chunk = compile(filename, &source, &ast)?;
+  let chunk = compile(&ast)?;
 
   print!("{chunk}");
 

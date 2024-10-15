@@ -403,6 +403,13 @@ impl<'s, 'ast> Parser<'s, 'ast> {
       Span::from(opening_curly).merge(statements.last().unwrap().span())
     };
 
+    if !ends_with_expression(&statements) {
+      self
+        .ast
+        .errors
+        .push(ParseError::BlockMustEndWithExpression(span));
+    }
+
     self.allocate_expression(Block { statements, span })
   }
 
@@ -770,19 +777,11 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
     let mut expression = self.parse_expression_with_newline();
     self.resync_if_error(TokenKind::EndOfLine);
+    self.expect_newline();
 
     let span = Span::from(let_token)
       .merge(identifier.span)
       .merge(expression.span());
-
-    if self.peek_token_kind() == TokenKind::RightCurly {
-      self
-        .ast
-        .errors
-        .push(ParseError::BlockMustEndWithExpression(span));
-    } else {
-      self.expect_newline();
-    }
 
     if let Expression::Function(ref mut function) = &mut expression {
       function.name = Some(identifier.clone());
@@ -973,4 +972,12 @@ impl From<TokenKind> for ParsePrecedence {
       _ => Self::None,
     }
   }
+}
+
+fn ends_with_expression(statements: &[Statement]) -> bool {
+  statements
+    .iter()
+    .rev()
+    .find(|statement| !matches!(statement, Statement::Comment(_)))
+    .is_some_and(|statement| matches!(statement, Statement::Expression(_)))
 }

@@ -278,10 +278,7 @@ impl<'s> Compile<'s> for Block<'s, '_> {
         Statement::Comment(_) | Statement::Let(_) => {}
       }
     }
-    match last {
-      Statement::Expression(_) => last.compile(compiler)?,
-      stmt => Err(CompileError::BlockMustEndWithExpression(stmt.span()))?,
-    }
+    last.compile(compiler)?;
 
     compiler.end_scope(self.span)
   }
@@ -613,8 +610,6 @@ pub enum CompileError {
   TooManyClosures,
   /// Too many local variables
   TooManyLocalVariables,
-  /// Block must end with expression
-  BlockMustEndWithExpression(Span),
   /// AST to compile has an error in it
   InvalidAST,
 }
@@ -628,7 +623,6 @@ impl CompileError {
       Self::TooBigJump => "Too Big Jump",
       Self::TooManyClosures => "Too Many Closures",
       Self::TooManyLocalVariables => "Too Many Local Variables",
-      Self::BlockMustEndWithExpression(_) => "Block Must End With Expression",
       Self::InvalidAST => "Invalid AST",
     }
   }
@@ -642,18 +636,7 @@ impl CompileError {
       Self::TooBigJump => "the maximum jump size has been reached (65536)",
       Self::TooManyClosures => "the maximum no. of closures has been reached (256)",
       Self::TooManyLocalVariables => "more than 256 local variables have been defined",
-      Self::BlockMustEndWithExpression(_) => {
-        "a block must return a value, so must end with an expression"
-      }
       Self::InvalidAST => "the AST contains an error, see errors from parser",
-    }
-  }
-}
-impl GetSpan for CompileError {
-  fn span(&self) -> Span {
-    match self {
-      Self::BlockMustEndWithExpression(span) => *span,
-      _ => Span::default(),
     }
   }
 }
