@@ -425,12 +425,12 @@ fn empty_ast() {
 
 #[test]
 fn expression_has_error() {
-  assert_eq!(synthesize_has_error("let a = -false\na"), "unknown");
-  assert_eq!(synthesize_has_error("_ => -false"), "a' => unknown");
+  assert_eq!(synthesize_has_error("let a = -false\na"), "number");
+  assert_eq!(synthesize_has_error("_ => -false"), "a' => number");
 
   assert_eq!(
     synthesize_has_error("let a = _ => -false\na"),
-    "a' => unknown"
+    "a' => number"
   );
 }
 

@@ -1,5 +1,3 @@
-use crate::TypeError;
-use bang_parser::Span;
 use std::{collections::BTreeMap, iter, ops};
 
 #[derive(Debug)]
@@ -47,17 +45,6 @@ impl TypeArena {
   }
   pub fn get_type_var_mut(&mut self, type_var_ref: TypeVarRef) -> &mut TypeVar {
     &mut self.type_vars[usize::try_from(type_var_ref.0).unwrap()]
-  }
-
-  /// Asserts that type `a` is applicable to type `b`
-  pub fn assert_type(&mut self, a: TypeRef, b: TypeRef, span: Span) -> Result<(), TypeError> {
-    self
-      .unify(a, b)
-      .map_err(|()| TypeError::ExpectedDifferentType {
-        expected: self.type_to_string(b),
-        given: self.type_to_string(a),
-        span,
-      })
   }
 
   /// Unifies types `a` and `b`, returning `Ok` if they are unifiable

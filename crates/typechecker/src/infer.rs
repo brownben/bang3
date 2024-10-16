@@ -1,7 +1,7 @@
 use crate::{exhaustive, Enviroment, Type, TypeArena, TypeError, TypeRef, TypeScheme};
 use bang_parser::{
   ast::{expression::*, statement::*},
-  GetSpan, AST,
+  GetSpan, Span, AST,
 };
 
 pub struct Typechecker {
@@ -53,26 +53,14 @@ impl Typechecker {
   fn infer_statement(&mut self, statement: &Statement<'_, '_>) -> TypeRef {
     match statement {
       Statement::Comment(_) => {}
-      Statement::Expression(expression) => match expression.infer(self) {
-        Ok(type_) => return type_,
-        Err(error) => {
-          self.problems.push(error);
-          return TypeArena::UNKNOWN;
-        }
-      },
+      Statement::Expression(expression) => return expression.infer(self),
       Statement::Let(let_) => {
         if let Expression::Function(_) = &let_.expression {
           self.infer_let_with_function(let_);
           return TypeArena::NEVER;
         }
 
-        let variable_type = match let_.expression.infer(self) {
-          Ok(type_) => type_,
-          Err(error) => {
-            self.problems.push(error);
-            TypeArena::UNKNOWN
-          }
-        };
+        let variable_type = let_.expression.infer(self);
 
         self.env.define_variable(
           &let_.identifier,
@@ -97,7 +85,7 @@ impl Typechecker {
       .define_variable(&let_.identifier, TypeScheme::monomorphic(function_type));
 
     // Infer the function type
-    let expression_type = let_.expression.infer(self).unwrap();
+    let expression_type = let_.expression.infer(self);
 
     // Update the variable type to be the inferred type
     self.env.update_variable(
@@ -106,17 +94,28 @@ impl Typechecker {
     );
   }
 
+  /// Asserts that type `a` is applicable to type `b`
+  pub fn assert_type(&mut self, a: TypeRef, b: TypeRef, span: Span) {
+    if self.types.unify(a, b).is_err() {
+      self.problems.push(TypeError::ExpectedDifferentType {
+        expected: self.types.type_to_string(b),
+        given: self.types.type_to_string(a),
+        span,
+      });
+    }
+  }
+
   fn new_type_var(&mut self) -> TypeRef {
     self.types.new_type_var(self.env.depth())
   }
 }
 
 pub(crate) trait InferType {
-  fn infer(&self, t: &mut Typechecker) -> Result<TypeRef, TypeError>;
+  fn infer(&self, t: &mut Typechecker) -> TypeRef;
 }
 
 impl InferType for Expression<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> Result<TypeRef, TypeError> {
+  fn infer(&self, t: &mut Typechecker) -> TypeRef {
     match self {
       Expression::Binary(binary) => binary.infer(t),
       Expression::Block(block) => block.infer(t),
@@ -130,14 +129,15 @@ impl InferType for Expression<'_, '_> {
       Expression::Match(match_) => match_.infer(t),
       Expression::Unary(unary) => unary.infer(t),
       Expression::Variable(variable) => variable.infer(t),
-      Expression::Invalid(_) => Ok(TypeArena::UNKNOWN),
+      Expression::Invalid(_) => TypeArena::UNKNOWN,
     }
   }
 }
 impl InferType for Binary<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> Result<TypeRef, TypeError> {
-    let left = self.left.infer(t)?;
-    let right = self.right.infer(t)?;
+  #[allow(clippy::match_same_arms)]
+  fn infer(&self, t: &mut Typechecker) -> TypeRef {
+    let left = self.left.infer(t);
+    let right = self.right.infer(t);
 
     match self.operator {
       BinaryOperator::Add
@@ -145,34 +145,30 @@ impl InferType for Binary<'_, '_> {
       | BinaryOperator::Multiply
       | BinaryOperator::Divide
       | BinaryOperator::Remainder => {
-        t.types
-          .assert_type(left, TypeArena::NUMBER, self.left.span())?;
-        t.types
-          .assert_type(right, TypeArena::NUMBER, self.right.span())?;
+        t.assert_type(left, TypeArena::NUMBER, self.left.span());
+        t.assert_type(right, TypeArena::NUMBER, self.right.span());
 
-        Ok(TypeArena::NUMBER)
+        TypeArena::NUMBER
       }
       BinaryOperator::AddString => {
-        t.types
-          .assert_type(left, TypeArena::STRING, self.left.span())?;
-        t.types
-          .assert_type(right, TypeArena::STRING, self.right.span())?;
-        Ok(TypeArena::STRING)
+        t.assert_type(left, TypeArena::STRING, self.left.span());
+        t.assert_type(right, TypeArena::STRING, self.right.span());
+        TypeArena::STRING
       }
       BinaryOperator::NotEqual | BinaryOperator::Equal => {
-        t.types.assert_type(right, left, self.right.span())?;
-        Ok(TypeArena::BOOLEAN)
+        t.assert_type(right, left, self.right.span());
+        TypeArena::BOOLEAN
       }
       BinaryOperator::Greater
       | BinaryOperator::GreaterEqual
       | BinaryOperator::Less
       | BinaryOperator::LessEqual => {
-        t.types.assert_type(right, left, self.right.span())?;
-        Ok(TypeArena::BOOLEAN)
+        t.assert_type(right, left, self.right.span());
+        TypeArena::BOOLEAN
       }
       BinaryOperator::And | BinaryOperator::Or => {
-        t.types.assert_type(right, left, self.right.span())?;
-        Ok(right)
+        t.assert_type(right, left, self.right.span());
+        right
       }
       BinaryOperator::Pipeline => {
         let callee_type = right;
@@ -182,28 +178,29 @@ impl InferType for Binary<'_, '_> {
         let function_type = t.types.new_type(Type::Function(argument_type, return_type));
 
         if t.types.unify(function_type, callee_type).is_err() {
-          let Some(expected) = t.types.function_parameter(callee_type) else {
-            return Err(TypeError::NotCallable {
-              type_: t.types.type_to_string(callee_type),
-              span: self.right.span(),
-            });
-          };
-
-          return Err(TypeError::IncorrectArgument {
-            given: t.types.type_to_string(argument_type),
-            expected: t.types.type_to_string(expected),
-            span: self.left.span(),
-          });
+          match t.types.function_parameter(callee_type) {
+            Some(expected) => t.problems.push(TypeError::IncorrectArgument {
+              given: t.types.type_to_string(argument_type),
+              expected: t.types.type_to_string(expected),
+              span: self.left.span(),
+            }),
+            None => {
+              t.problems.push(TypeError::NotCallable {
+                type_: t.types.type_to_string(callee_type),
+                span: self.right.span(),
+              });
+            }
+          }
         }
 
-        Ok(return_type)
+        return_type
       }
-      BinaryOperator::Invalid => Ok(TypeArena::UNKNOWN),
+      BinaryOperator::Invalid => TypeArena::UNKNOWN,
     }
   }
 }
 impl InferType for Block<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> Result<TypeRef, TypeError> {
+  fn infer(&self, t: &mut Typechecker) -> TypeRef {
     t.env.enter_scope();
     let (last_statement, statements) = self.statements.split_last().unwrap();
     for statement in statements {
@@ -211,14 +208,14 @@ impl InferType for Block<'_, '_> {
     }
     let return_type = t.infer_statement(last_statement);
     t.env.exit_scope(self.span());
-    Ok(return_type)
+    return_type
   }
 }
 impl InferType for Call<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> Result<TypeRef, TypeError> {
-    let callee_type = self.expression.infer(t)?;
+  fn infer(&self, t: &mut Typechecker) -> TypeRef {
+    let callee_type = self.expression.infer(t);
     let argument_type = if let Some(argument) = &self.argument {
-      argument.infer(t)?
+      argument.infer(t)
     } else {
       TypeArena::NEVER
     };
@@ -227,46 +224,42 @@ impl InferType for Call<'_, '_> {
     let function_type = t.types.new_type(Type::Function(argument_type, return_type));
 
     if t.types.unify(function_type, callee_type).is_err() {
-      let Some(expected) = t.types.function_parameter(callee_type) else {
-        return Err(TypeError::NotCallable {
-          type_: t.types.type_to_string(callee_type),
+      match t.types.function_parameter(callee_type) {
+        Some(expected) if self.argument.is_none() => t.problems.push(TypeError::MissingArgument {
+          expected: t.types.type_to_string(expected),
           span: self.expression.span(),
-        });
-      };
-
-      if let Some(argument) = &self.argument {
-        return Err(TypeError::IncorrectArgument {
+        }),
+        Some(expected) => t.problems.push(TypeError::IncorrectArgument {
           given: t.types.type_to_string(argument_type),
           expected: t.types.type_to_string(expected),
-          span: argument.span(),
-        });
+          span: self.argument.as_ref().unwrap().span(),
+        }),
+        None => t.problems.push(TypeError::NotCallable {
+          type_: t.types.type_to_string(callee_type),
+          span: self.expression.span(),
+        }),
       }
-
-      return Err(TypeError::MissingArgument {
-        expected: t.types.type_to_string(expected),
-        span: self.expression.span(),
-      });
     }
 
-    Ok(return_type)
+    return_type
   }
 }
 impl InferType for Comment<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> Result<TypeRef, TypeError> {
+  fn infer(&self, t: &mut Typechecker) -> TypeRef {
     self.expression.infer(t)
   }
 }
 impl InferType for FormatString<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> Result<TypeRef, TypeError> {
+  fn infer(&self, t: &mut Typechecker) -> TypeRef {
     for expression in &self.expressions {
-      expression.infer(t)?;
+      expression.infer(t);
     }
 
-    Ok(TypeArena::STRING)
+    TypeArena::STRING
   }
 }
 impl InferType for Function<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> Result<TypeRef, TypeError> {
+  fn infer(&self, t: &mut Typechecker) -> TypeRef {
     t.env.enter_scope();
 
     let parameter = t.new_type_var();
@@ -275,64 +268,58 @@ impl InferType for Function<'_, '_> {
 
     t.env
       .define_variable(&self.parameter, TypeScheme::monomorphic(parameter));
-    let return_type = match self.body.infer(t) {
-      Ok(return_type) => return_type,
-      Err(error) => {
-        t.problems.push(error);
-        TypeArena::UNKNOWN
-      }
-    };
+    let return_type = self.body.infer(t);
     t.types.unify(return_type, expected_return).unwrap();
 
     t.env.exit_scope(self.span());
 
-    Ok(function_type)
+    function_type
   }
 }
 impl InferType for Group<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> Result<TypeRef, TypeError> {
+  fn infer(&self, t: &mut Typechecker) -> TypeRef {
     self.expression.infer(t)
   }
 }
 impl InferType for If<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> Result<TypeRef, TypeError> {
-    self.condition.infer(t)?;
+  fn infer(&self, t: &mut Typechecker) -> TypeRef {
+    self.condition.infer(t);
 
-    let then_type = self.then.infer(t)?;
-    let else_type = self.otherwise.infer(t)?;
+    let then_type = self.then.infer(t);
+    let else_type = self.otherwise.infer(t);
 
     if t.types.unify(then_type, else_type).is_err() {
-      return Err(TypeError::IfElseDontMatch {
+      t.problems.push(TypeError::IfElseDontMatch {
         then: t.types.type_to_string(then_type),
         otherwise: t.types.type_to_string(else_type),
         span: self.otherwise.span(),
       });
     }
 
-    Ok(then_type)
+    then_type
   }
 }
 impl InferType for Literal<'_> {
-  fn infer(&self, _: &mut Typechecker) -> Result<TypeRef, TypeError> {
-    Ok(match self.kind {
+  fn infer(&self, _: &mut Typechecker) -> TypeRef {
+    match self.kind {
       LiteralKind::Boolean(_) => TypeArena::BOOLEAN,
       LiteralKind::Number { .. } => TypeArena::NUMBER,
       LiteralKind::String(_) => TypeArena::STRING,
-    })
+    }
   }
 }
 impl InferType for Match<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> Result<TypeRef, TypeError> {
-    let value_type = self.value.infer(t)?;
+  fn infer(&self, t: &mut Typechecker) -> TypeRef {
+    let value_type = self.value.infer(t);
 
     // check patterns match the value passes
     for case in &self.cases {
       match &case.pattern {
         Pattern::Identifier(_) => {}
         Pattern::Literal(literal) => {
-          let literal = literal.infer(t)?;
+          let literal = literal.infer(t);
           if t.types.unify(literal, value_type).is_err() {
-            return Err(TypeError::PatternNeverMatches {
+            t.problems.push(TypeError::PatternNeverMatches {
               pattern: t.types.type_to_string(literal),
               value: t.types.type_to_string(value_type),
               span: case.pattern.span(),
@@ -341,9 +328,9 @@ impl InferType for Match<'_, '_> {
         }
         Pattern::Range(range) => {
           if let Some(start) = &range.start {
-            let start_type = start.get_range_literal().infer(t)?;
+            let start_type = start.get_range_literal().infer(t);
             if t.types.unify(start_type, value_type).is_err() {
-              return Err(TypeError::PatternNeverMatches {
+              t.problems.push(TypeError::PatternNeverMatches {
                 pattern: t.types.type_to_string(start_type),
                 value: t.types.type_to_string(value_type),
                 span: case.pattern.span(),
@@ -351,9 +338,9 @@ impl InferType for Match<'_, '_> {
             }
           }
           if let Some(end) = &range.end {
-            let end_type = end.get_range_literal().infer(t)?;
+            let end_type = end.get_range_literal().infer(t);
             if t.types.unify(end_type, value_type).is_err() {
-              return Err(TypeError::PatternNeverMatches {
+              t.problems.push(TypeError::PatternNeverMatches {
                 pattern: t.types.type_to_string(end_type),
                 value: t.types.type_to_string(value_type),
                 span: case.pattern.span(),
@@ -376,12 +363,12 @@ impl InferType for Match<'_, '_> {
 
       // check the guard is valid, needs the value to be defined
       if let Some(guard) = &case.guard {
-        guard.infer(t)?;
+        guard.infer(t);
       }
 
-      let case_type = case.expression.infer(t)?;
+      let case_type = case.expression.infer(t);
       if t.types.unify(case_type, return_type).is_err() {
-        return Err(TypeError::MatchCasesDontMatch {
+        t.problems.push(TypeError::MatchCasesDontMatch {
           first: t.types.type_to_string(return_type),
           later: t.types.type_to_string(case_type),
           span: case.span(),
@@ -408,34 +395,34 @@ impl InferType for Match<'_, '_> {
       ),
     };
 
-    Ok(return_type)
+    return_type
   }
 }
 impl InferType for Unary<'_, '_> {
-  fn infer(&self, t: &mut Typechecker) -> Result<TypeRef, TypeError> {
-    let left = self.expression.infer(t)?;
+  fn infer(&self, t: &mut Typechecker) -> TypeRef {
+    let left = self.expression.infer(t);
     let span = self.expression.span();
 
     match self.operator {
-      UnaryOperator::Not => Ok(TypeArena::BOOLEAN),
+      UnaryOperator::Not => TypeArena::BOOLEAN,
       UnaryOperator::Minus => {
-        t.types.assert_type(left, TypeArena::NUMBER, span)?;
-        Ok(TypeArena::NUMBER)
+        t.assert_type(left, TypeArena::NUMBER, span);
+        TypeArena::NUMBER
       }
     }
   }
 }
 impl InferType for Variable<'_> {
-  fn infer(&self, Typechecker { env, types, .. }: &mut Typechecker) -> Result<TypeRef, TypeError> {
-    match env.get_variable(self.name) {
-      Some(type_) => {
-        env.mark_variable_use(self.name, self.span());
-        Ok(types.instantiate(type_, env.depth()))
-      }
-      None => Err(TypeError::UndefinedVariable {
+  fn infer(&self, t: &mut Typechecker) -> TypeRef {
+    if let Some(type_) = t.env.get_variable(self.name) {
+      t.env.mark_variable_use(self.name, self.span());
+      t.types.instantiate(type_, t.env.depth())
+    } else {
+      t.problems.push(TypeError::UndefinedVariable {
         identifier: self.name.to_owned(),
         span: self.span,
-      }),
+      });
+      TypeArena::UNKNOWN
     }
   }
 }

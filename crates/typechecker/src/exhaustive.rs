@@ -60,7 +60,10 @@ fn boolean(cases: &[MatchCase]) -> Result {
     (true, true) => Result::UnreachableCases(unused_cases),
     (false, true) => Result::MissingCases(vec![MissingPattern::Boolean(true)]),
     (true, false) => Result::MissingCases(vec![MissingPattern::Boolean(false)]),
-    (false, false) => unreachable!("must have at least one arm"),
+    (false, false) => Result::MissingCases(vec![
+      MissingPattern::Boolean(true),
+      MissingPattern::Boolean(false),
+    ]),
   }
 }
 
