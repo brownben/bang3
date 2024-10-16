@@ -369,7 +369,11 @@ impl<'s> Compile<'s> for If<'s, '_> {
 
     compiler.patch_jump(jump_to_else)?;
     compiler.chunk.add_opcode(OpCode::Pop, self.span);
-    self.otherwise.compile(compiler)?;
+    if let Some(otherwise) = &self.otherwise {
+      otherwise.compile(compiler)?;
+    } else {
+      compiler.chunk.add_opcode(OpCode::Null, self.span);
+    }
 
     compiler.patch_jump(jump_to_end)?;
 

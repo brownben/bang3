@@ -290,6 +290,12 @@ impl From<*const Chunk> for Value {
     )
   }
 }
+#[cfg(test)]
+impl From<()> for Value {
+  fn from((): ()) -> Self {
+    Self::NULL
+  }
+}
 
 // To check if a value is a number, or a tagged pointer
 // Sign bit is not set, but all bits of the exponent, and 2 bits of the mantissa are set (so real NaNs can be represented)

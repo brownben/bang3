@@ -234,7 +234,8 @@ impl LintRule for NoUselessIf {
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression) {
     if let Expression::If(if_) = &expression
-      && if_.then.unwrap().equals(if_.otherwise.unwrap())
+      && let Some(otherwise) = &if_.otherwise
+      && if_.then.unwrap().equals(otherwise.unwrap())
     {
       context.add_diagnostic(&Self, if_.span());
     }
@@ -323,7 +324,13 @@ impl LintRule for NoUnnecessaryReturn {
 
         // Could contain a block with return sensibly at the end
         Expression::Group(group) => ends_with_return(&group.expression),
-        Expression::If(if_) => ends_with_return(&if_.otherwise).or(ends_with_return(&if_.then)),
+        Expression::If(if_) => {
+          if let Some(otherwise) = &if_.otherwise {
+            ends_with_return(otherwise).or(ends_with_return(&if_.then))
+          } else {
+            None
+          }
+        }
         Expression::Match(match_) => match_
           .cases
           .iter()
@@ -379,7 +386,9 @@ impl LintRule for NoUnreachableCode {
 
         // Could contain a block with return sensibly at the end
         Expression::Group(group) => always_returns(&group.expression),
-        Expression::If(if_) => always_returns(&if_.otherwise) && always_returns(&if_.then),
+        Expression::If(if_) => {
+          always_returns(&if_.then) && if_.otherwise.as_ref().is_some_and(always_returns)
+        }
         Expression::Match(match_) => match_
           .cases
           .iter()

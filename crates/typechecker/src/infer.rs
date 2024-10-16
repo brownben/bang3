@@ -349,6 +349,11 @@ impl InferType for Function<'_, '_> {
     };
     t.types.unify(return_type, expected_return).unwrap();
 
+    if t.types[return_type] == Type::Primitive(TypeArena::NEVER) {
+      t.problems
+        .push(TypeError::FunctionReturnsNever { span: self.span() });
+    }
+
     t.env.exit_scope(self.span());
 
     function_type.into()
@@ -364,9 +369,13 @@ impl InferType for If<'_, '_> {
     self.condition.infer(t);
 
     let then_type = self.then.infer(t);
-    let else_type = self.otherwise.infer(t);
 
-    t.merge_branches(&then_type, &else_type, self.span())
+    if let Some(otherwise) = &self.otherwise {
+      let else_type = otherwise.infer(t);
+      t.merge_branches(&then_type, &else_type, self.span())
+    } else {
+      TypeArena::NEVER.into()
+    }
   }
 }
 impl InferType for Literal<'_> {

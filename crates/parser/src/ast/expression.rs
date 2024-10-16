@@ -171,7 +171,7 @@ pub struct Group<'source, 'ast> {
 pub struct If<'source, 'ast> {
   pub condition: Expression<'source, 'ast>,
   pub then: Expression<'source, 'ast>,
-  pub otherwise: Expression<'source, 'ast>,
+  pub otherwise: Option<Expression<'source, 'ast>>,
   pub span: Span,
 }
 

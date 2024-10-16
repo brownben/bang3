@@ -556,3 +556,32 @@ fn early_returns() {
   "};
   assert_eq!(synthesize(source), "boolean => boolean");
 }
+
+#[test]
+fn if_no_else() {
+  let with_early_return = indoc! {"
+    let function = a => {
+      if (a == true) { return 5 }
+
+      4
+    }
+    function
+  "};
+  assert_eq!(synthesize(with_early_return), "boolean => number");
+
+  let assign_to_variable = "let a = if (a) 5";
+  assert!(has_type_error(assign_to_variable));
+
+  let as_return = "_ => if (a) 5";
+  assert!(has_type_error(as_return));
+
+  let with_possible_side_effect = indoc! {"
+    let function = a => {
+      if (a == false) print(a)
+
+      4
+    }
+    function
+  "};
+  assert_eq!(synthesize(with_possible_side_effect), "boolean => number");
+}

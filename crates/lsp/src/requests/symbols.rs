@@ -90,7 +90,9 @@ fn expression_symbols(
     Expression::If(if_) => {
       expression_symbols(&if_.condition, file, symbols);
       expression_symbols(&if_.then, file, symbols);
-      expression_symbols(&if_.otherwise, file, symbols);
+      if let Some(otherwise) = &if_.otherwise {
+        expression_symbols(otherwise, file, symbols);
+      }
     }
     Expression::Match(match_) => {
       expression_symbols(&match_.value, file, symbols);

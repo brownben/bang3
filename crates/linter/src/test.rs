@@ -180,6 +180,8 @@ fn no_unnecessary_return() {
 
   assert!(lint("_ => match a | 1 -> { return 5 } | 2 -> 3").is_err());
   assert!(lint("_ => match a | 1 -> { 5 } | 2 -> 3").is_ok());
+
+  assert!(lint("_ => if (a) { return 5 }").is_ok());
 }
 
 #[test]

@@ -59,7 +59,9 @@ pub trait Visitor {
   fn visit_if(&mut self, if_: &If) {
     self.visit_expression(&if_.condition);
     self.visit_expression(&if_.then);
-    self.visit_expression(&if_.otherwise);
+    if let Some(otherwise) = &if_.otherwise {
+      self.visit_expression(otherwise);
+    }
   }
   fn visit_match(&mut self, match_: &Match) {
     self.visit_expression(&match_.value);

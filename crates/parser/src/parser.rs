@@ -507,10 +507,11 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     let then = self.parse_expression();
 
     self.skip_newline();
-    self.expect(TokenKind::Else);
-    let otherwise = self.parse_expression();
+    let otherwise = self
+      .matches(TokenKind::Else)
+      .map(|_| self.parse_expression());
 
-    let span = Span::from(if_token).merge(otherwise.span());
+    let span = Span::from(if_token).merge(otherwise.as_ref().map_or(then.span(), GetSpan::span));
 
     self.allocate_expression(If {
       condition,

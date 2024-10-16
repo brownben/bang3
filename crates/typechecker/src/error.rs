@@ -80,6 +80,11 @@ pub enum Problem {
     /// The location of the error
     span: Span,
   },
+  /// Function tries to return a `never` value
+  FunctionReturnsNever {
+    /// The location of the error
+    span: Span,
+  },
 }
 impl Problem {
   /// The title of the error message
@@ -96,6 +101,7 @@ impl Problem {
       Self::MissingArgument { .. } => "Missing Argument",
       Self::BranchesDontMatch { .. } => "If Else Branch Type Mismatch",
       Self::PatternNeverMatches { .. } => "Pattern Doesn't Match Value",
+      Self::FunctionReturnsNever { .. } => "Function Returns `Never`",
     }
   }
 
@@ -135,6 +141,10 @@ impl Problem {
       Self::PatternNeverMatches { pattern, value, .. } => {
         format!("match value is `{value}` which doesn't match pattern of type `{pattern}``")
       }
+      Self::FunctionReturnsNever { .. } => {
+        "function returns `never` which indicates a lack of value, functions must return a value"
+          .to_string()
+      }
     }
   }
 
@@ -168,7 +178,8 @@ impl GetSpan for Problem {
       | Self::IncorrectArgument { span, .. }
       | Self::MissingArgument { span, .. }
       | Self::BranchesDontMatch { span, .. }
-      | Self::PatternNeverMatches { span, .. } => *span,
+      | Self::PatternNeverMatches { span, .. }
+      | Self::FunctionReturnsNever { span } => *span,
     }
   }
 }

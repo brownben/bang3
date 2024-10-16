@@ -552,6 +552,13 @@ fn if_() {
 
   assert_variable!(vm; a, 1.0);
   assert_variable!(vm; b, 4.0);
+
+  let no_else = run(indoc! {"
+    let a = if (false) 4
+    let b = if (true) 1.1
+  "});
+  assert_variable!(no_else; a, ());
+  assert_variable!(no_else; b, 1.1);
 }
 
 #[test]
