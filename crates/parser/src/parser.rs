@@ -420,7 +420,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
   fn call(
     &mut self,
     expression: Expression<'s, 'ast>,
-    _left_bracket: Token,
+    left_bracket: Token,
   ) -> Expression<'s, 'ast> {
     self.skip_newline();
     let argument = if self.peek_token_kind() == TokenKind::RightParen {
@@ -430,17 +430,19 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     };
     self.skip_newline();
 
-    let span = if let Some(right_paren) = self.expect(TokenKind::RightParen) {
-      expression.span().merge(right_paren.into())
+    let argument_span = if let Some(right_paren) = self.expect(TokenKind::RightParen) {
+      Span::from(left_bracket).merge(right_paren.into())
     } else if let Some(argument) = &argument {
-      expression.span().merge(argument.span())
+      Span::from(left_bracket).merge(argument.span())
     } else {
-      expression.span()
+      Span::from(left_bracket)
     };
+    let span = expression.span().merge(argument_span);
 
     self.allocate_expression(Call {
       expression,
       argument,
+      argument_span,
       span,
     })
   }

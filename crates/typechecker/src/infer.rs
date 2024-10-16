@@ -299,7 +299,7 @@ impl InferType for Call<'_, '_> {
       match t.types.function_parameter(callee_type) {
         Some(expected) if self.argument.is_none() => t.problems.push(TypeError::MissingArgument {
           expected: t.types.type_to_string(expected),
-          span: self.expression.span(),
+          span: self.argument_span,
         }),
         Some(expected) => t.problems.push(TypeError::IncorrectArgument {
           given: t.types.type_to_string(argument_type),

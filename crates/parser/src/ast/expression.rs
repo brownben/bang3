@@ -130,6 +130,7 @@ pub struct Block<'source, 'ast> {
 pub struct Call<'source, 'ast> {
   pub expression: Expression<'source, 'ast>,
   pub argument: Option<Expression<'source, 'ast>>,
+  pub argument_span: Span,
   pub span: Span,
 }
 
