@@ -222,3 +222,16 @@ fn no_unreachable_code() {
   )
   .is_err());
 }
+
+#[test]
+fn no_double_condition() {
+  assert!(lint("a == b or a > b").is_err());
+  assert!(lint("a == b || a < b").is_err());
+  assert!(lint("a < b || a == b").is_err());
+  assert!(lint("a > b or a == b").is_err());
+
+  assert!(lint("a < b and a == b").is_ok());
+
+  assert!(lint("a <= b").is_ok());
+  assert!(lint("a >= b").is_ok());
+}

@@ -5,7 +5,7 @@ use super::{
 };
 use bang_parser::ast::{expression::*, statement::*, GetSpan, Span};
 
-pub const RULES: [&dyn LintRule; 14] = [
+pub const RULES: [&dyn LintRule; 15] = [
   &NoConstantConditions,
   &NoNegativeZero,
   &NoSelfAssign,
@@ -20,6 +20,7 @@ pub const RULES: [&dyn LintRule; 14] = [
   &NoConstantStringsInFormatString,
   &NoUnnecessaryReturn,
   &NoUnreachableCode,
+  &NoDoubleCondition,
 ];
 
 pub struct NoConstantConditions;
@@ -420,6 +421,48 @@ impl LintRule for NoUnreachableCode {
         let span = Span::new(first_unused_statement.span().start, block.span.end - 1);
 
         context.add_diagnostic(&Self, span);
+      }
+    }
+  }
+}
+
+pub struct NoDoubleCondition;
+impl LintRule for NoDoubleCondition {
+  fn name(&self) -> &'static str {
+    "No Double Condition"
+  }
+  fn message(&self) -> &'static str {
+    "can be simplified into a single condition"
+  }
+  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+    fn is_comparison(operator: BinaryOperator) -> bool {
+      matches!(
+        operator,
+        BinaryOperator::Greater
+          | BinaryOperator::GreaterEqual
+          | BinaryOperator::Less
+          | BinaryOperator::LessEqual
+      )
+    }
+
+    // a == b or a > b
+    if let Expression::Binary(binary) = expression
+      && binary.operator == BinaryOperator::Or
+      && let Expression::Binary(left) = &binary.left
+      && let Expression::Binary(right) = &binary.right
+    {
+      if (left.operator == BinaryOperator::Equal && is_comparison(right.operator))
+        && (right.left.equals(&left.left) || right.left.equals(&left.right))
+        && (right.right.equals(&left.left) || right.right.equals(&left.right))
+      {
+        context.add_diagnostic(&Self, binary.span());
+      }
+
+      if (right.operator == BinaryOperator::Equal && is_comparison(left.operator))
+        && (left.left.equals(&right.left) || left.left.equals(&right.right))
+        && (left.right.equals(&right.left) || left.right.equals(&right.right))
+      {
+        context.add_diagnostic(&Self, binary.span());
       }
     }
   }
