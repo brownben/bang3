@@ -1,4 +1,5 @@
 use crate::config::{self, Config};
+use bang_parser::LineIndex;
 use bumpalo::{boxed::Box, collections::Vec, Bump as Allocator};
 use std::{fmt, marker, mem};
 
@@ -15,21 +16,29 @@ impl<'a, 'b, T: Formattable<'a, 'b>> Formattable<'a, 'b> for Option<T> {
 
 /// Formatter used to create then print the intermediate formatting representation
 pub struct Formatter<'source, 'allocator> {
+  pub(crate) line_index: LineIndex,
   pub(crate) config: Config,
   allocator: &'allocator Allocator,
   _source: marker::PhantomData<&'source ()>,
 }
 impl<'source: 'allocator, 'allocator> Formatter<'source, 'allocator> {
-  pub fn new(config: Config, allocator: &'allocator Allocator) -> Self {
+  pub(crate) fn format(
+    source: &str,
+    ast: &bang_parser::AST<'source, '_>,
+    config: Config,
+    allocator: &'allocator Allocator,
+  ) -> String {
     Self {
+      line_index: LineIndex::from_source(source),
       config,
       allocator,
       _source: marker::PhantomData,
     }
+    .print(ast)
   }
 
   /// Format the AST Node into a string
-  pub(crate) fn print(&self, item: &dyn Formattable<'source, 'allocator>) -> String {
+  fn print(&self, item: &dyn Formattable<'source, 'allocator>) -> String {
     let ir = item.format(self);
     let display_ir = ir.display(0, 0, true, self.config, self.allocator);
     format!("{display_ir}")

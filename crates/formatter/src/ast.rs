@@ -8,8 +8,8 @@ impl<'a, 'b> Formattable<'a, 'b> for AST<'a, '_> {
   fn format(&self, f: &Formatter<'a, 'b>) -> IR<'a, 'b> {
     let mut last_line = 0;
     f.concat_iterator(self.statements.iter().map(|statement| {
-      let gap_to_previous = statement.span().start > last_line + f.config.line_ending.len();
-      last_line = statement.span().end;
+      let gap_to_previous = f.line_index.get_line(statement.span()) > last_line + 1;
+      last_line = f.line_index.get_final_line(statement.span());
 
       if gap_to_previous {
         f.concat([IR::AlwaysLine, statement.format(f), IR::AlwaysLine])
@@ -90,12 +90,17 @@ impl<'a, 'b> Formattable<'a, 'b> for Block<'a, '_> {
       }
     }
 
-    let statements = f.concat_iterator(
-      self
-        .statements
-        .iter()
-        .map(|statement| f.concat([IR::LineOrSpace, statement.format(f)])),
-    );
+    let mut last_line = f.line_index.get_line(self.statements[0].span());
+    let statements = f.concat_iterator(self.statements.iter().map(|statement| {
+      let gap_to_previous = f.line_index.get_line(statement.span()) > last_line + 1;
+      last_line = f.line_index.get_final_line(statement.span());
+
+      if gap_to_previous {
+        f.concat([IR::AlwaysLine, IR::AlwaysLine, statement.format(f)])
+      } else {
+        f.concat([IR::AlwaysLine, statement.format(f)])
+      }
+    }));
 
     f.group([
       IR::Text("{"),

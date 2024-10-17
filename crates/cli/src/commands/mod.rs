@@ -104,7 +104,7 @@ pub fn format(options: &FormatOptions) -> Result<CommandStatus, ()> {
   let allocator = Allocator::new();
   let source = read_file(&options.file)?;
   let ast = parse(&options.file, &source, &allocator)?;
-  let formatted_source = bang_formatter::format(&ast, config);
+  let formatted_source = bang_formatter::format(&source, &ast, config);
 
   if options.dryrun {
     println!("{formatted_source}");

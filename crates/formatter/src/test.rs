@@ -2,7 +2,6 @@ use bumpalo::Bump as Allocator;
 use indoc::indoc;
 
 use super::config::{Config, LineEnding};
-use super::formatter::Formatter;
 use bang_parser::parse;
 
 fn format(source: &str, print_width: u16) -> String {
@@ -14,7 +13,7 @@ fn format(source: &str, print_width: u16) -> String {
   let allocator = Allocator::new();
   let ast = parse(source, &allocator);
 
-  crate::format(&ast, config)
+  crate::format(source, &ast, config)
 }
 
 macro assert_format($source:expr, $expected:expr, $print_width:expr) {
@@ -26,30 +25,39 @@ macro assert_format($source:expr, $expected:expr, $print_width:expr) {
 #[test]
 fn config_indentation() {
   let allocator = Allocator::new();
-  let ast = parse("(a)", &allocator);
-  let mut formatter = Formatter::new(Config::default(), &allocator);
+  let source = "(a)";
+  let ast = parse(source, &allocator);
 
-  formatter.config.line_ending = LineEnding::LineFeed;
-  formatter.config.print_width = 1;
-  formatter.config.indentation = 2.into();
-  assert_eq!(formatter.print(&ast), "(\n  a\n)\n");
-  formatter.config.indentation = 4.into();
-  assert_eq!(formatter.print(&ast), "(\n    a\n)\n");
-  formatter.config.indentation = 0.into();
-  assert_eq!(formatter.print(&ast), "(\n\ta\n)\n");
+  let mut config = Config {
+    print_width: 1,
+    single_quotes: true,
+    indentation: 2.into(),
+    line_ending: LineEnding::LineFeed,
+  };
+
+  assert_eq!(crate::format(source, &ast, config), "(\n  a\n)\n");
+  config.indentation = 4.into();
+  assert_eq!(crate::format(source, &ast, config), "(\n    a\n)\n");
+  config.indentation = 0.into();
+  assert_eq!(crate::format(source, &ast, config), "(\n\ta\n)\n");
 }
 
 #[test]
 fn config_quote() {
   let allocator = Allocator::new();
-  let ast = parse("'string'", &allocator);
-  let mut formatter = Formatter::new(Config::default(), &allocator);
+  let source = "'string'";
+  let ast = parse(source, &allocator);
 
-  formatter.config.line_ending = LineEnding::LineFeed;
-  formatter.config.single_quotes = true;
-  assert_eq!(formatter.print(&ast), "'string'\n");
-  formatter.config.single_quotes = false;
-  assert_eq!(formatter.print(&ast), "\"string\"\n");
+  let mut config = Config {
+    print_width: 1,
+    single_quotes: true,
+    indentation: 2.into(),
+    line_ending: LineEnding::LineFeed,
+  };
+
+  assert_eq!(crate::format(source, &ast, config), "'string'\n");
+  config.single_quotes = false;
+  assert_eq!(crate::format(source, &ast, config), "\"string\"\n");
 
   assert_format!("\"who's who\"", "\"who's who\"", 100);
 }
@@ -99,6 +107,11 @@ fn block() {
   assert_format!("{ a\n b }", "{\n  a\n  b\n}", 6);
   assert_format!("{let a=false\n a+b}", "{\n  let a = false\n  a + b\n}", 6);
   assert_format!("{{let a=false\n a+b}}", "{\n  let a = false\n  a + b\n}", 6);
+  assert_format!(
+    "{{let a=false\n\n a+b}}",
+    "{\n  let a = false\n  \n  a + b\n}",
+    6
+  );
   assert_format!("{let a=false}", "{\n  let a = false\n}", 6);
 }
 

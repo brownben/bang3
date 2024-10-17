@@ -85,17 +85,4 @@ impl LineEnding {
       LineEnding::Native => "\r\n",
     }
   }
-
-  #[inline]
-  pub(super) const fn len(self) -> u32 {
-    match self {
-      LineEnding::LineFeed => 1,
-      LineEnding::CarriageReturnLineFeed => 2,
-
-      #[cfg(not(target_os = "windows"))]
-      LineEnding::Native => 1,
-      #[cfg(target_os = "windows")]
-      LineEnding::Native => 2,
-    }
-  }
 }

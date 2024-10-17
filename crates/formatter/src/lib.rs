@@ -31,12 +31,11 @@ mod test;
 /// let source = "5 + 3";
 /// let ast = parse(source, &allocator);
 /// let config = FormatterConfig::default();
-/// let formatted = format(&ast, config);
+/// let formatted = format(source, &ast, config);
 /// ```
 #[must_use]
-pub fn format(ast: &bang_parser::AST, config: FormatterConfig) -> String {
+pub fn format(source: &str, ast: &bang_parser::AST, config: FormatterConfig) -> String {
   let allocator = bumpalo::Bump::new();
-  let formatter = formatter::Formatter::new(config, &allocator);
-  formatter.print(ast)
+  formatter::Formatter::format(source, ast, config, &allocator)
 }
 pub use config::Config as FormatterConfig;

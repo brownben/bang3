@@ -15,7 +15,7 @@ pub fn format_file(file: &Document) -> Option<Vec<lsp::TextEdit>> {
   }
 
   let config = FormatterConfig::default(); // TODO: request parameter options
-  let new_text = format(&ast, config);
+  let new_text = format(&file.source, &ast, config);
 
   Some(vec![lsp::TextEdit {
     range: lsp_range_from_span(file.line_index.get_file_span(), file),
