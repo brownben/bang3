@@ -105,9 +105,10 @@ impl<'a, 'b> IR<'a, 'b> {
   fn has_always_line(&self) -> bool {
     match self {
       IR::AlwaysLine => true,
-      IR::Empty | IR::Text(_) | IR::LineOrSpace | IR::Line | IR::Group(_) => false,
+      IR::Empty | IR::Text(_) | IR::LineOrSpace | IR::Line => false,
       IR::Concat(x) => x.iter().any(IR::has_always_line),
       IR::Indent(ir) => ir.has_always_line(),
+      IR::Group(group) => group.has_always_line(),
     }
   }
 

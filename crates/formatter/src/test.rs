@@ -156,6 +156,14 @@ fn group_with_forced_line() {
     6
   );
   assert_format!("(\n  '' + ({\n      a\n\n    })\n)", "('' + ({ a }))", 80);
+
+  let immediately_called_function = indoc! {"
+    let b = (_ => {
+      let x = if (false) { 5 } else { 6 }
+      x + 4
+    })()
+  "};
+  assert_format!(immediately_called_function, immediately_called_function, 80);
 }
 
 #[test]
@@ -180,6 +188,16 @@ fn if_() {
     }
   "};
   assert_format!(source, source, 30);
+
+  let expected = indoc! {"
+    let function = _ => {
+      if (a) {
+        let a = 4
+        a
+      } else 4
+    }
+  "};
+  assert_format!(expected, expected, 80);
 }
 
 #[test]

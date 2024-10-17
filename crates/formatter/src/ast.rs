@@ -66,19 +66,30 @@ impl<'a, 'b> Formattable<'a, 'b> for Block<'a, '_> {
       return block.format(f);
     }
 
-    let line = if self.statements.len() == 1 {
-      match &self.statements[0] {
-        Statement::Expression(expression) if !matches!(**expression, Expression::Comment(_)) => {
-          IR::LineOrSpace
-        }
-        Statement::Return(return_) if !matches!(return_.expression, Expression::Comment(_)) => {
-          IR::LineOrSpace
-        }
-        _ => IR::AlwaysLine,
+    // Blocks that can be written on a single line
+    if self.statements.len() == 1 {
+      let is_single_expression = matches!(
+        &self.statements[0],
+        Statement::Expression(e)
+          if !matches!(**e, Expression::Comment(_))
+      );
+      let is_single_return = matches!(
+        &self.statements[0],
+        Statement::Return(e)
+          if !matches!(e.expression, Expression::Comment(_))
+      );
+
+      let statement = self.statements[0].format(f);
+      if is_single_expression || is_single_return {
+        return f.group([
+          IR::Text("{"),
+          f.indent([IR::LineOrSpace, statement]),
+          IR::LineOrSpace,
+          IR::Text("}"),
+        ]);
       }
-    } else {
-      IR::AlwaysLine
-    };
+    }
+
     let statements = f.concat_iterator(
       self
         .statements
@@ -86,7 +97,12 @@ impl<'a, 'b> Formattable<'a, 'b> for Block<'a, '_> {
         .map(|statement| f.concat([IR::LineOrSpace, statement.format(f)])),
     );
 
-    f.group([IR::Text("{"), f.indent([statements]), line, IR::Text("}")])
+    f.group([
+      IR::Text("{"),
+      f.indent([statements]),
+      IR::AlwaysLine,
+      IR::Text("}"),
+    ])
   }
 }
 impl<'a, 'b> Formattable<'a, 'b> for Call<'a, '_> {
@@ -150,7 +166,10 @@ impl<'a, 'b> Formattable<'a, 'b> for Function<'a, '_> {
 }
 impl<'a, 'b> Formattable<'a, 'b> for Group<'a, '_> {
   fn format(&self, f: &Formatter<'a, 'b>) -> IR<'a, 'b> {
-    if matches!(self.expression, Expression::Block(_)) {
+    if matches!(
+      self.expression,
+      Expression::Block(_) | Expression::Function(_)
+    ) {
       return f.concat([IR::Text("("), self.expression.format(f), IR::Text(")")]);
     }
 
