@@ -25,6 +25,17 @@ impl<'ast> AST<'_, 'ast> {
   pub fn is_valid(&self) -> bool {
     self.errors.is_empty()
   }
+
+  /// Is the parsed AST contain all information needed for formatting
+  #[must_use]
+  pub fn is_formattable(&self) -> bool {
+    self.errors.iter().all(|error| {
+      matches!(
+        error,
+        ParseError::BlockMustEndWithExpression(_) | ParseError::ReturnOutsideFunction(_)
+      )
+    })
+  }
 }
 
 /// Parse a source code string into an AST
