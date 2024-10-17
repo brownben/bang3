@@ -1,5 +1,5 @@
 use crate::config::{self, Config};
-use bang_parser::allocator::{Allocator, Box, Vec};
+use bumpalo::{boxed::Box, collections::Vec, Bump as Allocator};
 use std::{fmt, marker, mem};
 
 /// An item which can be formatted

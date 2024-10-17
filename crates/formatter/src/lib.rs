@@ -35,7 +35,7 @@ mod test;
 /// ```
 #[must_use]
 pub fn format(ast: &bang_parser::AST, config: FormatterConfig) -> String {
-  let allocator = bang_parser::Allocator::new();
+  let allocator = bumpalo::Bump::new();
   let formatter = formatter::Formatter::new(config, &allocator);
   formatter.print(ast)
 }

@@ -5,9 +5,10 @@ edition = "2021"
 
 [dependencies]
 bang-parser = { path = "../parser" }
+bumpalo.workspace = true
 
 [dev-dependencies]
-indoc = "2.0.4"
+indoc.workspace = true
 
 [lints]
 workspace = true

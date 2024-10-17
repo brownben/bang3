@@ -11,10 +11,10 @@ bang-lsp = { path = "../lsp" }
 bang-parser = { path = "../parser" }
 bang-typechecker = { path = "../typechecker" }
 
-anstream = "0.6.4"
-clap = { version = "4.4.8", features = ["derive"] }
-owo-colors = "4.1.0"
-rustyline = { version = "14.0.0", features = ["derive"] }
+anstream.workspace = true
+clap.workspace = true
+owo-colors.workspace = true
+rustyline.workspace = true
 
 [lints]
 workspace = true

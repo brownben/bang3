@@ -1,8 +1,9 @@
+use bumpalo::Bump as Allocator;
 use indoc::indoc;
 
 use super::config::{Config, LineEnding};
 use super::formatter::Formatter;
-use bang_parser::{parse, Allocator};
+use bang_parser::parse;
 
 fn format(source: &str, print_width: u16) -> String {
   let config = Config {

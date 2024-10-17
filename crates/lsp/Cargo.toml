@@ -9,9 +9,9 @@ bang-linter = { path = "../linter" }
 bang-parser = { path = "../parser" }
 bang-typechecker = { path = "../typechecker" }
 
-lsp-server = "0.7.7"
-lsp-types = "0.97.0"
-serde_json = "1.0.128"
+lsp-server.workspace = true
+lsp-types.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true
