@@ -304,6 +304,7 @@ impl<'a, 'b> Formattable<'a, 'b> for Statement<'a, '_> {
     match self {
       Statement::Comment(comment) => comment.format(f),
       Statement::Expression(expression) => expression.format(f),
+      Statement::Import(import) => import.format(f),
       Statement::Let(let_) => let_.format(f),
       Statement::Return(return_) => return_.format(f),
     }
@@ -312,6 +313,54 @@ impl<'a, 'b> Formattable<'a, 'b> for Statement<'a, '_> {
 impl<'a, 'b> Formattable<'a, 'b> for CommentStmt<'a> {
   fn format(&self, f: &Formatter<'a, 'b>) -> IR<'a, 'b> {
     f.concat([IR::Text("// "), IR::Text(self.text.trim())])
+  }
+}
+impl<'a, 'b> Formattable<'a, 'b> for Import<'a, '_> {
+  fn format(&self, f: &Formatter<'a, 'b>) -> IR<'a, 'b> {
+    let items_in_line = {
+      let (last, items) = self.items.split_last().unwrap();
+
+      f.concat([
+        IR::Text(" "),
+        f.concat_iterator(
+          items
+            .iter()
+            .map(|item| f.concat([item.format(f), IR::Text(", ")])),
+        ),
+        last.format(f),
+      ])
+    };
+
+    let items_on_new_lines = f.indent([f.concat_iterator(
+      self
+        .items
+        .iter()
+        .map(|item| f.concat([IR::LineOrSpace, item.format(f), IR::Text(",")])),
+    )]);
+
+    f.concat([
+      IR::Text("from "),
+      IR::Text(self.module.name),
+      IR::Text(" import "),
+      f.group([
+        IR::Text("{"),
+        f.option(items_in_line, items_on_new_lines),
+        IR::LineOrSpace,
+        IR::Text("}"),
+      ]),
+    ])
+  }
+}
+impl<'a, 'b> Formattable<'a, 'b> for ImportItem<'a> {
+  fn format(&self, f: &Formatter<'a, 'b>) -> IR<'a, 'b> {
+    f.concat([
+      IR::Text(self.name.name),
+      if let Some(alias) = &self.alias {
+        f.concat([IR::Text(" as "), IR::Text(alias.name)])
+      } else {
+        IR::Empty
+      },
+    ])
   }
 }
 impl<'a, 'b> Formattable<'a, 'b> for Let<'a, '_> {

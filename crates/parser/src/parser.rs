@@ -750,8 +750,9 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     self.skip_newline();
 
     match self.peek_token_kind() {
-      TokenKind::Let => self.declaration_statement(),
       TokenKind::Comment => self.comment_statement(),
+      TokenKind::From => self.import_statement(),
+      TokenKind::Let => self.declaration_statement(),
       TokenKind::Return => self.return_statement(),
       _ => self.expression_statement(),
     }
@@ -823,6 +824,100 @@ impl<'s, 'ast> Parser<'s, 'ast> {
     self.allocate_statement(expression)
   }
 
+  /// Parses an import statement
+  fn import_statement(&mut self) -> Statement<'s, 'ast> {
+    let from_token = self.next_token();
+
+    let module = if self.peek_token_kind() == TokenKind::Import {
+      let span = Span::from(from_token);
+      self.ast.errors.push(ParseError::MissingModuleName(span));
+
+      Variable { name: "", span }
+    } else {
+      if self.peek_token_kind() != TokenKind::Identifier {
+        let error = ParseError::Expected {
+          expected: TokenKind::Identifier,
+          recieved: self.peek_token(),
+        };
+        self.ast.errors.push(error);
+      }
+
+      let span = Span::from(self.next_token());
+      Variable {
+        name: span.source_text(self.source),
+        span,
+      }
+    };
+
+    self.expect(TokenKind::Import);
+    self.skip_newline();
+    let left_curly = self.expect(TokenKind::LeftCurly);
+
+    let mut items = Vec::new_in(self.allocator);
+    loop {
+      if let Ok(item) = self.import_item() {
+        items.push(item);
+      }
+
+      if self.matches(TokenKind::Comma).is_none() || self.peek_token_kind() == TokenKind::RightCurly
+      {
+        break;
+      }
+    }
+    self.skip_newline();
+    let end_curly = self.expect(TokenKind::RightCurly);
+    self.resync_if_error(TokenKind::EndOfLine);
+    self.expect_newline();
+
+    let items_span = Span::default()
+      .merge_option(left_curly.map(Into::into))
+      .merge_option(items.first().map(GetSpan::span))
+      .merge_option(items.last().map(GetSpan::span))
+      .merge_option(end_curly.map(Into::into));
+    let span = Span::from(from_token).merge(module.span).merge(items_span);
+
+    self.allocate_statement(Import {
+      module,
+      items,
+      items_span,
+      span,
+    })
+  }
+
+  // Parses an Import Item
+  fn import_item(&mut self) -> Result<ImportItem<'s>, ()> {
+    self.skip_newline();
+    let Some(token) = self.matches(TokenKind::Identifier) else {
+      let token = self.next_token();
+      self.ast.errors.push(ParseError::ExpectedImportItem(token));
+      return Err(());
+    };
+
+    let mut item_span = Span::from(token);
+    let name = Variable {
+      name: item_span.source_text(self.source),
+      span: item_span,
+    };
+
+    let alias = if self.matches(TokenKind::As).is_some() {
+      let alias_name = self.expect(TokenKind::Identifier);
+      let span = alias_name.map(Span::from).unwrap_or_default();
+      item_span = item_span.merge(span);
+      Some(Variable {
+        name: span.source_text(self.source),
+        span,
+      })
+    } else {
+      None
+    };
+
+    Ok(ImportItem {
+      name,
+      alias,
+      span: item_span,
+    })
+  }
+
   /// Parses a return statement
   fn return_statement(&mut self) -> Statement<'s, 'ast> {
     let return_token = self.next_token();
@@ -875,6 +970,10 @@ pub enum ParseError {
   },
   /// Return Outside of Function
   ReturnOutsideFunction(Span),
+  /// Missing Module Name in Import
+  MissingModuleName(Span),
+  /// Missing Import Item
+  ExpectedImportItem(Token),
 }
 impl ParseError {
   /// The title of the error message
@@ -891,6 +990,8 @@ impl ParseError {
       Self::MissingIdentifier(_) => "Missing Identifier".into(),
       Self::NoSingleEqualOperator { .. } => "No Single Equal Operator".into(),
       Self::ReturnOutsideFunction(_) => "Return Outside of Function".into(),
+      Self::MissingModuleName(_) => "Missing Module Name in Import".into(),
+      Self::ExpectedImportItem(_) => "Expected Import Item".into(),
     }
   }
 
@@ -924,6 +1025,10 @@ impl ParseError {
         "a single equal is not an operator. start line with `let` for variable declaration, or use `==` for equality".into()
       }
       Self::ReturnOutsideFunction(_) => "can only return a value from a function".into(),
+      Self::MissingModuleName(_) => "expected module name for import".into(),
+      Self::ExpectedImportItem(t) => {
+        format!("expected import item but got {}", t.kind)
+      }
     }
   }
 
@@ -945,10 +1050,12 @@ impl GetSpan for ParseError {
       | Self::ExpectedPatternRangeEnd(token)
       | Self::UnknownCharacter(token)
       | Self::UnterminatedString(token)
-      | Self::NoSingleEqualOperator { token, .. } => token,
+      | Self::NoSingleEqualOperator { token, .. }
+      | Self::ExpectedImportItem(token) => token,
       Self::BlockMustEndWithExpression(span)
       | Self::MissingIdentifier(span)
-      | Self::ReturnOutsideFunction(span) => return *span,
+      | Self::ReturnOutsideFunction(span)
+      | Self::MissingModuleName(span) => return *span,
     };
 
     Span::from(*token)

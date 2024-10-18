@@ -1,4 +1,11 @@
-use crate::{compile, vm::allocate_string, HeapSize, Value, VM};
+use crate::{
+  compile,
+  stdlib::StandardContext,
+  value::Value,
+  vm::{allocate_string, VM},
+  EmptyContext,
+};
+use bang_gc::HeapSize;
 use bang_parser::{parse, Allocator};
 use indoc::indoc;
 
@@ -23,8 +30,7 @@ fn run(source: &str) -> Result<VM, Error> {
   let ast = parse(source, &allocator);
   assert!(ast.is_valid());
   let chunk = compile(&ast)?;
-  let mut vm = VM::new(HeapSize::Small).unwrap();
-  vm.define_builtin_functions();
+  let mut vm = VM::new(HeapSize::Small, &StandardContext).unwrap();
   vm.run(&chunk)?;
   Ok(vm)
 }
@@ -842,8 +848,44 @@ fn native_function() {
   assert_variable!(vm; a, string "number");
 }
 
+#[test]
+fn imports() {
+  let unknown_module = run("from unknown_goo_goo_gaa_gaa import { abs }");
+  assert!(unknown_module.is_err());
+
+  let unknown_item = run("from maths import { unknown_goo_goo_gaa_gaa }");
+  assert!(unknown_item.is_err());
+
+  let unknown_item = run("from maths import { abs, unknown_goo_goo_gaa_gaa }");
+  assert!(unknown_item.is_err());
+
+  let same_item_imported_but_renamed = run("from maths import { abs, abs as absolute }");
+  assert!(same_item_imported_but_renamed.is_ok());
+
+  let same_item_imported_but_renamed = run("from maths import { PI, PI as pi }");
+  assert_variable!(same_item_imported_but_renamed; pi, std::f64::consts::PI);
+  assert_variable!(same_item_imported_but_renamed; PI, std::f64::consts::PI);
+}
+
+#[test]
+fn cant_import_anything_with_empty_context() {
+  let allocator = Allocator::new();
+  let ast = parse("from maths import { abs }", &allocator);
+  assert!(ast.is_valid());
+  let chunk = compile(&ast).unwrap();
+  let mut vm = VM::new(HeapSize::Small, &EmptyContext).unwrap();
+  assert!(vm.run(&chunk).is_err());
+}
+
 mod builtin_function {
-  use super::{assert_variable, run};
+  use super::{assert_variable, indoc, run};
+
+  #[test]
+  fn print() {
+    let mut works_as_identity = run("let a = print('hello')\nlet b = print(5)");
+    assert_variable!(works_as_identity; a, string "hello");
+    assert_variable!(works_as_identity; b, 5.0);
+  }
 
   #[test]
   fn type_of() {
@@ -873,5 +915,166 @@ mod builtin_function {
 
     let mut closure = run("let a = type((x => _ => x)())");
     assert_variable!(closure; a, string "function");
+  }
+
+  #[test]
+  fn maths() {
+    let constants = run(indoc! {"
+      from maths import { PI, E, INFINITY }
+
+      let bigger = INFINITY > 1000000000000000000000000
+    "});
+    assert_variable!(constants; PI, std::f64::consts::PI);
+    assert_variable!(constants; E, std::f64::consts::E);
+    assert_variable!(constants; bigger, true);
+
+    let rounding = run(indoc! {"
+      from maths import { ceil, floor, round }
+
+      let ceil_a = ceil(1)
+      let ceil_b = ceil(1.01)
+      let ceil_c = ceil(1.5)
+      let ceil_d = ceil(72.3)
+      let ceil_e = ceil(false)
+
+      let floor_a = floor(1)
+      let floor_b = floor(1.01)
+      let floor_c = floor(1.5)
+      let floor_d = floor(72.3)
+      let floor_e = floor(false)
+
+      let round_a = round(1)
+      let round_b = round(1.01)
+      let round_c = round(1.5)
+      let round_d = round(72.3)
+      let round_e = round(false)
+    "});
+    assert_variable!(rounding; ceil_a, 1.0);
+    assert_variable!(rounding; ceil_b, 2.0);
+    assert_variable!(rounding; ceil_c, 2.0);
+    assert_variable!(rounding; ceil_d, 73.0);
+    assert_variable!(rounding; ceil_e, ());
+
+    assert_variable!(rounding; floor_a, 1.0);
+    assert_variable!(rounding; floor_b, 1.0);
+    assert_variable!(rounding; floor_c, 1.0);
+    assert_variable!(rounding; floor_d, 72.0);
+    assert_variable!(rounding; floor_e, ());
+
+    assert_variable!(rounding; round_a, 1.0);
+    assert_variable!(rounding; round_b, 1.0);
+    assert_variable!(rounding; round_c, 2.0);
+    assert_variable!(rounding; round_d, 72.0);
+    assert_variable!(rounding; round_e, ());
+
+    let abs = run(indoc! {"
+      from maths import { abs }
+
+      let d = abs(1)
+      let e = abs(-1)
+      let f = abs(0)
+      let g = abs(1.1)
+    "});
+    assert_variable!(abs; d, 1.0);
+    assert_variable!(abs; e, 1.0);
+    assert_variable!(abs; f, 0.0);
+    assert_variable!(abs; g, 1.1);
+
+    let root = run(indoc! {"
+      from maths import { sqrt, cbrt }
+
+      let a = sqrt(4)
+      let b = cbrt(8)
+    "});
+    assert_variable!(root; a, 2.0);
+    assert_variable!(root; b, 2.0);
+
+    let hyperbolic = run(indoc! {"
+      from maths import { sinh, cosh, tanh, asinh, acosh, atanh }
+
+      let a = sinh(0)
+      let b = cosh(0)
+      let c = tanh(0)
+      let d = asinh(0)
+      let e = acosh(1)
+      let f = atanh(0)
+    "});
+    assert_variable!(hyperbolic; a, 0.0);
+    assert_variable!(hyperbolic; b, 1.0);
+    assert_variable!(hyperbolic; c, 0.0);
+    assert_variable!(hyperbolic; d, 0.0);
+    assert_variable!(hyperbolic; e, 0.0);
+    assert_variable!(hyperbolic; f, 0.0);
+
+    let trig = run(indoc! {"
+      from maths import { sin, cos, tan, PI }
+
+      let a = sin(0)
+      let b = cos(0)
+      let c = tan(0)
+      let d = sin(PI / 6)
+
+      let dSmall = d > 0.49
+      let dBig = d < 0.51
+    "});
+    assert_variable!(trig; a, 0.0);
+    assert_variable!(trig; b, 1.0);
+    assert_variable!(trig; c, 0.0);
+    assert_variable!(trig; dSmall, true);
+    assert_variable!(trig; dBig, true);
+
+    let inverse_trig = run(indoc! {"
+      from maths import { asin, acos, atan, isNan }
+
+      let a = asin(0)
+      let b = acos(1)
+      let c = atan(0)
+      let d = isNan(asin(55))
+    "});
+    assert_variable!(inverse_trig; a, 0.0);
+    assert_variable!(inverse_trig; b, 0.0);
+    assert_variable!(inverse_trig; c, 0.0);
+    assert_variable!(inverse_trig; d, true);
+
+    let exp = run(indoc! {"
+      from maths import { exp }
+
+      let a = exp(0)
+      let b = exp(1)
+    "});
+    assert_variable!(exp; a, 1.0);
+    assert_variable!(exp; b, std::f64::consts::E);
+
+    let logs = run(indoc! {"
+      from maths import { ln, E }
+
+      let a = ln(1)
+      let b = ln(E)
+    "});
+    assert_variable!(logs; a, 0.0);
+    assert_variable!(logs; b, 1.0);
+
+    let vm = run(indoc! {"
+      from maths import { degreesToRadians, radiansToDegrees, PI }
+
+      let a = degreesToRadians(180)
+      let b = radiansToDegrees(PI)
+    "});
+    assert_variable!(vm; a, std::f64::consts::PI);
+    assert_variable!(vm; b, 180.0);
+  }
+
+  #[test]
+  fn string() {
+    let length = run(indoc! {"
+      from string import { length }
+
+      let a = length('  hello  ')
+      let b = length('hello')
+      let c = length(3)
+    "});
+    assert_variable!(length; a, 9.0);
+    assert_variable!(length; b, 5.0);
+    assert_variable!(length; c, ());
   }
 }

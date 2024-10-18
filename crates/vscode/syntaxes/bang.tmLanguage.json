@@ -63,6 +63,10 @@
         {
           "name": "storage.type.bang",
           "match": "\\b(let)\\b"
+        },
+        {
+          "name": "keyword.control.import.bang",
+          "match": "\\b(import|from|as)\\b"
         }
       ]
     },

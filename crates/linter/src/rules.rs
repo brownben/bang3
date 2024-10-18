@@ -317,7 +317,7 @@ impl LintRule for NoUnnecessaryReturn {
           .rev()
           .find(|statement| !matches!(statement, Statement::Comment(_)))
           .and_then(|statement| match statement {
-            Statement::Comment(_) => None,
+            Statement::Comment(_) | Statement::Import(_) => None,
             Statement::Expression(expression) => ends_with_return(expression),
             Statement::Return(_) => Some(statement.span()),
             Statement::Let(_) => unreachable!(),
@@ -377,7 +377,7 @@ impl LintRule for NoUnreachableCode {
       match statement {
         Statement::Return(_) => true,
         Statement::Expression(expression) => always_returns(expression),
-        Statement::Let(_) | Statement::Comment(_) => false,
+        Statement::Let(_) | Statement::Comment(_) | Statement::Import(_) => false,
       }
     }
     fn always_returns(expression: &Expression) -> bool {

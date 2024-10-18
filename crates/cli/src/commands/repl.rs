@@ -1,7 +1,7 @@
 use super::{compile, parse, CommandStatus};
 use crate::diagnostics::{highlight_source, Message};
 
-use bang_interpreter::{Chunk, ChunkBuilder, HeapSize, OpCode, VM};
+use bang_interpreter::{Chunk, ChunkBuilder, HeapSize, OpCode, StandardContext, VM};
 use bang_parser::{ast, tokenise, Allocator, Span, TokenKind};
 
 use anstream::{eprintln, println};
@@ -55,14 +55,13 @@ pub fn repl() -> Result<CommandStatus, ()> {
   println!("{}", crate::coloured_header());
   println!("{}", "exit using ctrl+d, or ctrl+c".dimmed());
 
-  let mut vm = match VM::new(HeapSize::Standard) {
+  let mut vm = match VM::new(HeapSize::Standard, &StandardContext) {
     Ok(vm) => vm,
     Err(error) => {
       eprintln!("{}", Message::from(&error));
       return Err(());
     }
   };
-  vm.define_builtin_functions();
 
   let mut rl = rustyline::Editor::new().unwrap();
   rl.set_helper(Some(BangRustyLine));
@@ -111,7 +110,7 @@ fn print_expression_result_function(expression: &ast::Expression) -> Result<Chun
   let mut function = ChunkBuilder::new("REPL");
 
   function.add_opcode(OpCode::GetGlobal, Span::default());
-  let print_name_id = function.add_global_name("print");
+  let print_name_id = function.add_symbol("print");
   function.add_value(print_name_id.try_into().unwrap(), Span::default());
 
   function.add_opcode(OpCode::Constant, Span::default());

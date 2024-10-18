@@ -84,7 +84,7 @@ pub trait Visitor {
     self.enter_statement(statement);
 
     match statement {
-      Statement::Comment(_) => {}
+      Statement::Comment(_) | Statement::Import(_) => {}
       Statement::Expression(x) => self.visit_expression(x),
       Statement::Let(x) => self.visit_let(x),
       Statement::Return(x) => self.visit_return(x),

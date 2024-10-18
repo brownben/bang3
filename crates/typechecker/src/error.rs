@@ -85,6 +85,22 @@ pub enum Problem {
     /// The location of the error
     span: Span,
   },
+  /// Module not found
+  ModuleNotFound {
+    /// The name of the module which was not found
+    module: String,
+    /// The location of the error
+    span: Span,
+  },
+  /// Item not found in module
+  ItemNotFound {
+    /// The name of the module
+    module: String,
+    /// The name of the item which was not found
+    item: String,
+    /// The location of the error
+    span: Span,
+  },
 }
 impl Problem {
   /// The title of the error message
@@ -102,6 +118,8 @@ impl Problem {
       Self::BranchesDontMatch { .. } => "If Else Branch Type Mismatch",
       Self::PatternNeverMatches { .. } => "Pattern Doesn't Match Value",
       Self::FunctionReturnsNever { .. } => "Function Returns `Never`",
+      Self::ModuleNotFound { .. } => "Module Not Found",
+      Self::ItemNotFound { .. } => "Item Not Found",
     }
   }
 
@@ -145,6 +163,12 @@ impl Problem {
         "function returns `never` which indicates a lack of value, functions must return a value"
           .to_string()
       }
+      Self::ModuleNotFound { module, .. } => {
+        format!("could not find module `{module}`")
+      }
+      Self::ItemNotFound { module, item, .. } => {
+        format!("could not find `{item}` in `{module}`")
+      }
     }
   }
 
@@ -179,7 +203,9 @@ impl GetSpan for Problem {
       | Self::MissingArgument { span, .. }
       | Self::BranchesDontMatch { span, .. }
       | Self::PatternNeverMatches { span, .. }
-      | Self::FunctionReturnsNever { span } => *span,
+      | Self::FunctionReturnsNever { span }
+      | Self::ModuleNotFound { span, .. }
+      | Self::ItemNotFound { span, .. } => *span,
     }
   }
 }

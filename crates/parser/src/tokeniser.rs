@@ -71,6 +71,7 @@ impl Tokeniser<'_> {
           (TokenKind::RightCurly, 1)
         }
       }
+      b',' => (TokenKind::Comma, 1),
 
       // Logical Operators
       b'&' if matches!(next_character, Some(b'&')) => (TokenKind::And, 2),
@@ -201,10 +202,13 @@ impl Tokeniser<'_> {
   /// Determines the type of the identifier, is it a keyword or a standard identifier
   fn identifier_type(&self, length: usize) -> TokenKind {
     match self.source[self.position] {
+      b'a' if self.is_keyword(length, "as") => TokenKind::As,
       b'a' if self.is_keyword(length, "and") => TokenKind::And,
       b'e' if self.is_keyword(length, "else") => TokenKind::Else,
       b'f' if self.is_keyword(length, "false") => TokenKind::False,
+      b'f' if self.is_keyword(length, "from") => TokenKind::From,
       b'i' if self.is_keyword(length, "if") => TokenKind::If,
+      b'i' if self.is_keyword(length, "import") => TokenKind::Import,
       b'l' if self.is_keyword(length, "let") => TokenKind::Let,
       b'm' if self.is_keyword(length, "match") => TokenKind::Match,
       b'o' if self.is_keyword(length, "or") => TokenKind::Or,
@@ -258,6 +262,14 @@ impl From<Token> for Span {
     }
   }
 }
+impl From<&Token> for Span {
+  fn from(token: &Token) -> Self {
+    Self {
+      start: token.start,
+      end: token.start + u32::from(token.length),
+    }
+  }
+}
 
 /// The type of a token
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
@@ -272,6 +284,8 @@ pub enum TokenKind {
   LeftCurly,
   /// `}`
   RightCurly,
+  /// `,`
+  Comma,
 
   // Operators
   /// `-`
@@ -332,12 +346,18 @@ pub enum TokenKind {
   FormatStringEnd,
 
   // Keywords
+  /// `as`
+  As,
   /// `else`
   Else,
   /// `false`
   False,
+  /// `from`
+  From,
   /// `if`
   If,
+  /// `import`
+  Import,
   /// `let`
   Let,
   /// `match`
@@ -420,6 +440,7 @@ impl fmt::Display for TokenKind {
       Self::RightParen => write!(f, ")"),
       Self::LeftCurly => write!(f, "{{"),
       Self::RightCurly => write!(f, "}}"),
+      Self::Comma => write!(f, ","),
 
       // Operators
       Self::Minus => write!(f, "-"),
@@ -456,9 +477,12 @@ impl fmt::Display for TokenKind {
       Self::FormatStringEnd => write!(f, "Format String End"),
 
       // Keywords
+      Self::As => write!(f, "as"),
       Self::Else => write!(f, "else"),
       Self::False => write!(f, "false"),
+      Self::From => write!(f, "from"),
       Self::If => write!(f, "if"),
+      Self::Import => write!(f, "import"),
       Self::Let => write!(f, "let"),
       Self::Match => write!(f, "match"),
       Self::Return => write!(f, "return"),

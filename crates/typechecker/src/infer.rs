@@ -1,4 +1,8 @@
-use crate::{exhaustive, Enviroment, Type, TypeArena, TypeError, TypeRef, TypeScheme};
+use crate::{
+  exhaustive,
+  stdlib::{self, ImportResult},
+  Enviroment, Type, TypeArena, TypeError, TypeRef, TypeScheme,
+};
 use bang_parser::{
   ast::{expression::*, statement::*},
   GetSpan, Span, AST,
@@ -54,6 +58,32 @@ impl Typechecker {
     match statement {
       Statement::Comment(_) => {}
       Statement::Expression(expression) => return expression.infer(self),
+      Statement::Import(import) => {
+        for item in &import.items {
+          match stdlib::import_value(&mut self.types, import.module.name, item.name.name) {
+            ImportResult::Value(type_) => {
+              if let Some(alias) = &item.alias {
+                self.env.define_variable(alias, type_);
+              } else {
+                self.env.define_variable(&item.name, type_);
+              }
+            }
+            ImportResult::ModuleNotFound => {
+              self.problems.push(TypeError::ModuleNotFound {
+                module: import.module.name.to_owned(),
+                span: import.module.span(),
+              });
+            }
+            ImportResult::ItemNotFound => {
+              self.problems.push(TypeError::ItemNotFound {
+                module: import.module.name.to_owned(),
+                item: item.name.name.to_owned(),
+                span: item.span(),
+              });
+            }
+          };
+        }
+      }
       Statement::Let(let_) => {
         if let Expression::Function(_) = &let_.expression {
           self.infer_let_with_function(let_);

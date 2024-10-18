@@ -1,5 +1,6 @@
 use super::{
   bytecode::{Chunk, ConstantValue, OpCode},
+  context::{Context, ImportResult},
   object::{BangString, Closure, NativeFunction},
   value::{Type, Value},
 };
@@ -20,20 +21,22 @@ struct CallFrame {
 
 /// A virtual machine to execute compiled bytecode
 #[derive(Debug)]
-pub struct VM {
+pub struct VM<'context> {
   stack: Vec<Value>,
   globals: HashMap<SmartString, Value>,
   frames: Vec<CallFrame>,
 
   pub(crate) heap: Heap,
   gc_threshold: usize,
+
+  context: &'context dyn Context,
 }
-impl VM {
+impl<'context> VM<'context> {
   /// Create a new VM
   ///
   /// # Errors
   /// Returns an error if the heap could not be initialized
-  pub fn new(heap_size: HeapSize) -> Result<Self, RuntimeError> {
+  pub fn new(heap_size: HeapSize, context: &'context dyn Context) -> Result<Self, RuntimeError> {
     let Some(heap) = Heap::new(heap_size) else {
       return Err(RuntimeError {
         kind: ErrorKind::OutOfMemory,
@@ -41,13 +44,22 @@ impl VM {
       });
     };
 
-    Ok(Self {
+    let mut vm = Self {
       stack: Vec::with_capacity(512),
       heap,
       globals: HashMap::default(),
       frames: Vec::with_capacity(16),
       gc_threshold: 6,
-    })
+      context,
+    };
+
+    for function in vm.context.global_functions() {
+      let name = function.name;
+      let function = vm.heap.allocate(function);
+      vm.define_global(name, Value::from_object(function, Type::NativeFunction));
+    }
+
+    Ok(vm)
   }
 
   /// Get the value of a global variable
@@ -58,23 +70,6 @@ impl VM {
   /// Set the value of a global variable
   pub fn define_global(&mut self, name: impl Into<SmartString>, value: impl Into<Value>) {
     self.globals.insert(name.into(), value.into());
-  }
-  /// Define the builtin functions
-  pub fn define_builtin_functions(&mut self) {
-    let print_function = NativeFunction::new("print", |vm, arg| {
-      println!("{}", arg.display(&vm.heap));
-      arg
-    });
-    let type_function = NativeFunction::new("type", |vm, arg| {
-      allocate_string(&mut vm.heap, arg.get_type())
-    });
-
-    let functions = [print_function, type_function];
-    for function in functions {
-      let name = function.name;
-      let allocated = self.heap.allocate(function);
-      self.define_global(name, Value::from_object(allocated, Type::NativeFunction));
-    }
   }
 
   #[inline]
@@ -155,7 +150,8 @@ impl VM {
       self.heap.full_page_count() > self.gc_threshold
     }
   }
-  fn garbage_collect(&mut self) {
+  /// Run the garbage collector
+  pub fn garbage_collect(&mut self) {
     fn mark_value(heap: &Heap, value: Value) {
       if value.is_object() {
         heap.mark(value.as_object::<u8>());
@@ -235,6 +231,27 @@ impl VM {
         OpCode::True => self.push(Value::TRUE),
         OpCode::False => self.push(Value::FALSE),
         OpCode::Null => self.push(Value::NULL),
+
+        // Imports
+        OpCode::Import => {
+          let module = chunk.get_symbol(chunk.get_value(ip + 1).into()).as_str();
+          let item = chunk.get_symbol(chunk.get_value(ip + 2).into()).as_str();
+
+          match self.context.import_value(&mut self.heap, module, item) {
+            ImportResult::Value(value) => self.push(value),
+            ImportResult::ModuleNotFound => {
+              break Some(ErrorKind::ModuleNotFound {
+                module: module.to_owned(),
+              });
+            }
+            ImportResult::ItemNotFound => {
+              break Some(ErrorKind::ItemNotFound {
+                module: module.to_owned(),
+                item: item.to_owned(),
+              });
+            }
+          }
+        }
 
         // Numeric Operations
         OpCode::Add => numeric_operation!((self, chunk), +),
@@ -588,6 +605,13 @@ enum ErrorKind {
   UndefinedVariable(String),
   NotCallable(&'static str),
   OutOfMemory,
+  ModuleNotFound {
+    module: String,
+  },
+  ItemNotFound {
+    module: String,
+    item: String,
+  },
 }
 impl ErrorKind {
   #[must_use]
@@ -597,6 +621,8 @@ impl ErrorKind {
       Self::UndefinedVariable(_) => "Undefined Variable",
       Self::NotCallable(_) => "Not Callable",
       Self::OutOfMemory => "Out of Memory",
+      Self::ModuleNotFound { .. } => "Module Not Found",
+      Self::ItemNotFound { .. } => "Item Not Found",
     }
   }
 
@@ -614,6 +640,12 @@ impl ErrorKind {
         format!("`{type_}` is not callable, only functions are callable")
       }
       Self::OutOfMemory => "could not initialise enough memory for the heap".into(),
+      Self::ModuleNotFound { module } => {
+        format!("could not find module `{module}`")
+      }
+      Self::ItemNotFound { module, item } => {
+        format!("could not find `{item}` in `{module}`")
+      }
     }
   }
 }

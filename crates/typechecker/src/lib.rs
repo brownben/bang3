@@ -7,6 +7,7 @@ mod enviroment;
 mod error;
 mod exhaustive;
 mod infer;
+mod stdlib;
 mod types;
 
 #[cfg(test)]
@@ -16,6 +17,7 @@ use bang_parser::AST;
 pub use enviroment::{Enviroment, Variable, VariableKind};
 pub use error::Problem as TypeError;
 use infer::Typechecker;
+pub use stdlib::import_type_info;
 use types::{Type, TypeArena, TypeRef, TypeScheme};
 
 /// Runs the typechecker against a given AST, returns a list of errors found

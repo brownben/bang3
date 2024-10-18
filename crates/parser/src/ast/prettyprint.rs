@@ -270,6 +270,7 @@ impl PrettyPrint for Statement<'_, '_> {
     match self {
       Self::Comment(x) => x.pretty(f, prefix, last),
       Self::Expression(x) => x.pretty(f, prefix, last),
+      Self::Import(x) => x.pretty(f, prefix, last),
       Self::Let(x) => x.pretty(f, prefix, last),
       Self::Return(x) => x.pretty(f, prefix, last),
     }
@@ -288,6 +289,29 @@ impl PrettyPrint for Let<'_, '_> {
 
     let new_prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
     self.expression.pretty(f, &new_prefix, true)
+  }
+}
+impl PrettyPrint for Import<'_, '_> {
+  fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
+    let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
+    writeln!(f, "{prefix}{connector}From '{}' Import", self.module.name)?;
+
+    let new_prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
+    let (last, items) = self.items.split_last().unwrap();
+    for item in items {
+      item.pretty(f, &new_prefix, false)?;
+    }
+    last.pretty(f, &new_prefix, true)
+  }
+}
+impl PrettyPrint for ImportItem<'_> {
+  fn pretty(&self, f: &mut fmt::Formatter<'_>, prefix: &str, last: bool) -> fmt::Result {
+    let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
+    if let Some(alias) = &self.alias {
+      writeln!(f, "{prefix}{connector}{} as {}", self.name.name, alias.name)
+    } else {
+      writeln!(f, "{prefix}{connector}{}", self.name.name)
+    }
   }
 }
 impl PrettyPrint for Return<'_, '_> {

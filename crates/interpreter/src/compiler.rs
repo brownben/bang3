@@ -40,7 +40,8 @@ impl<'s> Compiler<'s> {
 
       match statement {
         Statement::Expression(_) => compiler.chunk.add_opcode(OpCode::Pop, statement.span()),
-        Statement::Comment(_) | Statement::Let(_) | Statement::Return(_) => {}
+        Statement::Comment(_) | Statement::Import(_) | Statement::Let(_) | Statement::Return(_) => {
+        }
       }
     }
 
@@ -275,7 +276,8 @@ impl<'s> Compile<'s> for Block<'s, '_> {
 
       match statement {
         Statement::Expression(_) => compiler.chunk.add_opcode(OpCode::Pop, self.span),
-        Statement::Comment(_) | Statement::Let(_) | Statement::Return(_) => {}
+        Statement::Comment(_) | Statement::Import(_) | Statement::Let(_) | Statement::Return(_) => {
+        }
       }
     }
     last.compile(compiler)?;
@@ -590,9 +592,27 @@ impl<'s> Compile<'s> for Statement<'s, '_> {
     match self {
       Statement::Comment(_) => Ok(()),
       Statement::Expression(expression) => expression.compile(compiler),
+      Statement::Import(import) => import.compile(compiler),
       Statement::Let(let_) => let_.compile(compiler),
       Statement::Return(return_) => return_.compile(compiler),
     }
+  }
+}
+impl<'s> Compile<'s> for Import<'s, '_> {
+  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+    for item in &self.items {
+      compiler.chunk.add_opcode(OpCode::Import, item.span);
+      compiler.add_symbol(self.module.name, item.span)?;
+      compiler.add_symbol(item.name.name, item.span)?;
+
+      if let Some(alias) = &item.alias {
+        compiler.define_variable(alias.name, item.span)?;
+      } else {
+        compiler.define_variable(item.name.name, item.span)?;
+      }
+    }
+
+    Ok(())
   }
 }
 impl<'s> Compile<'s> for Let<'s, '_> {

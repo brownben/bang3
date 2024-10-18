@@ -66,6 +66,18 @@ impl<'source: 'allocator, 'allocator> Formatter<'source, 'allocator> {
     IR::Group(Box::new_in(self.concat(ir), self.allocator))
   }
 
+  /// Create a new group, an option for the formatter to break the source on
+  pub(crate) fn option(
+    &self,
+    a: IR<'source, 'allocator>,
+    b: IR<'source, 'allocator>,
+  ) -> IR<'source, 'allocator> {
+    IR::Option(
+      Box::new_in(a, self.allocator),
+      Box::new_in(b, self.allocator),
+    )
+  }
+
   /// Merge multiple IRs into a single IR
   pub(crate) fn concat<const N: usize>(
     &self,
@@ -107,6 +119,11 @@ pub enum IR<'source, 'allocator> {
   Indent(Box<'allocator, IR<'source, 'allocator>>),
   /// Mark a section where there are different options to break source code
   Group(Box<'allocator, IR<'source, 'allocator>>),
+  /// Give two options for different ways to format the code, the first is more condensed
+  Option(
+    Box<'allocator, IR<'source, 'allocator>>,
+    Box<'allocator, IR<'source, 'allocator>>,
+  ),
 }
 impl<'a, 'b> IR<'a, 'b> {
   /// Check if the option has any always lines
@@ -118,6 +135,7 @@ impl<'a, 'b> IR<'a, 'b> {
       IR::Concat(x) => x.iter().any(IR::has_always_line),
       IR::Indent(ir) => ir.has_always_line(),
       IR::Group(group) => group.has_always_line(),
+      IR::Option(a, b) => a.has_always_line() && b.has_always_line(),
     }
   }
 
@@ -170,6 +188,15 @@ impl<'a, 'b> IR<'a, 'b> {
           ir.display(line_length, indentation, false, config, allocator)
         }
       }
+      IR::Option(a, b) => {
+        let option_a = a.display(line_length, indentation, true, config, allocator);
+
+        if option_a.fits(config.print_width, line_length) {
+          option_a
+        } else {
+          b.display(line_length, indentation, false, config, allocator)
+        }
+      }
     }
   }
 }
@@ -184,6 +211,7 @@ impl fmt::Debug for IR<'_, '_> {
       Self::Concat(items) => f.debug_list().entries(items).finish(),
       Self::Indent(ir) => f.debug_tuple("Indent").field(ir).finish(),
       Self::Group(a) => f.debug_tuple("Union").field(a).finish(),
+      Self::Option(a, b) => f.debug_tuple("Option").field(a).field(b).finish(),
     }
   }
 }

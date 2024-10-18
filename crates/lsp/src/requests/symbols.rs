@@ -24,7 +24,7 @@ fn statement_symbols(
   symbols: &mut Vec<lsp::DocumentSymbol>,
 ) {
   match statement {
-    Statement::Comment(_) => {}
+    Statement::Comment(_) | Statement::Import(_) => {}
     Statement::Expression(expression) => expression_symbols(expression, file, symbols),
     Statement::Let(let_) => {
       let mut children = Vec::new();

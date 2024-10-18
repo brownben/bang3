@@ -30,6 +30,15 @@ impl Span {
     }
   }
 
+  /// Combine span with a possible span
+  pub fn merge_option(self, other: Option<Self>) -> Self {
+    if let Some(other) = other {
+      self.merge(other)
+    } else {
+      self
+    }
+  }
+
   /// Combine two `Span`s into one
   pub fn merge_end(self, other: Self) -> Self {
     if self == Self::default() {

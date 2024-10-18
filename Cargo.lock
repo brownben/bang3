@@ -109,6 +109,7 @@ name = "bang-lsp"
 version = "3.0.0"
 dependencies = [
  "bang-formatter",
+ "bang-interpreter",
  "bang-linter",
  "bang-parser",
  "bang-typechecker",
@@ -129,6 +130,7 @@ dependencies = [
 name = "bang-typechecker"
 version = "3.0.0"
 dependencies = [
+ "bang-interpreter",
  "bang-parser",
  "indoc",
 ]

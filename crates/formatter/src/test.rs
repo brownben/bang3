@@ -396,3 +396,37 @@ fn return_statement() {
   "};
   assert_format!(code, code, 80);
 }
+
+#[test]
+fn import_statement() {
+  let code = indoc! {"
+    from maths import { sin, cos, tan }
+    from string import { split }
+
+    from maths import { abs as absolute, sqrt, cbrt as cubeRoot }
+  "};
+  assert_format!(code, code, 80);
+
+  assert_format!(
+    "from maths   import {  sin   }",
+    "from maths import { sin }",
+    50
+  );
+
+  assert_format!(
+    "from maths import { sin }",
+    "from maths import {\n  sin,\n}",
+    10
+  );
+  assert_format!(
+    "from maths import { sin, cos,    tan, }",
+    "from maths import {\n  sin,\n  cos,\n  tan,\n}",
+    10
+  );
+
+  assert_format!(
+    "from maths import { abs as absolute, sqrt, cbrt as cubeRoot }",
+    "from maths import {\n  abs as absolute,\n  sqrt,\n  cbrt as cubeRoot,\n}",
+    10
+  );
+}

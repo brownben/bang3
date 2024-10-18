@@ -24,7 +24,7 @@ impl IsConstant for Expression<'_, '_> {
 impl IsConstant for Statement<'_, '_> {
   fn is_constant(&self) -> bool {
     match self {
-      Self::Comment(_) => true,
+      Self::Comment(_) | Self::Import(_) => true,
       Self::Expression(x) => x.is_constant(),
       Self::Let(x) => x.is_constant(),
       Self::Return(x) => x.is_constant(),

@@ -5,11 +5,14 @@
 #![feature(strict_provenance)]
 #![feature(decl_macro)]
 #![feature(negative_impls)]
+#![feature(macro_metavar_expr)]
 #![allow(unsafe_code)]
 
 mod bytecode;
 mod compiler;
+mod context;
 mod object;
+pub mod stdlib;
 mod value;
 mod vm;
 
@@ -48,5 +51,7 @@ pub fn compile_expression(
 pub use bang_gc::HeapSize;
 pub use bytecode::{Chunk, ChunkBuilder, OpCode};
 pub use compiler::CompileError;
+pub use context::{Context, Empty as EmptyContext, ImportResult};
+pub use stdlib::StandardContext;
 pub use value::Value;
 pub use vm::{RuntimeError, VM};

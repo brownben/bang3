@@ -189,6 +189,8 @@ pub enum OpCode {
   False,
   /// Load a null
   Null,
+  /// Import a value from the context. Arg(u8, u8) - symbol positions for module and item
+  Import,
 
   // Numeric Operations
   /// Takes the top 2 elements of the stack and adds them together
@@ -273,7 +275,7 @@ impl OpCode {
   pub fn length(self) -> usize {
     match self {
       OpCode::Number => 9,
-      OpCode::ConstantLong | OpCode::Jump | OpCode::JumpIfFalse => 3,
+      OpCode::ConstantLong | OpCode::Jump | OpCode::JumpIfFalse | OpCode::Import => 3,
       OpCode::Constant
       | OpCode::DefineGlobal
       | OpCode::GetGlobal
@@ -418,6 +420,12 @@ impl fmt::Display for Chunk {
         OpCode::Number => {
           let number = self.get_number(position + 1);
           write!(f, "Number {number:?}")
+        }
+        OpCode::Import => {
+          let module_name = self.get_symbol(self.get_value(position + 1).into());
+          let item_name = self.get_symbol(self.get_value(position + 2).into());
+
+          write!(f, "Import {module_name}::{item_name}")
         }
         OpCode::DefineGlobal => {
           let name_location = self.get_value(position + 1);

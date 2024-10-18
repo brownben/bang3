@@ -21,6 +21,7 @@ fn synthesize_has_error(source: &str) -> String {
 
   let mut checker = Typechecker::new();
   let result = checker.check_ast(&ast);
+  assert!(!checker.problems.is_empty());
 
   let generalized_type = checker.types.generalize(result, 0).type_;
   checker.types.type_to_string(generalized_type)
@@ -584,4 +585,54 @@ fn if_no_else() {
     function
   "};
   assert_eq!(synthesize(with_possible_side_effect), "boolean => number");
+}
+
+#[test]
+fn unknown_imports() {
+  assert!(has_type_error("from unknown_goo_goo import unknown_aaa"));
+  assert!(has_type_error("from maths import unknown_aaa"));
+  assert!(has_type_error("from maths import abs, unknown_aaa"));
+
+  assert!(has_type_error("{from unknown_goo import unknown_aaa\n 5}"));
+
+  assert_eq!(
+    synthesize_has_error("from unknown_goo import unknown_aaa\n unknown_aaa"),
+    "unknown"
+  );
+}
+
+mod stdlib {
+  use super::*;
+
+  #[test]
+  fn maths() {
+    let source = indoc! {"
+      from maths import { PI, E, INFINITY }
+      PI + E + INFINITY
+    "};
+    assert_eq!(synthesize(source), "number");
+
+    let source = indoc! {"
+      from maths import { abs, sin, cos, PI }
+
+      let x = sin(PI) + cos(PI)
+      abs(x / 44)
+    "};
+    assert_eq!(synthesize(source), "number");
+  }
+
+  #[test]
+  fn string() {
+    let source = indoc! {"
+      from string import { NEW_LINE, TAB, CARRIAGE_RETURN }
+      NEW_LINE ++ TAB ++ CARRIAGE_RETURN
+    "};
+    assert_eq!(synthesize(source), "string");
+
+    let source = indoc! {"
+      from string import { length }
+      'this is a string' >> length >> x => x * 2
+    "};
+    assert_eq!(synthesize(source), "number");
+  }
 }

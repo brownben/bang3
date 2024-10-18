@@ -724,6 +724,47 @@ fn return_statement() {
   assert!(parse("_ => { return & }", &allocator).is_err());
 }
 
+#[test]
+fn import_statement() {
+  let ast = parse_to_string("from maths import { sin, cos, tan }");
+  let expected = indoc! {"
+    ├─ From 'maths' Import
+    │  ├─ sin
+    │  ├─ cos
+    │  ╰─ tan
+  "};
+  assert_eq!(ast, expected);
+
+  let ast = parse_to_string("from strings import { split }");
+  let expected = indoc! {"
+    ├─ From 'strings' Import
+    │  ╰─ split
+  "};
+  assert_eq!(ast, expected);
+
+  let ast = parse_to_string("from strings import { TAB as tab }");
+  let expected = indoc! {"
+    ├─ From 'strings' Import
+    │  ╰─ TAB as tab
+  "};
+  assert_eq!(ast, expected);
+
+  let allocator = Allocator::new();
+  assert!(parse("from 4 import { x }", &allocator).is_err());
+  assert!(parse("from import { x }", &allocator).is_err());
+  assert!(parse("import x", &allocator).is_err());
+  assert!(parse("from maths { sin, cos }", &allocator).is_err());
+  assert!(parse("from maths import {}", &allocator).is_err());
+
+  // Block can't end with import
+  assert!(parse("{ from maths import { sin } }", &allocator).is_err());
+  assert!(parse("{ from maths import { sin }\n sin(5) }", &allocator).is_ok());
+  assert!(parse("{ from maths import { sin, }\n sin(5) }", &allocator).is_ok());
+
+  assert!(parse("from maths import { sin as }", &allocator).is_err());
+  assert!(parse("from maths import { sin as 7 }", &allocator).is_err());
+}
+
 mod fault_tolerant {
   use super::{parse, Allocator};
   use indoc::indoc;
@@ -1009,6 +1050,19 @@ mod fault_tolerant {
     "};
     assert!(ast.is_err());
     assert!(ast.errors.len() == 1);
+    assert_eq!(ast.to_string(), expected);
+  }
+
+  #[test]
+  fn import_statement() {
+    let allocator = Allocator::new();
+
+    let ast = parse("from 4 import xx", &allocator);
+    let expected = indoc! {"
+      ├─ From '4' Import
+      │  ╰─ xx
+    "};
+    assert!(ast.is_err());
     assert_eq!(ast.to_string(), expected);
   }
 }
