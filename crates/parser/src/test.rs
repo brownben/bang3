@@ -25,6 +25,15 @@ fn space_at_end() {
 }
 
 #[test]
+fn empty_string() {
+  let allocator = Allocator::new();
+  assert!(parse("\n\n\n", &allocator).is_ok());
+  assert!(parse("    ", &allocator).is_ok());
+  assert!(parse("", &allocator).is_ok());
+  assert!(parse("  \n    \n   \n ", &allocator).is_ok());
+}
+
+#[test]
 fn unterminated_string() {
   let allocator = Allocator::new();
   assert!(parse("'unterminated string", &allocator).is_err());

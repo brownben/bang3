@@ -91,6 +91,7 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
   /// Check if the parser has finished parsing the source code
   fn is_finished(&mut self) -> bool {
+    self.skip_newline();
     self.peek_token_kind() == TokenKind::EndOfFile
   }
 
