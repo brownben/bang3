@@ -312,15 +312,13 @@ impl VM {
 
         // Variables
         OpCode::DefineGlobal => {
-          let name_position = chunk.get_value(ip + 1);
-          let name = chunk.get_global_name(name_position.into()).clone();
+          let name = chunk.get_symbol(chunk.get_value(ip + 1).into()).clone();
           let value = self.pop();
 
           self.globals.insert(name, value);
         }
         OpCode::GetGlobal => {
-          let name_position = chunk.get_value(ip + 1);
-          let name = chunk.get_global_name(name_position.into());
+          let name = chunk.get_symbol(chunk.get_value(ip + 1).into());
 
           match self.globals.get(name) {
             Some(value) => self.push(*value),

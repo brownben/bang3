@@ -9,7 +9,7 @@ pub struct Chunk {
   pub(crate) name: SmartString,
   code: Vec<u8>,
   constants: Vec<ConstantValue>,
-  global_names: Vec<SmartString>,
+  symbols: Vec<SmartString>,
   debug_info: DebugInfo,
 }
 impl Chunk {
@@ -52,11 +52,11 @@ impl Chunk {
     unsafe { self.constants.get_unchecked(pointer) }
   }
   #[inline]
-  pub(crate) fn get_global_name(&self, pointer: usize) -> &SmartString {
+  pub(crate) fn get_symbol(&self, pointer: usize) -> &SmartString {
     // SAFETY: Assume bytecode is valid, so constant exists at pointer
-    debug_assert!(pointer < self.global_names.len());
+    debug_assert!(pointer < self.symbols.len());
 
-    unsafe { self.global_names.get_unchecked(pointer) }
+    unsafe { self.symbols.get_unchecked(pointer) }
   }
 
   pub(crate) fn get_span(&self, opcode_position: usize) -> Span {
@@ -85,7 +85,7 @@ pub struct ChunkBuilder<'source> {
   pub(crate) name: &'source str,
   code: Vec<u8>,
   pub(crate) constants: Vec<ConstantValue>,
-  global_names: Vec<&'source str>,
+  symbols: Vec<&'source str>,
   debug_info: DebugInfoBuilder,
 }
 impl<'source> ChunkBuilder<'source> {
@@ -95,7 +95,7 @@ impl<'source> ChunkBuilder<'source> {
       name,
       code: Vec::with_capacity(512),
       constants: Vec::with_capacity(32),
-      global_names: Vec::with_capacity(16),
+      symbols: Vec::with_capacity(16),
       debug_info: DebugInfoBuilder::new(),
     }
   }
@@ -106,11 +106,7 @@ impl<'source> ChunkBuilder<'source> {
       name: self.name.into(),
       code: self.code,
       constants: self.constants,
-      global_names: self
-        .global_names
-        .into_iter()
-        .map(SmartString::from)
-        .collect(),
+      symbols: self.symbols.into_iter().map(SmartString::from).collect(),
       debug_info: self.debug_info.finalize(),
     }
   }
@@ -158,11 +154,15 @@ impl<'source> ChunkBuilder<'source> {
       constant_position
     }
   }
-  /// Add a global name
-  pub fn add_global_name(&mut self, name: &'source str) -> usize {
-    let name_position = self.global_names.len();
-    self.global_names.push(name);
-    name_position
+  /// Add a symbol (global variable/ module name)
+  pub fn add_symbol(&mut self, name: &'source str) -> usize {
+    if let Some(name_position) = self.symbols.iter().position(|x| *x == name) {
+      name_position
+    } else {
+      let name_position = self.symbols.len();
+      self.symbols.push(name);
+      name_position
+    }
   }
   /// Replace a long argument at the given `position`
   pub fn replace_long_value(&mut self, position: usize, value: u16) {
@@ -227,9 +227,9 @@ pub enum OpCode {
   LessEqual,
 
   // Variables
-  /// Defines a global variable. Takes the top item of the stack. Arg(u8) - global name position
+  /// Defines a global variable. Takes the top item of the stack. Arg(u8) - symbol position
   DefineGlobal,
-  /// Gets a global variable. Arg(u8) - global name position
+  /// Gets a global variable. Arg(u8) - symbol position
   GetGlobal,
   /// Gets a local variable on the stack. Arg(u8) - stack offset
   GetLocal,
@@ -421,12 +421,12 @@ impl fmt::Display for Chunk {
         }
         OpCode::DefineGlobal => {
           let name_location = self.get_value(position + 1);
-          let name = self.get_global_name(name_location.into());
+          let name = self.get_symbol(name_location.into());
           write!(f, "DefineGlobal '{name}' ({name_location})")
         }
         OpCode::GetGlobal => {
           let name_location = self.get_value(position + 1);
-          let name = self.get_global_name(name_location.into());
+          let name = self.get_symbol(name_location.into());
           write!(f, "GetGlobal '{name}' ({name_location})")
         }
         OpCode::GetLocal => {

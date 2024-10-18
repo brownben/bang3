@@ -88,13 +88,13 @@ impl<'s> Compiler<'s> {
 
     Ok(())
   }
-  fn add_global_name(&mut self, string: &'s str, span: Span) -> Result<(), CompileError> {
-    let string_position = self.chunk.add_global_name(string);
+  fn add_symbol(&mut self, string: &'s str, span: Span) -> Result<(), CompileError> {
+    let string_position = self.chunk.add_symbol(string);
 
     if let Ok(string_position) = u8::try_from(string_position) {
       self.chunk.add_value(string_position, span);
     } else {
-      Err(CompileError::TooManyGlobalNames)?;
+      Err(CompileError::TooManySymbols)?;
     }
 
     Ok(())
@@ -155,7 +155,7 @@ impl<'s> Compiler<'s> {
       });
     } else {
       self.chunk.add_opcode(OpCode::DefineGlobal, span);
-      self.add_global_name(name, span)?;
+      self.add_symbol(name, span)?;
     }
 
     Ok(())
@@ -579,7 +579,7 @@ impl<'s> Compile<'s> for Variable<'s> {
 
     // Otherwise, it must be a global variable
     compiler.chunk.add_opcode(OpCode::GetGlobal, self.span);
-    compiler.add_global_name(self.name, self.span)?;
+    compiler.add_symbol(self.name, self.span)?;
 
     Ok(())
   }
@@ -614,8 +614,8 @@ impl<'s> Compile<'s> for Return<'s, '_> {
 pub enum CompileError {
   /// Too many constants
   TooManyConstants,
-  /// Too many global names
-  TooManyGlobalNames,
+  /// Too many symbols
+  TooManySymbols,
   /// Too big jump
   TooBigJump,
   /// Too many closures
@@ -631,7 +631,7 @@ impl CompileError {
   pub fn title(&self) -> &'static str {
     match self {
       Self::TooManyConstants => "Too Many Constants",
-      Self::TooManyGlobalNames => "Too Many Global Variable Names",
+      Self::TooManySymbols => "Too Many Symbols",
       Self::TooBigJump => "Too Big Jump",
       Self::TooManyClosures => "Too Many Closures",
       Self::TooManyLocalVariables => "Too Many Local Variables",
@@ -644,7 +644,7 @@ impl CompileError {
   pub fn message(&self) -> &'static str {
     match self {
       Self::TooManyConstants => "the maximum no. of constants has been reached (65536)",
-      Self::TooManyGlobalNames => "the maximum no. of global variables has been reached (256)",
+      Self::TooManySymbols => "the maximum no. of symbols has been reached (256)",
       Self::TooBigJump => "the maximum jump size has been reached (65536)",
       Self::TooManyClosures => "the maximum no. of closures has been reached (256)",
       Self::TooManyLocalVariables => "more than 256 local variables have been defined",
