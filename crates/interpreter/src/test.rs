@@ -29,7 +29,7 @@ fn run(source: &str) -> Result<VM, Error> {
   Ok(vm)
 }
 
-macro assert_variable  {
+macro assert_variable {
   ($vm:expr; $name:ident, string $string:literal) => {
     let vm = $vm.as_mut().unwrap();
     let value = vm.get_global(stringify!($name)).unwrap();
@@ -829,6 +829,17 @@ fn return_statement() {
     let c = (_ => { return 5 + 5 })()
   "});
   assert_variable!(code_after; a, 5.0);
+}
+
+#[test]
+fn native_function() {
+  let mut vm = run(indoc! {"
+    let a = {
+      let x = type(55)
+      x
+    }
+  "});
+  assert_variable!(vm; a, string "number");
 }
 
 mod builtin_function {

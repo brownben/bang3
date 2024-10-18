@@ -353,6 +353,7 @@ impl VM {
             let function = &self.heap[callee.as_object::<NativeFunction>()];
 
             let result = (function.func)(self, argument);
+            self.pop();
             self.push(result);
 
             ip += 1;
