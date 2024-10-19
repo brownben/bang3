@@ -855,6 +855,10 @@ impl<'s, 'ast> Parser<'s, 'ast> {
 
     let mut items = Vec::new_in(self.allocator);
     loop {
+      if self.peek_token_kind() == TokenKind::RightCurly {
+        break;
+      }
+
       if let Ok(item) = self.import_item() {
         items.push(item);
       }

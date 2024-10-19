@@ -296,6 +296,10 @@ impl PrettyPrint for Import<'_, '_> {
     let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
     writeln!(f, "{prefix}{connector}From '{}' Import", self.module.name)?;
 
+    if self.items.is_empty() {
+      return Ok(());
+    }
+
     let new_prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
     let (last, items) = self.items.split_last().unwrap();
     for item in items {

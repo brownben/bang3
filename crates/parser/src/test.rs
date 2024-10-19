@@ -749,12 +749,17 @@ fn import_statement() {
   "};
   assert_eq!(ast, expected);
 
+  let ast = parse_to_string("from strings import {  }");
+  let expected = indoc! {"
+    ├─ From 'strings' Import
+  "};
+  assert_eq!(ast, expected);
+
   let allocator = Allocator::new();
   assert!(parse("from 4 import { x }", &allocator).is_err());
   assert!(parse("from import { x }", &allocator).is_err());
   assert!(parse("import x", &allocator).is_err());
   assert!(parse("from maths { sin, cos }", &allocator).is_err());
-  assert!(parse("from maths import {}", &allocator).is_err());
 
   // Block can't end with import
   assert!(parse("{ from maths import { sin } }", &allocator).is_err());

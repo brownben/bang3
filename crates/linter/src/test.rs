@@ -235,3 +235,11 @@ fn no_double_condition() {
   assert!(lint("a <= b").is_ok());
   assert!(lint("a >= b").is_ok());
 }
+
+#[test]
+fn no_empty_import() {
+  assert!(lint("from maths import {}").is_err());
+  assert!(lint("from string import {   }").is_err());
+
+  assert!(lint("from string import { length }").is_ok());
+}

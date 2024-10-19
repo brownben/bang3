@@ -5,7 +5,7 @@ use super::{
 };
 use bang_parser::ast::{expression::*, statement::*, GetSpan, Span};
 
-pub const RULES: [&dyn LintRule; 15] = [
+pub const RULES: [&dyn LintRule; 16] = [
   &NoConstantConditions,
   &NoNegativeZero,
   &NoSelfAssign,
@@ -21,6 +21,7 @@ pub const RULES: [&dyn LintRule; 15] = [
   &NoUnnecessaryReturn,
   &NoUnreachableCode,
   &NoDoubleCondition,
+  &NoEmptyImports,
 ];
 
 pub struct NoConstantConditions;
@@ -464,6 +465,23 @@ impl LintRule for NoDoubleCondition {
       {
         context.add_diagnostic(&Self, binary.span());
       }
+    }
+  }
+}
+
+pub struct NoEmptyImports;
+impl LintRule for NoEmptyImports {
+  fn name(&self) -> &'static str {
+    "No Empty Imports"
+  }
+  fn message(&self) -> &'static str {
+    "statement can be deleted"
+  }
+  fn visit_statement(&self, context: &mut Context, statement: &Statement) {
+    if let Statement::Import(import) = statement
+      && import.items.is_empty()
+    {
+      context.add_diagnostic(&Self, import.span());
     }
   }
 }
