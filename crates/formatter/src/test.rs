@@ -438,6 +438,13 @@ fn import_statement() {
     10
   );
 
+  assert_format!("from maths import {}", "from maths import {  }", 80);
+  assert_format!(
+    "from maths import { abs as abs }",
+    "from maths import { abs }",
+    80
+  );
+
   let allocator = Allocator::new();
   let source = "from maths import { sin, cos, tan }";
   let ast = parse(source, &allocator);

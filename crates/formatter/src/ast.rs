@@ -322,7 +322,9 @@ impl<'a, 'b> Formattable<'a, 'b> for Import<'a, '_> {
       items.sort_by_key(|item| item.name.name);
     };
 
-    let items_in_line = {
+    let items_in_line = if items.is_empty() {
+      IR::Text(" ")
+    } else {
       let (last, items) = items.split_last().unwrap();
 
       f.concat([
@@ -359,7 +361,9 @@ impl<'a, 'b> Formattable<'a, 'b> for ImportItem<'a> {
   fn format(&self, f: &Formatter<'a, 'b>) -> IR<'a, 'b> {
     f.concat([
       IR::Text(self.name.name),
-      if let Some(alias) = &self.alias {
+      if let Some(alias) = &self.alias
+        && alias.name != self.name.name
+      {
         f.concat([IR::Text(" as "), IR::Text(alias.name)])
       } else {
         IR::Empty
