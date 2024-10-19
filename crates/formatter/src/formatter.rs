@@ -18,7 +18,7 @@ impl<'a, 'b, T: Formattable<'a, 'b>> Formattable<'a, 'b> for Option<T> {
 pub struct Formatter<'source, 'allocator> {
   pub(crate) line_index: LineIndex,
   pub(crate) config: Config,
-  allocator: &'allocator Allocator,
+  pub(crate) allocator: &'allocator Allocator,
   _source: marker::PhantomData<&'source ()>,
 }
 impl<'source: 'allocator, 'allocator> Formatter<'source, 'allocator> {

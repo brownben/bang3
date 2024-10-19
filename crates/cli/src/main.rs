@@ -85,11 +85,11 @@ struct FormatOptions {
   /// Preview the results of the formatting
   #[clap(long)]
   dryrun: bool,
-  /// Check the file is formatted
+  /// Check the file is formatted. Do not write to file
   #[clap(long)]
   check: bool,
 
-  /// Use single quotes. Defaults to true
+  /// Use single quotes. [default: true]
   #[clap(long, default_value_t = true)]
   config_single_quote: bool,
   /// Maximum line width
@@ -98,6 +98,9 @@ struct FormatOptions {
   /// Indentation size (spaces) to use. If 0 uses tabs
   #[clap(long, default_value_t = 2)]
   config_indent_size: u16,
+  /// Sort imports [default: true]
+  #[clap(long, default_value_t = true)]
+  config_sort_imports: bool,
 }
 
 #[derive(Subcommand)]

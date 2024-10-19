@@ -33,6 +33,7 @@ fn config_indentation() {
     single_quotes: true,
     indentation: 2.into(),
     line_ending: LineEnding::LineFeed,
+    sort_imports: true,
   };
 
   assert_eq!(crate::format(source, &ast, config), "(\n  a\n)\n");
@@ -53,6 +54,7 @@ fn config_quote() {
     single_quotes: true,
     indentation: 2.into(),
     line_ending: LineEnding::LineFeed,
+    sort_imports: true,
   };
 
   assert_eq!(crate::format(source, &ast, config), "'string'\n");
@@ -400,10 +402,10 @@ fn return_statement() {
 #[test]
 fn import_statement() {
   let code = indoc! {"
-    from maths import { sin, cos, tan }
+    from maths import { cos, sin, tan }
     from string import { split }
 
-    from maths import { abs as absolute, sqrt, cbrt as cubeRoot }
+    from maths import { abs as absolute, cbrt as cubeRoot, sqrt }
   "};
   assert_format!(code, code, 80);
 
@@ -419,14 +421,36 @@ fn import_statement() {
     10
   );
   assert_format!(
-    "from maths import { sin, cos,    tan, }",
-    "from maths import {\n  sin,\n  cos,\n  tan,\n}",
+    "from maths   import   { cos, sin,    tan, }",
+    "from maths import {\n  cos,\n  sin,\n  tan,\n}",
     10
   );
 
   assert_format!(
-    "from maths import { abs as absolute, sqrt, cbrt as cubeRoot }",
-    "from maths import {\n  abs as absolute,\n  sqrt,\n  cbrt as cubeRoot,\n}",
+    "from maths import { abs as absolute, cbrt as cubeRoot, sqrt }",
+    "from maths import {\n  abs as absolute,\n  cbrt as cubeRoot,\n  sqrt,\n}",
     10
+  );
+
+  assert_format!(
+    "from maths import { sqrt, abs as absolute, cbrt as cubeRoot }",
+    "from maths import {\n  abs as absolute,\n  cbrt as cubeRoot,\n  sqrt,\n}",
+    10
+  );
+
+  let allocator = Allocator::new();
+  let source = "from maths import { sin, cos, tan }";
+  let ast = parse(source, &allocator);
+
+  let config = Config {
+    print_width: 100,
+    single_quotes: true,
+    indentation: 2.into(),
+    line_ending: LineEnding::LineFeed,
+    sort_imports: false,
+  };
+  assert_eq!(
+    crate::format(source, &ast, config),
+    "from maths import { sin, cos, tan }\n"
   );
 }

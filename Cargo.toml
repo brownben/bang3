@@ -38,7 +38,7 @@ indoc = "2.0.4"
 rust.missing_docs = "warn"
 clippy.pedantic = "warn"
 clippy.wildcard_imports = { level = "allow", priority = 1 }
-
+clippy.struct_excessive_bools = { level = "allow", priority = 1 }
 
 [profile.release]
 codegen-units = 1

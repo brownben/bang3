@@ -317,8 +317,13 @@ impl<'a, 'b> Formattable<'a, 'b> for CommentStmt<'a> {
 }
 impl<'a, 'b> Formattable<'a, 'b> for Import<'a, '_> {
   fn format(&self, f: &Formatter<'a, 'b>) -> IR<'a, 'b> {
+    let mut items = self.items.clone();
+    if f.config.sort_imports && !self.items.is_sorted_by_key(|item| item.name.name) {
+      items.sort_by_key(|item| item.name.name);
+    };
+
     let items_in_line = {
-      let (last, items) = self.items.split_last().unwrap();
+      let (last, items) = items.split_last().unwrap();
 
       f.concat([
         IR::Text(" "),
@@ -332,8 +337,7 @@ impl<'a, 'b> Formattable<'a, 'b> for Import<'a, '_> {
     };
 
     let items_on_new_lines = f.indent([f.concat_iterator(
-      self
-        .items
+      items
         .iter()
         .map(|item| f.concat([IR::LineOrSpace, item.format(f), IR::Text(",")])),
     )]);

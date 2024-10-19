@@ -27,7 +27,7 @@ pub struct Import<'source, 'ast> {
   pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ImportItem<'source> {
   pub name: Variable<'source>,
   pub alias: Option<Variable<'source>>,

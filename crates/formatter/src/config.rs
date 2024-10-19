@@ -12,6 +12,8 @@ pub struct Config {
   pub indentation: Indentation,
   /// The line ending to use
   pub line_ending: LineEnding,
+  /// Should imports be sorted
+  pub sort_imports: bool,
 }
 impl Default for Config {
   fn default() -> Self {
@@ -20,6 +22,7 @@ impl Default for Config {
       single_quotes: true,
       indentation: Indentation::Space(2),
       line_ending: LineEnding::Native,
+      sort_imports: true,
     }
   }
 }

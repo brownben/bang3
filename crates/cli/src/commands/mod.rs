@@ -96,6 +96,7 @@ pub fn format(options: &FormatOptions) -> Result<CommandStatus, ()> {
     print_width: options.config_print_width,
     single_quotes: options.config_single_quote,
     indentation: options.config_indent_size.into(),
+    sort_imports: options.config_sort_imports,
     ..FormatterConfig::default()
   };
 
