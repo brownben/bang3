@@ -27,6 +27,13 @@ pub enum Problem {
     /// The location of the variable
     span: Span,
   },
+  /// A variable was imported, but was never used
+  UnusedImport {
+    /// The variable which was imported, but never used
+    identifier: String,
+    /// The location of the variable
+    span: Span,
+  },
   /// Match statement arms are not exhaustive
   MissingPattern {
     /// A message describing what patterns are missing
@@ -110,6 +117,7 @@ impl Problem {
       Self::UndefinedVariable { .. } => "Undefined Variable",
       Self::ExpectedDifferentType { .. } => "Expected Different Type",
       Self::UnusedVariable { .. } => "Unused Variable",
+      Self::UnusedImport { .. } => "Unused Import",
       Self::MissingPattern { .. } => "Match Not Exhaustive",
       Self::UnreachableCase { .. } => "Unreachable Case",
       Self::NotCallable { .. } => "Type Not Callable",
@@ -138,6 +146,7 @@ impl Problem {
       Self::UnusedVariable { identifier, .. } => {
         format!("variable `{identifier}` is declared but never used. if this is intentional prefix with a underscore")
       }
+      Self::UnusedImport { identifier, .. } => format!("`{identifier}` is imported but never used"),
       Self::MissingPattern { message, .. } => message.clone(),
       Self::UnreachableCase { .. } => "case is already covered, so is unreachable".to_string(),
       Self::NotCallable { type_, .. } => {
@@ -186,7 +195,7 @@ impl Problem {
   pub fn is_warning(&self) -> bool {
     matches!(
       self,
-      Self::UnusedVariable { .. } | Self::UnreachableCase { .. }
+      Self::UnusedVariable { .. } | Self::UnusedImport { .. } | Self::UnreachableCase { .. }
     )
   }
 }
@@ -196,6 +205,7 @@ impl GetSpan for Problem {
       Self::UndefinedVariable { span, .. }
       | Self::ExpectedDifferentType { span, .. }
       | Self::UnusedVariable { span, .. }
+      | Self::UnusedImport { span, .. }
       | Self::MissingPattern { span, .. }
       | Self::UnreachableCase { span }
       | Self::NotCallable { span, .. }

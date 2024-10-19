@@ -44,10 +44,17 @@ impl Typechecker {
     // Check for unused variables
     for variable in self.env.defined_variables() {
       if !variable.name.starts_with('_') && !variable.is_used() {
-        self.problems.push(TypeError::UnusedVariable {
-          identifier: variable.name.clone(),
-          span: variable.span(),
-        });
+        if variable.is_import {
+          self.problems.push(TypeError::UnusedImport {
+            identifier: variable.name.clone(),
+            span: variable.span(),
+          });
+        } else {
+          self.problems.push(TypeError::UnusedVariable {
+            identifier: variable.name.clone(),
+            span: variable.span(),
+          });
+        }
       }
     }
 
@@ -61,13 +68,7 @@ impl Typechecker {
       Statement::Import(import) => {
         for item in &import.items {
           match stdlib::import_value(&mut self.types, import.module.name, item.name.name) {
-            ImportResult::Value(type_) => {
-              if let Some(alias) = &item.alias {
-                self.env.define_variable(alias, type_);
-              } else {
-                self.env.define_variable(&item.name, type_);
-              }
-            }
+            ImportResult::Value(type_) => self.env.define_import(item, type_),
             ImportResult::ModuleNotFound => {
               self.problems.push(TypeError::ModuleNotFound {
                 module: import.module.name.to_owned(),
@@ -293,7 +294,7 @@ impl InferType for Block<'_, '_> {
           .rev()
           .find_map(|(id, statment)| matches!(statment, Statement::Expression(_)).then_some(id)),
       )
-      .expect("block ends with an expression");
+      .unwrap_or(self.statements.len() - 1);
 
     let block_return_type = t.new_type_var();
     for (id, statement) in self.statements.iter().enumerate() {

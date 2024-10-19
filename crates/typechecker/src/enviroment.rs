@@ -1,7 +1,10 @@
 //! Tracks variables, their types, and where they are defined and used
 
 use crate::{Type, TypeArena, TypeRef, TypeScheme};
-use bang_parser::{ast::expression, GetSpan, Span};
+use bang_parser::{
+  ast::{expression, statement},
+  GetSpan, Span,
+};
 
 /// Holds variables and where they are defined and used
 #[derive(Debug)]
@@ -66,6 +69,32 @@ impl Enviroment {
       defined: variable.span(),
       used: Vec::new(),
       active: variable.span(),
+
+      is_import: false,
+      alias: None,
+
+      depth: self.depth,
+      type_,
+
+      type_info: None,
+    });
+  }
+
+  pub(crate) fn define_import(&mut self, item: &statement::ImportItem, type_: TypeScheme) {
+    let name = if let Some(alias) = &item.alias {
+      alias
+    } else {
+      &item.name
+    };
+
+    self.variables.push(Variable {
+      name: name.name.to_owned(),
+      defined: item.span(),
+      used: Vec::new(),
+      active: item.span(),
+
+      is_import: true,
+      alias: item.alias.as_ref().map(GetSpan::span),
 
       depth: self.depth,
       type_,
@@ -151,6 +180,11 @@ pub struct Variable {
   pub used: Vec<Span>,
   /// the span where the variable is active and can be used
   active: Span,
+
+  /// is the variable from an import
+  pub is_import: bool,
+  /// the location of the alias, if the import is aliased
+  pub alias: Option<Span>,
 
   /// the depth of the variable, used to track the scope of the variable
   depth: u32,

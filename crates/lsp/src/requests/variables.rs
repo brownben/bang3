@@ -1,7 +1,7 @@
 use crate::documents::Document;
 use crate::locations::{lsp_range_from_span, span_from_lsp_position};
 use lsp_types as lsp;
-use std::{collections::HashMap, iter};
+use std::collections::HashMap;
 
 use bang_parser::{parse, Allocator, GetSpan};
 use bang_typechecker::get_enviroment;
@@ -84,13 +84,36 @@ pub fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::
     return lsp::WorkspaceEdit::default();
   };
 
-  let text_edits = iter::once(&declaration.span())
-    .chain(declaration.used.iter())
-    .map(|span| lsp::TextEdit {
-      range: lsp_range_from_span(*span, file),
+  let mut text_edits = Vec::new();
+
+  if declaration.is_import
+    && let Some(alias) = declaration.alias
+  {
+    text_edits.push(lsp::TextEdit {
+      range: lsp_range_from_span(alias, file),
       new_text: new_name.to_owned(),
-    })
-    .collect();
+    });
+  } else if declaration.is_import {
+    let mut span = declaration.span();
+    span.start = span.end;
+
+    text_edits.push(lsp::TextEdit {
+      range: lsp_range_from_span(span, file),
+      new_text: format!(" as {new_name}"),
+    });
+  } else {
+    text_edits.push(lsp::TextEdit {
+      range: lsp_range_from_span(declaration.span(), file),
+      new_text: new_name.to_owned(),
+    });
+  };
+
+  for used in &declaration.used {
+    text_edits.push(lsp::TextEdit {
+      range: lsp_range_from_span(*used, file),
+      new_text: new_name.to_owned(),
+    });
+  }
 
   lsp::WorkspaceEdit::new(HashMap::from([(file.id.clone(), text_edits)]))
 }

@@ -37,10 +37,6 @@ pub fn typecheck(ast: &AST) -> Vec<TypeError> {
 
   checker.check_ast(ast);
 
-  for variable in checker.env.defined_variables() {
-    checker.types.type_to_string(variable.type_());
-  }
-
   checker.problems
 }
 
