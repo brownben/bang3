@@ -1,11 +1,11 @@
 use crate::{typecheck, Typechecker};
 
-use bang_parser::{parse, Allocator};
+use bang_syntax::parse;
 use indoc::indoc;
 
 fn synthesize(source: &str) -> String {
-  let allocator = Allocator::new();
-  let ast = parse(source, &allocator);
+  let ast = parse(source);
+  assert!(ast.errors.is_empty());
 
   let mut checker = Typechecker::new();
   let result = checker.check_ast(&ast);
@@ -16,8 +16,8 @@ fn synthesize(source: &str) -> String {
 }
 
 fn synthesize_has_error(source: &str) -> String {
-  let allocator = Allocator::new();
-  let ast = parse(source, &allocator);
+  let ast = parse(source);
+  assert!(ast.errors.is_empty());
 
   let mut checker = Typechecker::new();
   let result = checker.check_ast(&ast);
@@ -28,8 +28,8 @@ fn synthesize_has_error(source: &str) -> String {
 }
 
 fn has_type_error(source: &str) -> bool {
-  let allocator = Allocator::new();
-  let ast = parse(source, &allocator);
+  let ast = parse(source);
+  assert!(ast.errors.is_empty());
 
   !typecheck(&ast).is_empty()
 }
@@ -589,14 +589,18 @@ fn if_no_else() {
 
 #[test]
 fn unknown_imports() {
-  assert!(has_type_error("from unknown_goo_goo import unknown_aaa"));
-  assert!(has_type_error("from maths import unknown_aaa"));
-  assert!(has_type_error("from maths import abs, unknown_aaa"));
+  assert!(has_type_error(
+    "from unknown_goo_goo import { unknown_aaa }"
+  ));
+  assert!(has_type_error("from maths import { unknown_aaa }"));
+  assert!(has_type_error("from maths import { abs, unknown_aaa }"));
 
-  assert!(has_type_error("{from unknown_goo import unknown_aaa\n 5}"));
+  assert!(has_type_error(
+    "{from unknown_goo import { unknown_aaa }\n 5}"
+  ));
 
   assert_eq!(
-    synthesize_has_error("from unknown_goo import unknown_aaa\n unknown_aaa"),
+    synthesize_has_error("from unknown_goo import { unknown_aaa }\n unknown_aaa"),
     "unknown"
   );
 }

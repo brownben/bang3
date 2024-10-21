@@ -13,7 +13,7 @@ mod types;
 #[cfg(test)]
 mod test;
 
-use bang_parser::AST;
+use bang_syntax::AST;
 pub use enviroment::{Enviroment, Variable, VariableKind};
 pub use error::Problem as TypeError;
 use infer::Typechecker;
@@ -24,11 +24,11 @@ use types::{Type, TypeArena, TypeRef, TypeScheme};
 ///
 /// # Examples
 /// ```
-/// use bang_parser::{parse, Allocator};
+/// use bang_syntax::parse;
 /// use bang_typechecker::typecheck;
-/// let allocator = Allocator::new();
+///
 /// let source = "5 + 3";
-/// let ast = parse(source, &allocator);
+/// let ast = parse(source);
 /// let typecheck_result = typecheck(&ast);
 /// ```
 #[must_use]

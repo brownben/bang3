@@ -1,10 +1,7 @@
 //! Tracks variables, their types, and where they are defined and used
 
 use crate::{Type, TypeArena, TypeRef, TypeScheme};
-use bang_parser::{
-  ast::{expression, statement},
-  GetSpan, Span,
-};
+use bang_syntax::{ast::statement::ImportItem, Span};
 
 /// Holds variables and where they are defined and used
 #[derive(Debug)]
@@ -63,12 +60,17 @@ impl Enviroment {
     self.depth -= 1;
   }
 
-  pub(crate) fn define_variable(&mut self, variable: &expression::Variable, type_: TypeScheme) {
+  pub(crate) fn define_variable(
+    &mut self,
+    variable_name: &str,
+    variable_span: Span,
+    type_: TypeScheme,
+  ) {
     self.variables.push(Variable {
-      name: variable.name.to_owned(),
-      defined: variable.span(),
+      name: variable_name.to_owned(),
+      defined: variable_span,
       used: Vec::new(),
-      active: variable.span(),
+      active: variable_span,
 
       is_import: false,
       alias: None,
@@ -80,21 +82,21 @@ impl Enviroment {
     });
   }
 
-  pub(crate) fn define_import(&mut self, item: &statement::ImportItem, type_: TypeScheme) {
+  pub(crate) fn define_import(&mut self, item: &ImportItem, type_: TypeScheme) {
     let name = if let Some(alias) = &item.alias {
       alias
     } else {
-      &item.name
+      item.name
     };
 
     self.variables.push(Variable {
-      name: name.name.to_owned(),
-      defined: item.span(),
+      name: name.to_owned(),
+      defined: item.span,
       used: Vec::new(),
-      active: item.span(),
+      active: item.span,
 
       is_import: true,
-      alias: item.alias.as_ref().map(GetSpan::span),
+      alias: item.alias_span,
 
       depth: self.depth,
       type_,
@@ -210,9 +212,9 @@ impl Variable {
   pub(crate) fn type_(&self) -> TypeRef {
     self.type_.type_
   }
-}
-impl GetSpan for Variable {
-  fn span(&self) -> Span {
+
+  /// The location of the variable definition
+  pub fn span(&self) -> Span {
     self.defined
   }
 }

@@ -1,4 +1,4 @@
-use bang_parser::{GetSpan, Span};
+use bang_syntax::Span;
 use std::{error, fmt};
 
 /// A error found by the Typechecker
@@ -198,9 +198,9 @@ impl Problem {
       Self::UnusedVariable { .. } | Self::UnusedImport { .. } | Self::UnreachableCase { .. }
     )
   }
-}
-impl GetSpan for Problem {
-  fn span(&self) -> Span {
+
+  /// The location of the error in the source code
+  pub fn span(&self) -> Span {
     match self {
       Self::UndefinedVariable { span, .. }
       | Self::ExpectedDifferentType { span, .. }

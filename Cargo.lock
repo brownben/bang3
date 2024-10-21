@@ -139,7 +139,7 @@ name = "bang-typechecker"
 version = "3.0.0"
 dependencies = [
  "bang-interpreter",
- "bang-parser",
+ "bang-syntax",
  "indoc",
 ]
 

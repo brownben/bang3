@@ -1,63 +1,64 @@
 use super::{Type, TypeArena};
-use bang_parser::{
-  ast::expression::{LiteralKind, MatchCase, Pattern},
-  Span,
+use bang_syntax::{
+  ast::expression::{LiteralValue, MatchArm, Pattern},
+  Span, AST,
 };
 use std::fmt;
 
 /// Checks if a match expressions arms are exhaustive
-pub fn check(value: &Type, cases: &[MatchCase]) -> Result {
+pub fn check<'a>(
+  value: &Type,
+  arms: impl ExactSizeIterator<Item = &'a MatchArm>,
+  ast: &AST,
+) -> Result {
   if let Type::Primitive(TypeArena::BOOLEAN) = value {
-    return boolean(cases);
+    return boolean(arms, ast);
   }
 
   // TODO: handle all numbers/ range case coverage
-  has_catch_all(cases)
+  has_catch_all(arms, ast)
 }
 
 /// Simple check that
-fn has_catch_all(cases: &[MatchCase]) -> Result {
-  let position = cases
-    .iter()
-    .position(|case| case.guard.is_none() && matches!(case.pattern, Pattern::Identifier(_)));
+fn has_catch_all<'a>(mut arms: impl ExactSizeIterator<Item = &'a MatchArm>, ast: &AST) -> Result {
+  let position = arms
+    .position(|case| case.guard(ast).is_none() && matches!(case.pattern, Pattern::Identifier(_)));
 
-  if let Some(position) = position
-    && position == cases.len() - 1
-  {
+  if position.is_some() && arms.len() == 0 {
     Result::Ok
-  } else if let Some(position) = position {
-    Result::UnreachableCases(cases[position + 1..].iter().map(|case| case.span).collect())
+  } else if position.is_some() {
+    Result::UnreachableCases(arms.map(|arm| arm.span(ast)).collect())
   } else {
     Result::MissingCases(vec![MissingPattern::CatchAll])
   }
 }
 
-fn boolean(cases: &[MatchCase]) -> Result {
+fn boolean<'a>(cases: impl Iterator<Item = &'a MatchArm>, ast: &AST) -> Result {
   let (mut has_true, mut has_false) = (false, false);
-  let mut unused_cases = vec![];
+  let mut unused_arms = vec![];
 
-  for case in cases {
-    match &case.pattern {
+  for arm in cases {
+    match &arm.pattern {
       Pattern::Identifier(_) if !has_true || !has_false => {
-        if case.guard.is_none() {
+        if arm.guard(ast).is_none() {
           has_true = true;
           has_false = true;
         }
       }
-      Pattern::Literal(literal) => match literal.kind {
-        LiteralKind::Boolean(true) if !has_true && case.guard.is_none() => has_true = true,
-        LiteralKind::Boolean(false) if !has_false && case.guard.is_none() => has_false = true,
-        LiteralKind::Boolean(true) if !has_true => {}
-        LiteralKind::Boolean(false) if !has_false => {}
-        _ => unused_cases.push(case.span),
+      Pattern::Literal(literal) => match literal.value(ast) {
+        LiteralValue::Boolean(true) if !has_true && arm.guard(ast).is_none() => has_true = true,
+        LiteralValue::Boolean(false) if !has_false && arm.guard(ast).is_none() => has_false = true,
+        LiteralValue::Boolean(true) if !has_true => {}
+        LiteralValue::Boolean(false) if !has_false => {}
+        _ => unused_arms.push(arm.span(ast)),
       },
-      _ => unused_cases.push(case.span),
+      _ => unused_arms.push(arm.span(ast)),
     }
   }
 
   match (has_true, has_false) {
-    (true, true) if unused_cases.is_empty() => Result::Ok,
-    (true, true) => Result::UnreachableCases(unused_cases),
+    (true, true) if unused_arms.is_empty() => Result::Ok,
+    (true, true) => Result::UnreachableCases(unused_arms),
     (false, true) => Result::MissingCases(vec![MissingPattern::Boolean(true)]),
     (true, false) => Result::MissingCases(vec![MissingPattern::Boolean(false)]),
     (false, false) => Result::MissingCases(vec![
