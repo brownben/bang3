@@ -1,9 +1,10 @@
 use bang_syntax::Span;
+use rustc_hash::FxHashMap as HashMap;
 use smartstring::alias::String as SmartString;
-use std::{fmt, mem, ptr};
+use std::{fmt, hash, mem, ptr};
 
 /// A chunk of bytecode
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Hash)]
 #[must_use]
 pub struct Chunk {
   pub(crate) name: SmartString,
@@ -84,8 +85,10 @@ impl Chunk {
 pub struct ChunkBuilder<'source> {
   pub(crate) name: &'source str,
   code: Vec<u8>,
-  pub(crate) constants: Vec<ConstantValue>,
+  constants: Vec<ConstantValue>,
+  constants_map: HashMap<ConstantValue, usize>,
   symbols: Vec<&'source str>,
+  symbols_map: HashMap<&'source str, usize>,
   debug_info: DebugInfoBuilder,
 }
 impl<'source> ChunkBuilder<'source> {
@@ -93,9 +96,11 @@ impl<'source> ChunkBuilder<'source> {
   pub fn new(name: &'source str) -> Self {
     Self {
       name,
-      code: Vec::with_capacity(512),
-      constants: Vec::with_capacity(32),
+      code: Vec::with_capacity(256),
+      constants: Vec::with_capacity(16),
+      constants_map: HashMap::default(),
       symbols: Vec::with_capacity(16),
+      symbols_map: HashMap::default(),
       debug_info: DebugInfoBuilder::new(),
     }
   }
@@ -146,22 +151,24 @@ impl<'source> ChunkBuilder<'source> {
   pub fn add_constant(&mut self, value: impl Into<ConstantValue>) -> usize {
     let value = value.into();
 
-    if let Some(constant_position) = self.constants.iter().position(|x| x == &value) {
-      constant_position
+    if let Some(constant_position) = self.constants_map.get(&value) {
+      *constant_position
     } else {
       let constant_position = self.constants.len();
-      self.constants.push(value);
+      self.constants.push(value.clone());
+      self.constants_map.insert(value, constant_position);
       constant_position
     }
   }
   /// Add a symbol (global variable/ module name)
   pub fn add_symbol(&mut self, name: &'source str) -> usize {
-    if let Some(name_position) = self.symbols.iter().position(|x| *x == name) {
-      name_position
+    if let Some(symbol_position) = self.symbols_map.get(name) {
+      *symbol_position
     } else {
-      let name_position = self.symbols.len();
+      let symbol_position = self.symbols.len();
       self.symbols.push(name);
-      name_position
+      self.symbols_map.insert(name, symbol_position);
+      symbol_position
     }
   }
   /// Replace a long argument at the given `position`
@@ -329,6 +336,16 @@ impl PartialEq<ConstantValue> for ConstantValue {
     }
   }
 }
+impl Eq for ConstantValue {}
+impl hash::Hash for ConstantValue {
+  fn hash<H: hash::Hasher>(&self, state: &mut H) {
+    mem::discriminant(self).hash(state);
+    match self {
+      Self::String(value) => value.hash(state),
+      Self::Function(func) => func.as_ptr().hash(state),
+    }
+  }
+}
 impl fmt::Debug for ConstantValue {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
@@ -374,7 +391,7 @@ impl DebugInfoBuilder {
   }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Hash)]
 struct DebugInfo {
   spans: Vec<(Span, u16)>,
 }
