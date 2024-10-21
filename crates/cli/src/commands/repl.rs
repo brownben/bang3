@@ -2,7 +2,7 @@ use super::{compile, parse, CommandStatus};
 use crate::diagnostics::{highlight_source, Message};
 
 use bang_interpreter::{Chunk, ChunkBuilder, HeapSize, OpCode, StandardContext, VM};
-use bang_parser::{ast, tokenise, Allocator, Span, TokenKind};
+use bang_syntax::{ast, tokenise, Span, TokenKind, AST};
 
 use anstream::{eprintln, println};
 use owo_colors::OwoColorize;
@@ -75,12 +75,11 @@ pub fn repl() -> Result<CommandStatus, ()> {
 }
 
 fn run_repl_entry(vm: &mut VM, line: &str) -> Result<(), ()> {
-  let allocator = Allocator::new();
-  let ast = parse("REPL", line, &allocator)?;
+  let ast = parse("REPL", line)?;
 
   // If it is an expression, print the result, else just compile it.
-  let chunk = if let Some(ast::Statement::Expression(expression)) = &ast.statements.first() {
-    print_expression_result_function(expression)?
+  let chunk = if let Some(ast::Statement::Expression(expression)) = &ast.root_statements.first() {
+    print_expression_result_function(expression.expression(&ast), &ast)?
   } else {
     compile(&ast)?
   };
@@ -98,8 +97,8 @@ fn run_repl_entry(vm: &mut VM, line: &str) -> Result<(), ()> {
 /// - Get the `print` function from the global scope.
 /// - Call the expression function, to get the result (With null as argument).
 /// - Call the `print` function. (With the result as the argument).
-fn print_expression_result_function(expression: &ast::Expression) -> Result<Chunk, ()> {
-  let expression_function = match bang_interpreter::compile_expression(expression) {
+fn print_expression_result_function(expression: &ast::Expression, ast: &AST) -> Result<Chunk, ()> {
+  let expression_function = match bang_interpreter::compile_expression(expression, ast) {
     Ok(chunk) => chunk,
     Err(error) => {
       eprintln!("{}", Message::from(&error));

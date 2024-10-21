@@ -8,7 +8,7 @@ bang-formatter = { path = "../formatter" }
 bang-interpreter = { path = "../interpreter" }
 bang-linter = { path = "../linter" }
 bang-lsp = { path = "../lsp" }
-bang-parser = { path = "../parser" }
+bang-syntax = { path = "../syntax" }
 bang-typechecker = { path = "../typechecker" }
 
 anstream.workspace = true

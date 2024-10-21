@@ -1,4 +1,4 @@
-use bang_parser::{LineIndex, Span};
+use bang_syntax::{LineIndex, Span};
 use owo_colors::{OwoColorize, Style};
 use std::fmt;
 
@@ -43,8 +43,8 @@ impl fmt::Display for Message {
     Ok(())
   }
 }
-impl From<&bang_parser::ParseError> for Message {
-  fn from(error: &bang_parser::ParseError) -> Self {
+impl From<&bang_syntax::ParseError> for Message {
+  fn from(error: &bang_syntax::ParseError) -> Self {
     Self {
       title: error.title(),
       body: error.message(),
@@ -112,8 +112,8 @@ impl<'a> CodeFrame<'a> {
 }
 impl fmt::Display for CodeFrame<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let start_line = self.lines.get_line(self.span).max(1);
-    let end_line = self.lines.get_final_line(self.span);
+    let start_line = self.lines.line(self.span).max(1);
+    let end_line = self.lines.final_line(self.span);
 
     writeln!(
       f,
@@ -139,7 +139,7 @@ impl fmt::Display for CodeFrame<'_> {
 }
 
 pub fn highlight_source(output: &mut dyn fmt::Write, source: &str) -> fmt::Result {
-  use bang_parser::{tokenise, TokenKind};
+  use bang_syntax::{tokenise, TokenKind};
 
   let mut last = 0;
   for token in tokenise(source) {

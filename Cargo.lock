@@ -66,7 +66,7 @@ dependencies = [
  "bang-interpreter",
  "bang-linter",
  "bang-lsp",
- "bang-parser",
+ "bang-syntax",
  "bang-typechecker",
  "clap",
  "owo-colors",

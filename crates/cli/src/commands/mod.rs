@@ -4,7 +4,7 @@ use super::FormatOptions;
 use bang_formatter::FormatterConfig;
 use bang_interpreter::{HeapSize, StandardContext, VM};
 use bang_lsp::LanguageServer;
-use bang_parser::{tokenise, Allocator, GetSpan, LineIndex, AST};
+use bang_syntax::{tokenise, LineIndex, AST};
 
 use anstream::{eprintln, println};
 use std::fs;
@@ -34,12 +34,8 @@ fn read_file(filename: &str) -> Result<String, ()> {
   }
 }
 
-fn parse<'s, 'a>(
-  filename: &str,
-  source: &'s str,
-  allocator: &'a Allocator,
-) -> Result<AST<'s, 'a>, ()> {
-  let ast = bang_parser::parse(source, allocator);
+fn parse<'source>(filename: &str, source: &'source str) -> Result<AST<'source>, ()> {
+  let ast = bang_syntax::parse(source);
 
   if ast.is_valid() {
     Ok(ast)
@@ -63,9 +59,8 @@ fn compile(ast: &AST) -> Result<bang_interpreter::Chunk, ()> {
 }
 
 pub fn run(filename: &str) -> Result<CommandStatus, ()> {
-  let allocator = Allocator::new();
   let source = read_file(filename)?;
-  let ast = parse(filename, &source, &allocator)?;
+  let ast = parse(filename, &source)?;
   let chunk = compile(&ast)?;
 
   let mut vm = match VM::new(HeapSize::Standard, &StandardContext) {
@@ -100,10 +95,9 @@ pub fn format(options: &FormatOptions) -> Result<CommandStatus, ()> {
     ..FormatterConfig::default()
   };
 
-  let allocator = Allocator::new();
   let source = read_file(&options.file)?;
-  let ast = parse(&options.file, &source, &allocator)?;
-  let formatted_source = bang_formatter::format(&source, &ast, config);
+  let ast = parse(&options.file, &source)?;
+  let formatted_source = bang_formatter::format(&ast, config);
 
   if options.dryrun {
     println!("{formatted_source}");
@@ -131,9 +125,8 @@ pub fn format(options: &FormatOptions) -> Result<CommandStatus, ()> {
 }
 
 pub fn lint(filename: &str) -> Result<CommandStatus, ()> {
-  let allocator = Allocator::new();
   let source = read_file(filename)?;
-  let ast = parse(filename, &source, &allocator)?;
+  let ast = parse(filename, &source)?;
   let diagnostics = bang_linter::lint(&ast);
 
   for diagnostic in &diagnostics {
@@ -149,9 +142,8 @@ pub fn lint(filename: &str) -> Result<CommandStatus, ()> {
 }
 
 pub fn typecheck(filename: &str) -> Result<CommandStatus, ()> {
-  let allocator = Allocator::new();
   let source = read_file(filename)?;
-  let ast = parse(filename, &source, &allocator)?;
+  let ast = parse(filename, &source)?;
   let errors = bang_typechecker::typecheck(&ast);
 
   for error in &errors {
@@ -183,9 +175,16 @@ pub fn print_tokens(filename: &str) -> Result<CommandStatus, ()> {
 }
 
 pub fn print_ast(filename: &str) -> Result<CommandStatus, ()> {
-  let allocator = Allocator::new();
   let source = read_file(filename)?;
-  let ast = parse(filename, &source, &allocator)?;
+  let ast = bang_syntax::parse(&source);
+
+  if !ast.is_valid() {
+    for error in &ast.errors {
+      eprintln!("{}", Message::from(error));
+      eprintln!("{}", CodeFrame::new(filename, &source, error.span()));
+    }
+    println!();
+  }
 
   println!("╭─[Abstract Syntax Tree: {filename}]");
   print!("{ast}");
@@ -195,9 +194,8 @@ pub fn print_ast(filename: &str) -> Result<CommandStatus, ()> {
 }
 
 pub fn print_chunk(filename: &str) -> Result<CommandStatus, ()> {
-  let allocator = Allocator::new();
   let source = read_file(filename)?;
-  let ast = parse(filename, &source, &allocator)?;
+  let ast = parse(filename, &source)?;
   let chunk = compile(&ast)?;
 
   print!("{chunk}");
