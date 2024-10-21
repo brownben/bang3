@@ -119,14 +119,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bang-parser"
-version = "3.0.0"
-dependencies = [
- "bumpalo",
- "indoc",
-]
-
-[[package]]
 name = "bang-syntax"
 version = "3.0.0"
 dependencies = [

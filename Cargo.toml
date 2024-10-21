@@ -7,7 +7,6 @@ members = [
   "crates/interpreter",
   "crates/linter",
   "crates/lsp",
-  "crates/parser",
   "crates/syntax",
   "crates/typechecker",
 ]
