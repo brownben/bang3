@@ -3,14 +3,13 @@ use crate::locations::{lsp_range_from_span, span_from_lsp_position};
 use lsp_types as lsp;
 use std::collections::HashMap;
 
-use bang_parser::{parse, Allocator, GetSpan};
+use bang_syntax::parse;
 use bang_typechecker::get_enviroment;
 
 pub fn hover(file: &Document, position: lsp::Position) -> Option<lsp::Hover> {
   let position = span_from_lsp_position(position, file);
 
-  let allocator = Allocator::new();
-  let ast = parse(&file.source, &allocator);
+  let ast = parse(&file.source);
   let variables = get_enviroment(&ast);
 
   let variable = variables
@@ -32,8 +31,7 @@ pub fn hover(file: &Document, position: lsp::Position) -> Option<lsp::Hover> {
 pub fn goto_definition(file: &Document, position: lsp::Position) -> Option<lsp::Location> {
   let position = span_from_lsp_position(position, file);
 
-  let allocator = Allocator::new();
-  let ast = parse(&file.source, &allocator);
+  let ast = parse(&file.source);
   let variables = get_enviroment(&ast);
 
   let declaration = variables
@@ -50,8 +48,7 @@ pub fn goto_definition(file: &Document, position: lsp::Position) -> Option<lsp::
 pub fn get_references(file: &Document, position: lsp::Position) -> Option<Vec<lsp::Location>> {
   let position = span_from_lsp_position(position, file);
 
-  let allocator = Allocator::new();
-  let ast = parse(&file.source, &allocator);
+  let ast = parse(&file.source);
   let variables = get_enviroment(&ast);
 
   let declaration = variables
@@ -70,8 +67,7 @@ pub fn get_references(file: &Document, position: lsp::Position) -> Option<Vec<ls
 pub fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::WorkspaceEdit {
   let position = span_from_lsp_position(position, file);
 
-  let allocator = Allocator::new();
-  let ast = parse(&file.source, &allocator);
+  let ast = parse(&file.source);
   let variables = get_enviroment(&ast);
 
   let Some(declaration) = variables

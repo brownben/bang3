@@ -1,4 +1,4 @@
-use bang_parser::LineIndex;
+use bang_syntax::LineIndex;
 pub use lsp_types::Uri as FileIdentfier;
 use std::collections::HashMap;
 

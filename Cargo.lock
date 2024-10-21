@@ -111,7 +111,7 @@ dependencies = [
  "bang-formatter",
  "bang-interpreter",
  "bang-linter",
- "bang-parser",
+ "bang-syntax",
  "bang-typechecker",
  "lsp-server",
  "lsp-types",

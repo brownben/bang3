@@ -1,5 +1,5 @@
 use crate::documents::Document;
-use bang_parser::Span;
+use bang_syntax::Span;
 
 pub fn span_from_lsp_position(position: lsp_types::Position, file: &Document) -> Span {
   let line_index = &file.line_index;
@@ -7,7 +7,7 @@ pub fn span_from_lsp_position(position: lsp_types::Position, file: &Document) ->
 
   let start = if line_index.is_ascii {
     // if ascii, utf8 and utf16 are the same
-    line_index.to_offset(line - 1, position.character)
+    return line_index.span_from_position(line - 1, position.character);
   } else {
     let line_start = line_index.get_line_start(line - 1);
     let line_source = line_index.line_span(line).source_text(&file.source);
@@ -37,10 +37,10 @@ fn byte_offset_from_utf16_offset(utf16_position: u32, string: &str) -> u32 {
 pub fn lsp_range_from_span(span: Span, file: &Document) -> lsp_types::Range {
   let lines = &file.line_index;
 
-  let start_line = lines.get_line(span) - 1;
+  let start_line = lines.line(span) - 1;
   let start_char = span.start - lines.get_line_start(start_line);
 
-  let end_line = lines.get_final_line(span) - 1;
+  let end_line = lines.final_line(span) - 1;
   let end_char = span.end - lines.get_line_start(end_line);
 
   let (start_char, end_char) = if lines.is_ascii {
@@ -73,8 +73,6 @@ fn byte_offset_to_utf16(position: u32, string: &str) -> u32 {
 
 #[cfg(test)]
 mod test {
-  use bang_parser::GetSpan;
-
   use super::{byte_offset_from_utf16_offset, byte_offset_to_utf16, Span};
 
   fn utf16_slice(string: &str, start: usize, end: usize) -> String {
@@ -108,8 +106,7 @@ mod test {
   fn byte_offset_to_utf16_unknown_character_span() {
     let source = "let string = '🏃' &";
 
-    let allocator = bang_parser::Allocator::new();
-    let ast = bang_parser::parse(source, &allocator);
+    let ast = bang_syntax::parse(source);
     let span = ast.errors.first().unwrap().span();
 
     let start = byte_offset_to_utf16(span.start, source).try_into().unwrap();
@@ -122,8 +119,7 @@ mod test {
   fn byte_offset_to_utf16_unused_variable_span() {
     let source = "let string = '🏃'";
 
-    let allocator = bang_parser::Allocator::new();
-    let ast = bang_parser::parse(source, &allocator);
+    let ast = bang_syntax::parse(source);
     let errors = bang_typechecker::typecheck(&ast);
     let span = errors.first().unwrap().span();
 
