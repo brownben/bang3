@@ -2,7 +2,7 @@
 // Basic Types
 // ==========================
 
-// There are 7 different types:
+// There are 4 different types:
 // - Strings
 // - Numbers
 // - Booleans
@@ -103,6 +103,13 @@ x => 3 + 5
 let addThree = x => x + 3
 addThree(4) // 7
 
+// you can early return from a function with return
+let addThree = x => {
+  if (x > 3) { return x }
+
+  x * 2 + 1
+}
+
 // ==========================
 // Logical Operators
 // ==========================
@@ -202,6 +209,13 @@ match value
   | false -> 1
   | x -> x + 2
 
+// you can also add guards to a match
+match value
+  | 1 if x > y -> 'a'
+  | 1 -> 'b'
+  | 2 -> 'c'
+  | _ -> 'd'
+
 // ==========================
 // Comments
 // ==========================
@@ -214,3 +228,13 @@ match value
 // - Inside a function's parameter list
 // - Directly after an else
 // - Plus a couple more
+
+// ==========================
+// Imports
+// ==========================
+
+from maths import { sin, cos, tan }
+from string import {
+  TAB as tab,
+  length as len,
+}
