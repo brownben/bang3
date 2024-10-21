@@ -38,11 +38,6 @@ impl From<Gc<usize>> for BangString {
     Self(value.into())
   }
 }
-impl From<GcList<u8>> for BangString {
-  fn from(value: GcList<u8>) -> Self {
-    Self(value)
-  }
-}
 
 /// A native function
 #[derive(Clone, Debug, PartialEq)]

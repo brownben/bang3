@@ -86,7 +86,7 @@ impl<'s> Compiler<'s> {
       self.chunk.add_opcode(OpCode::ConstantLong, span);
       self.chunk.add_long_value(constant_position, span);
     } else {
-      Err(CompileError::TooManyConstants)?;
+      return Err(CompileError::TooManyConstants);
     }
 
     Ok(())
@@ -97,7 +97,7 @@ impl<'s> Compiler<'s> {
     if let Ok(string_position) = u8::try_from(string_position) {
       self.chunk.add_value(string_position, span);
     } else {
-      Err(CompileError::TooManySymbols)?;
+      return Err(CompileError::TooManySymbols);
     }
 
     Ok(())
@@ -137,7 +137,7 @@ impl<'s> Compiler<'s> {
       if let Ok(count) = u8::try_from(count) {
         self.chunk.add_value(count, span);
       } else {
-        Err(CompileError::TooManyLocalVariables)?;
+        return Err(CompileError::TooManyLocalVariables);
       }
     }
     self.scope_depth -= 1;
@@ -437,34 +437,31 @@ impl<'s> Compile<'s> for Match {
           literal.compile(compiler, ast)?;
           compiler.chunk.add_opcode(OpCode::Equals, span);
         }
-        Pattern::Range(start, end) => match (start, end) {
-          (None, Some(pattern)) => {
-            compiler.chunk.add_opcode(OpCode::Peek, span);
-            pattern.compile(compiler, ast)?;
-            compiler.chunk.add_opcode(OpCode::LessEqual, span);
-          }
-          (Some(pattern), None) => {
-            compiler.chunk.add_opcode(OpCode::Peek, span);
-            pattern.compile(compiler, ast)?;
-            compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
-          }
-          (Some(greater_than), Some(less_than)) => {
-            compiler.chunk.add_opcode(OpCode::Peek, span);
-            greater_than.compile(compiler, ast)?;
-            compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
+        Pattern::Range(None, Some(pattern)) => {
+          compiler.chunk.add_opcode(OpCode::Peek, span);
+          pattern.compile(compiler, ast)?;
+          compiler.chunk.add_opcode(OpCode::LessEqual, span);
+        }
+        Pattern::Range(Some(pattern), None) => {
+          compiler.chunk.add_opcode(OpCode::Peek, span);
+          pattern.compile(compiler, ast)?;
+          compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
+        }
+        Pattern::Range(Some(greater_than), Some(less_than)) => {
+          compiler.chunk.add_opcode(OpCode::Peek, span);
+          greater_than.compile(compiler, ast)?;
+          compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
 
-            let jump = compiler.add_jump(OpCode::JumpIfFalse, span);
-            compiler.chunk.add_opcode(OpCode::Pop, span);
+          let jump = compiler.add_jump(OpCode::JumpIfFalse, span);
+          compiler.chunk.add_opcode(OpCode::Pop, span);
 
-            compiler.chunk.add_opcode(OpCode::Peek, span);
-            less_than.compile(compiler, ast)?;
-            compiler.chunk.add_opcode(OpCode::LessEqual, span);
+          compiler.chunk.add_opcode(OpCode::Peek, span);
+          less_than.compile(compiler, ast)?;
+          compiler.chunk.add_opcode(OpCode::LessEqual, span);
 
-            compiler.patch_jump(jump)?;
-          }
-          (None, None) => unreachable!("range has bound, checked in parser"),
-        },
-        Pattern::Invalid => unreachable!("compile only valid ASTs"),
+          compiler.patch_jump(jump)?;
+        }
+        Pattern::Range(None, None) | Pattern::Invalid => return Err(CompileError::InvalidAST),
       }
 
       if let Some(guard) = &case.guard(ast) {
@@ -536,7 +533,7 @@ impl<'s> Compile<'s> for Variable {
       if let Ok(local_position) = u8::try_from(local_position) {
         compiler.chunk.add_value(local_position, span);
       } else {
-        Err(CompileError::TooManyLocalVariables)?;
+        return Err(CompileError::TooManyLocalVariables);
       }
 
       return Ok(());
@@ -577,7 +574,7 @@ impl<'s> Compile<'s> for Variable {
       if let Ok(index) = u8::try_from(index) {
         compiler.chunk.add_value(index, span);
       } else {
-        Err(CompileError::TooManyClosures)?;
+        return Err(CompileError::TooManyClosures);
       }
 
       return Ok(());

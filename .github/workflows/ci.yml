@@ -23,7 +23,7 @@ jobs:
       - name: Test
         run: |
           cargo test --workspace --verbose
-          cargo test --workspace --verbose -F gc-stress-test
+          cargo test -p bang-interpreter --verbose -F gc-stress-test
 
   miri:
     name: Miri
@@ -43,4 +43,6 @@ jobs:
         with:
           tool: cargo-nextest
       - name: Test
-        run: cargo miri nextest run --no-fail-fast
+        run: |
+          cargo miri nextest run --no-fail-fast
+          cargo miri nextest run -p bang-interpreter -F gc-stress-test --no-fail-fast
