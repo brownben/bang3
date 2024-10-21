@@ -1,45 +1,41 @@
 use crate::config::{self, Config};
-use bang_parser::LineIndex;
 use bumpalo::{boxed::Box, collections::Vec, Bump as Allocator};
 use std::{fmt, marker, mem};
 
 /// An item which can be formatted
-pub trait Formattable<'source, 'allocator> {
+pub trait Formattable<'source, 'allocator, AST> {
   /// Convert the item into the formatting intermediate representation
-  fn format(&self, f: &Formatter<'source, 'allocator>) -> IR<'source, 'allocator>;
+  fn format(&self, f: &Formatter<'source, 'allocator>, ast: &AST) -> IR<'source, 'allocator>;
 }
-impl<'a, 'b, T: Formattable<'a, 'b>> Formattable<'a, 'b> for Option<T> {
-  fn format(&self, f: &Formatter<'a, 'b>) -> IR<'a, 'b> {
-    self.as_ref().map(|x| x.format(f)).unwrap_or_default()
+impl<'a, 'b, T: Formattable<'a, 'b, AST>, AST> Formattable<'a, 'b, AST> for Option<T> {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST) -> IR<'a, 'b> {
+    self.as_ref().map(|x| x.format(f, ast)).unwrap_or_default()
   }
 }
 
 /// Formatter used to create then print the intermediate formatting representation
 pub struct Formatter<'source, 'allocator> {
-  pub(crate) line_index: LineIndex,
   pub(crate) config: Config,
   pub(crate) allocator: &'allocator Allocator,
   _source: marker::PhantomData<&'source ()>,
 }
 impl<'source: 'allocator, 'allocator> Formatter<'source, 'allocator> {
   pub(crate) fn format(
-    source: &str,
-    ast: &bang_parser::AST<'source, '_>,
+    ast: &bang_syntax::AST<'source>,
     config: Config,
     allocator: &'allocator Allocator,
   ) -> String {
     Self {
-      line_index: LineIndex::from_source(source),
       config,
       allocator,
       _source: marker::PhantomData,
     }
-    .print(ast)
+    .print(ast, ast)
   }
 
   /// Format the AST Node into a string
-  fn print(&self, item: &dyn Formattable<'source, 'allocator>) -> String {
-    let ir = item.format(self);
+  fn print<AST>(&self, item: &dyn Formattable<'source, 'allocator, AST>, ast: &AST) -> String {
+    let ir = item.format(self, ast);
     let display_ir = ir.display(0, 0, true, self.config, self.allocator);
     format!("{display_ir}")
   }

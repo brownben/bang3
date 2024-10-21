@@ -1,8 +1,6 @@
-use bumpalo::Bump as Allocator;
-use indoc::indoc;
-
 use super::config::{Config, LineEnding};
-use bang_parser::parse;
+use bang_syntax::parse;
+use indoc::indoc;
 
 fn format(source: &str, print_width: u16) -> String {
   let config = Config {
@@ -10,10 +8,9 @@ fn format(source: &str, print_width: u16) -> String {
     line_ending: LineEnding::LineFeed,
     ..Config::default()
   };
-  let allocator = Allocator::new();
-  let ast = parse(source, &allocator);
+  let ast = parse(source);
 
-  crate::format(source, &ast, config)
+  crate::format(&ast, config)
 }
 
 macro assert_format($source:expr, $expected:expr, $print_width:expr) {
@@ -24,9 +21,7 @@ macro assert_format($source:expr, $expected:expr, $print_width:expr) {
 
 #[test]
 fn config_indentation() {
-  let allocator = Allocator::new();
-  let source = "(a)";
-  let ast = parse(source, &allocator);
+  let ast = parse("(a)");
 
   let mut config = Config {
     print_width: 1,
@@ -36,18 +31,16 @@ fn config_indentation() {
     sort_imports: true,
   };
 
-  assert_eq!(crate::format(source, &ast, config), "(\n  a\n)\n");
+  assert_eq!(crate::format(&ast, config), "(\n  a\n)\n");
   config.indentation = 4.into();
-  assert_eq!(crate::format(source, &ast, config), "(\n    a\n)\n");
+  assert_eq!(crate::format(&ast, config), "(\n    a\n)\n");
   config.indentation = 0.into();
-  assert_eq!(crate::format(source, &ast, config), "(\n\ta\n)\n");
+  assert_eq!(crate::format(&ast, config), "(\n\ta\n)\n");
 }
 
 #[test]
 fn config_quote() {
-  let allocator = Allocator::new();
-  let source = "'string'";
-  let ast = parse(source, &allocator);
+  let ast = parse("'string'");
 
   let mut config = Config {
     print_width: 1,
@@ -57,9 +50,9 @@ fn config_quote() {
     sort_imports: true,
   };
 
-  assert_eq!(crate::format(source, &ast, config), "'string'\n");
+  assert_eq!(crate::format(&ast, config), "'string'\n");
   config.single_quotes = false;
-  assert_eq!(crate::format(source, &ast, config), "\"string\"\n");
+  assert_eq!(crate::format(&ast, config), "\"string\"\n");
 
   assert_format!("\"who's who\"", "\"who's who\"", 100);
 }
@@ -214,6 +207,8 @@ fn if_() {
     }
   "};
   assert_format!(expected, expected, 80);
+
+  assert_format!("if (true) false", "if (true) false", 25);
 }
 
 #[test]
@@ -445,10 +440,7 @@ fn import_statement() {
     80
   );
 
-  let allocator = Allocator::new();
-  let source = "from maths import { sin, cos, tan }";
-  let ast = parse(source, &allocator);
-
+  let ast = parse("from maths import { sin, cos, tan, }");
   let config = Config {
     print_width: 100,
     single_quotes: true,
@@ -457,7 +449,7 @@ fn import_statement() {
     sort_imports: false,
   };
   assert_eq!(
-    crate::format(source, &ast, config),
+    crate::format(&ast, config),
     "from maths import { sin, cos, tan }\n"
   );
 }

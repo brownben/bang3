@@ -26,16 +26,15 @@ mod test;
 /// # Examples
 /// ```
 /// use bang_formatter::{format, FormatterConfig};
-/// use bang_parser::{parse, Allocator};
-/// let allocator = Allocator::new();
+/// use bang_syntax::parse;
 /// let source = "5 + 3";
-/// let ast = parse(source, &allocator);
+/// let ast = parse(source);
 /// let config = FormatterConfig::default();
-/// let formatted = format(source, &ast, config);
+/// let formatted = format(&ast, config);
 /// ```
 #[must_use]
-pub fn format(source: &str, ast: &bang_parser::AST, config: FormatterConfig) -> String {
+pub fn format(ast: &bang_syntax::AST, config: FormatterConfig) -> String {
   let allocator = bumpalo::Bump::new();
-  formatter::Formatter::format(source, ast, config, &allocator)
+  formatter::Formatter::format(ast, config, &allocator)
 }
 pub use config::Config as FormatterConfig;
