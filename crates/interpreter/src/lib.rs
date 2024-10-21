@@ -23,16 +23,14 @@ mod test;
 ///
 /// # Examples
 /// ```
-/// use bang_parser::{parse, Allocator};
-/// let allocator = Allocator::new();
-/// let source = "5 + 3";
-/// let ast = parse(source, &allocator);
+/// use bang_syntax::parse;
+/// let ast = parse("5 + 3");
 /// let chunk = bang_interpreter::compile(&ast).unwrap();
 /// ```
 ///
 /// # Errors
 /// If there is a problem constructing the bytecode
-pub fn compile(ast: &bang_parser::AST<'_, '_>) -> Result<Chunk, CompileError> {
+pub fn compile(ast: &bang_syntax::AST) -> Result<Chunk, CompileError> {
   compiler::Compiler::compile(ast)
 }
 
@@ -43,9 +41,10 @@ pub fn compile(ast: &bang_parser::AST<'_, '_>) -> Result<Chunk, CompileError> {
 /// # Errors
 /// If there is a problem constructing the bytecode
 pub fn compile_expression(
-  expression: &bang_parser::ast::Expression,
+  expression: &bang_syntax::ast::Expression,
+  ast: &bang_syntax::AST,
 ) -> Result<Chunk, CompileError> {
-  compiler::Compiler::compile_expression(expression)
+  compiler::Compiler::compile_expression(expression, ast)
 }
 
 pub use bang_gc::HeapSize;

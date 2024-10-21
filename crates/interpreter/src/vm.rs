@@ -5,7 +5,7 @@ use super::{
   value::{Type, Value},
 };
 use bang_gc::{GcList, Heap, HeapSize};
-use bang_parser::{GetSpan, LineIndex, Span};
+use bang_syntax::{LineIndex, Span};
 
 use rustc_hash::FxHashMap as HashMap;
 use smartstring::alias::String as SmartString;
@@ -559,7 +559,7 @@ impl RuntimeError {
     let mut string = String::new();
 
     for location in &self.traceback {
-      let line = line_index.get_line(location.span);
+      let line = line_index.line(location.span);
       match &location.kind {
         StackTraceLocationKind::Root => {
           writeln!(&mut string, "at line {line}").unwrap();
@@ -575,14 +575,10 @@ impl RuntimeError {
 
     Some(string)
   }
-}
-impl GetSpan for RuntimeError {
-  fn span(&self) -> Span {
-    self
-      .traceback
-      .first()
-      .map(GetSpan::span)
-      .unwrap_or_default()
+
+  /// The location of the error in the source code
+  pub fn span(&self) -> Span {
+    self.traceback.first().map(|x| x.span).unwrap_or_default()
   }
 }
 impl fmt::Display for RuntimeError {
@@ -671,11 +667,6 @@ impl StackTraceLocation {
     let chunk = unsafe { &*frame.chunk };
 
     Self::from_chunk_ip(chunk, frame.ip, frame.offset)
-  }
-}
-impl GetSpan for StackTraceLocation {
-  fn span(&self) -> Span {
-    self.span
   }
 }
 #[derive(Clone, Debug)]

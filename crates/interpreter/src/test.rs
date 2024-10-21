@@ -6,7 +6,7 @@ use crate::{
   EmptyContext,
 };
 use bang_gc::HeapSize;
-use bang_parser::{parse, Allocator};
+use bang_syntax::parse;
 use indoc::indoc;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -26,8 +26,7 @@ impl From<crate::RuntimeError> for Error {
 }
 
 fn run(source: &str) -> Result<VM, Error> {
-  let allocator = Allocator::new();
-  let ast = parse(source, &allocator);
+  let ast = parse(source);
   assert!(ast.is_valid());
   let chunk = compile(&ast)?;
   let mut vm = VM::new(HeapSize::Small, &StandardContext).unwrap();
@@ -869,8 +868,7 @@ fn imports() {
 
 #[test]
 fn cant_import_anything_with_empty_context() {
-  let allocator = Allocator::new();
-  let ast = parse("from maths import { abs }", &allocator);
+  let ast = parse("from maths import { abs }");
   assert!(ast.is_valid());
   let chunk = compile(&ast).unwrap();
   let mut vm = VM::new(HeapSize::Small, &EmptyContext).unwrap();

@@ -91,7 +91,7 @@ name = "bang-interpreter"
 version = "3.0.0"
 dependencies = [
  "bang-gc",
- "bang-parser",
+ "bang-syntax",
  "indoc",
  "rustc-hash",
  "smartstring",

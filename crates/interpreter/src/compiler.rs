@@ -1,7 +1,7 @@
 use super::bytecode::{Chunk, ChunkBuilder, ConstantValue, OpCode};
-use bang_parser::{
+use bang_syntax::{
   ast::{expression::*, statement::*},
-  GetSpan, Span, AST,
+  Span, AST,
 };
 use std::{error, fmt, mem};
 
@@ -32,14 +32,14 @@ impl<'s> Compiler<'s> {
     self.chunk.finalize()
   }
 
-  pub fn compile(ast: &AST<'s, '_>) -> Result<Chunk, CompileError> {
+  pub fn compile(ast: &AST) -> Result<Chunk, CompileError> {
     let mut compiler = Compiler::new();
 
-    for statement in &ast.statements {
-      statement.compile(&mut compiler)?;
+    for statement in &ast.root_statements {
+      statement.compile(&mut compiler, ast)?;
 
       match statement {
-        Statement::Expression(_) => compiler.chunk.add_opcode(OpCode::Pop, statement.span()),
+        Statement::Expression(_) => compiler.chunk.add_opcode(OpCode::Pop, statement.span(ast)),
         Statement::Comment(_) | Statement::Import(_) | Statement::Let(_) | Statement::Return(_) => {
         }
       }
@@ -47,10 +47,12 @@ impl<'s> Compiler<'s> {
 
     Ok(compiler.finish())
   }
-  pub fn compile_expression(expression: &Expression<'s, '_>) -> Result<Chunk, CompileError> {
+  pub fn compile_expression(expression: &Expression, ast: &AST) -> Result<Chunk, CompileError> {
     let mut compiler = Compiler::new();
-    expression.compile(&mut compiler)?;
-    compiler.chunk.add_opcode(OpCode::Return, expression.span());
+    expression.compile(&mut compiler, ast)?;
+    compiler
+      .chunk
+      .add_opcode(OpCode::Return, expression.span(ast));
     Ok(compiler.finish())
   }
 
@@ -181,68 +183,68 @@ enum VariableStatus {
 }
 
 trait Compile<'s> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError>;
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST<'s>) -> Result<(), CompileError>;
 }
 
-impl<'s> Compile<'s> for Expression<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+impl<'s> Compile<'s> for Expression {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
     match self {
-      Expression::Binary(binary) => binary.compile(compiler),
-      Expression::Block(block) => block.compile(compiler),
-      Expression::Call(call) => call.compile(compiler),
-      Expression::Comment(comment) => comment.compile(compiler),
-      Expression::FormatString(format_string) => format_string.compile(compiler),
-      Expression::Function(function) => function.compile(compiler),
-      Expression::Group(group) => group.compile(compiler),
-      Expression::If(if_) => if_.compile(compiler),
-      Expression::Literal(literal) => literal.compile(compiler),
-      Expression::Match(match_) => match_.compile(compiler),
-      Expression::Unary(unary) => unary.compile(compiler),
-      Expression::Variable(variable) => variable.compile(compiler),
+      Expression::Binary(binary) => binary.compile(compiler, ast),
+      Expression::Block(block) => block.compile(compiler, ast),
+      Expression::Call(call) => call.compile(compiler, ast),
+      Expression::Comment(comment) => comment.compile(compiler, ast),
+      Expression::FormatString(format_string) => format_string.compile(compiler, ast),
+      Expression::Function(function) => function.compile(compiler, ast),
+      Expression::Group(group) => group.compile(compiler, ast),
+      Expression::If(if_) => if_.compile(compiler, ast),
+      Expression::Literal(literal) => literal.compile(compiler, ast),
+      Expression::Match(match_) => match_.compile(compiler, ast),
+      Expression::Unary(unary) => unary.compile(compiler, ast),
+      Expression::Variable(variable) => variable.compile(compiler, ast),
       Expression::Invalid(_) => Err(CompileError::InvalidAST),
     }
   }
 }
-impl<'s> Compile<'s> for Binary<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
-    match self.operator {
+impl<'s> Compile<'s> for Binary {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
+    match self.operator(ast) {
       BinaryOperator::And => {
-        self.left.compile(compiler)?;
-        let jump = compiler.add_jump(OpCode::JumpIfFalse, self.span);
-        compiler.chunk.add_opcode(OpCode::Pop, self.span);
-        self.right.compile(compiler)?;
+        self.left(ast).compile(compiler, ast)?;
+        let jump = compiler.add_jump(OpCode::JumpIfFalse, self.span(ast));
+        compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
+        self.right(ast).compile(compiler, ast)?;
         compiler.patch_jump(jump)?;
 
         return Ok(());
       }
       BinaryOperator::Or => {
-        self.left.compile(compiler)?;
-        let else_jump = compiler.add_jump(OpCode::JumpIfFalse, self.span);
-        let end_jump = compiler.add_jump(OpCode::Jump, self.span);
+        self.left(ast).compile(compiler, ast)?;
+        let else_jump = compiler.add_jump(OpCode::JumpIfFalse, self.span(ast));
+        let end_jump = compiler.add_jump(OpCode::Jump, self.span(ast));
 
         compiler.patch_jump(else_jump)?;
-        compiler.chunk.add_opcode(OpCode::Pop, self.span);
+        compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
 
-        self.right.compile(compiler)?;
+        self.right(ast).compile(compiler, ast)?;
         compiler.patch_jump(end_jump)?;
 
         return Ok(());
       }
       BinaryOperator::Pipeline => {
-        self.right.compile(compiler)?;
-        self.left.compile(compiler)?;
-        compiler.chunk.add_opcode(OpCode::Call, self.span);
+        self.right(ast).compile(compiler, ast)?;
+        self.left(ast).compile(compiler, ast)?;
+        compiler.chunk.add_opcode(OpCode::Call, self.span(ast));
 
         return Ok(());
       }
       _ => {}
     }
 
-    self.left.compile(compiler)?;
-    self.right.compile(compiler)?;
+    self.left(ast).compile(compiler, ast)?;
+    self.right(ast).compile(compiler, ast)?;
 
     compiler.chunk.add_opcode(
-      match self.operator {
+      match self.operator(ast) {
         BinaryOperator::Add => OpCode::Add,
         BinaryOperator::Subtract => OpCode::Subtract,
         BinaryOperator::Multiply => OpCode::Multiply,
@@ -258,77 +260,78 @@ impl<'s> Compile<'s> for Binary<'s, '_> {
         BinaryOperator::And | BinaryOperator::Or | BinaryOperator::Pipeline => {
           unreachable!("handled above")
         }
-        BinaryOperator::Invalid => unreachable!("invalid ast"),
+        BinaryOperator::InvalidSingleEqual => return Err(CompileError::InvalidAST),
       },
-      self.span,
+      self.span(ast),
     );
 
     Ok(())
   }
 }
-impl<'s> Compile<'s> for Block<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+impl<'s> Compile<'s> for Block {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
     compiler.begin_scope();
 
-    let (last, rest) = self.statements.split_last().unwrap();
-    for statement in rest {
-      statement.compile(compiler)?;
+    for (id, statement) in self.statements(ast).enumerate() {
+      statement.compile(compiler, ast)?;
 
-      match statement {
-        Statement::Expression(_) => compiler.chunk.add_opcode(OpCode::Pop, self.span),
-        Statement::Comment(_) | Statement::Import(_) | Statement::Let(_) | Statement::Return(_) => {
-        }
+      if let Statement::Expression(_) = statement
+        && id != self.len() - 1
+      {
+        compiler.chunk.add_opcode(OpCode::Pop, statement.span(ast));
       }
     }
-    last.compile(compiler)?;
 
-    compiler.end_scope(self.span)
+    compiler.end_scope(self.span(ast))
   }
 }
-impl<'s> Compile<'s> for Call<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
-    self.expression.compile(compiler)?;
-    if let Some(argument) = &self.argument {
-      argument.compile(compiler)?;
+impl<'s> Compile<'s> for Call {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
+    self.callee(ast).compile(compiler, ast)?;
+    if let Some(argument) = self.argument(ast) {
+      argument.compile(compiler, ast)?;
     } else {
-      compiler.chunk.add_opcode(OpCode::Null, self.span);
+      compiler.chunk.add_opcode(OpCode::Null, self.span(ast));
     }
-    compiler.chunk.add_opcode(OpCode::Call, self.span);
+    compiler.chunk.add_opcode(OpCode::Call, self.span(ast));
     Ok(())
   }
 }
-impl<'s> Compile<'s> for Comment<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
-    self.expression.compile(compiler)
+impl<'s> Compile<'s> for Comment {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
+    self.expression(ast).compile(compiler, ast)
   }
 }
-impl<'s> Compile<'s> for FormatString<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
-    compiler.add_constant(self.strings[0].string, self.strings[0].span)?;
-    for (index, expr) in self.expressions.iter().enumerate() {
-      expr.compile(compiler)?;
-      compiler.chunk.add_opcode(OpCode::ToString, expr.span());
-      compiler.chunk.add_opcode(OpCode::AddString, expr.span());
+impl<'s> Compile<'s> for FormatString {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
+    let mut strings = self.strings_with_spans(ast);
 
-      let string = &self.strings[index + 1];
-      compiler.add_constant(string.string, string.span)?;
-      compiler.chunk.add_opcode(OpCode::AddString, string.span);
+    let (first_string, first_string_span) = strings.next().unwrap();
+    compiler.add_constant(first_string, first_string_span)?;
+
+    for (expr, (string, string_span)) in self.expressions(ast).zip(strings) {
+      expr.compile(compiler, ast)?;
+      compiler.chunk.add_opcode(OpCode::ToString, expr.span(ast));
+      compiler.chunk.add_opcode(OpCode::AddString, expr.span(ast));
+
+      compiler.add_constant(string, string_span)?;
+      compiler.chunk.add_opcode(OpCode::AddString, string_span);
     }
 
     Ok(())
   }
 }
-impl<'s> Compile<'s> for Function<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
-    let name = self.name.as_ref().map_or("", |var| var.name);
+impl<'s> Compile<'s> for Function {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
+    let name = self.name(ast).unwrap_or("");
     compiler.new_chunk(name);
 
-    compiler.define_variable(self.parameter.name, self.span)?;
-    self.body.compile(compiler)?;
-    compiler.chunk.add_opcode(OpCode::Return, self.span);
+    compiler.define_variable(self.parameter.name(ast), self.span(ast))?;
+    self.body(ast).compile(compiler, ast)?;
+    compiler.chunk.add_opcode(OpCode::Return, self.span(ast));
 
-    let function_chunk = compiler.finish_chunk(self.span)?;
-    compiler.add_constant(function_chunk, self.span)?;
+    let function_chunk = compiler.finish_chunk(self.span(ast))?;
+    compiler.add_constant(function_chunk, self.span(ast))?;
 
     let upvalues = compiler.closures.pop().unwrap();
     if !upvalues.is_empty() {
@@ -339,14 +342,14 @@ impl<'s> Compile<'s> for Function<'s, '_> {
             VariableStatus::Closed => OpCode::GetLocal,
             VariableStatus::Upvalue => OpCode::GetAllocatedPointer,
           },
-          self.span,
+          self.span(ast),
         );
-        compiler.chunk.add_value(*upvalue_index, self.span);
+        compiler.chunk.add_value(*upvalue_index, self.span(ast));
       }
 
-      compiler.chunk.add_opcode(OpCode::Closure, self.span);
+      compiler.chunk.add_opcode(OpCode::Closure, self.span(ast));
       if let Ok(value) = u8::try_from(upvalues.len()) {
-        compiler.chunk.add_value(value, self.span);
+        compiler.chunk.add_value(value, self.span(ast));
       } else {
         return Err(CompileError::TooManyClosures);
       }
@@ -355,26 +358,26 @@ impl<'s> Compile<'s> for Function<'s, '_> {
     Ok(())
   }
 }
-impl<'s> Compile<'s> for Group<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
-    self.expression.compile(compiler)
+impl<'s> Compile<'s> for Group {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
+    self.expression(ast).compile(compiler, ast)
   }
 }
-impl<'s> Compile<'s> for If<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
-    self.condition.compile(compiler)?;
-    let jump_to_else = compiler.add_jump(OpCode::JumpIfFalse, self.span);
+impl<'s> Compile<'s> for If {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
+    self.condition(ast).compile(compiler, ast)?;
+    let jump_to_else = compiler.add_jump(OpCode::JumpIfFalse, self.span(ast));
 
-    compiler.chunk.add_opcode(OpCode::Pop, self.span);
-    self.then.compile(compiler)?;
-    let jump_to_end = compiler.add_jump(OpCode::Jump, self.span);
+    compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
+    self.then(ast).compile(compiler, ast)?;
+    let jump_to_end = compiler.add_jump(OpCode::Jump, self.span(ast));
 
     compiler.patch_jump(jump_to_else)?;
-    compiler.chunk.add_opcode(OpCode::Pop, self.span);
-    if let Some(otherwise) = &self.otherwise {
-      otherwise.compile(compiler)?;
+    compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
+    if let Some(otherwise) = &self.otherwise(ast) {
+      otherwise.compile(compiler, ast)?;
     } else {
-      compiler.chunk.add_opcode(OpCode::Null, self.span);
+      compiler.chunk.add_opcode(OpCode::Null, self.span(ast));
     }
 
     compiler.patch_jump(jump_to_end)?;
@@ -382,37 +385,37 @@ impl<'s> Compile<'s> for If<'s, '_> {
     Ok(())
   }
 }
-impl<'s> Compile<'s> for Literal<'s> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
-    match self.kind {
-      LiteralKind::Boolean(true) => compiler.chunk.add_opcode(OpCode::True, self.span),
-      LiteralKind::Boolean(false) => compiler.chunk.add_opcode(OpCode::False, self.span),
-      LiteralKind::Number { value, .. } => compiler.chunk.add_number(value, self.span),
-      LiteralKind::String(value) => compiler.add_constant(value, self.span)?,
+impl<'s> Compile<'s> for Literal {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
+    match self.value(ast) {
+      LiteralValue::Boolean(true) => compiler.chunk.add_opcode(OpCode::True, self.span(ast)),
+      LiteralValue::Boolean(false) => compiler.chunk.add_opcode(OpCode::False, self.span(ast)),
+      LiteralValue::Number(value) => compiler.chunk.add_number(value, self.span(ast)),
+      LiteralValue::String(value) => compiler.add_constant(value, self.span(ast))?,
     };
 
     Ok(())
   }
 }
-impl<'s> Compile<'s> for Match<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+impl<'s> Compile<'s> for Match {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
     let is_exhaustive = self
-      .cases
-      .iter()
-      .any(|case| case.guard.is_none() && matches!(case.pattern, Pattern::Identifier(_)));
+      .arms()
+      .any(|case| case.guard(ast).is_none() && matches!(case.pattern, Pattern::Identifier(_)));
 
-    self.value.compile(compiler)?;
+    let span = self.span(ast);
+    self.value(ast).compile(compiler, ast)?;
 
     let mut case_end_jumps = Vec::new();
-    for case in &self.cases {
+    for case in self.arms() {
       if let Pattern::Identifier(variable) = &case.pattern
-        && case.guard.is_none()
+        && case.guard(ast).is_none()
       {
-        compiler.chunk.add_opcode(OpCode::Peek, self.span);
+        compiler.chunk.add_opcode(OpCode::Peek, span);
         compiler.begin_scope();
-        compiler.define_variable(variable.name, variable.span)?;
-        case.expression.compile(compiler)?;
-        compiler.end_scope(case.span)?; // clears up the value being matched upon
+        compiler.define_variable(variable.name(ast), variable.span(ast))?;
+        case.expression(ast).compile(compiler, ast)?;
+        compiler.end_scope(case.span(ast))?; // clears up the value being matched upon
         break; // optimisation: nothing can match after this
       }
 
@@ -420,72 +423,73 @@ impl<'s> Compile<'s> for Match<'s, '_> {
       match &case.pattern {
         Pattern::Identifier(variable) => {
           compiler.begin_scope();
-          compiler.chunk.add_opcode(OpCode::Peek, self.span);
-          compiler.define_variable(variable.name, variable.span)?;
+          compiler.chunk.add_opcode(OpCode::Peek, span);
+          compiler.define_variable(variable.name(ast), variable.span(ast))?;
 
           // This statement is only used when there is a guard
           // Other guards already have a condition, so we and the guard, to simplify we and with if
-          compiler.chunk.add_opcode(OpCode::True, self.span);
+          compiler.chunk.add_opcode(OpCode::True, span);
 
           bound_variable = true;
         }
         Pattern::Literal(literal) => {
-          compiler.chunk.add_opcode(OpCode::Peek, self.span);
-          literal.compile(compiler)?;
-          compiler.chunk.add_opcode(OpCode::Equals, self.span);
+          compiler.chunk.add_opcode(OpCode::Peek, span);
+          literal.compile(compiler, ast)?;
+          compiler.chunk.add_opcode(OpCode::Equals, span);
         }
-        Pattern::Range(range) => match (&range.start, &range.end) {
+        Pattern::Range(start, end) => match (start, end) {
           (None, Some(pattern)) => {
-            compiler.chunk.add_opcode(OpCode::Peek, self.span);
-            pattern.get_range_literal().compile(compiler)?;
-            compiler.chunk.add_opcode(OpCode::LessEqual, self.span);
+            compiler.chunk.add_opcode(OpCode::Peek, span);
+            pattern.compile(compiler, ast)?;
+            compiler.chunk.add_opcode(OpCode::LessEqual, span);
           }
           (Some(pattern), None) => {
-            compiler.chunk.add_opcode(OpCode::Peek, self.span);
-            pattern.get_range_literal().compile(compiler)?;
-            compiler.chunk.add_opcode(OpCode::GreaterEqual, self.span);
+            compiler.chunk.add_opcode(OpCode::Peek, span);
+            pattern.compile(compiler, ast)?;
+            compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
           }
           (Some(greater_than), Some(less_than)) => {
-            compiler.chunk.add_opcode(OpCode::Peek, self.span);
-            greater_than.get_range_literal().compile(compiler)?;
-            compiler.chunk.add_opcode(OpCode::GreaterEqual, self.span);
+            compiler.chunk.add_opcode(OpCode::Peek, span);
+            greater_than.compile(compiler, ast)?;
+            compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
 
-            let jump = compiler.add_jump(OpCode::JumpIfFalse, self.span);
-            compiler.chunk.add_opcode(OpCode::Pop, self.span);
+            let jump = compiler.add_jump(OpCode::JumpIfFalse, span);
+            compiler.chunk.add_opcode(OpCode::Pop, span);
 
-            compiler.chunk.add_opcode(OpCode::Peek, self.span);
-            less_than.get_range_literal().compile(compiler)?;
-            compiler.chunk.add_opcode(OpCode::LessEqual, self.span);
+            compiler.chunk.add_opcode(OpCode::Peek, span);
+            less_than.compile(compiler, ast)?;
+            compiler.chunk.add_opcode(OpCode::LessEqual, span);
 
             compiler.patch_jump(jump)?;
           }
           (None, None) => unreachable!("range has bound, checked in parser"),
         },
+        Pattern::Invalid => unreachable!("compile only valid ASTs"),
       }
 
-      if let Some(guard) = &case.guard {
-        let jump = compiler.add_jump(OpCode::JumpIfFalse, self.span);
-        compiler.chunk.add_opcode(OpCode::Pop, self.span);
-        guard.compile(compiler)?;
+      if let Some(guard) = &case.guard(ast) {
+        let jump = compiler.add_jump(OpCode::JumpIfFalse, self.span(ast));
+        compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
+        guard.compile(compiler, ast)?;
         compiler.patch_jump(jump)?;
       }
 
       // If it does, do the expression
-      let non_match_jump = compiler.add_jump(OpCode::JumpIfFalse, self.span);
-      compiler.chunk.add_opcode(OpCode::Pop, self.span);
-      case.expression.compile(compiler)?;
-      case_end_jumps.push(compiler.add_jump(OpCode::Jump, self.span));
+      let non_match_jump = compiler.add_jump(OpCode::JumpIfFalse, self.span(ast));
+      compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
+      case.expression(ast).compile(compiler, ast)?;
+      case_end_jumps.push(compiler.add_jump(OpCode::Jump, self.span(ast)));
 
       // Otherwise skip to the next case
       if bound_variable {
-        compiler.end_scope(case.span)?;
+        compiler.end_scope(case.span(ast))?;
       }
       compiler.patch_jump(non_match_jump)?;
-      compiler.chunk.add_opcode(OpCode::Pop, self.span);
+      compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
     }
 
     if !is_exhaustive {
-      compiler.chunk.add_opcode(OpCode::Null, self.span);
+      compiler.chunk.add_opcode(OpCode::Null, self.span(ast));
     }
 
     for jump in case_end_jumps {
@@ -493,44 +497,44 @@ impl<'s> Compile<'s> for Match<'s, '_> {
     }
 
     // Remove the value being matched upon
-    compiler.chunk.add_opcode(OpCode::PopBelow, self.span);
-    compiler.chunk.add_value(1, self.span);
+    compiler.chunk.add_opcode(OpCode::PopBelow, self.span(ast));
+    compiler.chunk.add_value(1, self.span(ast));
 
     Ok(())
   }
 }
-impl<'s> Compile<'s> for Unary<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
-    self.expression.compile(compiler)?;
+impl<'s> Compile<'s> for Unary {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
+    self.expression(ast).compile(compiler, ast)?;
 
     compiler.chunk.add_opcode(
-      match self.operator {
+      match self.operator(ast) {
         UnaryOperator::Not => OpCode::Not,
         UnaryOperator::Minus => OpCode::Negate,
       },
-      self.span,
+      self.span(ast),
     );
 
     Ok(())
   }
 }
-impl<'s> Compile<'s> for Variable<'s> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+impl<'s> Compile<'s> for Variable {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
+    let span = self.span(ast);
+
     // See if the variable is local to the current function
     if let Some(local_position) = compiler
       .function_locals()
       .iter()
-      .rposition(|local| local.name == self.name)
+      .rposition(|local| local.name == self.name(ast))
     {
       match compiler.function_locals()[local_position].status {
-        VariableStatus::Open => compiler.chunk.add_opcode(OpCode::GetLocal, self.span),
-        VariableStatus::Closed => compiler
-          .chunk
-          .add_opcode(OpCode::GetAllocatedValue, self.span),
+        VariableStatus::Open => compiler.chunk.add_opcode(OpCode::GetLocal, span),
+        VariableStatus::Closed => compiler.chunk.add_opcode(OpCode::GetAllocatedValue, span),
         VariableStatus::Upvalue => unreachable!("we are only checking the current scope"),
       }
       if let Ok(local_position) = u8::try_from(local_position) {
-        compiler.chunk.add_value(local_position, self.span);
+        compiler.chunk.add_value(local_position, span);
       } else {
         Err(CompileError::TooManyLocalVariables)?;
       }
@@ -548,7 +552,7 @@ impl<'s> Compile<'s> for Variable<'s> {
       .find_map(|(scope_index, locals)| {
         locals
           .iter()
-          .rposition(|local| local.name == self.name)
+          .rposition(|local| local.name == self.name(ast))
           .map(|local_index| (scope_index, local_index))
       })
     {
@@ -569,9 +573,9 @@ impl<'s> Compile<'s> for Variable<'s> {
         status = VariableStatus::Upvalue;
       }
 
-      compiler.chunk.add_opcode(OpCode::GetUpvalue, self.span);
+      compiler.chunk.add_opcode(OpCode::GetUpvalue, span);
       if let Ok(index) = u8::try_from(index) {
-        compiler.chunk.add_value(index, self.span);
+        compiler.chunk.add_value(index, span);
       } else {
         Err(CompileError::TooManyClosures)?;
       }
@@ -580,51 +584,51 @@ impl<'s> Compile<'s> for Variable<'s> {
     }
 
     // Otherwise, it must be a global variable
-    compiler.chunk.add_opcode(OpCode::GetGlobal, self.span);
-    compiler.add_symbol(self.name, self.span)?;
+    compiler.chunk.add_opcode(OpCode::GetGlobal, span);
+    compiler.add_symbol(self.name(ast), span)?;
 
     Ok(())
   }
 }
 
-impl<'s> Compile<'s> for Statement<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
+impl<'s> Compile<'s> for Statement {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
     match self {
       Statement::Comment(_) => Ok(()),
-      Statement::Expression(expression) => expression.compile(compiler),
-      Statement::Import(import) => import.compile(compiler),
-      Statement::Let(let_) => let_.compile(compiler),
-      Statement::Return(return_) => return_.compile(compiler),
+      Statement::Expression(expression) => expression.expression(ast).compile(compiler, ast),
+      Statement::Import(import) => import.compile(compiler, ast),
+      Statement::Let(let_) => let_.compile(compiler, ast),
+      Statement::Return(return_) => return_.compile(compiler, ast),
     }
   }
 }
-impl<'s> Compile<'s> for Import<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
-    for item in &self.items {
+impl<'s> Compile<'s> for Import {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
+    for item in self.items(ast) {
       compiler.chunk.add_opcode(OpCode::Import, item.span);
-      compiler.add_symbol(self.module.name, item.span)?;
-      compiler.add_symbol(item.name.name, item.span)?;
+      compiler.add_symbol(self.module(ast), item.span)?;
+      compiler.add_symbol(item.name, item.span)?;
 
       if let Some(alias) = &item.alias {
-        compiler.define_variable(alias.name, item.span)?;
+        compiler.define_variable(alias, item.span)?;
       } else {
-        compiler.define_variable(item.name.name, item.span)?;
+        compiler.define_variable(item.name, item.span)?;
       }
     }
 
     Ok(())
   }
 }
-impl<'s> Compile<'s> for Let<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
-    self.expression.compile(compiler)?;
-    compiler.define_variable(self.identifier.name, self.span)
+impl<'s> Compile<'s> for Let {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
+    self.value(ast).compile(compiler, ast)?;
+    compiler.define_variable(self.identifier(ast), self.span(ast))
   }
 }
-impl<'s> Compile<'s> for Return<'s, '_> {
-  fn compile(&self, compiler: &mut Compiler<'s>) -> Result<(), CompileError> {
-    self.expression.compile(compiler)?;
-    compiler.chunk.add_opcode(OpCode::Return, self.span());
+impl<'s> Compile<'s> for Return {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
+    self.expression(ast).compile(compiler, ast)?;
+    compiler.chunk.add_opcode(OpCode::Return, self.span(ast));
     Ok(())
   }
 }

@@ -1,4 +1,4 @@
-use bang_parser::Span;
+use bang_syntax::Span;
 use smartstring::alias::String as SmartString;
 use std::{fmt, mem, ptr};
 
