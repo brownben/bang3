@@ -1,6 +1,6 @@
 //! Definitions of the lint rules
 use super::{
-  helpers::{unwrap, ASTEquality, IsConstant},
+  helpers::{is_zero, unwrap, ASTEquality, IsConstant, ReturnAnalysis},
   Context, LintRule,
 };
 use bang_syntax::{
@@ -232,16 +232,6 @@ impl LintRule for NoErasingOperations {
     "this operation always returns 0"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
-    fn is_zero(expression: &Expression, ast: &AST) -> bool {
-      if let Expression::Literal(literal) = &expression
-        && let LiteralValue::Number(value) = &literal.value(ast)
-      {
-        return *value == 0.0;
-      }
-
-      false
-    }
-
     if let Expression::Binary(binary) = &expression
       && binary.operator(ast) == BinaryOperator::Multiply
       && (is_zero(unwrap(binary.left(ast), ast), ast)
@@ -289,50 +279,8 @@ impl LintRule for NoUnnecessaryReturn {
     "return statement is unnecessary, as a block returns the last expression"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
-    #[allow(clippy::match_same_arms)]
-    fn ends_with_return(expression: &Expression, ast: &AST) -> Option<Span> {
-      match expression {
-        Expression::Block(block) => block
-          .statements(ast)
-          .rev()
-          .find(|statement| !matches!(statement, Statement::Comment(_)))
-          .and_then(|statement| match statement {
-            Statement::Comment(_) | Statement::Import(_) | Statement::Let(_) => None,
-            Statement::Expression(expression) => ends_with_return(expression.expression(ast), ast),
-            Statement::Return(_) => Some(statement.span(ast)),
-          }),
-
-        // Could contain a block with return sensibly at the end
-        Expression::Group(group) => ends_with_return(group.expression(ast), ast),
-        Expression::If(if_) => {
-          if let Some(otherwise) = &if_.otherwise(ast) {
-            ends_with_return(otherwise, ast).or(ends_with_return(if_.then(ast), ast))
-          } else {
-            None
-          }
-        }
-        Expression::Match(match_) => match_
-          .arms()
-          .find_map(|case| ends_with_return(case.expression(ast), ast)),
-
-        // Can never end with a return
-        Expression::Function(_)
-        | Expression::Literal(_)
-        | Expression::Variable(_)
-        | Expression::Invalid(_) => None,
-
-        // Could feasibly end with a return,
-        // but would be contrived code as would skip the primary operation
-        Expression::Binary(_)
-        | Expression::Comment(_)
-        | Expression::Call(_)
-        | Expression::FormatString(_)
-        | Expression::Unary(_) => None,
-      }
-    }
-
     if let Expression::Function(function) = &expression {
-      if let Some(return_span) = ends_with_return(function.body(ast), ast) {
+      if let Some(return_span) = function.body(ast).ends_with_return(ast) {
         context.add_diagnostic(&Self, return_span);
       }
     }
@@ -351,50 +299,8 @@ impl LintRule for NoUnreachableCode {
     true
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
-    fn statement_always_returns(statement: &Statement, ast: &AST) -> bool {
-      match statement {
-        Statement::Return(_) => true,
-        Statement::Expression(expression) => always_returns(expression.expression(ast), ast),
-        Statement::Let(_) | Statement::Comment(_) | Statement::Import(_) => false,
-      }
-    }
-    fn always_returns(expression: &Expression, ast: &AST) -> bool {
-      #[allow(clippy::match_same_arms)]
-      match expression {
-        Expression::Block(block) => block
-          .statements(ast)
-          .any(|s| statement_always_returns(s, ast)),
-
-        // Could contain a block with return sensibly at the end
-        Expression::Group(group) => always_returns(group.expression(ast), ast),
-        Expression::If(if_) => {
-          always_returns(if_.then(ast), ast)
-            && if_.otherwise(ast).is_some_and(|x| always_returns(x, ast))
-        }
-        Expression::Match(match_) => match_
-          .arms()
-          .all(|case| always_returns(case.expression(ast), ast)),
-
-        // Can never end with a return
-        Expression::Function(_)
-        | Expression::Literal(_)
-        | Expression::Variable(_)
-        | Expression::Invalid(_) => false,
-
-        // Could feasibly end with a return,
-        // but would be contrived code as would skip the primary operation
-        Expression::Binary(_)
-        | Expression::Comment(_)
-        | Expression::Call(_)
-        | Expression::FormatString(_)
-        | Expression::Unary(_) => false,
-      }
-    }
-
     if let Expression::Block(block) = expression {
-      let return_index = block
-        .statements(ast)
-        .position(|s| statement_always_returns(s, ast));
+      let return_index = block.statements(ast).position(|s| s.always_returns(ast));
 
       if let Some(return_index) = return_index
         && return_index < block.len() - 1
