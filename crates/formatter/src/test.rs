@@ -118,6 +118,13 @@ fn call() {
   assert_format!("function((a))", "function(a)", 25);
   assert_format!("function(((a)))", "function(a)", 25);
   assert_format!("function(((a)))", "function(\n  a\n)", 8);
+
+  assert_format!("function({a})", "function(a)", 25);
+  assert_format!(
+    "function({\na\n// comment\n})",
+    "function(\n  {\n    a\n    // comment\n  }\n)",
+    25
+  );
 }
 
 #[test]
@@ -269,6 +276,16 @@ fn match_() {
   assert_format!(
     "(match n | ''.. if x > 5 -> a | b -> '')",
     "(\n  match n\n    | ''.. if x > 5 -> a\n    | b -> ''\n)",
+    100
+  );
+  assert_format!(
+    "match n | ..1 -> a |1..2 -> b | 2.. -> c",
+    "match n\n  | ..1 -> a\n  | 1..2 -> b\n  | 2.. -> c",
+    100
+  );
+  assert_format!(
+    "match n | 1 -> a | 2.25 -> b | 'hello' -> c",
+    "match n\n  | 1 -> a\n  | 2.25 -> b\n  | 'hello' -> c",
     100
   );
 }

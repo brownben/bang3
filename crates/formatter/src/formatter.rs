@@ -46,7 +46,6 @@ impl<'source: 'allocator, 'allocator> Formatter<'source, 'allocator> {
     mut ir: [IR<'source, 'allocator>; N],
   ) -> IR<'source, 'allocator> {
     let ir = match N {
-      0 => IR::Empty,
       1 => mem::take(&mut ir[0]),
       _ => IR::Concat(Vec::from_iter_in(ir, self.allocator)),
     };
@@ -77,13 +76,9 @@ impl<'source: 'allocator, 'allocator> Formatter<'source, 'allocator> {
   /// Merge multiple IRs into a single IR
   pub(crate) fn concat<const N: usize>(
     &self,
-    mut ir: [IR<'source, 'allocator>; N],
+    ir: [IR<'source, 'allocator>; N],
   ) -> IR<'source, 'allocator> {
-    match N {
-      0 => IR::Empty,
-      1 => mem::take(&mut ir[0]),
-      _ => IR::Concat(Vec::from_iter_in(ir, self.allocator)),
-    }
+    IR::Concat(Vec::from_iter_in(ir, self.allocator))
   }
 
   /// Merge multiple IRs together from an iterator
@@ -260,11 +255,8 @@ impl DisplayIR<'_, '_> {
   /// The length of the display item on the final line
   pub fn end_len(&self) -> u16 {
     match self {
-      DisplayIR::Empty => 0,
+      DisplayIR::Empty | DisplayIR::Line { .. } => 0,
       DisplayIR::Text(text) => u16::try_from(text.len()).unwrap(),
-      DisplayIR::Line {
-        depth, indentation, ..
-      } => indentation.len() * depth,
       DisplayIR::Collection(x) => x
         .iter()
         .rev()
