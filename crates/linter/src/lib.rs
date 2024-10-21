@@ -5,29 +5,26 @@
 #![feature(decl_macro)]
 #![deny(unsafe_code)]
 
-use bang_parser::{
-  ast::{Expression, Statement},
-  GetSpan, Span, AST,
+use bang_syntax::{
+  ast::{expression::Expression, statement::Statement},
+  Span, AST,
 };
 use std::{error, fmt};
 
 mod helpers;
 mod rules;
-mod visitor;
 
 #[cfg(test)]
 mod test;
-use visitor::Visitor;
 
 /// Runs the linter against a given AST, returns a list of diagnostics found
 ///
 /// # Examples
 /// ```
 /// use bang_linter::lint;
-/// use bang_parser::{parse, Allocator};
-/// let allocator = Allocator::new();
+/// use bang_syntax::parse;
 /// let source = "5 + 3";
-/// let ast = parse(source, &allocator);
+/// let ast = parse(source);
 /// let diagnostics = lint(&ast);
 /// ```
 #[must_use]
@@ -45,24 +42,23 @@ impl Linter {
   }
 
   fn check(mut self, ast: &AST) -> Vec<LintDiagnostic> {
+    for statement in &ast.root_statements {
+      for rule in rules::RULES {
+        rule.visit_statement(&mut self.context, statement, ast);
+      }
+    }
     for statement in &ast.statements {
-      self.visit_statement(statement);
+      for rule in rules::RULES {
+        rule.visit_statement(&mut self.context, statement, ast);
+      }
+    }
+    for expression in &ast.expressions {
+      for rule in rules::RULES {
+        rule.visit_expression(&mut self.context, expression, ast);
+      }
     }
 
     self.context.diagnostics
-  }
-}
-impl Visitor for Linter {
-  fn enter_expression(&mut self, expression: &Expression) {
-    for rule in rules::RULES {
-      rule.visit_expression(&mut self.context, expression);
-    }
-  }
-
-  fn enter_statement(&mut self, statement: &Statement) {
-    for rule in rules::RULES {
-      rule.visit_statement(&mut self.context, statement);
-    }
   }
 }
 
@@ -73,8 +69,12 @@ trait LintRule {
     false
   }
 
-  fn visit_expression(&self, _: &mut Context, _: &Expression) {}
-  fn visit_statement(&self, _: &mut Context, _: &Statement) {}
+  fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
+    let (_, _, _) = (context, expression, ast);
+  }
+  fn visit_statement(&self, context: &mut Context, statement: &Statement, ast: &AST) {
+    let (_, _, _) = (context, statement, ast);
+  }
 }
 
 #[derive(Debug, Default)]
@@ -119,9 +119,9 @@ impl LintDiagnostic {
   pub fn is_unused(&self) -> bool {
     self.is_unused
   }
-}
-impl GetSpan for LintDiagnostic {
-  fn span(&self) -> Span {
+
+  /// The span of the source code which triggered this diagnostic
+  pub fn span(&self) -> Span {
     self.span
   }
 }

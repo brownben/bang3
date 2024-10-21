@@ -4,7 +4,7 @@ version = "3.0.0"
 edition = "2021"
 
 [dependencies]
-bang-parser = { path = "../parser" }
+bang-syntax = { path = "../syntax" }
 
 [lints]
 workspace = true

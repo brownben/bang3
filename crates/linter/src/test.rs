@@ -1,10 +1,8 @@
 use crate::lint as lint_ast;
-use bang_parser::{parse, Allocator};
+use bang_syntax::parse;
 
 fn lint(source: &str) -> Result<(), ()> {
-  let allocator = Allocator::new();
-  let ast = parse(source, &allocator);
-  let diagnostics = lint_ast(&ast);
+  let diagnostics = lint_ast(&parse(source));
 
   if diagnostics.is_empty() {
     Ok(())
@@ -64,18 +62,6 @@ fn no_self_comparison() {
   assert!(lint("a < b").is_ok());
   assert!(lint("a > d").is_ok());
   assert!(lint("a > { d \n b }").is_ok());
-}
-
-#[test]
-fn no_todo_comment() {
-  assert!(lint("7 != x // TODO: stuff").is_err());
-  assert!(lint("7 // TODO: stuff").is_err());
-  assert!(lint("// TODO: jkfal").is_err());
-
-  assert!(lint("// still todo").is_ok());
-  assert!(lint("// ToDo: ").is_ok());
-  assert!(lint("// Yet TODO: ").is_ok());
-  assert!(lint("// TOD0: 2").is_ok());
 }
 
 #[test]

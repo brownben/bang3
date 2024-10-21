@@ -1,16 +1,18 @@
 //! Definitions of the lint rules
 use super::{
-  helpers::{ASTEquality, IsConstant},
+  helpers::{unwrap, ASTEquality, IsConstant},
   Context, LintRule,
 };
-use bang_parser::ast::{expression::*, statement::*, GetSpan, Span};
+use bang_syntax::{
+  ast::{expression::*, statement::*},
+  Span, AST,
+};
 
-pub const RULES: [&dyn LintRule; 16] = [
+pub const RULES: [&dyn LintRule; 15] = [
   &NoConstantConditions,
   &NoNegativeZero,
   &NoSelfAssign,
   &NoSelfComparison,
-  &NoTodoComments,
   &NoUnderscoreVariableUse,
   &NoUselessMatch,
   &NoYodaComparison,
@@ -32,21 +34,21 @@ impl LintRule for NoConstantConditions {
   fn message(&self) -> &'static str {
     "the control flow could be removed, as the condition is always the same"
   }
-  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+  fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
     if let Expression::If(if_) = &expression
-      && if_.condition.is_constant()
+      && if_.condition(ast).is_constant(ast)
     {
-      context.add_diagnostic(&Self, if_.condition.span());
+      context.add_diagnostic(&Self, if_.condition(ast).span(ast));
     }
 
     if let Expression::Match(match_) = &expression {
-      if match_.value.is_constant() {
-        context.add_diagnostic(&Self, match_.value.span());
+      if match_.value(ast).is_constant(ast) {
+        context.add_diagnostic(&Self, match_.value(ast).span(ast));
       }
 
-      for case in match_.cases.iter().flat_map(|case| &case.guard) {
-        if case.is_constant() {
-          context.add_diagnostic(&Self, case.span());
+      for case in match_.arms().filter_map(|case| case.guard(ast)) {
+        if case.is_constant(ast) {
+          context.add_diagnostic(&Self, case.span(ast));
         }
       }
     }
@@ -61,14 +63,14 @@ impl LintRule for NoNegativeZero {
   fn message(&self) -> &'static str {
     "negative zero is unnecessary as 0 == -0"
   }
-  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+  fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
     if let Expression::Unary(unary) = &expression
-      && unary.operator == UnaryOperator::Minus
-      && let Expression::Literal(literal) = &unary.expression
-      && let LiteralKind::Number { value, .. } = literal.kind
+      && unary.operator(ast) == UnaryOperator::Minus
+      && let Expression::Literal(literal) = &unary.expression(ast)
+      && let LiteralValue::Number(value) = literal.value(ast)
       && value == 0.0
     {
-      context.add_diagnostic(&Self, unary.span());
+      context.add_diagnostic(&Self, unary.span(ast));
     }
   }
 }
@@ -81,12 +83,12 @@ impl LintRule for NoSelfAssign {
   fn message(&self) -> &'static str {
     "assigning a variable to itself is unnecessary"
   }
-  fn visit_statement(&self, context: &mut Context, expression: &Statement) {
+  fn visit_statement(&self, context: &mut Context, expression: &Statement, ast: &AST) {
     if let Statement::Let(let_) = &expression
-      && let Expression::Variable(variable) = &let_.expression.unwrap()
-      && let_.identifier.name == variable.name
+      && let Expression::Variable(variable) = unwrap(let_.value(ast), ast)
+      && let_.identifier(ast) == variable.name(ast)
     {
-      context.add_diagnostic(&Self, let_.span());
+      context.add_diagnostic(&Self, let_.span(ast));
     }
   }
 }
@@ -99,7 +101,7 @@ impl LintRule for NoSelfComparison {
   fn message(&self) -> &'static str {
     "comparing a variable to itself is unnecessary"
   }
-  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+  fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
     fn is_comparison(operator: BinaryOperator) -> bool {
       matches!(
         operator,
@@ -113,34 +115,10 @@ impl LintRule for NoSelfComparison {
     }
 
     if let Expression::Binary(binary) = &expression
-      && is_comparison(binary.operator)
-      && binary.left.equals(&binary.right)
+      && is_comparison(binary.operator(ast))
+      && binary.left(ast).equals(binary.right(ast), ast)
     {
-      context.add_diagnostic(&Self, binary.span());
-    }
-  }
-}
-
-pub struct NoTodoComments;
-impl LintRule for NoTodoComments {
-  fn name(&self) -> &'static str {
-    "No TODO Comments"
-  }
-  fn message(&self) -> &'static str {
-    "line contains TODO, consider resolving the issue"
-  }
-  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
-    if let Expression::Comment(comment) = &expression
-      && comment.text.trim().starts_with("TODO:")
-    {
-      context.add_diagnostic(&Self, comment.message_span);
-    }
-  }
-  fn visit_statement(&self, context: &mut Context, statement: &Statement) {
-    if let Statement::Comment(comment) = &statement
-      && comment.text.trim().starts_with("TODO:")
-    {
-      context.add_diagnostic(&Self, comment.span());
+      context.add_diagnostic(&Self, binary.span(ast));
     }
   }
 }
@@ -153,11 +131,11 @@ impl LintRule for NoUnderscoreVariableUse {
   fn message(&self) -> &'static str {
     "`_` indicates the variable/ parameter is not used, but it has been used"
   }
-  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+  fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
     if let Expression::Variable(variable) = &expression
-      && variable.name == "_"
+      && variable.name(ast) == "_"
     {
-      context.add_diagnostic(&Self, variable.span());
+      context.add_diagnostic(&Self, variable.span(ast));
     }
   }
 }
@@ -170,12 +148,13 @@ impl LintRule for NoUselessMatch {
   fn message(&self) -> &'static str {
     "match statement is unnecessary as the first case matches everything"
   }
-  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+  fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
     if let Expression::Match(match_) = &expression
-      && let Pattern::Identifier(_) = match_.cases[0].pattern
-      && match_.cases[0].guard.is_none()
+      && let Some(first_arm) = match_.arms().next()
+      && let Pattern::Identifier(_) = first_arm.pattern
+      && first_arm.guard(ast).is_none()
     {
-      context.add_diagnostic(&Self, match_.span());
+      context.add_diagnostic(&Self, match_.span(ast));
     }
   }
 }
@@ -188,13 +167,13 @@ impl LintRule for NoYodaComparison {
   fn message(&self) -> &'static str {
     "it is clearer to have the variable first then the value to compare to"
   }
-  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+  fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
     if let Expression::Binary(binary) = &expression
-      && let BinaryOperator::Equal | BinaryOperator::NotEqual = binary.operator
-      && let Expression::Variable(_) = binary.right.unwrap()
-      && let Expression::Literal(_) = binary.left.unwrap()
+      && let BinaryOperator::Equal | BinaryOperator::NotEqual = binary.operator(ast)
+      && let Expression::Variable(_) = unwrap(binary.right(ast), ast)
+      && let Expression::Literal(_) = unwrap(binary.left(ast), ast)
     {
-      context.add_diagnostic(&Self, binary.span());
+      context.add_diagnostic(&Self, binary.span(ast));
     }
   }
 }
@@ -208,19 +187,19 @@ impl LintRule for NoUnnecessaryClosures {
     "function could just be passed directly, without being wrapped in another function"
   }
 
-  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+  fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
     if let Expression::Function(function) = &expression
-      && let Expression::Call(call) = &function.body.unwrap()
+      && let Expression::Call(call) = unwrap(function.body(ast), ast)
     {
-      if let Some(argument) = &call.argument
-        && let Expression::Variable(variable) = argument.unwrap()
-        && variable.name == function.parameter.name
+      if let Some(argument) = &call.argument(ast)
+        && let Expression::Variable(variable) = unwrap(argument, ast)
+        && variable.name(ast) == function.parameter.name(ast)
       {
-        context.add_diagnostic(&Self, function.span());
+        context.add_diagnostic(&Self, function.span(ast));
       }
 
-      if call.argument.is_none() && function.parameter.name.starts_with('_') {
-        context.add_diagnostic(&Self, function.span());
+      if call.argument(ast).is_none() && function.parameter.name(ast).starts_with('_') {
+        context.add_diagnostic(&Self, function.span(ast));
       }
     }
   }
@@ -234,12 +213,12 @@ impl LintRule for NoUselessIf {
   fn message(&self) -> &'static str {
     "both branches of the if-else are the same, consider removing the if"
   }
-  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+  fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
     if let Expression::If(if_) = &expression
-      && let Some(otherwise) = &if_.otherwise
-      && if_.then.unwrap().equals(otherwise.unwrap())
+      && let Some(otherwise) = &if_.otherwise(ast)
+      && if_.then(ast).equals(otherwise, ast)
     {
-      context.add_diagnostic(&Self, if_.span());
+      context.add_diagnostic(&Self, if_.span(ast));
     }
   }
 }
@@ -252,29 +231,30 @@ impl LintRule for NoErasingOperations {
   fn message(&self) -> &'static str {
     "this operation always returns 0"
   }
-  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
-    fn is_zero(expression: &Expression) -> bool {
-      match expression {
-        Expression::Literal(literal) => match literal.kind {
-          LiteralKind::Number { value, .. } => value == 0.0,
-          _ => false,
-        },
-        _ => false,
+  fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
+    fn is_zero(expression: &Expression, ast: &AST) -> bool {
+      if let Expression::Literal(literal) = &expression
+        && let LiteralValue::Number(value) = &literal.value(ast)
+      {
+        return *value == 0.0;
       }
+
+      false
     }
 
     if let Expression::Binary(binary) = &expression
-      && binary.operator == BinaryOperator::Multiply
-      && (is_zero(binary.left.unwrap()) || is_zero(binary.right.unwrap()))
+      && binary.operator(ast) == BinaryOperator::Multiply
+      && (is_zero(unwrap(binary.left(ast), ast), ast)
+        || is_zero(unwrap(binary.right(ast), ast), ast))
     {
-      context.add_diagnostic(&Self, binary.span());
+      context.add_diagnostic(&Self, binary.span(ast));
     }
 
     if let Expression::Binary(binary) = &expression
-      && binary.operator == BinaryOperator::Divide
-      && is_zero(binary.left.unwrap())
+      && binary.operator(ast) == BinaryOperator::Divide
+      && is_zero(unwrap(binary.left(ast), ast), ast)
     {
-      context.add_diagnostic(&Self, binary.span());
+      context.add_diagnostic(&Self, binary.span(ast));
     }
   }
 }
@@ -287,13 +267,13 @@ impl LintRule for NoConstantStringsInFormatString {
   fn message(&self) -> &'static str {
     "can be combined with the rest of the string"
   }
-  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+  fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
     if let Expression::FormatString(format_string) = &expression {
-      for expression in &format_string.expressions {
+      for expression in format_string.expressions(ast) {
         if let Expression::Literal(literal) = &expression
-          && let LiteralKind::String { .. } = literal.kind
+          && let LiteralValue::String(_) = literal.value(ast)
         {
-          context.add_diagnostic(&Self, literal.span());
+          context.add_diagnostic(&Self, literal.span(ast));
         }
       }
     }
@@ -308,35 +288,32 @@ impl LintRule for NoUnnecessaryReturn {
   fn message(&self) -> &'static str {
     "return statement is unnecessary, as a block returns the last expression"
   }
-  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+  fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
     #[allow(clippy::match_same_arms)]
-    fn ends_with_return(expression: &Expression<'_, '_>) -> Option<Span> {
+    fn ends_with_return(expression: &Expression, ast: &AST) -> Option<Span> {
       match expression {
         Expression::Block(block) => block
-          .statements
-          .iter()
+          .statements(ast)
           .rev()
           .find(|statement| !matches!(statement, Statement::Comment(_)))
           .and_then(|statement| match statement {
-            Statement::Comment(_) | Statement::Import(_) => None,
-            Statement::Expression(expression) => ends_with_return(expression),
-            Statement::Return(_) => Some(statement.span()),
-            Statement::Let(_) => unreachable!(),
+            Statement::Comment(_) | Statement::Import(_) | Statement::Let(_) => None,
+            Statement::Expression(expression) => ends_with_return(expression.expression(ast), ast),
+            Statement::Return(_) => Some(statement.span(ast)),
           }),
 
         // Could contain a block with return sensibly at the end
-        Expression::Group(group) => ends_with_return(&group.expression),
+        Expression::Group(group) => ends_with_return(group.expression(ast), ast),
         Expression::If(if_) => {
-          if let Some(otherwise) = &if_.otherwise {
-            ends_with_return(otherwise).or(ends_with_return(&if_.then))
+          if let Some(otherwise) = &if_.otherwise(ast) {
+            ends_with_return(otherwise, ast).or(ends_with_return(if_.then(ast), ast))
           } else {
             None
           }
         }
         Expression::Match(match_) => match_
-          .cases
-          .iter()
-          .find_map(|case| ends_with_return(&case.expression)),
+          .arms()
+          .find_map(|case| ends_with_return(case.expression(ast), ast)),
 
         // Can never end with a return
         Expression::Function(_)
@@ -355,7 +332,7 @@ impl LintRule for NoUnnecessaryReturn {
     }
 
     if let Expression::Function(function) = &expression {
-      if let Some(return_span) = ends_with_return(&function.body) {
+      if let Some(return_span) = ends_with_return(function.body(ast), ast) {
         context.add_diagnostic(&Self, return_span);
       }
     }
@@ -373,28 +350,30 @@ impl LintRule for NoUnreachableCode {
   fn is_unused(&self) -> bool {
     true
   }
-  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
-    fn statement_always_returns(statement: &Statement) -> bool {
+  fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
+    fn statement_always_returns(statement: &Statement, ast: &AST) -> bool {
       match statement {
         Statement::Return(_) => true,
-        Statement::Expression(expression) => always_returns(expression),
+        Statement::Expression(expression) => always_returns(expression.expression(ast), ast),
         Statement::Let(_) | Statement::Comment(_) | Statement::Import(_) => false,
       }
     }
-    fn always_returns(expression: &Expression) -> bool {
+    fn always_returns(expression: &Expression, ast: &AST) -> bool {
       #[allow(clippy::match_same_arms)]
       match expression {
-        Expression::Block(block) => block.statements.iter().any(statement_always_returns),
+        Expression::Block(block) => block
+          .statements(ast)
+          .any(|s| statement_always_returns(s, ast)),
 
         // Could contain a block with return sensibly at the end
-        Expression::Group(group) => always_returns(&group.expression),
+        Expression::Group(group) => always_returns(group.expression(ast), ast),
         Expression::If(if_) => {
-          always_returns(&if_.then) && if_.otherwise.as_ref().is_some_and(always_returns)
+          always_returns(if_.then(ast), ast)
+            && if_.otherwise(ast).is_some_and(|x| always_returns(x, ast))
         }
         Expression::Match(match_) => match_
-          .cases
-          .iter()
-          .all(|case| always_returns(&case.expression)),
+          .arms()
+          .all(|case| always_returns(case.expression(ast), ast)),
 
         // Can never end with a return
         Expression::Function(_)
@@ -413,13 +392,18 @@ impl LintRule for NoUnreachableCode {
     }
 
     if let Expression::Block(block) = expression {
-      let return_index = block.statements.iter().position(statement_always_returns);
+      let return_index = block
+        .statements(ast)
+        .position(|s| statement_always_returns(s, ast));
 
       if let Some(return_index) = return_index
-        && return_index < block.statements.len() - 1
+        && return_index < block.len() - 1
       {
-        let first_unused_statement = &block.statements[return_index + 1];
-        let span = Span::new(first_unused_statement.span().start, block.span.end - 1);
+        let first_unused_statement = &block.statement(return_index + 1, ast);
+        let span = Span::new(
+          first_unused_statement.span(ast).start,
+          block.span(ast).end - 1,
+        );
 
         context.add_diagnostic(&Self, span);
       }
@@ -435,7 +419,7 @@ impl LintRule for NoDoubleCondition {
   fn message(&self) -> &'static str {
     "can be simplified into a single condition"
   }
-  fn visit_expression(&self, context: &mut Context, expression: &Expression) {
+  fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
     fn is_comparison(operator: BinaryOperator) -> bool {
       matches!(
         operator,
@@ -448,22 +432,26 @@ impl LintRule for NoDoubleCondition {
 
     // a == b or a > b
     if let Expression::Binary(binary) = expression
-      && binary.operator == BinaryOperator::Or
-      && let Expression::Binary(left) = &binary.left
-      && let Expression::Binary(right) = &binary.right
+      && binary.operator(ast) == BinaryOperator::Or
+      && let Expression::Binary(left) = unwrap(binary.left(ast), ast)
+      && let Expression::Binary(right) = unwrap(binary.right(ast), ast)
     {
-      if (left.operator == BinaryOperator::Equal && is_comparison(right.operator))
-        && (right.left.equals(&left.left) || right.left.equals(&left.right))
-        && (right.right.equals(&left.left) || right.right.equals(&left.right))
+      // a `op` b or c `op` d
+      let (a, b) = (left.left(ast), left.right(ast));
+      let (c, d) = (right.left(ast), right.right(ast));
+
+      if (left.operator(ast) == BinaryOperator::Equal && is_comparison(right.operator(ast)))
+        && (c.equals(a, ast) || c.equals(b, ast))
+        && (d.equals(a, ast) || d.equals(b, ast))
       {
-        context.add_diagnostic(&Self, binary.span());
+        context.add_diagnostic(&Self, binary.span(ast));
       }
 
-      if (right.operator == BinaryOperator::Equal && is_comparison(left.operator))
-        && (left.left.equals(&right.left) || left.left.equals(&right.right))
-        && (left.right.equals(&right.left) || left.right.equals(&right.right))
+      if (right.operator(ast) == BinaryOperator::Equal && is_comparison(left.operator(ast)))
+        && (a.equals(c, ast) || a.equals(d, ast))
+        && (b.equals(c, ast) || b.equals(d, ast))
       {
-        context.add_diagnostic(&Self, binary.span());
+        context.add_diagnostic(&Self, binary.span(ast));
       }
     }
   }
@@ -477,11 +465,11 @@ impl LintRule for NoEmptyImports {
   fn message(&self) -> &'static str {
     "statement can be deleted"
   }
-  fn visit_statement(&self, context: &mut Context, statement: &Statement) {
+  fn visit_statement(&self, context: &mut Context, statement: &Statement, ast: &AST) {
     if let Statement::Import(import) = statement
-      && import.items.is_empty()
+      && import.items(ast).count() == 0
     {
-      context.add_diagnostic(&Self, import.span());
+      context.add_diagnostic(&Self, import.span(ast));
     }
   }
 }

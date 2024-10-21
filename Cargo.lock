@@ -101,7 +101,7 @@ dependencies = [
 name = "bang-linter"
 version = "3.0.0"
 dependencies = [
- "bang-parser",
+ "bang-syntax",
 ]
 
 [[package]]

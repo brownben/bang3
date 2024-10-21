@@ -1,257 +1,277 @@
 //! Helpers to simplify the definitions of lint rules
-use bang_parser::ast::{expression::*, statement::*};
+use bang_syntax::ast::{expression::*, statement::*, AST};
 
 pub(super) trait IsConstant {
-  fn is_constant(&self) -> bool;
+  fn is_constant(&self, ast: &AST) -> bool;
 }
 
-impl IsConstant for Expression<'_, '_> {
-  fn is_constant(&self) -> bool {
+impl IsConstant for Expression {
+  fn is_constant(&self, ast: &AST) -> bool {
     match self {
       Self::Call(_) | Self::Variable(_) | Self::Invalid(_) => false,
       Self::Function(_) | Self::Literal(_) => true,
-      Self::Binary(x) => x.is_constant(),
-      Self::Block(x) => x.is_constant(),
-      Self::Comment(x) => x.is_constant(),
-      Self::Group(x) => x.is_constant(),
-      Self::FormatString(x) => x.is_constant(),
-      Self::If(x) => x.is_constant(),
-      Self::Match(x) => x.is_constant(),
-      Self::Unary(x) => x.is_constant(),
+      Self::Binary(x) => x.is_constant(ast),
+      Self::Block(x) => x.is_constant(ast),
+      Self::Comment(x) => x.is_constant(ast),
+      Self::Group(x) => x.is_constant(ast),
+      Self::FormatString(x) => x.is_constant(ast),
+      Self::If(x) => x.is_constant(ast),
+      Self::Match(x) => x.is_constant(ast),
+      Self::Unary(x) => x.is_constant(ast),
     }
   }
 }
-impl IsConstant for Statement<'_, '_> {
-  fn is_constant(&self) -> bool {
+impl IsConstant for Statement {
+  fn is_constant(&self, ast: &AST) -> bool {
     match self {
       Self::Comment(_) | Self::Import(_) => true,
-      Self::Expression(x) => x.is_constant(),
-      Self::Let(x) => x.is_constant(),
-      Self::Return(x) => x.is_constant(),
+      Self::Expression(x) => x.expression(ast).is_constant(ast),
+      Self::Let(x) => x.is_constant(ast),
+      Self::Return(x) => x.is_constant(ast),
     }
   }
 }
 
-impl IsConstant for Binary<'_, '_> {
-  fn is_constant(&self) -> bool {
-    self.operator != BinaryOperator::Pipeline && self.left.is_constant() && self.right.is_constant()
+impl IsConstant for Binary {
+  fn is_constant(&self, ast: &AST) -> bool {
+    self.operator(ast) != BinaryOperator::Pipeline
+      && self.left(ast).is_constant(ast)
+      && self.right(ast).is_constant(ast)
   }
 }
-impl IsConstant for Block<'_, '_> {
-  fn is_constant(&self) -> bool {
-    self.statements.iter().all(IsConstant::is_constant)
+impl IsConstant for Block {
+  fn is_constant(&self, ast: &AST) -> bool {
+    self.statements(ast).all(|s| s.is_constant(ast))
   }
 }
-impl IsConstant for Comment<'_, '_> {
-  fn is_constant(&self) -> bool {
-    self.expression.is_constant()
+impl IsConstant for Comment {
+  fn is_constant(&self, ast: &AST) -> bool {
+    self.expression(ast).is_constant(ast)
   }
 }
-impl IsConstant for FormatString<'_, '_> {
-  fn is_constant(&self) -> bool {
-    self.expressions.iter().all(Expression::is_constant)
+impl IsConstant for FormatString {
+  fn is_constant(&self, ast: &AST) -> bool {
+    self.expressions(ast).all(|e| e.is_constant(ast))
   }
 }
-impl IsConstant for Group<'_, '_> {
-  fn is_constant(&self) -> bool {
-    self.expression.is_constant()
+impl IsConstant for Group {
+  fn is_constant(&self, ast: &AST) -> bool {
+    self.expression(ast).is_constant(ast)
   }
 }
-impl IsConstant for If<'_, '_> {
-  fn is_constant(&self) -> bool {
-    self.condition.is_constant()
-      && self.then.is_constant()
-      && self
-        .otherwise
-        .as_ref()
-        .map_or(true, IsConstant::is_constant)
+impl IsConstant for If {
+  fn is_constant(&self, ast: &AST) -> bool {
+    self.condition(ast).is_constant(ast)
+      && self.then(ast).is_constant(ast)
+      && self.otherwise(ast).map_or(true, |e| e.is_constant(ast))
   }
 }
-impl IsConstant for Match<'_, '_> {
-  fn is_constant(&self) -> bool {
-    self.cases.iter().all(IsConstant::is_constant)
+impl IsConstant for Match {
+  fn is_constant(&self, ast: &AST) -> bool {
+    self.value(ast).is_constant(ast) && self.arms().all(|arm| arm.is_constant(ast))
   }
 }
-impl IsConstant for MatchCase<'_, '_> {
-  fn is_constant(&self) -> bool {
-    self.expression.is_constant() && self.guard.as_ref().map_or(true, IsConstant::is_constant)
+impl IsConstant for MatchArm {
+  fn is_constant(&self, ast: &AST) -> bool {
+    self.expression(ast).is_constant(ast) && self.guard(ast).map_or(true, |x| x.is_constant(ast))
   }
 }
-impl IsConstant for Unary<'_, '_> {
-  fn is_constant(&self) -> bool {
-    self.expression.is_constant()
+impl IsConstant for Unary {
+  fn is_constant(&self, ast: &AST) -> bool {
+    self.expression(ast).is_constant(ast)
   }
 }
 
-impl IsConstant for Let<'_, '_> {
-  fn is_constant(&self) -> bool {
-    self.expression.is_constant()
+impl IsConstant for Let {
+  fn is_constant(&self, ast: &AST) -> bool {
+    self.value(ast).is_constant(ast)
   }
 }
-impl IsConstant for Return<'_, '_> {
-  fn is_constant(&self) -> bool {
-    self.expression.is_constant()
+impl IsConstant for Return {
+  fn is_constant(&self, ast: &AST) -> bool {
+    self.expression(ast).is_constant(ast)
   }
 }
 
 pub(super) trait ASTEquality {
-  fn equals(&self, other: &Self) -> bool;
+  fn equals(&self, other: &Self, ast: &AST) -> bool;
 }
 
-impl ASTEquality for Expression<'_, '_> {
-  fn equals(&self, other: &Self) -> bool {
-    match (self.unwrap(), other.unwrap()) {
-      (Self::Binary(x), Self::Binary(y)) => x.equals(y),
-      (Self::Block(x), Self::Block(y)) => x.equals(y),
-      (Self::Call(x), Self::Call(y)) => x.equals(y),
-      (Self::Comment(x), Self::Comment(y)) => x.equals(y),
+impl ASTEquality for Expression {
+  fn equals(&self, other: &Self, ast: &AST) -> bool {
+    match (unwrap(self, ast), unwrap(other, ast)) {
+      (Self::Binary(x), Self::Binary(y)) => x.equals(y, ast),
+      (Self::Block(x), Self::Block(y)) => x.equals(y, ast),
+      (Self::Call(x), Self::Call(y)) => x.equals(y, ast),
       // We don't compare functions, as they only have one instance
-      (Self::FormatString(x), Self::FormatString(y)) => x.equals(y),
-      (Self::Group(x), Self::Group(y)) => x.equals(y),
-      (Self::If(x), Self::If(y)) => x.equals(y),
-      (Self::Literal(x), Self::Literal(y)) => x.equals(y),
-      (Self::Match(x), Self::Match(y)) => x.equals(y),
-      (Self::Unary(x), Self::Unary(y)) => x.equals(y),
-      (Self::Variable(x), Self::Variable(y)) => x.equals(y),
+      (Self::FormatString(x), Self::FormatString(y)) => x.equals(y, ast),
+      (Self::If(x), Self::If(y)) => x.equals(y, ast),
+      (Self::Literal(x), Self::Literal(y)) => x.equals(y, ast),
+      (Self::Match(x), Self::Match(y)) => x.equals(y, ast),
+      (Self::Unary(x), Self::Unary(y)) => x.equals(y, ast),
+      (Self::Variable(x), Self::Variable(y)) => x.equals(y, ast),
       _ => false,
     }
   }
 }
-impl ASTEquality for Statement<'_, '_> {
-  fn equals(&self, other: &Self) -> bool {
+impl ASTEquality for Statement {
+  fn equals(&self, other: &Self, ast: &AST) -> bool {
     match (self, other) {
-      (Self::Comment(_), Self::Comment(_)) => true,
-      (Self::Expression(x), Self::Expression(y)) => x.equals(y),
-      (Self::Let(x), Self::Let(y)) => x.equals(y),
-      (Self::Return(x), Self::Return(y)) => x.equals(y),
+      (Self::Expression(x), Self::Expression(y)) => x.equals(y, ast),
+      (Self::Let(x), Self::Let(y)) => x.equals(y, ast),
+      (Self::Return(x), Self::Return(y)) => x.equals(y, ast),
       _ => false,
     }
   }
 }
 
-impl ASTEquality for Binary<'_, '_> {
-  fn equals(&self, other: &Self) -> bool {
-    self.operator == other.operator
-      && self.left.equals(&other.left)
-      && self.right.equals(&other.right)
+impl ASTEquality for Binary {
+  fn equals(&self, other: &Self, ast: &AST) -> bool {
+    self.operator(ast) == other.operator(ast)
+      && self.left(ast).equals(other.left(ast), ast)
+      && self.right(ast).equals(other.right(ast), ast)
   }
 }
-impl ASTEquality for Block<'_, '_> {
-  fn equals(&self, other: &Self) -> bool {
+impl ASTEquality for Block {
+  fn equals(&self, other: &Self, ast: &AST) -> bool {
+    let mut statements = self.statements(ast);
+    let mut other_statements = other.statements(ast);
+
+    let mut a = statements.next();
+    let mut b = other_statements.next();
+    loop {
+      if a.is_none() && b.is_none() {
+        return true;
+      }
+
+      while let Some(Statement::Comment(_)) = a {
+        a = statements.next();
+      }
+      while let Some(Statement::Comment(_)) = b {
+        b = other_statements.next();
+        continue;
+      }
+
+      if !a.equals(&b, ast) {
+        return false;
+      }
+
+      a = statements.next();
+      b = other_statements.next();
+    }
+  }
+}
+impl ASTEquality for Call {
+  fn equals(&self, other: &Self, ast: &AST) -> bool {
+    self.callee(ast).equals(other.callee(ast), ast)
+      && self.argument(ast).equals(&other.argument(ast), ast)
+  }
+}
+impl ASTEquality for FormatString {
+  fn equals(&self, other: &Self, ast: &AST) -> bool {
     self
-      .statements
-      .iter()
-      .zip(&other.statements)
-      .map(|(x, y)| x.equals(y))
-      .all(|x| x)
-  }
-}
-impl ASTEquality for Comment<'_, '_> {
-  fn equals(&self, other: &Self) -> bool {
-    self.expression.equals(&other.expression)
-  }
-}
-impl ASTEquality for Call<'_, '_> {
-  fn equals(&self, other: &Self) -> bool {
-    self.expression.equals(&other.expression) && self.argument.equals(&other.argument)
-  }
-}
-impl ASTEquality for FormatString<'_, '_> {
-  fn equals(&self, other: &Self) -> bool {
-    self
-      .expressions
-      .iter()
-      .zip(other.expressions.iter())
-      .all(|(x, y)| x.equals(y))
+      .expressions(ast)
+      .zip(other.expressions(ast))
+      .all(|(x, y)| x.equals(y, ast))
       && self
-        .strings
-        .iter()
-        .zip(other.strings.iter())
-        .all(|(x, y)| x.equals(y))
+        .strings(ast)
+        .zip(other.strings(ast))
+        .all(|(x, y)| x == y)
   }
 }
-impl ASTEquality for StringPart<'_> {
-  fn equals(&self, other: &Self) -> bool {
-    self.string == other.string
+impl ASTEquality for If {
+  fn equals(&self, other: &Self, ast: &AST) -> bool {
+    self.condition(ast).equals(other.condition(ast), ast)
+      && self.then(ast).equals(other.then(ast), ast)
+      && self.otherwise(ast).equals(&other.otherwise(ast), ast)
   }
 }
-impl ASTEquality for Group<'_, '_> {
-  fn equals(&self, other: &Self) -> bool {
-    self.expression.equals(&other.expression)
+impl ASTEquality for Literal {
+  fn equals(&self, other: &Self, ast: &AST) -> bool {
+    self.value(ast) == other.value(ast)
   }
 }
-impl ASTEquality for If<'_, '_> {
-  fn equals(&self, other: &Self) -> bool {
-    self.condition.equals(&other.condition)
-      && self.then.equals(&other.then)
-      && self.otherwise.equals(&other.otherwise)
+impl ASTEquality for Match {
+  fn equals(&self, other: &Self, ast: &AST) -> bool {
+    self.value(ast).equals(other.value(ast), ast)
+      && self.arms().zip(other.arms()).all(|(x, y)| x.equals(y, ast))
   }
 }
-impl ASTEquality for Literal<'_> {
-  fn equals(&self, other: &Self) -> bool {
-    self.kind == other.kind
+impl ASTEquality for MatchArm {
+  fn equals(&self, other: &Self, ast: &AST) -> bool {
+    self.pattern.equals(&other.pattern, ast)
+      && self.guard(ast).equals(&other.guard(ast), ast)
+      && self.expression(ast).equals(other.expression(ast), ast)
   }
 }
-impl ASTEquality for Match<'_, '_> {
-  fn equals(&self, other: &Self) -> bool {
-    self.value.equals(&other.value)
-      && self
-        .cases
-        .iter()
-        .zip(&other.cases)
-        .all(|(x, y)| x.equals(y))
-  }
-}
-impl ASTEquality for MatchCase<'_, '_> {
-  fn equals(&self, other: &Self) -> bool {
-    self.pattern.equals(&other.pattern)
-      && self.guard.equals(&other.guard)
-      && self.expression.equals(&other.expression)
-  }
-}
-impl ASTEquality for Pattern<'_, '_> {
-  fn equals(&self, other: &Self) -> bool {
+impl ASTEquality for Pattern {
+  fn equals(&self, other: &Self, ast: &AST) -> bool {
     match (self, other) {
       (Self::Identifier(_), Self::Identifier(_)) => true,
-      (Self::Literal(x), Self::Literal(y)) => x.equals(y),
-      (Self::Range(x), Self::Range(y)) => x.equals(y),
+      (Self::Literal(x), Self::Literal(y)) => x.equals(y, ast),
+      (Self::Range(a, b), Self::Range(c, d)) => a.equals(c, ast) && b.equals(d, ast),
       _ => false,
     }
   }
 }
-impl ASTEquality for PatternRange<'_, '_> {
-  fn equals(&self, other: &Self) -> bool {
-    self.start.equals(&other.start) && self.end.equals(&other.end)
+impl ASTEquality for Unary {
+  fn equals(&self, other: &Self, ast: &AST) -> bool {
+    self.operator(ast) == other.operator(ast)
+      && self.expression(ast).equals(other.expression(ast), ast)
   }
 }
-impl ASTEquality for Unary<'_, '_> {
-  fn equals(&self, other: &Self) -> bool {
-    self.operator == other.operator && self.expression.equals(&other.expression)
-  }
-}
-impl ASTEquality for Variable<'_> {
-  fn equals(&self, other: &Self) -> bool {
-    self.name == other.name
+impl ASTEquality for Variable {
+  fn equals(&self, other: &Self, ast: &AST) -> bool {
+    self.name(ast) == other.name(ast)
   }
 }
 
-impl ASTEquality for Let<'_, '_> {
-  fn equals(&self, other: &Self) -> bool {
-    self.identifier.equals(&other.identifier) && self.expression.equals(&other.expression)
+impl ASTEquality for ExpressionStmt {
+  fn equals(&self, other: &Self, ast: &AST) -> bool {
+    self.expression(ast).equals(other.expression(ast), ast)
   }
 }
-impl ASTEquality for Return<'_, '_> {
-  fn equals(&self, other: &Self) -> bool {
-    self.expression.equals(&other.expression)
+impl ASTEquality for Let {
+  fn equals(&self, other: &Self, ast: &AST) -> bool {
+    self.identifier(ast) == other.identifier(ast) && self.value(ast).equals(other.value(ast), ast)
+  }
+}
+impl ASTEquality for Return {
+  fn equals(&self, other: &Self, ast: &AST) -> bool {
+    self.expression(ast).equals(other.expression(ast), ast)
   }
 }
 
 impl<T: ASTEquality> ASTEquality for Option<T> {
-  fn equals(&self, other: &Self) -> bool {
+  fn equals(&self, other: &Self, ast: &AST) -> bool {
     match (self, other) {
-      (Some(x), Some(y)) => x.equals(y),
+      (Some(x), Some(y)) => x.equals(y, ast),
       (None, None) => true,
       _ => false,
     }
+  }
+}
+impl<T: ASTEquality> ASTEquality for &T {
+  fn equals(&self, other: &Self, ast: &AST) -> bool {
+    (*self).equals(other, ast)
+  }
+}
+
+/// Extract a single expression from a group or block
+pub fn unwrap<'a>(expression: &'a Expression, ast: &'a AST) -> &'a Expression {
+  match expression {
+    Expression::Comment(comment) => unwrap(comment.expression(ast), ast),
+    Expression::Group(group) => unwrap(group.expression(ast), ast),
+    Expression::Block(block) => {
+      if block.len() == 1
+        && let Some(statement) = block.statements(ast).next()
+        && let Statement::Expression(expression) = statement
+      {
+        unwrap(expression.expression(ast), ast)
+      } else {
+        expression
+      }
+    }
+    _ => expression,
   }
 }
