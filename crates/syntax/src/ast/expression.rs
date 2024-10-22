@@ -417,6 +417,17 @@ impl Match {
   pub fn arms(&self) -> impl ExactSizeIterator<Item = &MatchArm> {
     self.arms.iter()
   }
+  /// The arms of the match
+  #[allow(clippy::missing_panics_doc)]
+  pub fn arms_span(&self, ast: &AST) -> Span {
+    if self.arms.is_empty() {
+      return Span::default();
+    }
+
+    let start = self.value(ast).span(ast).end;
+    let end = self.arms.last().unwrap().span(ast);
+    Span::new(start, start).merge(end)
+  }
 
   /// The location of the expression
   pub fn span(&self, ast: &AST) -> Span {

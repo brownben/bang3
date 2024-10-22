@@ -5,12 +5,14 @@ use lsp_types as lsp;
 
 mod completions;
 mod diagnostics;
+mod folding;
 mod format;
 mod symbols;
 mod variables;
 
 use completions::completions;
 use diagnostics::file_diagnostics;
+use folding::folding_ranges;
 use format::format_file;
 use symbols::document_symbols;
 use variables::{get_references, goto_definition, hover, rename};
@@ -85,6 +87,13 @@ pub fn handle(
       let (request_id, params) = get_params::<DocumentSymbolRequest>(request);
       let file = files.get(&params.text_document.uri);
       let result = document_symbols(file);
+
+      Some(lsp_server::Response::new_ok(request_id, result))
+    }
+    FoldingRangeRequest::METHOD => {
+      let (request_id, params) = get_params::<FoldingRangeRequest>(request);
+      let file = files.get(&params.text_document.uri);
+      let result = folding_ranges(file);
 
       Some(lsp_server::Response::new_ok(request_id, result))
     }

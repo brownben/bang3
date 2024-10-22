@@ -113,6 +113,9 @@ impl LanguageServer {
       // Document Symbols
       document_symbol_provider: Some(lsp_types::OneOf::Left(true)),
 
+      // Folding Ranges
+      folding_range_provider: Some(lsp_types::FoldingRangeProviderCapability::Simple(true)),
+
       // Doesn't provide all capabilities
       ..Default::default()
     }

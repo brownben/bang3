@@ -407,7 +407,7 @@ impl ReturnAnalysis for FormatString {
 impl ReturnAnalysis for If {
   fn always_returns(&self, ast: &AST) -> bool {
     self.then(ast).always_returns(ast)
-      || self
+      && self
         .otherwise(ast)
         .map_or(false, |otherwise| otherwise.always_returns(ast))
   }
