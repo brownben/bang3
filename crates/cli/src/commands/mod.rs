@@ -17,18 +17,41 @@ pub enum CommandStatus {
 }
 
 fn read_file(filename: &str) -> Result<String, ()> {
+  if filename == "-" {
+    return read_stdin();
+  };
+
   match fs::read_to_string(filename) {
     Ok(file) if file.is_empty() => {
       eprintln!("{}", Message::warning(format!("Empty file `{filename}`")));
       Err(())
     }
-    Ok(file) if file.bytes().len() > u32::MAX as usize => {
+    Ok(file) if file.len() > u32::MAX as usize => {
       eprintln!("{}", Message::error("File too large - max size 4GB".into()));
       Err(())
     }
     Ok(file) => Ok(file),
     Err(_) => {
       eprintln!("{}", Message::error(format!("File not found `{filename}`")));
+      Err(())
+    }
+  }
+}
+
+fn read_stdin() -> Result<String, ()> {
+  use std::io::{self, Read};
+
+  let mut buffer = Vec::new();
+  let mut stdin = io::stdin().lock();
+
+  match stdin.read_to_end(&mut buffer) {
+    Ok(_) if buffer.len() > usize::try_from(u32::MAX).unwrap() => {
+      eprintln!("{}", Message::error("File too large - max size 4GB".into()));
+      Err(())
+    }
+    Ok(_) => Ok(unsafe { String::from_utf8_unchecked(buffer) }),
+    Err(_) => {
+      eprintln!("{}", Message::error("Problem Reading from STDIN".into()));
       Err(())
     }
   }
@@ -116,6 +139,11 @@ pub fn format(options: &FormatOptions) -> Result<CommandStatus, ()> {
     return Ok(CommandStatus::Failure);
   }
 
+  if options.file == "-" {
+    println!("{formatted_source}");
+    return Ok(CommandStatus::Success);
+  }
+
   if formatted_source != source && fs::write(&options.file, formatted_source).is_err() {
     eprintln!("{}", Message::error("Problem writing to file".into()));
     return Err(());
@@ -160,6 +188,7 @@ pub fn typecheck(filename: &str) -> Result<CommandStatus, ()> {
 
 pub fn print_tokens(filename: &str) -> Result<CommandStatus, ()> {
   let source = read_file(filename)?;
+  let filename = if filename == "-" { "STDIN" } else { filename };
 
   println!("    ╭─[Tokens: {filename}]");
   for token in tokenise(&source) {
@@ -186,6 +215,7 @@ pub fn print_ast(filename: &str) -> Result<CommandStatus, ()> {
     println!();
   }
 
+  let filename = if filename == "-" { "STDIN" } else { filename };
   println!("╭─[Abstract Syntax Tree: {filename}]");
   print!("{ast}");
   println!("╯");

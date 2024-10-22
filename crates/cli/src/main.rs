@@ -89,17 +89,17 @@ struct FormatOptions {
   #[clap(long)]
   check: bool,
 
-  /// Use single quotes. [default: true]
-  #[clap(long, default_value_t = true)]
+  /// Use single quotes [default: true]
+  #[clap(long, default_value_t = true, help_heading = "Formatting Config")]
   config_single_quote: bool,
   /// Maximum line width
-  #[clap(long, default_value_t = 80)]
+  #[clap(long, default_value_t = 80, help_heading = "Formatting Config")]
   config_print_width: u16,
   /// Indentation size (spaces) to use. If 0 uses tabs
-  #[clap(long, default_value_t = 2)]
+  #[clap(long, default_value_t = 2, help_heading = "Formatting Config")]
   config_indent_size: u16,
   /// Sort imports [default: true]
-  #[clap(long, default_value_t = true)]
+  #[clap(long, default_value_t = true, help_heading = "Formatting Config")]
   config_sort_imports: bool,
 }
 

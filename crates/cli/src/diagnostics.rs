@@ -103,7 +103,7 @@ pub struct CodeFrame<'a> {
 impl<'a> CodeFrame<'a> {
   pub fn new(title: &'a str, source: &'a str, span: Span) -> Self {
     Self {
-      title,
+      title: if title == "-" { "STDIN" } else { title },
       source,
       span,
       lines: LineIndex::from_source(source),
