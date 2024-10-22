@@ -1,19 +1,20 @@
 use crate::{
+  enviroment::Enviroment,
   exhaustive,
   stdlib::{self, ImportResult},
-  Enviroment, Type, TypeArena, TypeError, TypeRef, TypeScheme,
+  types::{Type, TypeArena, TypeRef, TypeScheme},
+  TypeError,
 };
 use bang_syntax::{
   ast::{expression::*, statement::*},
   Span, AST,
 };
-
-pub struct Typechecker {
+pub struct TypeChecker {
   pub types: TypeArena,
   pub env: Enviroment,
   pub problems: Vec<TypeError>,
 }
-impl Typechecker {
+impl TypeChecker {
   pub fn new() -> Self {
     let mut types = TypeArena::new();
     let mut env = Enviroment::new();
@@ -28,22 +29,10 @@ impl Typechecker {
   }
 
   pub fn check_ast(&mut self, ast: &AST) -> TypeRef {
-    if ast.root_statements.is_empty() {
-      return TypeArena::NEVER;
-    }
+    ast.infer(self, ast).expression()
+  }
 
-    // Infer types
-    self.env.enter_scope();
-    let (last_statement, statements) = ast.root_statements.split_last().unwrap();
-    for statement in statements {
-      self.infer_statement(statement, ast);
-    }
-    let result = self.infer_statement(last_statement, ast);
-    self
-      .env
-      .exit_scope(ast.root_statements.last().unwrap().span(ast));
-
-    // Check for unused variables
+  pub fn check_unused_variables(&mut self) {
     for variable in self.env.defined_variables() {
       if !variable.name.starts_with('_') && !variable.is_used() {
         if variable.is_import {
@@ -59,78 +48,9 @@ impl Typechecker {
         }
       }
     }
-
-    result.expression()
   }
-
-  fn infer_statement(&mut self, statement: &Statement, ast: &AST) -> ExpressionType {
-    match statement {
-      Statement::Comment(_) => {}
-      Statement::Expression(expression) => return expression.expression(ast).infer(self, ast),
-      Statement::Import(import) => {
-        for item in import.items(ast) {
-          match stdlib::import_value(&mut self.types, import.module(ast), item.name) {
-            ImportResult::Value(type_) => self.env.define_import(&item, type_),
-            ImportResult::ModuleNotFound => {
-              self.problems.push(TypeError::ModuleNotFound {
-                module: import.module(ast).to_owned(),
-                span: import.module_span(ast),
-              });
-            }
-            ImportResult::ItemNotFound => {
-              self.problems.push(TypeError::ItemNotFound {
-                module: import.module(ast).to_owned(),
-                item: item.name.to_owned(),
-                span: item.span,
-              });
-            }
-          };
-        }
-      }
-      Statement::Let(let_) => {
-        if let Expression::Function(_) = &let_.value(ast) {
-          self.infer_let_with_function(let_, ast);
-          return TypeArena::NEVER.into();
-        }
-
-        let variable_type = let_.value(ast).infer(self, ast).expression();
-
-        self.env.define_variable(
-          let_.identifier(ast),
-          let_.identifier_span(ast),
-          self.types.generalize(variable_type, self.env.depth()),
-        );
-      }
-      Statement::Return(return_) => {
-        return ExpressionType::return_(return_.expression(ast).infer(self, ast).expression())
-      }
-    };
-
-    TypeArena::NEVER.into()
-  }
-
-  /// Infer the type of a let statement with a function
-  ///
-  /// Function might be recursive, so we need to define the variable before we infer the function type
-  fn infer_let_with_function(&mut self, let_: &Let, ast: &AST) {
-    // Define the function type
-    let function_type = self.new_type_var();
-    self.env.define_variable(
-      let_.identifier(ast),
-      let_.identifier_span(ast),
-      TypeScheme::monomorphic(function_type),
-    );
-
-    // Infer the function type
-    let expression_type = let_.value(ast).infer(self, ast).expression();
-
-    // Update the variable type to be the inferred type
-    self.env.update_variable(
-      let_.identifier(ast),
-      self.types.generalize(expression_type, self.env.depth()),
-    );
-  }
-
+}
+impl TypeChecker {
   /// Asserts that type `a` is applicable to type `b`
   fn assert_type(&mut self, a: TypeRef, b: TypeRef, span: Span) {
     if self.types.unify(a, b).is_err() {
@@ -193,11 +113,102 @@ impl Typechecker {
 }
 
 pub(crate) trait InferType {
-  fn infer(&self, t: &mut Typechecker, ast: &AST) -> ExpressionType;
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType;
+}
+
+impl InferType for AST<'_> {
+  fn infer(&self, t: &mut TypeChecker, _ast: &AST) -> ExpressionType {
+    if self.root_statements.is_empty() {
+      return TypeArena::NEVER.into();
+    }
+
+    // Infer types
+    t.env.enter_scope();
+    let (last_statement, statements) = self.root_statements.split_last().unwrap();
+    for statement in statements {
+      statement.infer(t, self);
+    }
+    let result = last_statement.infer(t, self);
+    t.env
+      .exit_scope(self.root_statements.last().unwrap().span(self));
+
+    result
+  }
+}
+
+impl InferType for Statement {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
+    match self {
+      Statement::Comment(_) => TypeArena::NEVER.into(),
+      Statement::Expression(expression) => expression.expression(ast).infer(t, ast),
+      Statement::Import(import) => import.infer(t, ast),
+      Statement::Let(let_) => let_.infer(t, ast),
+      Statement::Return(return_) => return_.infer(t, ast),
+    }
+  }
+}
+impl InferType for Import {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
+    for item in self.items(ast) {
+      match stdlib::import_value(&mut t.types, self.module(ast), item.name) {
+        ImportResult::Value(type_) => t.env.define_import(&item, type_),
+        ImportResult::ModuleNotFound => {
+          t.problems.push(TypeError::ModuleNotFound {
+            module: self.module(ast).to_owned(),
+            span: self.module_span(ast),
+          });
+        }
+        ImportResult::ItemNotFound => {
+          t.problems.push(TypeError::ItemNotFound {
+            module: self.module(ast).to_owned(),
+            item: item.name.to_owned(),
+            span: item.span,
+          });
+        }
+      };
+    }
+
+    TypeArena::NEVER.into()
+  }
+}
+impl InferType for Let {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
+    if let Expression::Function(_) = self.value(ast) {
+      let function_type = t.new_type_var();
+      t.env.define_variable(
+        self.identifier(ast),
+        self.identifier_span(ast),
+        TypeScheme::monomorphic(function_type),
+      );
+
+      // Infer the function type
+      let expression_type = self.value(ast).infer(t, ast).expression();
+
+      // Update the variable type to be the inferred type
+      t.env.update_variable(
+        self.identifier(ast),
+        t.types.generalize(expression_type, t.env.depth()),
+      );
+      return TypeArena::NEVER.into();
+    }
+
+    let type_ = self.value(ast).infer(t, ast).expression();
+    t.env.define_variable(
+      self.identifier(ast),
+      self.identifier_span(ast),
+      TypeScheme::monomorphic(type_),
+    );
+    TypeArena::NEVER.into()
+  }
+}
+impl InferType for Return {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
+    ExpressionType::return_(self.expression(ast).infer(t, ast).expression())
+  }
 }
 
 impl InferType for Expression {
-  fn infer(&self, t: &mut Typechecker, ast: &AST) -> ExpressionType {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     match self {
       Expression::Binary(binary) => binary.infer(t, ast),
       Expression::Block(block) => block.infer(t, ast),
@@ -216,7 +227,7 @@ impl InferType for Expression {
   }
 }
 impl InferType for Binary {
-  fn infer(&self, t: &mut Typechecker, ast: &AST) -> ExpressionType {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     let left = self.left(ast).infer(t, ast).expression();
     let right = self.right(ast).infer(t, ast).expression();
 
@@ -281,7 +292,7 @@ impl InferType for Binary {
   }
 }
 impl InferType for Block {
-  fn infer(&self, t: &mut Typechecker, ast: &AST) -> ExpressionType {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     t.env.enter_scope();
 
     let final_statement = self
@@ -298,7 +309,7 @@ impl InferType for Block {
 
     let block_return_type = t.new_type_var();
     for (id, statement) in self.statements(ast).enumerate() {
-      let statement_type = t.infer_statement(statement, ast);
+      let statement_type = statement.infer(t, ast);
 
       if let Some(return_type) = statement_type.get_return() {
         t.assert_type(return_type, block_return_type, statement.span(ast));
@@ -315,7 +326,7 @@ impl InferType for Block {
   }
 }
 impl InferType for Call {
-  fn infer(&self, t: &mut Typechecker, ast: &AST) -> ExpressionType {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     let callee_type = self.callee(ast).infer(t, ast).expression();
     let argument_type = if let Some(argument) = self.argument(ast) {
       argument.infer(t, ast).expression()
@@ -350,12 +361,12 @@ impl InferType for Call {
   }
 }
 impl InferType for Comment {
-  fn infer(&self, t: &mut Typechecker, ast: &AST) -> ExpressionType {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     self.expression(ast).infer(t, ast)
   }
 }
 impl InferType for FormatString {
-  fn infer(&self, t: &mut Typechecker, ast: &AST) -> ExpressionType {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     for expression in self.expressions(ast) {
       expression.infer(t, ast);
     }
@@ -364,7 +375,7 @@ impl InferType for FormatString {
   }
 }
 impl InferType for Function {
-  fn infer(&self, t: &mut Typechecker, ast: &AST) -> ExpressionType {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     t.env.enter_scope();
 
     let parameter = t.new_type_var();
@@ -397,12 +408,12 @@ impl InferType for Function {
   }
 }
 impl InferType for Group {
-  fn infer(&self, t: &mut Typechecker, ast: &AST) -> ExpressionType {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     self.expression(ast).infer(t, ast)
   }
 }
 impl InferType for If {
-  fn infer(&self, t: &mut Typechecker, ast: &AST) -> ExpressionType {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     self.condition(ast).infer(t, ast);
 
     let then_type = self.then(ast).infer(t, ast);
@@ -416,7 +427,7 @@ impl InferType for If {
   }
 }
 impl InferType for Literal {
-  fn infer(&self, _: &mut Typechecker, ast: &AST) -> ExpressionType {
+  fn infer(&self, _: &mut TypeChecker, ast: &AST) -> ExpressionType {
     match self.value(ast) {
       LiteralValue::Boolean(_) => TypeArena::BOOLEAN,
       LiteralValue::Number { .. } => TypeArena::NUMBER,
@@ -426,7 +437,7 @@ impl InferType for Literal {
   }
 }
 impl InferType for Match {
-  fn infer(&self, t: &mut Typechecker, ast: &AST) -> ExpressionType {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     let value_type = self.value(ast).infer(t, ast).expression();
 
     // check patterns match the value passes
@@ -513,7 +524,7 @@ impl InferType for Match {
   }
 }
 impl InferType for Unary {
-  fn infer(&self, t: &mut Typechecker, ast: &AST) -> ExpressionType {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     let left = self.expression(ast).infer(t, ast).expression();
     let span = self.expression(ast).span(ast);
 
@@ -527,7 +538,7 @@ impl InferType for Unary {
   }
 }
 impl InferType for Variable {
-  fn infer(&self, t: &mut Typechecker, ast: &AST) -> ExpressionType {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     if let Some(type_) = t.env.get_variable(self.name(ast)) {
       t.env.mark_variable_use(self.name(ast), self.span(ast));
       t.types.instantiate(type_, t.env.depth()).into()

@@ -1,6 +1,6 @@
 //! Tracks variables, their types, and where they are defined and used
 
-use crate::{Type, TypeArena, TypeRef, TypeScheme};
+use crate::types::{Type, TypeArena, TypeRef, TypeScheme};
 use bang_syntax::{ast::statement::ImportItem, Span};
 
 /// Holds variables and where they are defined and used

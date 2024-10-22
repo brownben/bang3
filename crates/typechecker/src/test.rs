@@ -1,4 +1,4 @@
-use crate::{typecheck, Typechecker};
+use crate::{typecheck, TypeChecker};
 
 use bang_syntax::parse;
 use indoc::indoc;
@@ -7,7 +7,7 @@ fn synthesize(source: &str) -> String {
   let ast = parse(source);
   assert!(ast.errors.is_empty());
 
-  let mut checker = Typechecker::new();
+  let mut checker = TypeChecker::new();
   let result = checker.check_ast(&ast);
   assert!(checker.problems.is_empty());
 
@@ -19,7 +19,7 @@ fn synthesize_has_error(source: &str) -> String {
   let ast = parse(source);
   assert!(ast.errors.is_empty());
 
-  let mut checker = Typechecker::new();
+  let mut checker = TypeChecker::new();
   let result = checker.check_ast(&ast);
   assert!(!checker.problems.is_empty());
 

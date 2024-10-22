@@ -1,4 +1,4 @@
-use super::{Type, TypeArena};
+use crate::types::{Type, TypeArena};
 use bang_syntax::{
   ast::expression::{LiteralValue, MatchArm, Pattern},
   Span, AST,

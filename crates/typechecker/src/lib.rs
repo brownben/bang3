@@ -16,9 +16,8 @@ mod test;
 use bang_syntax::AST;
 pub use enviroment::{Enviroment, Variable, VariableKind};
 pub use error::Problem as TypeError;
-use infer::Typechecker;
+use infer::TypeChecker;
 pub use stdlib::import_type_info;
-use types::{Type, TypeArena, TypeRef, TypeScheme};
 
 /// Runs the typechecker against a given AST, returns a list of errors found
 ///
@@ -33,20 +32,17 @@ use types::{Type, TypeArena, TypeRef, TypeScheme};
 /// ```
 #[must_use]
 pub fn typecheck(ast: &AST) -> Vec<TypeError> {
-  let mut checker = Typechecker::new();
-
+  let mut checker = TypeChecker::new();
   checker.check_ast(ast);
-
+  checker.check_unused_variables();
   checker.problems
 }
 
 /// Gets the enviroment of defined variables for a given AST
 #[must_use]
 pub fn get_enviroment(ast: &AST) -> Enviroment {
-  let mut checker = Typechecker::new();
-
+  let mut checker = TypeChecker::new();
   checker.check_ast(ast);
   checker.env.add_static_type_info(&mut checker.types);
-
   checker.env
 }
