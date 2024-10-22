@@ -2,9 +2,7 @@
 //! Bytecode compiler and virtual machine for running Bang code.
 
 #![feature(let_chains)]
-#![feature(strict_provenance)]
 #![feature(decl_macro)]
-#![feature(negative_impls)]
 #![feature(macro_metavar_expr)]
 #![allow(unsafe_code)]
 

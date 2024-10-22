@@ -44,8 +44,6 @@
 //!
 //! We do not yet compact consecutive empty pages back into reams.
 
-#![feature(strict_provenance)]
-
 use std::{alloc, fmt, marker::PhantomData, mem, num::NonZero, ops, panic, slice};
 
 mod display;
