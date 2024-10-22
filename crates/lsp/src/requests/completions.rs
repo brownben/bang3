@@ -74,7 +74,11 @@ fn constant_snippets() -> [lsp::CompletionItem; 11] {
       ..Default::default()
     },
     lsp::CompletionItem {
-      label: "from".to_owned(),
+      label: "from ".to_owned(),
+      label_details: Some(lsp::CompletionItemLabelDetails {
+        detail: Some("_ import { }".to_owned()),
+        description: None,
+      }),
       insert_text: Some("from $1 import { $0 }".to_owned()),
       insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
       kind: Some(lsp::CompletionItemKind::KEYWORD),
@@ -83,7 +87,7 @@ fn constant_snippets() -> [lsp::CompletionItem; 11] {
     lsp::CompletionItem {
       label: "import".to_owned(),
       insert_text: Some("from $1 import { $0 }".to_owned()),
-      kind: Some(lsp::CompletionItemKind::KEYWORD),
+      kind: Some(lsp::CompletionItemKind::SNIPPET),
       ..Default::default()
     },
     lsp::CompletionItem {
@@ -191,18 +195,7 @@ fn module_item_completions(module: &str) -> lsp::CompletionList {
 }
 
 fn in_import_module(ast: &AST, position: Span) -> bool {
-  for statement in &ast.root_statements {
-    if let Statement::Import(import) = statement
-      && import.span(ast).contains(position)
-    {
-      if let Some(item) = import.items(ast).next() {
-        return position.start < item.span.start;
-      }
-
-      return true;
-    }
-  }
-  for statement in &ast.statements {
+  for statement in ast.root_statements.iter().chain(ast.statements.iter()) {
     if let Statement::Import(import) = statement
       && import.span(ast).contains(position)
     {
@@ -218,14 +211,7 @@ fn in_import_module(ast: &AST, position: Span) -> bool {
 }
 
 fn in_import_items<'a>(ast: &'a AST, position: Span) -> Option<&'a str> {
-  for statement in &ast.root_statements {
-    if let Statement::Import(import) = statement
-      && import.items_span(ast).contains(position)
-    {
-      return Some(import.module(ast));
-    }
-  }
-  for statement in &ast.statements {
+  for statement in ast.root_statements.iter().chain(ast.statements.iter()) {
     if let Statement::Import(import) = statement
       && import.items_span(ast).contains(position)
     {

@@ -3,21 +3,15 @@ use crate::locations::{lsp_range_from_span, span_from_lsp_position};
 use lsp_types as lsp;
 use std::collections::HashMap;
 
-use bang_syntax::parse;
-use bang_typechecker::get_enviroment;
+use bang_syntax::{parse, Span};
+use bang_typechecker::{get_enviroment, Enviroment, Variable};
 
 pub fn hover(file: &Document, position: lsp::Position) -> Option<lsp::Hover> {
   let position = span_from_lsp_position(position, file);
 
   let ast = parse(&file.source);
   let variables = get_enviroment(&ast);
-
-  let variable = variables
-    .defined_variables()
-    .filter(|variable| variable.is_active(position))
-    .find(|var| {
-      var.defined.contains(position) || var.used.iter().any(|used| used.contains(position))
-    })?;
+  let variable = find_variable(position, &variables)?;
 
   Some(lsp::Hover {
     contents: lsp::HoverContents::Scalar(lsp::MarkedString::from_language_code(
@@ -33,11 +27,7 @@ pub fn goto_definition(file: &Document, position: lsp::Position) -> Option<lsp::
 
   let ast = parse(&file.source);
   let variables = get_enviroment(&ast);
-
-  let declaration = variables
-    .defined_variables()
-    .filter(|variable| variable.is_active(position))
-    .find(|variable| variable.used.iter().any(|used| used.contains(position)))?;
+  let declaration = find_variable(position, &variables)?;
 
   Some(lsp::Location::new(
     file.id.clone(),
@@ -51,10 +41,7 @@ pub fn get_references(file: &Document, position: lsp::Position) -> Option<Vec<ls
   let ast = parse(&file.source);
   let variables = get_enviroment(&ast);
 
-  let declaration = variables
-    .defined_variables()
-    .find(|variable| variable.span().contains(position))?;
-
+  let declaration = find_variable(position, &variables)?;
   let references = declaration
     .used
     .iter()
@@ -70,13 +57,7 @@ pub fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::
   let ast = parse(&file.source);
   let variables = get_enviroment(&ast);
 
-  let Some(declaration) = variables
-    .defined_variables()
-    .filter(|variable| variable.is_active(position))
-    .find(|var| {
-      var.defined.contains(position) || var.used.iter().any(|used| used.contains(position))
-    })
-  else {
+  let Some(declaration) = find_variable(position, &variables) else {
     return lsp::WorkspaceEdit::default();
   };
 
@@ -112,4 +93,15 @@ pub fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::
   }
 
   lsp::WorkspaceEdit::new(HashMap::from([(file.id.clone(), text_edits)]))
+}
+
+fn find_variable(position: Span, variables: &Enviroment) -> Option<&Variable> {
+  variables
+    .defined_variables()
+    .filter(|variable| variable.is_active(position))
+    .find(|var| {
+      var.defined.contains(position)
+        || var.alias.is_some_and(|x| x.contains(position))
+        || var.used.iter().any(|used| used.contains(position))
+    })
 }

@@ -11,22 +11,18 @@ pub fn file_diagnostics(file: &Document) -> lsp::DocumentDiagnosticReport {
 
   let mut diagnostics = Vec::new();
 
-  if ast.is_valid() {
-    let lints = lint(&ast);
-    diagnostics.extend(lints.iter().map(|lint| diagnostic_from_lint(lint, file)));
+  let parse_errors = ast.errors.iter();
+  diagnostics.extend(parse_errors.map(|error| diagnostic_from_parse_error(error, file)));
 
+  let lints = lint(&ast);
+  diagnostics.extend(lints.iter().map(|lint| diagnostic_from_lint(lint, file)));
+
+  if ast.is_valid() {
     let type_problems = typecheck(&ast);
     diagnostics.extend(
       type_problems
         .iter()
         .map(|error| diagnostic_from_type_error(error, file)),
-    );
-  } else {
-    diagnostics.extend(
-      ast
-        .errors
-        .iter()
-        .map(|error| diagnostic_from_parse_error(error, file)),
     );
   }
 
