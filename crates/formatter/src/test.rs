@@ -220,14 +220,41 @@ fn if_() {
 
 #[test]
 fn literal() {
+  // booleans
   assert_format!("true", "true", 25);
   assert_format!("false", "false", 25);
+
+  // strings
   assert_format!("'string with a space'", "'string with a space'", 1);
   assert_format!("\"string\"", "'string'", 1);
+
+  // simple numbers
   assert_format!("7", "7", 25);
   assert_format!("1_000", "1_000", 25);
   assert_format!("7.0", "7.0", 25);
   assert_format!("3.14", "3.14", 25);
+
+  // add zeros to the front of decimal points
+  assert_format!(".14", "0.14", 25);
+  assert_format!(".140000", "0.14", 25);
+
+  // trim leading zeros
+  assert_format!("0", "0", 25);
+  assert_format!("0.0", "0.0", 25);
+  assert_format!("000.0", "0.0", 25);
+  assert_format!("000.000", "0.0", 25);
+  assert_format!("0.000", "0.0", 25);
+  assert_format!("0.01400", "0.014", 25);
+  assert_format!("0.14", "0.14", 25);
+  assert_format!("00.14", "0.14", 25);
+  assert_format!("003.14", "3.14", 25);
+  assert_format!("003.140000", "3.14", 25);
+
+  // if there are separators, just bail out
+  assert_format!("0001_000", "0001_000", 25);
+  assert_format!("0001_000.000", "0001_000.000", 25);
+  assert_format!("1_000.000_000", "1_000.000_000", 25);
+  assert_format!("000_1_000.000_000", "000_1_000.000_000", 25);
 }
 
 #[test]

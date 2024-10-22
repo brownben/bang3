@@ -240,7 +240,15 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Literal {
     match self.value(ast) {
       LiteralValue::Boolean(true) => IR::Text("true"),
       LiteralValue::Boolean(false) => IR::Text("false"),
-      LiteralValue::Number(_) => IR::Text(self.raw_value(ast)),
+      LiteralValue::Number(_) => {
+        let raw_value = self.raw_value(ast);
+
+        if raw_value.contains('_') {
+          IR::Text(raw_value)
+        } else {
+          remove_leading_trailing_zeros(f, raw_value)
+        }
+      }
       LiteralValue::String(string) => {
         let quote = if f.config.single_quotes && !string.contains('\'') {
           "'"
@@ -420,5 +428,45 @@ fn unwrap<'a>(expression: &'a Expression, ast: &'a AST) -> &'a Expression {
       }
     }
     _ => expression,
+  }
+}
+
+/// Make sure that numbers don't have any unnecessary leading or trailing zeros
+/// Also ensure numbers don't start with a decimal point
+fn remove_leading_trailing_zeros<'a, 'b>(f: &Formatter<'a, 'b>, raw: &'a str) -> IR<'a, 'b> {
+  // if it doesn't have unnecessary zeros, return it
+  if !raw.starts_with('0') && !raw.starts_with('.') && !raw.ends_with('0') {
+    return IR::Text(raw);
+  }
+
+  // If it is a decimal, we make sure that there is at least one digit each side of the point
+  if let Some((before, after)) = raw.split_once('.') {
+    let mut leading_zeros = before.len() - before.trim_start_matches('0').len();
+    let mut trailing_zeros = after.len() - after.trim_end_matches('0').len();
+
+    // If there is no leading zeros, we add a 0 before the point
+    if before.is_empty() {
+      return f.concat([
+        IR::Text("0"),
+        IR::Text(&raw[leading_zeros..(raw.len() - trailing_zeros)]),
+      ]);
+    }
+
+    // Make sure that there is at least one digit each side of the point
+    if trailing_zeros == after.len() {
+      trailing_zeros -= 1;
+    }
+    if leading_zeros == before.len() {
+      leading_zeros -= 1;
+    }
+
+    return IR::Text(&raw[leading_zeros..(raw.len() - trailing_zeros)]);
+  }
+
+  // Otherwise its just an integer, and we check there is atleast one digit
+  if raw.trim_start_matches('0').is_empty() {
+    IR::Text("0")
+  } else {
+    IR::Text(raw.trim_start_matches('0'))
   }
 }
