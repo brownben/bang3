@@ -7,8 +7,9 @@ use bang_syntax::{
   ast::{expression::*, statement::*},
   Span, AST,
 };
+use std::borrow::Cow;
 
-pub const RULES: [&dyn LintRule; 15] = [
+pub const RULES: [&dyn LintRule; 16] = [
   &NoConstantConditions,
   &NoNegativeZero,
   &NoSelfAssign,
@@ -24,6 +25,7 @@ pub const RULES: [&dyn LintRule; 15] = [
   &NoUnreachableCode,
   &NoDoubleCondition,
   &NoEmptyImports,
+  &NoLossOfPrecision,
 ];
 
 pub struct NoConstantConditions;
@@ -376,6 +378,60 @@ impl LintRule for NoEmptyImports {
       && import.items(ast).count() == 0
     {
       context.add_diagnostic(&Self, import.span(ast));
+    }
+  }
+}
+
+pub struct NoLossOfPrecision;
+impl LintRule for NoLossOfPrecision {
+  fn name(&self) -> &'static str {
+    "No Loss of Precision"
+  }
+  fn message(&self) -> &'static str {
+    "numbers are stored as double-precision floating-point numbers according to the IEEE 754 standard\nwhen the literal is converted to a number, precision will be lost and the value may not be what was intended"
+  }
+  fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
+    fn clean_up_number_literal(raw: &str) -> Cow<str> {
+      // If the number is already clean, return it
+      if !raw.contains('_') && !raw.starts_with('0') && !raw.starts_with('.') && !raw.ends_with('0')
+      {
+        return Cow::Borrowed(raw);
+      }
+
+      // Remove underscores/ numeric separators
+      let value = raw.replace('_', "");
+
+      // Remove leading and trailing zeros
+      // Can only remove trailing zeros if they are after a decimal point
+      let value = if value.contains('.') {
+        value.trim_start_matches('0').trim_end_matches('0')
+      } else {
+        value.trim_start_matches('0')
+      };
+
+      if value.is_empty() {
+        return Cow::Borrowed("0");
+      }
+
+      // Remove values which start or end with a decimal point
+      let value = if value.starts_with('.') {
+        format!("0{}", value.trim_end_matches('.'))
+      } else {
+        value.trim_end_matches('.').to_owned()
+      };
+
+      Cow::Owned(value)
+    }
+
+    if let Expression::Literal(literal) = &expression
+      && let LiteralValue::Number(f64_value) = literal.value(ast)
+    {
+      let existing = clean_up_number_literal(literal.raw_value(ast));
+      let round_tripped = f64_value.to_string();
+
+      if existing != round_tripped {
+        context.add_diagnostic(&Self, literal.span(ast));
+      }
     }
   }
 }

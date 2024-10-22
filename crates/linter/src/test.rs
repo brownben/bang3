@@ -229,6 +229,43 @@ fn no_double_condition() {
 fn no_empty_import() {
   assert!(lint("from maths import {}").is_err());
   assert!(lint("from string import {   }").is_err());
+  assert!(lint("from string import { ,,, }").is_err());
 
   assert!(lint("from string import { length }").is_ok());
+}
+
+#[test]
+fn no_loss_of_precision() {
+  assert!(lint("1234567890123456789").is_err());
+  assert!(lint("9007199254740993").is_err());
+  assert!(lint("5123000000000000000000000000001").is_err());
+  assert!(lint("0.1234567890123456789").is_err());
+  assert!(lint(".1234567890123456789").is_err());
+
+  assert!(lint("0").is_ok());
+  assert!(lint("0.0").is_ok());
+  assert!(lint("1.0").is_ok());
+  assert!(lint("12345").is_ok());
+  assert!(lint("123.456").is_ok());
+  assert!(lint("3.14159").is_ok());
+  assert!(lint("12300000000000000000000000").is_ok());
+  assert!(lint("9007199254740991").is_ok());
+  assert!(lint("9007_1992547409_91").is_ok());
+
+  // various leading and trailing zeros, to ensure number cleaning works properly
+  assert!(lint("0").is_ok());
+  assert!(lint(".0").is_ok());
+  assert!(lint("0.0").is_ok());
+  assert!(lint("000.0").is_ok());
+  assert!(lint("000.000").is_ok());
+  assert!(lint("0.000").is_ok());
+  assert!(lint("0.01400").is_ok());
+  assert!(lint("0.14").is_ok());
+  assert!(lint(".14").is_ok());
+  assert!(lint("003.14").is_ok());
+  assert!(lint("003.140000").is_ok());
+  assert!(lint("0001_000").is_ok());
+  assert!(lint("0001_000.000").is_ok());
+  assert!(lint("1_000.000_000").is_ok());
+  assert!(lint("000_1_000.000_000").is_ok());
 }
