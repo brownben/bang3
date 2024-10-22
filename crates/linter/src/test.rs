@@ -12,7 +12,7 @@ fn lint(source: &str) -> Result<(), ()> {
 }
 
 #[test]
-fn constant_conditions() {
+fn constant_condition() {
   assert!(lint("if (true) pass else other").is_err());
   assert!(lint("if (4 > 5) pass else other").is_err());
   assert!(lint("match false | _ -> false").is_err());
@@ -25,7 +25,7 @@ fn constant_conditions() {
 }
 
 #[test]
-fn no_negative_zero() {
+fn negative_zero() {
   assert!(lint("-0").is_err());
   assert!(lint("-0.0").is_err());
   assert!(lint("x == -0.0").is_err());
@@ -37,7 +37,7 @@ fn no_negative_zero() {
 }
 
 #[test]
-fn no_self_assign() {
+fn self_assign() {
   assert!(lint("let x = x\n x").is_err());
   assert!(lint("let var = (var)\n var").is_err());
   assert!(lint("let bla = bla // bla\n bla").is_err());
@@ -48,7 +48,7 @@ fn no_self_assign() {
 }
 
 #[test]
-fn no_self_comparison() {
+fn self_comparison() {
   assert!(lint("x == x").is_err());
   assert!(lint("var >= (var)").is_err());
   assert!(lint("bla <= bla // bla").is_err());
@@ -65,7 +65,7 @@ fn no_self_comparison() {
 }
 
 #[test]
-fn no_underscore_variable_use() {
+fn underscore_variable_use() {
   assert!(lint("match n | _ -> _").is_err());
   assert!(lint("let _ = 3\n_ + 2").is_err());
 
@@ -74,7 +74,7 @@ fn no_underscore_variable_use() {
 }
 
 #[test]
-fn no_useless_match() {
+fn useless_match() {
   assert!(lint("match n | _ -> 3").is_err());
   assert!(lint("match x\n | x -> 3").is_err());
   assert!(lint("match x\n | pattern -> 3").is_err());
@@ -85,7 +85,7 @@ fn no_useless_match() {
 }
 
 #[test]
-fn no_yoda_comparison() {
+fn yoda_equality() {
   assert!(lint("7 != x").is_err());
   assert!(lint("7 == x").is_err());
   assert!(lint("(7) != x").is_err());
@@ -100,7 +100,7 @@ fn no_yoda_comparison() {
 }
 
 #[test]
-fn no_unnecessary_closures() {
+fn unnecessary_closures() {
   assert!(lint("x => y(x)").is_err());
   assert!(lint("x => { y(x) }").is_err());
   assert!(lint("x => y((x))").is_err());
@@ -114,7 +114,7 @@ fn no_unnecessary_closures() {
 }
 
 #[test]
-fn no_useless_if() {
+fn identical_branches() {
   assert!(lint("if (a) pass else pass").is_err());
   assert!(lint("if (b) 5 else { 5 }").is_err());
 
@@ -122,7 +122,7 @@ fn no_useless_if() {
 }
 
 #[test]
-fn no_erasing_operations() {
+fn erasing_operations() {
   assert!(lint("5 * 0").is_err());
   assert!(lint("0 * 555").is_err());
   assert!(lint("0 / a").is_err());
@@ -137,7 +137,7 @@ fn no_erasing_operations() {
 }
 
 #[test]
-fn no_constant_string_in_format_string() {
+fn constant_string_in_format_string() {
   assert!(lint("`hello {'world'}`").is_err());
   assert!(lint("`{'world'} hello`").is_err());
   assert!(lint("`{'world'}`").is_err());
@@ -148,7 +148,7 @@ fn no_constant_string_in_format_string() {
 }
 
 #[test]
-fn no_unnecessary_return() {
+fn unnecessary_return() {
   assert!(lint("_ => { { return 5 } }").is_err());
   assert!(lint("_ => { return 5 }").is_err());
   assert!(lint("_ => { 5 }").is_ok());
@@ -174,7 +174,7 @@ fn no_unnecessary_return() {
 }
 
 #[test]
-fn no_unreachable_code() {
+fn unreachable_code() {
   assert!(lint(
     "
     let function = _ => {
@@ -213,7 +213,7 @@ fn no_unreachable_code() {
 }
 
 #[test]
-fn no_double_condition() {
+fn double_comparison_chain() {
   assert!(lint("a == b or a > b").is_err());
   assert!(lint("a == b || a < b").is_err());
   assert!(lint("a < b || a == b").is_err());
@@ -226,7 +226,7 @@ fn no_double_condition() {
 }
 
 #[test]
-fn no_empty_import() {
+fn empty_import() {
   assert!(lint("from maths import {}").is_err());
   assert!(lint("from string import {   }").is_err());
   assert!(lint("from string import { ,,, }").is_err());
@@ -235,7 +235,7 @@ fn no_empty_import() {
 }
 
 #[test]
-fn no_loss_of_precision() {
+fn loss_of_precision() {
   assert!(lint("1234567890123456789").is_err());
   assert!(lint("9007199254740993").is_err());
   assert!(lint("5123000000000000000000000000001").is_err());

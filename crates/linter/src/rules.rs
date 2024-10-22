@@ -10,28 +10,28 @@ use bang_syntax::{
 use std::borrow::Cow;
 
 pub const RULES: [&dyn LintRule; 16] = [
-  &NoConstantConditions,
-  &NoNegativeZero,
-  &NoSelfAssign,
-  &NoSelfComparison,
-  &NoUnderscoreVariableUse,
-  &NoUselessMatch,
-  &NoYodaComparison,
-  &NoUnnecessaryClosures,
-  &NoUselessIf,
-  &NoErasingOperations,
-  &NoConstantStringsInFormatString,
-  &NoUnnecessaryReturn,
-  &NoUnreachableCode,
-  &NoDoubleCondition,
-  &NoEmptyImports,
-  &NoLossOfPrecision,
+  &ConstantCondition,
+  &NegativeZero,
+  &SelfAssignment,
+  &SelfComparison,
+  &UnderscoreVariableUse,
+  &UselessMatch,
+  &YodaEquality,
+  &UnnecessaryClosure,
+  &IdenticalBranches,
+  &ErasingOperation,
+  &ConstantStringInFormatString,
+  &UnnecessaryReturn,
+  &UnreachableCode,
+  &DoubleComparisonChain,
+  &EmptyImport,
+  &LossOfPrecision,
 ];
 
-pub struct NoConstantConditions;
-impl LintRule for NoConstantConditions {
+pub struct ConstantCondition;
+impl LintRule for ConstantCondition {
   fn name(&self) -> &'static str {
-    "No Constant Conditions"
+    "Constant Condition"
   }
   fn message(&self) -> &'static str {
     "the control flow could be removed, as the condition is always the same"
@@ -57,13 +57,13 @@ impl LintRule for NoConstantConditions {
   }
 }
 
-pub struct NoNegativeZero;
-impl LintRule for NoNegativeZero {
+pub struct NegativeZero;
+impl LintRule for NegativeZero {
   fn name(&self) -> &'static str {
-    "No Negative Zero"
+    "Negative Zero"
   }
   fn message(&self) -> &'static str {
-    "negative zero is unnecessary as 0 == -0"
+    "negative zero is unnecessary, as 0 == -0"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
     if let Expression::Unary(unary) = &expression
@@ -77,10 +77,10 @@ impl LintRule for NoNegativeZero {
   }
 }
 
-pub struct NoSelfAssign;
-impl LintRule for NoSelfAssign {
+pub struct SelfAssignment;
+impl LintRule for SelfAssignment {
   fn name(&self) -> &'static str {
-    "No Self Assign"
+    "Self Assignment"
   }
   fn message(&self) -> &'static str {
     "assigning a variable to itself is unnecessary"
@@ -95,13 +95,13 @@ impl LintRule for NoSelfAssign {
   }
 }
 
-pub struct NoSelfComparison;
-impl LintRule for NoSelfComparison {
+pub struct SelfComparison;
+impl LintRule for SelfComparison {
   fn name(&self) -> &'static str {
-    "No Self Comparison"
+    "Self Comparison"
   }
   fn message(&self) -> &'static str {
-    "comparing a variable to itself is unnecessary"
+    "comparing a value to itself is unnecessary"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
     fn is_comparison(operator: BinaryOperator) -> bool {
@@ -125,13 +125,13 @@ impl LintRule for NoSelfComparison {
   }
 }
 
-pub struct NoUnderscoreVariableUse;
-impl LintRule for NoUnderscoreVariableUse {
+pub struct UnderscoreVariableUse;
+impl LintRule for UnderscoreVariableUse {
   fn name(&self) -> &'static str {
-    "No `_` Variable Use"
+    "Underscore Variable Use"
   }
   fn message(&self) -> &'static str {
-    "`_` indicates the variable/ parameter is not used, but it has been used"
+    "a `_` prefix indicates the variable/ parameter is unused, but it has been used"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
     if let Expression::Variable(variable) = &expression
@@ -142,13 +142,13 @@ impl LintRule for NoUnderscoreVariableUse {
   }
 }
 
-pub struct NoUselessMatch;
-impl LintRule for NoUselessMatch {
+pub struct UselessMatch;
+impl LintRule for UselessMatch {
   fn name(&self) -> &'static str {
-    "No Useless Match"
+    "Useless Match"
   }
   fn message(&self) -> &'static str {
-    "match statement is unnecessary as the first case matches everything"
+    "the first case matches everything, therefore the match is useless"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
     if let Expression::Match(match_) = &expression
@@ -161,10 +161,10 @@ impl LintRule for NoUselessMatch {
   }
 }
 
-pub struct NoYodaComparison;
-impl LintRule for NoYodaComparison {
+pub struct YodaEquality;
+impl LintRule for YodaEquality {
   fn name(&self) -> &'static str {
-    "No Yoda Equality"
+    "Yoda Equality"
   }
   fn message(&self) -> &'static str {
     "it is clearer to have the variable first then the value to compare to"
@@ -180,13 +180,13 @@ impl LintRule for NoYodaComparison {
   }
 }
 
-pub struct NoUnnecessaryClosures;
-impl LintRule for NoUnnecessaryClosures {
+pub struct UnnecessaryClosure;
+impl LintRule for UnnecessaryClosure {
   fn name(&self) -> &'static str {
-    "No Unnecessary Closures"
+    "Unnecessary Closure"
   }
   fn message(&self) -> &'static str {
-    "function could just be passed directly, without being wrapped in another function"
+    "the inner function could be used directly, without being wrapped in another function"
   }
 
   fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
@@ -207,10 +207,10 @@ impl LintRule for NoUnnecessaryClosures {
   }
 }
 
-pub struct NoUselessIf;
-impl LintRule for NoUselessIf {
+pub struct IdenticalBranches;
+impl LintRule for IdenticalBranches {
   fn name(&self) -> &'static str {
-    "No Useless If"
+    "Identiical Branches"
   }
   fn message(&self) -> &'static str {
     "both branches of the if-else are the same, consider removing the if"
@@ -225,10 +225,10 @@ impl LintRule for NoUselessIf {
   }
 }
 
-pub struct NoErasingOperations;
-impl LintRule for NoErasingOperations {
+pub struct ErasingOperation;
+impl LintRule for ErasingOperation {
   fn name(&self) -> &'static str {
-    "No Erasing Operations"
+    "Erasing Operation"
   }
   fn message(&self) -> &'static str {
     "this operation always returns 0"
@@ -251,13 +251,13 @@ impl LintRule for NoErasingOperations {
   }
 }
 
-pub struct NoConstantStringsInFormatString;
-impl LintRule for NoConstantStringsInFormatString {
+pub struct ConstantStringInFormatString;
+impl LintRule for ConstantStringInFormatString {
   fn name(&self) -> &'static str {
-    "No Constant Strings in Format Strings"
+    "Constant String in Format String"
   }
   fn message(&self) -> &'static str {
-    "can be combined with the rest of the string"
+    "the constant can be combined with the rest of the string"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
     if let Expression::FormatString(format_string) = &expression {
@@ -272,13 +272,13 @@ impl LintRule for NoConstantStringsInFormatString {
   }
 }
 
-pub struct NoUnnecessaryReturn;
-impl LintRule for NoUnnecessaryReturn {
+pub struct UnnecessaryReturn;
+impl LintRule for UnnecessaryReturn {
   fn name(&self) -> &'static str {
-    "No Unnecessary Return"
+    "Unnecessary Return"
   }
   fn message(&self) -> &'static str {
-    "return statement is unnecessary, as a block returns the last expression"
+    "the return statement is unnecessary, as a block will return the last expression"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
     if let Expression::Function(function) = &expression {
@@ -289,13 +289,13 @@ impl LintRule for NoUnnecessaryReturn {
   }
 }
 
-pub struct NoUnreachableCode;
-impl LintRule for NoUnreachableCode {
+pub struct UnreachableCode;
+impl LintRule for UnreachableCode {
   fn name(&self) -> &'static str {
-    "No Unreachable Code"
+    "Unreachable Code"
   }
   fn message(&self) -> &'static str {
-    "code after a return will never be executed"
+    "code after a return will never be run"
   }
   fn is_unused(&self) -> bool {
     true
@@ -319,13 +319,13 @@ impl LintRule for NoUnreachableCode {
   }
 }
 
-pub struct NoDoubleCondition;
-impl LintRule for NoDoubleCondition {
+pub struct DoubleComparisonChain;
+impl LintRule for DoubleComparisonChain {
   fn name(&self) -> &'static str {
-    "No Double Condition"
+    "Double Comparison Chain"
   }
   fn message(&self) -> &'static str {
-    "can be simplified into a single condition"
+    "the expression can be simplified into a single condition\n`a == b or a > b` can be simplified to `a >= b`"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
     fn is_comparison(operator: BinaryOperator) -> bool {
@@ -365,13 +365,16 @@ impl LintRule for NoDoubleCondition {
   }
 }
 
-pub struct NoEmptyImports;
-impl LintRule for NoEmptyImports {
+pub struct EmptyImport;
+impl LintRule for EmptyImport {
   fn name(&self) -> &'static str {
-    "No Empty Imports"
+    "Empty Imports"
   }
   fn message(&self) -> &'static str {
-    "statement can be deleted"
+    "the import statement imports nothing, it can be removed"
+  }
+  fn is_unused(&self) -> bool {
+    true
   }
   fn visit_statement(&self, context: &mut Context, statement: &Statement, ast: &AST) {
     if let Statement::Import(import) = statement
@@ -382,10 +385,10 @@ impl LintRule for NoEmptyImports {
   }
 }
 
-pub struct NoLossOfPrecision;
-impl LintRule for NoLossOfPrecision {
+pub struct LossOfPrecision;
+impl LintRule for LossOfPrecision {
   fn name(&self) -> &'static str {
-    "No Loss of Precision"
+    "Loss of Precision"
   }
   fn message(&self) -> &'static str {
     "numbers are stored as double-precision floating-point numbers according to the IEEE 754 standard\nwhen the literal is converted to a number, precision will be lost and the value may not be what was intended"
