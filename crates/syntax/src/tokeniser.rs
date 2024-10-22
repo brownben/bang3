@@ -176,10 +176,13 @@ impl Tokeniser<'_> {
     }
 
     // Match numbers after the decimal point
-    position += self.source[position..]
+    let after_decimal = self.source[position..]
       .iter()
       .take_while(|c| matches!(c, b'0'..=b'9' | b'_'))
       .count();
+    if after_decimal > 0 {
+      position += after_decimal;
+    }
 
     (TokenKind::Number, position - self.position)
   }

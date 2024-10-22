@@ -389,6 +389,20 @@ fn literal() {
   let expected = "├─ Number (5.6)\n";
   assert_eq!(ast, expected);
 
+  let ast = parse_to_string(".6");
+  let expected = "├─ Number (0.6)\n";
+  assert_eq!(ast, expected);
+
+  assert!(parse("1.").is_err());
+  assert!(parse("01.").is_err());
+  assert!(parse("55.").is_err());
+  assert!(parse("01.0").is_ok());
+  assert!(parse("55.0000").is_ok());
+
+  let ast = parse_to_string("5.");
+  let expected = "├─ Number (5)\n├─ Invalid\n";
+  assert_eq!(ast, expected);
+
   let ast = parse_to_string("5_000.03");
   let expected = "├─ Number (5000.03)\n";
   assert_eq!(ast, expected);
