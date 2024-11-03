@@ -1,8 +1,9 @@
 use super::{
   bytecode::{Chunk, ConstantValue, OpCode},
   context::{Context, ImportResult},
-  object::{BangString, Closure, NativeFunction},
-  value::{Type, Value},
+  object::{BangString, Closure, NativeFunction, TypeDescriptor, DEFAULT_TYPE_DESCRIPTORS},
+  object::{ALLOCATED_TYPE_ID, CLOSURE_TYPE_ID, NATIVE_FUNCTION_TYPE_ID, STRING_TYPE_ID},
+  value::Value,
 };
 use bang_gc::{GcList, Heap, HeapSize};
 use bang_syntax::{LineIndex, Span};
@@ -30,6 +31,7 @@ pub struct VM<'context> {
   gc_threshold: usize,
 
   context: &'context dyn Context,
+  pub(crate) types: Vec<TypeDescriptor>,
 }
 impl<'context> VM<'context> {
   /// Create a new VM
@@ -51,12 +53,13 @@ impl<'context> VM<'context> {
       frames: Vec::with_capacity(16),
       gc_threshold: 6,
       context,
+      types: DEFAULT_TYPE_DESCRIPTORS.to_vec(),
     };
 
     for function in vm.context.global_functions() {
       let name = function.name;
       let function = vm.heap.allocate(function);
-      vm.define_global(name, Value::from_object(function, Type::NativeFunction));
+      vm.define_global(name, Value::from_object(function, NATIVE_FUNCTION_TYPE_ID));
     }
 
     Ok(vm)
@@ -152,39 +155,26 @@ impl<'context> VM<'context> {
   }
   /// Run the garbage collector
   pub fn garbage_collect(&mut self) {
-    fn mark_value(heap: &Heap, value: Value) {
+    fn mark_value(vm: &VM, value: Value) {
       if value.is_object() {
-        heap.mark(value.as_object::<u8>());
-
-        if value.is_object_type(Type::Allocated) {
-          let allocated_value = heap[value.as_object::<Value>()];
-          mark_value(heap, allocated_value);
-        }
-
-        if value.is_object_type(Type::Closure) {
-          let closure = &heap[value.as_object::<Closure>()];
-          heap.mark(*closure.upvalues);
-          for upvalue in heap.get_list_buffer(closure.upvalues) {
-            mark_value(heap, *upvalue);
-          }
-        }
+        (vm.types[value.object_type()].trace)(vm, value.as_object(), mark_value);
       }
     }
 
     self.heap.start_gc();
 
     for value in &self.stack {
-      mark_value(&self.heap, *value);
+      mark_value(self, *value);
     }
     for value in self.globals.values() {
-      mark_value(&self.heap, *value);
+      mark_value(self, *value);
     }
     for frame in &self.frames {
       if let Some(upvalues) = frame.upvalues {
         self.heap.mark(*upvalues);
 
         for upvalue in self.heap.get_list_buffer(upvalues) {
-          mark_value(&self.heap, *upvalue);
+          mark_value(self, *upvalue);
         }
       }
     }
@@ -278,7 +268,7 @@ impl<'context> VM<'context> {
           } else {
             break Some(ErrorKind::TypeErrorBinary {
               expected: "two strings",
-              got: format!("a {} and a {}", left.get_type(), right.get_type()),
+              got: format!("a {} and a {}", left.get_type(self), right.get_type(self)),
             });
           }
         }
@@ -288,7 +278,7 @@ impl<'context> VM<'context> {
           let string = if value.is_string() {
             value
           } else {
-            let string = value.display(&self.heap);
+            let string = value.display(self);
             allocate_string(&mut self.heap, &string)
           };
           self.push(string);
@@ -302,13 +292,13 @@ impl<'context> VM<'context> {
           } else {
             break Some(ErrorKind::TypeError {
               expected: "number",
-              got: value.get_type(),
+              got: value.get_type(self),
             });
           }
         }
         OpCode::Not => {
           let value = self.pop();
-          self.push(value.is_falsy(&self.heap).into());
+          self.push(value.is_falsy(self).into());
         }
 
         // Equalities
@@ -352,20 +342,20 @@ impl<'context> VM<'context> {
         OpCode::Call => {
           let callee = self.get_stack_value(self.stack.len() - 2);
 
-          if callee.is_function() {
+          if callee.is_constant_function() {
             self.push_frame(ip, offset, chunk, None);
 
             ip = 0;
             offset = self.stack.len() - 1;
             chunk = unsafe { &*callee.as_function(&self.heap).as_ptr() };
-          } else if callee.is_object_type(Type::Closure) {
+          } else if callee.is_object_type(CLOSURE_TYPE_ID) {
             let upvalues = self.heap[callee.as_object::<Closure>()].upvalues;
             self.push_frame(ip, offset, chunk, Some(upvalues));
 
             ip = 0;
             offset = self.stack.len() - 1;
             chunk = unsafe { &*self.heap[callee.as_object::<Closure>()].function().as_ptr() };
-          } else if callee.is_object_type(Type::NativeFunction) {
+          } else if callee.is_object_type(NATIVE_FUNCTION_TYPE_ID) {
             let argument = self.pop();
             let function = &self.heap[callee.as_object::<NativeFunction>()];
 
@@ -375,7 +365,7 @@ impl<'context> VM<'context> {
 
             ip += 1;
           } else {
-            break Some(ErrorKind::NotCallable(callee.get_type()));
+            break Some(ErrorKind::NotCallable(callee.get_type(self)));
           }
 
           continue; // skip the ip increment, as we're jumping to a new chunk
@@ -396,7 +386,7 @@ impl<'context> VM<'context> {
         OpCode::Allocate => {
           let index = chunk.get_value(ip + 1);
           let local = &mut self.stack[offset + usize::from(index)];
-          let allocated = Value::from_object(self.heap.allocate(*local), Type::Allocated);
+          let allocated = Value::from_object(self.heap.allocate(*local), ALLOCATED_TYPE_ID);
           *local = allocated;
           self.push(allocated);
         }
@@ -411,7 +401,7 @@ impl<'context> VM<'context> {
           let closure = self
             .heap
             .allocate(Closure::new(value.as_function(&self.heap), upvalue_list));
-          self.push(Value::from_object(closure, Type::Closure));
+          self.push(Value::from_object(closure, CLOSURE_TYPE_ID));
         }
         OpCode::GetUpvalue => {
           let upvalue = chunk.get_value(ip + 1);
@@ -456,7 +446,7 @@ impl<'context> VM<'context> {
         }
         OpCode::JumpIfFalse => {
           let jump = chunk.get_long_value(ip + 1);
-          if self.peek().is_falsy(&self.heap) {
+          if self.peek().is_falsy(self) {
             ip += usize::from(jump);
           }
         }
@@ -500,9 +490,9 @@ macro numeric_operation(($vm:expr, $chunk:expr), $operator:tt) {{
   if left.is_number() && right.is_number() {
     $vm.push(Value::from(left.as_number() $operator right.as_number()));
   } else if right.is_number() {
-    break Some(ErrorKind::TypeError { expected: "number", got: left.get_type() });
+    break Some(ErrorKind::TypeError { expected: "number", got: left.get_type(&$vm) });
   } else {
-    break Some(ErrorKind::TypeError { expected: "number", got: right.get_type() });
+    break Some(ErrorKind::TypeError { expected: "number", got: right.get_type(&$vm) });
   }
 }}
 
@@ -517,7 +507,7 @@ macro comparison_operation(($vm:expr, $chunk:expr), $operator:tt) {{
   } else {
     break Some(ErrorKind::TypeErrorBinary {
       expected: "two numbers or two strings",
-      got: format!("a {} and a {}", left.get_type(), right.get_type()),
+      got: format!("a {} and a {}", left.get_type(&$vm), right.get_type(&$vm)),
     });
   }
 }}
@@ -525,7 +515,7 @@ macro comparison_operation(($vm:expr, $chunk:expr), $operator:tt) {{
 /// Allocates a string on the heap and returns a `Value` pointing to it.
 pub(crate) fn allocate_string(heap: &mut Heap, value: &str) -> Value {
   let string = heap.allocate_list(value.bytes(), value.len());
-  Value::from_object(*string, Type::String)
+  Value::from_object(*string, STRING_TYPE_ID)
 }
 
 /// An error whilst executing bytecode

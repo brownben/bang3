@@ -1,6 +1,7 @@
 use super::{
   bytecode::Chunk,
-  object::{BangString, Closure, NativeFunction},
+  object::{BangString, STRING_TYPE_ID},
+  vm::VM,
 };
 use bang_gc::{Gc, Heap};
 use smartstring::alias::String as SmartString;
@@ -88,9 +89,9 @@ impl Value {
 
   /// Create a new [Value] from a pointer to the heap
   #[must_use]
-  pub(crate) fn from_object<T>(object: Gc<T>, type_: Type) -> Self {
+  pub(crate) fn from_object<T>(object: Gc<T>, type_: usize) -> Self {
     Self(ptr::without_provenance(
-      TO_POINTER | usize::from(type_) << 32 | object.addr() | OBJECT,
+      TO_POINTER | type_ << 32 | object.addr() | OBJECT,
     ))
   }
   /// Is the [Value] a pointer to the heap?
@@ -98,25 +99,21 @@ impl Value {
   pub(crate) fn is_object(self) -> bool {
     (self.0.addr() & TO_POINTER) == TO_POINTER && self.0.addr() & TAG == OBJECT
   }
-  /// Is the [Value] an object of the given [Type]?
+  /// Is the [Value] an object of the given type?
   #[must_use]
-  pub(crate) fn is_object_type(self, type_: Type) -> bool {
+  pub(crate) fn is_object_type(self, type_: usize) -> bool {
     self.is_object() && self.object_type() == type_
   }
-  /// Get the [Type] of a pointer to the heap
+  /// Get the type of a pointer to the heap
   ///
   /// SAFETY: Undefined behaviour if [Value] is not a pointer to the heap.
   /// Use [`Value::is_object`] to check if it is a pointer to the heap.
   #[must_use]
-  pub(crate) fn object_type(self) -> Type {
+  pub(crate) fn object_type(self) -> usize {
     debug_assert!(self.is_object());
 
     let raw = self.0.addr() & FROM_POINTER;
-    #[expect(
-      clippy::cast_possible_truncation,
-      reason = "we want truncate the address info"
-    )]
-    Type::from((raw >> 32) as u16)
+    raw >> 32
   }
   /// View the [Value] as a object
   ///
@@ -136,7 +133,7 @@ impl Value {
   /// Is the [Value] a string?
   #[must_use]
   pub fn is_string(&self) -> bool {
-    self.is_constant_string() || self.is_object_type(Type::String)
+    self.is_constant_string() || self.is_object_type(STRING_TYPE_ID)
   }
   /// View the [Value] as a string.
   /// It can be a constant string or a string on the heap.
@@ -152,11 +149,6 @@ impl Value {
     }
   }
 
-  /// Is the [Value] a function?
-  #[must_use]
-  pub fn is_function(&self) -> bool {
-    self.is_constant_function() || self.is_object_type(Type::Function)
-  }
   /// View the [Value] as a function.
   /// It can be a constant function or a function on the heap.
   ///
@@ -209,50 +201,41 @@ impl Value {
   /// It is falsy if false, 0, or an empty collection
   #[inline]
   #[must_use]
-  pub fn is_falsy(&self, heap: &Heap) -> bool {
+  pub fn is_falsy(&self, vm: &VM) -> bool {
     match self {
       Self(TRUE) => false,
       Self(FALSE | NULL) => true,
       x if x.is_number() => (x.as_number() - 0.0).abs() < f64::EPSILON,
-      x if x.is_string() => x.as_string(heap).is_empty(),
-      _ => false, // all other objects are truthy
+      x if x.is_string() => x.as_string(&vm.heap).is_empty(),
+      x if x.is_constant_function() => false,
+      x => (vm.types[x.object_type()].is_falsy)(&vm.heap, x.as_object()),
     }
   }
 
   /// Get the type of the value as a string
   #[must_use]
-  pub fn get_type(&self) -> &'static str {
+  pub fn get_type(&self, vm: &VM) -> &'static str {
     match self {
       Self(TRUE | FALSE) => "boolean",
       Self(NULL) => "null",
       x if x.is_number() => "number",
       x if x.is_constant_string() => "string",
       x if x.is_constant_function() => "function",
-      x => match x.object_type() {
-        Type::String => "string",
-        Type::Closure | Type::Function | Type::NativeFunction => "function",
-        Type::Allocated | Type::UpvalueList => unreachable!("not used as value"),
-      },
+      x => vm.types[x.object_type()].type_name,
     }
   }
 
   /// Get the value as a string
   #[must_use]
-  pub fn display(&self, heap: &Heap) -> String {
+  pub fn display(&self, vm: &VM) -> String {
     match self {
       Self(TRUE) => "true".to_owned(),
       Self(FALSE) => "false".to_owned(),
       Self(NULL) => "null".to_owned(),
       x if x.is_number() => x.as_number().to_string(),
-      x if x.is_string() => x.as_string(heap).to_owned(),
-      x if x.is_function() => x.as_function(heap).display(),
-      x if x.is_object_type(Type::NativeFunction) => {
-        heap[x.as_object::<NativeFunction>()].to_string()
-      }
-      x if x.is_object_type(Type::Closure) => {
-        format!("{}", heap[x.as_object::<Closure>()])
-      }
-      _ => unreachable!(),
+      x if x.is_string() => x.as_string(&vm.heap).to_owned(),
+      x if x.is_constant_function() => x.as_function(&vm.heap).display(),
+      x => (vm.types[x.object_type()].display)(&vm.heap, x.as_object()),
     }
   }
 }
@@ -315,29 +298,6 @@ pub const TRUE: *const () = ptr::without_provenance(0xFFFF_0000_0000_0017);
 pub const FALSE: *const () = ptr::without_provenance(0xFFFF_0000_0000_0027);
 pub const NULL: *const () = ptr::without_provenance(0xFFFF_0000_0000_0037);
 
-/// Marker to indicate the type of a garbage collected object
-/// Stored inline with the [Value] for quick access
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-#[repr(u16)]
-pub enum Type {
-  String,
-  Function,
-  NativeFunction,
-  Closure,
-  Allocated,
-  UpvalueList,
-}
-impl From<u16> for Type {
-  fn from(value: u16) -> Self {
-    unsafe { std::mem::transmute(value) }
-  }
-}
-impl From<Type> for usize {
-  fn from(value: Type) -> Self {
-    usize::from(value as u16)
-  }
-}
-
 #[cfg(test)]
 mod test {
   use super::*;
@@ -352,14 +312,14 @@ mod test {
     let true_ = Value::TRUE;
     assert!(!true_.is_number());
     assert!(!true_.is_constant_string());
-    assert!(!true_.is_function());
+    assert!(!true_.is_constant_function());
     assert!(!true_.is_object());
     assert!(!true_.is_string());
 
     let false_ = Value::FALSE;
     assert!(!false_.is_number());
     assert!(!false_.is_constant_string());
-    assert!(!false_.is_function());
+    assert!(!false_.is_constant_function());
     assert!(!false_.is_object());
     assert!(!false_.is_string());
 
@@ -372,7 +332,7 @@ mod test {
     let null = Value::NULL;
     assert!(!null.is_number());
     assert!(!null.is_constant_string());
-    assert!(!null.is_function());
+    assert!(!null.is_constant_function());
     assert!(!null.is_object());
     assert!(!null.is_string());
   }
@@ -383,7 +343,7 @@ mod test {
       let num = Value::from(number);
       assert!(num.is_number());
       assert!(!num.is_constant_string());
-      assert!(!num.is_function());
+      assert!(!num.is_constant_function());
       assert!(!num.is_object());
       assert!(!num.is_string());
 
@@ -393,7 +353,7 @@ mod test {
     let num = Value::from(f64::NAN);
     assert!(num.is_number());
     assert!(!num.is_constant_string());
-    assert!(!num.is_function());
+    assert!(!num.is_constant_function());
     assert!(!num.is_object());
     assert!(!num.is_string());
     assert!(num.as_number().is_nan());
@@ -401,7 +361,7 @@ mod test {
     let num = Value::from(f64::INFINITY);
     assert!(num.is_number());
     assert!(!num.is_constant_string());
-    assert!(!num.is_function());
+    assert!(!num.is_constant_function());
     assert!(!num.is_object());
     assert!(!num.is_string());
 
@@ -410,7 +370,7 @@ mod test {
     let num = Value::from(-f64::INFINITY);
     assert!(num.is_number());
     assert!(!num.is_constant_string());
-    assert!(!num.is_function());
+    assert!(!num.is_constant_function());
     assert!(!num.is_object());
     assert!(!num.is_string());
 
@@ -419,7 +379,7 @@ mod test {
     let num = Value::from(f64::asin(55.0));
     assert!(num.is_number());
     assert!(!num.is_constant_string());
-    assert!(!num.is_function());
+    assert!(!num.is_constant_function());
     assert!(!num.is_object());
     assert!(!num.is_string());
     assert!(num.as_number().is_nan());
@@ -431,7 +391,7 @@ mod test {
     let constant_string = Value::from(ptr::from_ref(&raw_constant_string));
     assert!(!constant_string.is_number());
     assert!(constant_string.is_constant_string());
-    assert!(!constant_string.is_function());
+    assert!(!constant_string.is_constant_function());
     assert!(!constant_string.is_object());
     assert!(constant_string.is_string());
 
@@ -441,7 +401,7 @@ mod test {
     let long_constant = Value::from(ptr::from_ref(&raw_long_constant_string));
     assert!(!long_constant.is_number());
     assert!(long_constant.is_constant_string());
-    assert!(!long_constant.is_function());
+    assert!(!long_constant.is_constant_function());
     assert!(!long_constant.is_object());
     assert!(long_constant.is_string());
   }
@@ -452,7 +412,7 @@ mod test {
     let function = Value::from(ptr::from_ref(&function));
     assert!(!function.is_number());
     assert!(!function.is_constant_string());
-    assert!(function.is_function());
+    assert!(function.is_constant_function());
     assert!(!function.is_object());
     assert!(!function.is_string());
   }

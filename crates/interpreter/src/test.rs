@@ -42,10 +42,10 @@ macro assert_variable {
     assert!(
       value.equals(string, &vm.heap),
       "{} (type {}) != {} (type {})",
-      value.display(&vm.heap),
-      value.get_type(),
-      string.display(&vm.heap),
-      string.get_type(),
+      value.display(&vm),
+      value.get_type(&vm),
+      string.display(&vm),
+      string.get_type(&vm),
     );
   },
   ($vm:expr; $name:ident, $value:expr) => {

@@ -11,11 +11,12 @@ impl Context for StandardContext {
   fn global_functions(&self) -> Vec<NativeFunction> {
     vec![
       NativeFunction::new("print", |vm, arg| {
-        println!("{}", arg.display(&vm.heap));
+        println!("{}", arg.display(vm));
         arg
       }),
       NativeFunction::new("type", |vm, arg| {
-        allocate_string(&mut vm.heap, arg.get_type())
+        let type_string = arg.get_type(vm);
+        allocate_string(&mut vm.heap, type_string)
       }),
     ]
   }
@@ -77,7 +78,7 @@ module!(maths, MATHS_ITEMS, {
 });
 
 mod macros {
-  use crate::{object::NativeFunction, value::Type, vm::allocate_string, ImportResult, Value};
+  use crate::{object::NativeFunction, vm::allocate_string, ImportResult, Value};
   use bang_gc::Heap;
 
   pub macro module($module_name:ident, $module_items_name:ident, {
@@ -108,7 +109,7 @@ mod macros {
     (fn, $heap:expr, $native_function:expr) => {
       ImportResult::Value(Value::from_object(
         $heap.allocate($native_function),
-        Type::NativeFunction,
+        crate::object::NATIVE_FUNCTION_TYPE_ID,
       ))
     },
     (String, $heap:expr, $value:expr) => {
