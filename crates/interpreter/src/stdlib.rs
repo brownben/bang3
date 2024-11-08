@@ -1,7 +1,11 @@
 //! # Standard library
 //! Standard library definition for Bang
 
-use crate::{object::NativeFunction, vm::allocate_string, Context, ImportResult};
+use crate::{
+  context::{Context, ImportResult},
+  object::NativeFunction,
+  vm::allocate_string,
+};
 use bang_gc::Heap;
 
 /// A context which provides the standard library
@@ -12,11 +16,11 @@ impl Context for StandardContext {
     vec![
       NativeFunction::new("print", |vm, arg| {
         println!("{}", arg.display(vm));
-        arg
+        Ok(arg)
       }),
       NativeFunction::new("type", |vm, arg| {
         let type_string = arg.get_type(vm);
-        allocate_string(&mut vm.heap, type_string)
+        Ok(allocate_string(&mut vm.heap, type_string))
       }),
     ]
   }
@@ -78,7 +82,8 @@ module!(maths, MATHS_ITEMS, {
 });
 
 mod macros {
-  use crate::{object::NativeFunction, vm::allocate_string, ImportResult, Value};
+  use crate::vm::ErrorKind;
+  use crate::{context::ImportResult, object::NativeFunction, vm::allocate_string, Value};
   use bang_gc::Heap;
 
   pub macro module($module_name:ident, $module_items_name:ident, {
@@ -124,9 +129,9 @@ mod macros {
     ($name:ident, Number, Number, $native_function:expr) => {
       NativeFunction::new(stringify!($name), |vm, arg| {
         if arg.is_number() {
-          $native_function(arg.as_number()).into()
+          Ok($native_function(arg.as_number()).into())
         } else {
-          Value::NULL
+          Err(ErrorKind::TypeError { expected: "number", got: arg.get_type(vm) })
         }
       })
     },
@@ -134,9 +139,9 @@ mod macros {
     ($name:ident, String, Number, $native_function:expr) => {
       NativeFunction::new(stringify!($name), |vm, arg| {
         if arg.is_string() {
-          $native_function(arg.as_string(&vm.heap)).into()
+          Ok($native_function(arg.as_string(&vm.heap)).into())
         } else {
-          Value::NULL
+          Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) })
         }
       })
     },
@@ -144,9 +149,9 @@ mod macros {
     ($name:ident, String, Boolean, $native_function:expr) => {
       NativeFunction::new(stringify!($name), |vm, arg| {
         if arg.is_string() {
-          $native_function(arg.as_string(&vm.heap)).into()
+          Ok($native_function(arg.as_string(&vm.heap)).into())
         } else {
-          Value::NULL
+          Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) })
         }
       })
     },
@@ -155,9 +160,9 @@ mod macros {
       NativeFunction::new(stringify!($name), |vm, arg| {
         if arg.is_string() {
           let result = $native_function(arg.as_string(&vm.heap));
-          allocate_string(&mut vm.heap, &result).into()
+          Ok(allocate_string(&mut vm.heap, &result).into())
         } else {
-          Value::NULL
+          Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) })
         }
       })
     },

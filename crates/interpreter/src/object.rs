@@ -1,4 +1,8 @@
-use crate::{value::Value, Chunk, VM};
+use crate::{
+  bytecode::Chunk,
+  value::Value,
+  vm::{ErrorKind, VM},
+};
 use bang_gc::{Gc, GcList, Heap};
 use std::{fmt, ptr, slice, str};
 
@@ -67,11 +71,14 @@ pub const STRING_TYPE_ID: usize = 0;
 #[derive(Clone, Debug, PartialEq)]
 pub struct NativeFunction {
   pub(crate) name: &'static str,
-  pub(crate) func: fn(&mut VM, Value) -> Value,
+  pub(crate) func: fn(&mut VM, Value) -> Result<Value, ErrorKind>,
 }
 impl NativeFunction {
   /// Create a new naative function
-  pub fn new(name: &'static str, func: fn(&mut VM, Value) -> Value) -> Self {
+  pub(crate) fn new(
+    name: &'static str,
+    func: fn(&mut VM, Value) -> Result<Value, ErrorKind>,
+  ) -> Self {
     Self { name, func }
   }
 }

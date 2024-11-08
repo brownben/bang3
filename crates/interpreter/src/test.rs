@@ -933,37 +933,31 @@ mod builtin_function {
       let ceil_b = ceil(1.01)
       let ceil_c = ceil(1.5)
       let ceil_d = ceil(72.3)
-      let ceil_e = ceil(false)
 
       let floor_a = floor(1)
       let floor_b = floor(1.01)
       let floor_c = floor(1.5)
       let floor_d = floor(72.3)
-      let floor_e = floor(false)
 
       let round_a = round(1)
       let round_b = round(1.01)
       let round_c = round(1.5)
       let round_d = round(72.3)
-      let round_e = round(false)
     "});
     assert_variable!(rounding; ceil_a, 1.0);
     assert_variable!(rounding; ceil_b, 2.0);
     assert_variable!(rounding; ceil_c, 2.0);
     assert_variable!(rounding; ceil_d, 73.0);
-    assert_variable!(rounding; ceil_e, ());
 
     assert_variable!(rounding; floor_a, 1.0);
     assert_variable!(rounding; floor_b, 1.0);
     assert_variable!(rounding; floor_c, 1.0);
     assert_variable!(rounding; floor_d, 72.0);
-    assert_variable!(rounding; floor_e, ());
 
     assert_variable!(rounding; round_a, 1.0);
     assert_variable!(rounding; round_b, 1.0);
     assert_variable!(rounding; round_c, 2.0);
     assert_variable!(rounding; round_d, 72.0);
-    assert_variable!(rounding; round_e, ());
 
     let abs = run(indoc! {"
       from maths import { abs }
@@ -1060,6 +1054,9 @@ mod builtin_function {
     "});
     assert_variable!(vm; a, std::f64::consts::PI);
     assert_variable!(vm; b, 180.0);
+
+    let wrong_type = run("from maths import { sin }\nlet a = sin(false)");
+    assert!(wrong_type.is_err_and(|error| error == super::Error::RuntimeError));
   }
 
   #[test]
@@ -1069,11 +1066,12 @@ mod builtin_function {
 
       let a = length('  hello  ')
       let b = length('hello')
-      let c = length(3)
     "});
     assert_variable!(length; a, 9.0);
     assert_variable!(length; b, 5.0);
-    assert_variable!(length; c, ());
+
+    let length_wrong_type = run("from string import { length }\nlet a = length(5)");
+    assert!(length_wrong_type.is_err_and(|error| error == super::Error::RuntimeError));
   }
 }
 

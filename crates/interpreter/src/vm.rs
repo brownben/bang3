@@ -361,7 +361,10 @@ impl<'context> VM<'context> {
 
             let result = (function.func)(self, argument);
             self.pop();
-            self.push(result);
+            match result {
+              Ok(value) => self.push(value),
+              Err(err) => break Some(err),
+            }
 
             ip += 1;
           } else {
@@ -579,7 +582,7 @@ impl fmt::Display for RuntimeError {
 impl error::Error for RuntimeError {}
 
 #[derive(Debug, Clone)]
-enum ErrorKind {
+pub(crate) enum ErrorKind {
   TypeError {
     expected: &'static str,
     got: &'static str,
