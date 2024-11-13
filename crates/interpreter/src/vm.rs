@@ -1,13 +1,9 @@
+use crate::object::{BangString, Closure, NativeClosure, NativeFunction};
+
 use super::{
   bytecode::{Chunk, ConstantValue, OpCode},
-  context::{Context, ImportResult},
-  object::{
-    BangString, Closure, NativeClosure, NativeFunction, TypeDescriptor, DEFAULT_TYPE_DESCRIPTORS,
-  },
-  object::{
-    ALLOCATED_TYPE_ID, CLOSURE_TYPE_ID, NATIVE_CLOSURE_TYPE_ID, NATIVE_FUNCTION_TYPE_ID,
-    STRING_TYPE_ID,
-  },
+  object::{self, TypeDescriptor},
+  stdlib::{Context, ImportResult},
   value::Value,
 };
 use bang_gc::{GcList, Heap, HeapSize};
@@ -58,13 +54,16 @@ impl<'context> VM<'context> {
       frames: Vec::with_capacity(16),
       gc_threshold: 6,
       context,
-      types: DEFAULT_TYPE_DESCRIPTORS.to_vec(),
+      types: object::DEFAULT_TYPE_DESCRIPTORS.to_vec(),
     };
 
     for function in vm.context.global_functions() {
       let name = function.name;
       let function = vm.heap.allocate(function);
-      vm.define_global(name, Value::from_object(function, NATIVE_FUNCTION_TYPE_ID));
+      vm.define_global(
+        name,
+        Value::from_object(function, object::NATIVE_FUNCTION_TYPE_ID),
+      );
     }
 
     Ok(vm)
@@ -108,7 +107,7 @@ impl<'context> VM<'context> {
   /// Allocates a new string in the [`VM`] returns a [`Value`] pointing to it
   pub fn allocate_string(&mut self, value: &str) -> Value {
     let string = self.heap.allocate_list(value.bytes(), value.len());
-    Value::from_object(*string, STRING_TYPE_ID)
+    Value::from_object(*string, object::STRING_TYPE_ID)
   }
 
   #[inline]
@@ -383,14 +382,14 @@ impl<'context> VM<'context> {
             ip = 0;
             offset = self.stack.len() - 1;
             chunk = unsafe { &*callee.as_function(&self.heap).as_ptr() };
-          } else if callee.is_object_type(CLOSURE_TYPE_ID) {
+          } else if callee.is_object_type(object::CLOSURE_TYPE_ID) {
             let upvalues = self.heap[callee.as_object::<Closure>()].upvalues;
             self.push_frame(ip, offset, chunk, Some(upvalues));
 
             ip = 0;
             offset = self.stack.len() - 1;
             chunk = unsafe { &*self.heap[callee.as_object::<Closure>()].function().as_ptr() };
-          } else if callee.is_object_type(NATIVE_FUNCTION_TYPE_ID) {
+          } else if callee.is_object_type(object::NATIVE_FUNCTION_TYPE_ID) {
             let argument = self.pop();
             let function = &self.heap[callee.as_object::<NativeFunction>()];
 
@@ -402,7 +401,7 @@ impl<'context> VM<'context> {
             }
 
             ip += 1;
-          } else if callee.is_object_type(NATIVE_CLOSURE_TYPE_ID) {
+          } else if callee.is_object_type(object::NATIVE_CLOSURE_TYPE_ID) {
             let argument = self.pop();
             let function = &self.heap[callee.as_object::<NativeClosure>()];
 
@@ -436,7 +435,7 @@ impl<'context> VM<'context> {
         OpCode::Allocate => {
           let index = chunk.get_value(ip + 1);
           let local = &mut self.stack[offset + usize::from(index)];
-          let allocated = Value::from_object(self.heap.allocate(*local), ALLOCATED_TYPE_ID);
+          let allocated = Value::from_object(self.heap.allocate(*local), object::ALLOCATED_TYPE_ID);
           *local = allocated;
           self.push(allocated);
         }
@@ -451,7 +450,7 @@ impl<'context> VM<'context> {
           let closure = self
             .heap
             .allocate(Closure::new(value.as_function(&self.heap), upvalue_list));
-          self.push(Value::from_object(closure, CLOSURE_TYPE_ID));
+          self.push(Value::from_object(closure, object::CLOSURE_TYPE_ID));
         }
         OpCode::GetUpvalue => {
           let upvalue = chunk.get_value(ip + 1);
@@ -516,7 +515,7 @@ impl<'context> VM<'context> {
         // we can't just use [`VM::allocate_string`], as it will borrow VM as mutable
         let value = constant.as_constant_string();
         let string = self.heap.allocate_list(value.bytes(), value.len());
-        *constant = Value::from_object(*string, STRING_TYPE_ID);
+        *constant = Value::from_object(*string, object::STRING_TYPE_ID);
       }
       // TODO: store chunks on the heap, to ensure if they are stored they can be accessed later
     }

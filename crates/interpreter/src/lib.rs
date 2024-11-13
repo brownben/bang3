@@ -8,7 +8,6 @@
 
 mod bytecode;
 mod compiler;
-mod context;
 mod object;
 pub mod stdlib;
 mod value;
@@ -45,7 +44,6 @@ pub fn compile_expression(
 pub use bang_gc::HeapSize;
 pub use bytecode::{Chunk, ChunkBuilder, OpCode};
 pub use compiler::CompileError;
-pub use context::Empty as EmptyContext;
-pub use stdlib::StandardContext;
+pub use stdlib::{EmptyContext, StandardContext};
 pub use value::Value;
 pub use vm::{RuntimeError, VM};

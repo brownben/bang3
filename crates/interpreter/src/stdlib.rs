@@ -1,11 +1,46 @@
 //! # Standard library
 //! Standard library definition for Bang
 
-use crate::{
-  context::{Context, ImportResult},
-  object::NativeFunction,
-  vm::VM,
-};
+use crate::{object::NativeFunction, Value, VM};
+use std::fmt;
+
+/// A context is the environment in which the VM runs.
+///
+/// It is responsible for defining the global functions which can be called,
+/// and for importing values from modules.
+pub trait Context: fmt::Debug {
+  /// Defines the functions which should be registered globally for the VM
+  fn global_functions(&self) -> Vec<NativeFunction> {
+    Vec::new()
+  }
+
+  /// Import a value from a module
+  fn import_value(&self, vm: &mut VM, module: &str, item: &str) -> ImportResult {
+    let (_vm, _module, _item) = (vm, module, item);
+    ImportResult::ModuleNotFound
+  }
+}
+
+/// The result of importing a value from a module.
+#[derive(Clone)]
+pub enum ImportResult {
+  /// The value which was requested
+  Value(Value),
+  /// The module was not found
+  ModuleNotFound,
+  /// The item was not found in the module
+  ItemNotFound,
+}
+impl<T: Into<Value>> From<T> for ImportResult {
+  fn from(value: T) -> Self {
+    ImportResult::Value(value.into())
+  }
+}
+
+/// An empty context, where nothing can be imported and has no global function
+#[derive(Clone, Debug)]
+pub struct EmptyContext;
+impl Context for EmptyContext {}
 
 /// A context which provides the standard library
 #[derive(Clone, Debug)]
@@ -89,11 +124,11 @@ module!(maths, MATHS_ITEMS, {
 });
 
 mod macros {
-  use crate::vm::ErrorKind;
+  use super::ImportResult;
   use crate::{
-    context::ImportResult,
     object::{NativeClosure, NativeFunction, NATIVE_CLOSURE_TYPE_ID},
-    Value, VM,
+    value::Value,
+    vm::{ErrorKind, VM},
   };
 
   pub macro module($module_name:ident, $module_items_name:ident, {

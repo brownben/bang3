@@ -194,11 +194,8 @@ pub const NATIVE_CLOSURE_TYPE_ID: usize = 4;
 
 #[cfg(test)]
 mod test {
-  use super::{
-    ALLOCATED_TYPE_ID, CLOSURE_TYPE_ID, NATIVE_CLOSURE_TYPE_ID, NATIVE_FUNCTION_TYPE_ID,
-    STRING_TYPE_ID,
-  };
-  use crate::{object::DEFAULT_TYPE_DESCRIPTORS, EmptyContext, VM};
+  use super::*;
+  use crate::{EmptyContext, VM};
   use bang_gc::HeapSize;
 
   #[test]
