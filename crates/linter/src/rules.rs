@@ -378,7 +378,7 @@ impl LintRule for EmptyImport {
   }
   fn visit_statement(&self, context: &mut Context, statement: &Statement, ast: &AST) {
     if let Statement::Import(import) = statement
-      && import.items(ast).count() == 0
+      && import.is_empty(ast)
     {
       context.add_diagnostic(&Self, import.span(ast));
     }

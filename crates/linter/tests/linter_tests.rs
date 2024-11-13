@@ -234,8 +234,11 @@ fn empty_import() {
   assert!(lint("from maths import {}").is_err());
   assert!(lint("from string import {   }").is_err());
   assert!(lint("from string import { ,,, }").is_err());
+  assert!(lint("from string import { \n\n,,\n, }").is_err());
+  assert!(lint("from string import { \n\n\n }").is_err());
 
   assert!(lint("from string import { length }").is_ok());
+  assert!(lint("from string import { 5 }").is_ok()); // has syntax error though
 }
 
 #[test]

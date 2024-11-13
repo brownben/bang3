@@ -133,6 +133,22 @@ impl Import {
     start.merge(end)
   }
 
+  /// Is the import statement empty?
+  pub fn is_empty(&self, ast: &AST) -> bool {
+    let mut position = self.start.unwrap_or(self.end).next();
+    while position < self.end {
+      let token = ast[position];
+
+      if token.kind != TokenKind::EndOfLine && token.kind != TokenKind::Comma {
+        return false;
+      }
+
+      position = position.next();
+    }
+
+    true
+  }
+
   /// The location of the statement
   pub fn span(&self, ast: &AST) -> Span {
     Span::from(ast[self.keyword]).merge(ast[self.end].into())
