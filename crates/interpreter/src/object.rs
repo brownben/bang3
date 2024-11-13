@@ -24,7 +24,7 @@ pub struct TypeDescriptor {
 type TraceValueFunction = fn(vm: &VM, Value) -> ();
 
 pub const DEFAULT_TYPE_DESCRIPTORS: &[TypeDescriptor] =
-  &[STRING, NATIVE_FUNCTION, CLOSURE, ALLOCATED];
+  &[STRING, NATIVE_FUNCTION, CLOSURE, ALLOCATED, NATIVE_CLOSURE];
 
 /// A string on the heap
 #[repr(C)]
@@ -147,9 +147,50 @@ const ALLOCATED: TypeDescriptor = TypeDescriptor {
 };
 pub const ALLOCATED_TYPE_ID: usize = 3;
 
+/// A native closure - a native function which has got a value from a previous call
+#[derive(Clone, Debug)]
+pub struct NativeClosure {
+  pub(crate) name: &'static str,
+  pub(crate) func: fn(&mut VM, Value, Value) -> Result<Value, ErrorKind>,
+  pub(crate) captured_value: Value,
+}
+impl NativeClosure {
+  /// Create a new naative function
+  pub(crate) fn new(
+    name: &'static str,
+    func: fn(&mut VM, Value, Value) -> Result<Value, ErrorKind>,
+    captured_value: Value,
+  ) -> Self {
+    Self {
+      name,
+      func,
+      captured_value,
+    }
+  }
+}
+impl fmt::Display for NativeClosure {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "<closure <function {}>>", self.name)
+  }
+}
+const NATIVE_CLOSURE: TypeDescriptor = TypeDescriptor {
+  type_name: "function",
+  trace: |vm, value, trace_value| {
+    vm.heap.mark(value);
+    let closure = &vm.heap[value.cast::<NativeClosure>()];
+    trace_value(vm, closure.captured_value);
+  },
+  display: |heap, value| heap[value.cast::<NativeClosure>()].to_string(),
+  is_falsy: |_, _| false,
+};
+pub const NATIVE_CLOSURE_TYPE_ID: usize = 4;
+
 #[cfg(test)]
 mod test {
-  use super::{ALLOCATED_TYPE_ID, CLOSURE_TYPE_ID, NATIVE_FUNCTION_TYPE_ID, STRING_TYPE_ID};
+  use super::{
+    ALLOCATED_TYPE_ID, CLOSURE_TYPE_ID, NATIVE_CLOSURE_TYPE_ID, NATIVE_FUNCTION_TYPE_ID,
+    STRING_TYPE_ID,
+  };
   use crate::{object::DEFAULT_TYPE_DESCRIPTORS, EmptyContext, VM};
   use bang_gc::HeapSize;
 
@@ -161,6 +202,7 @@ mod test {
     assert_eq!(objects[NATIVE_FUNCTION_TYPE_ID].type_name, "function");
     assert_eq!(objects[CLOSURE_TYPE_ID].type_name, "function");
     assert_eq!(objects[ALLOCATED_TYPE_ID].type_name, "allocated");
+    assert_eq!(objects[NATIVE_CLOSURE_TYPE_ID].type_name, "function");
   }
 
   #[test]
@@ -171,5 +213,6 @@ mod test {
     assert_eq!(vm.types[NATIVE_FUNCTION_TYPE_ID].type_name, "function");
     assert_eq!(vm.types[CLOSURE_TYPE_ID].type_name, "function");
     assert_eq!(vm.types[ALLOCATED_TYPE_ID].type_name, "allocated");
+    assert_eq!(vm.types[NATIVE_CLOSURE_TYPE_ID].type_name, "function");
   }
 }

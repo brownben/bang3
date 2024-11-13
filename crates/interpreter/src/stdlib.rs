@@ -47,12 +47,16 @@ module!(string, STRING_ITEMS, {
 
   fn toLowercase(String) -> String = str::to_lowercase;
   fn toUppercase(String) -> String = str::to_uppercase;
+
+  fn contains(String, String) -> bool = |pattern, string| str::contains(string, pattern);
+  fn startsWith(String, String) -> bool = |pattern, string| str::starts_with(string, pattern);
+  fn endsWith(String, String) -> bool = |pattern, string| str::ends_with(string, pattern);
 });
 
 module!(maths, MATHS_ITEMS, {
-  const PI: Number = std::f64::consts::PI;
-  const E: Number = std::f64::consts::E;
-  const INFINITY: Number = f64::INFINITY;
+  const PI: f64 = std::f64::consts::PI;
+  const E: f64 = std::f64::consts::E;
+  const INFINITY: f64 = f64::INFINITY;
 
   fn floor(Number) -> f64 = f64::floor;
   fn ceil(Number) -> f64 = f64::ceil;
@@ -78,6 +82,8 @@ module!(maths, MATHS_ITEMS, {
   fn cbrt(Number) -> f64 = f64::cbrt;
   fn exp(Number) -> f64 = f64::exp;
   fn ln(Number) -> f64 = f64::ln;
+  fn pow(Number, Number) -> f64 = f64::powf;
+  fn log(Number, Number) -> f64 = |base, num| f64::log(num, base);
 
   fn radiansToDegrees(Number) -> f64 = f64::to_degrees;
   fn degreesToRadians(Number) -> f64 = f64::to_radians;
@@ -85,12 +91,17 @@ module!(maths, MATHS_ITEMS, {
 
 mod macros {
   use crate::vm::ErrorKind;
-  use crate::{context::ImportResult, object::NativeFunction, vm::allocate_string, Value};
+  use crate::{
+    context::ImportResult,
+    object::{NativeClosure, NativeFunction, NATIVE_CLOSURE_TYPE_ID},
+    vm::{allocate_string, VM},
+    Value,
+  };
   use bang_gc::Heap;
 
   pub macro module($module_name:ident, $module_items_name:ident, {
     $(const $constant_name:ident : $constant_type:ident = $constant:expr;)*
-    $(fn $function_name:ident($function_type:ident) -> $function_return:ident = $function:expr;)*
+    $(fn $function_name:ident($($function_type:ident$(,)?)+) -> $function_return:ident = $function:expr;)*
   }) {
     #[allow(unused_variables)]
     /// A module of Bang's Standard Library
@@ -99,7 +110,7 @@ mod macros {
         $(stringify!($constant_name) => wrap_value!($constant_type, heap, $constant),)*
         $(
           stringify!($function_name) => wrap_value!(fn, heap,
-            native_function!($function_name, $function_type, $function_return, $function)
+            native_function!($function_name, $($function_type)+, $function_return, $function)
           ),
         )*
         _ => ImportResult::ItemNotFound,
@@ -138,6 +149,25 @@ mod macros {
       })
     },
 
+    ($name:ident, Number Number, f64, $native_function:expr) => {
+      NativeFunction::new(stringify!($name), |vm, arg| {
+        if arg.is_number() {
+          fn func(vm: &mut VM, a: Value, b: Value) -> Result<Value, ErrorKind> {
+            if b.is_number() {
+              Ok($native_function(a.as_number(), b.as_number()).into())
+            } else {
+              Err(ErrorKind::TypeError { expected: "number", got: b.get_type(vm) })
+            }
+          }
+
+          let closure = vm.heap.allocate(NativeClosure::new(stringify!($name), func, arg));
+          Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
+        } else {
+          Err(ErrorKind::TypeError { expected: "number", got: arg.get_type(vm) })
+        }
+      })
+    },
+
     ($name:ident, String, usize, $native_function:expr) => {
       NativeFunction::new(stringify!($name), |vm, arg| {
         if arg.is_string() {
@@ -165,6 +195,25 @@ mod macros {
         if arg.is_string() {
           let result = $native_function(arg.as_string(&vm.heap));
           Ok(allocate_string(&mut vm.heap, &result).into())
+        } else {
+          Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) })
+        }
+      })
+    },
+
+    ($name:ident, String String, bool, $native_function:expr) => {
+      NativeFunction::new(stringify!($name), |vm, arg| {
+        if arg.is_string() {
+          fn func(vm: &mut VM, a: Value, b: Value) -> Result<Value, ErrorKind> {
+            if b.is_string() {
+              Ok($native_function(a.as_string(&vm.heap), b.as_string(&vm.heap)).into())
+            } else {
+              Err(ErrorKind::TypeError { expected: "string", got: b.get_type(vm) })
+            }
+          }
+
+          let closure = vm.heap.allocate(NativeClosure::new(stringify!($name), func, arg));
+          Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
         } else {
           Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) })
         }

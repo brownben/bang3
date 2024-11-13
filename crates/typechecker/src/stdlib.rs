@@ -55,6 +55,7 @@ pub fn import_type_info(module: &str, item: &str) -> StaticTypeInfo {
 
 fn maths_module(types: &mut TypeArena, item: &str) -> ImportResult {
   let number_to_number = types.new_type(Type::Function(TypeArena::NUMBER, TypeArena::NUMBER));
+  let number_number_to_number = types.new_type(Type::Function(TypeArena::NUMBER, number_to_number));
 
   match item {
     "PI" | "E" | "INFINITY" => TypeArena::NUMBER.into(),
@@ -62,6 +63,8 @@ fn maths_module(types: &mut TypeArena, item: &str) -> ImportResult {
     "floor" | "ceil" | "round" | "abs" | "sqrt" | "cbrt" | "sin" | "cos" | "tan" | "asin"
     | "acos" | "atan" | "sinh" | "cosh" | "tanh" | "asinh" | "acosh" | "atanh" | "isNan"
     | "exp" | "ln" | "radiansToDegrees" | "degreesToRadians" => number_to_number.into(),
+
+    "pow" | "log" => number_number_to_number.into(),
 
     _ => ImportResult::ItemNotFound,
   }
@@ -71,6 +74,7 @@ fn string_module(types: &mut TypeArena, item: &str) -> ImportResult {
   let string_to_number = types.new_type(Type::Function(TypeArena::STRING, TypeArena::NUMBER));
   let string_to_bool = types.new_type(Type::Function(TypeArena::STRING, TypeArena::BOOLEAN));
   let string_to_string = types.new_type(Type::Function(TypeArena::STRING, TypeArena::STRING));
+  let string_string_to_bool = types.new_type(Type::Function(TypeArena::STRING, string_to_bool));
 
   match item {
     "NEW_LINE" | "TAB" | "CARRIAGE_RETURN" => TypeArena::STRING.into(),
@@ -78,6 +82,7 @@ fn string_module(types: &mut TypeArena, item: &str) -> ImportResult {
     "length" | "byteLength" => string_to_number.into(),
     "isEmpty" | "isAscii" => string_to_bool.into(),
     "toLowercase" | "toUppercase" => string_to_string.into(),
+    "contains" | "startsWith" | "endsWith" => string_string_to_bool.into(),
 
     _ => ImportResult::ItemNotFound,
   }

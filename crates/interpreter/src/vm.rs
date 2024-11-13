@@ -1,8 +1,13 @@
 use super::{
   bytecode::{Chunk, ConstantValue, OpCode},
   context::{Context, ImportResult},
-  object::{BangString, Closure, NativeFunction, TypeDescriptor, DEFAULT_TYPE_DESCRIPTORS},
-  object::{ALLOCATED_TYPE_ID, CLOSURE_TYPE_ID, NATIVE_FUNCTION_TYPE_ID, STRING_TYPE_ID},
+  object::{
+    BangString, Closure, NativeClosure, NativeFunction, TypeDescriptor, DEFAULT_TYPE_DESCRIPTORS,
+  },
+  object::{
+    ALLOCATED_TYPE_ID, CLOSURE_TYPE_ID, NATIVE_CLOSURE_TYPE_ID, NATIVE_FUNCTION_TYPE_ID,
+    STRING_TYPE_ID,
+  },
   value::Value,
 };
 use bang_gc::{GcList, Heap, HeapSize};
@@ -360,6 +365,18 @@ impl<'context> VM<'context> {
             let function = &self.heap[callee.as_object::<NativeFunction>()];
 
             let result = (function.func)(self, argument);
+            self.pop();
+            match result {
+              Ok(value) => self.push(value),
+              Err(err) => break Some(err),
+            }
+
+            ip += 1;
+          } else if callee.is_object_type(NATIVE_CLOSURE_TYPE_ID) {
+            let argument = self.pop();
+            let function = &self.heap[callee.as_object::<NativeClosure>()];
+
+            let result = (function.func)(self, function.captured_value, argument);
             self.pop();
             match result {
               Ok(value) => self.push(value),

@@ -651,6 +651,16 @@ fn closure_twice() {
   "});
   assert_variable!(two_parameters; x, 5.0);
   assert_variable!(two_parameters; y, 3.75);
+
+  let two_parameters = run(indoc! {"
+    let add = a => b => a + b
+    let a = add(2)
+    let x = a(3)
+    let b = 3.5 >> add
+    let y = 0.25 >> b
+  "});
+  assert_variable!(two_parameters; x, 5.0);
+  assert_variable!(two_parameters; y, 3.75);
 }
 
 #[test]
@@ -771,7 +781,10 @@ fn format_string() {
   assert_variable!(vm; c, string "i can quote true or false");
   assert_variable!(vm; d, string "nested stuff: 56");
   assert_variable!(vm; e, string "55");
+}
 
+#[test]
+fn to_string() {
   let mut vm = run(indoc! {"
     let a = `{'hello'}`
     let b = `{55.2}`
@@ -783,6 +796,9 @@ fn format_string() {
     let f = `{identity}`
     let g = `{x => x}`
     let h = `{(x => _ => x)()}`
+
+    from maths import { pow }
+    let i = `{pow(2)}`
   "});
   assert_variable!(vm; a, string "hello");
   assert_variable!(vm; b, string "55.2");
@@ -792,6 +808,7 @@ fn format_string() {
   assert_variable!(vm; f, string "<function identity>");
   assert_variable!(vm; g, string "<function>");
   assert_variable!(vm; h, string "<closure <function>>");
+  assert_variable!(vm; i, string "<closure <function pow>>");
 }
 
 #[test]
@@ -913,6 +930,9 @@ mod builtin_function {
 
     let mut closure = run("let a = type((x => _ => x)())");
     assert_variable!(closure; a, string "function");
+
+    let mut native_closure = run("from maths import { pow }\nlet a = type(pow(3))");
+    assert_variable!(native_closure; a, string "function");
   }
 
   #[test]
@@ -1037,14 +1057,36 @@ mod builtin_function {
     assert_variable!(exp; a, 1.0);
     assert_variable!(exp; b, std::f64::consts::E);
 
-    let logs = run(indoc! {"
+    let pow = run(indoc! {"
+      from maths import { pow }
+
+      let a = pow(2)(3)
+      let b = 4 >> pow(2)
+
+      let power = pow(5)
+      let c = power(3)
+    "});
+    assert_variable!(pow; a, 8.0);
+    assert_variable!(pow; b, 16.0);
+    assert_variable!(pow; c, 125.0);
+
+    let ln = run(indoc! {"
       from maths import { ln, E }
 
       let a = ln(1)
       let b = ln(E)
     "});
-    assert_variable!(logs; a, 0.0);
-    assert_variable!(logs; b, 1.0);
+    assert_variable!(ln; a, 0.0);
+    assert_variable!(ln; b, 1.0);
+
+    let log = run(indoc! {"
+      from maths import { log }
+
+      let a = log(10)(1)
+      let b = 100 >> log(10)
+    "});
+    assert_variable!(log; a, 0.0);
+    assert_variable!(log; b, 2.0);
 
     let vm = run(indoc! {"
       from maths import { degreesToRadians, radiansToDegrees, PI }
@@ -1056,6 +1098,10 @@ mod builtin_function {
     assert_variable!(vm; b, 180.0);
 
     let wrong_type = run("from maths import { sin }\nlet a = sin(false)");
+    assert!(wrong_type.is_err_and(|error| error == super::Error::RuntimeError));
+    let wrong_type = run("from maths import { pow }\nlet a = pow(false)(5)");
+    assert!(wrong_type.is_err_and(|error| error == super::Error::RuntimeError));
+    let wrong_type = run("from maths import { pow }\nlet a = pow(5)(false)");
     assert!(wrong_type.is_err_and(|error| error == super::Error::RuntimeError));
   }
 
@@ -1139,8 +1185,34 @@ mod builtin_function {
     assert_variable!(change_case; i, string "hello");
     assert_variable!(change_case; j, string "hello");
 
+    let contains = run(indoc! {"
+      from string import { contains, startsWith, endsWith }
+
+      let a = 'hello' >> contains('x')
+      let b = 'hello' >> contains('l')
+      let c = contains('h')('hello')
+      let d = 'whats up' >> contains('up')
+
+      let e = 'starts' >> startsWith('start')
+      let f = 'starts' >> endsWith('s')
+      let g = 'starts' >> startsWith('t')
+      let h = 'starts' >> endsWith('farts')
+    "});
+    assert_variable!(contains; a, false);
+    assert_variable!(contains; b, true);
+    assert_variable!(contains; d, true);
+    assert_variable!(contains; e, true);
+    assert_variable!(contains; f, true);
+    assert_variable!(contains; g, false);
+    assert_variable!(contains; h, false);
+
     let length_wrong_type = run("from string import { length }\nlet a = length(5)");
     assert!(length_wrong_type.is_err_and(|error| error == super::Error::RuntimeError));
+
+    let contains_wrong_type = run("from string import { contains }\nlet a = contains(5)('')");
+    assert!(contains_wrong_type.is_err_and(|error| error == super::Error::RuntimeError));
+    let contains_wrong_type = run("from string import { contains }\nlet a = contains('')(5)");
+    assert!(contains_wrong_type.is_err_and(|error| error == super::Error::RuntimeError));
   }
 }
 

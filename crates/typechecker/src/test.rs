@@ -623,6 +623,16 @@ mod stdlib {
       abs(x / 44)
     "};
     assert_eq!(synthesize(source), "number");
+
+    let source = indoc! {"
+      from maths import { pow }
+
+      let x = pow(2)(3)
+      let y = pow(2)
+
+      (4 >> y) + x
+    "};
+    assert_eq!(synthesize(source), "number");
   }
 
   #[test]
@@ -638,5 +648,23 @@ mod stdlib {
       'this is a string' >> length >> x => x * 2
     "};
     assert_eq!(synthesize(source), "number");
+
+    let source = indoc! {"
+      from string import { isEmpty }
+      'this is a string' >> isEmpty
+    "};
+    assert_eq!(synthesize(source), "boolean");
+
+    let source = indoc! {"
+      from string import { toUppercase }
+      toUppercase('this is a string')
+    "};
+    assert_eq!(synthesize(source), "string");
+
+    let source = indoc! {"
+      from string import { contains }
+      'this is a string' >> contains('is')
+    "};
+    assert_eq!(synthesize(source), "boolean");
   }
 }
