@@ -35,6 +35,7 @@ thin-vec = "0.2.13"
 
 # testing
 indoc = "2.0.4"
+assert_cmd = "2.0.16"
 
 
 [workspace.lints]

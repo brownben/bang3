@@ -127,7 +127,10 @@ impl fmt::Display for CodeFrame<'_> {
 
     for line in start_line..=end_line {
       let line_text = self.lines.line_span(line).source_text(self.source);
-      write!(f, "{line:>3} {} ", "│".dimmed())?;
+      write!(f, "{line:>3} {}", "│".dimmed())?;
+      if !line_text.is_empty() {
+        write!(f, " ")?;
+      }
       highlight_source(f, line_text)?;
       if !line_text.ends_with('\n') {
         writeln!(f)?;

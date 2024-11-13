@@ -210,7 +210,7 @@ impl LintRule for UnnecessaryClosure {
 pub struct IdenticalBranches;
 impl LintRule for IdenticalBranches {
   fn name(&self) -> &'static str {
-    "Identiical Branches"
+    "Identical Branches"
   }
   fn message(&self) -> &'static str {
     "both branches of the if-else are the same, consider removing the if"
