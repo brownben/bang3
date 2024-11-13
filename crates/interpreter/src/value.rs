@@ -254,7 +254,6 @@ impl From<*const Chunk> for Value {
     )
   }
 }
-#[cfg(test)]
 impl From<()> for Value {
   fn from((): ()) -> Self {
     Self::NULL

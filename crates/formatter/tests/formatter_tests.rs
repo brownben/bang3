@@ -1,4 +1,8 @@
-use super::config::{Config, LineEnding};
+//! # Formatter Tests
+//!
+//! Check that the output of the formatter matches the expected output.
+
+use bang_formatter::config::{Config, LineEnding};
 use bang_syntax::parse;
 use indoc::indoc;
 
@@ -10,13 +14,15 @@ fn format(source: &str, print_width: u16) -> String {
   };
   let ast = parse(source);
 
-  crate::format(&ast, config)
+  bang_formatter::format(&ast, config)
 }
 
-macro assert_format($source:expr, $expected:expr, $print_width:expr) {
-  let output = format($source, $print_width);
-  assert_eq!(output.trim(), $expected.trim());
-  assert_eq!(format(&output, $print_width).trim(), output.trim());
+macro_rules! assert_format {
+  ($source:expr, $expected:expr, $print_width:expr) => {
+    let output = format($source, $print_width);
+    assert_eq!(output.trim(), $expected.trim());
+    assert_eq!(format(&output, $print_width).trim(), output.trim());
+  };
 }
 
 #[test]
@@ -31,11 +37,11 @@ fn config_indentation() {
     sort_imports: true,
   };
 
-  assert_eq!(crate::format(&ast, config), "(\n  a\n)\n");
+  assert_eq!(bang_formatter::format(&ast, config), "(\n  a\n)\n");
   config.indentation = 4.into();
-  assert_eq!(crate::format(&ast, config), "(\n    a\n)\n");
+  assert_eq!(bang_formatter::format(&ast, config), "(\n    a\n)\n");
   config.indentation = 0.into();
-  assert_eq!(crate::format(&ast, config), "(\n\ta\n)\n");
+  assert_eq!(bang_formatter::format(&ast, config), "(\n\ta\n)\n");
 }
 
 #[test]
@@ -50,11 +56,34 @@ fn config_quote() {
     sort_imports: true,
   };
 
-  assert_eq!(crate::format(&ast, config), "'string'\n");
+  assert_eq!(bang_formatter::format(&ast, config), "'string'\n");
   config.single_quotes = false;
-  assert_eq!(crate::format(&ast, config), "\"string\"\n");
+  assert_eq!(bang_formatter::format(&ast, config), "\"string\"\n");
 
   assert_format!("\"who's who\"", "\"who's who\"", 100);
+}
+
+#[test]
+fn config_sort_imports() {
+  let ast = parse("from maths import { sin, cos, tan, }");
+  let mut config = Config {
+    print_width: 100,
+    single_quotes: true,
+    indentation: 2.into(),
+    line_ending: LineEnding::LineFeed,
+    sort_imports: false,
+  };
+
+  assert_eq!(
+    bang_formatter::format(&ast, config),
+    "from maths import { sin, cos, tan }\n"
+  );
+
+  config.sort_imports = true;
+  assert_eq!(
+    bang_formatter::format(&ast, config),
+    "from maths import { cos, sin, tan }\n"
+  );
 }
 
 #[test]
@@ -482,18 +511,5 @@ fn import_statement() {
     "from maths import { abs as abs }",
     "from maths import { abs }",
     80
-  );
-
-  let ast = parse("from maths import { sin, cos, tan, }");
-  let config = Config {
-    print_width: 100,
-    single_quotes: true,
-    indentation: 2.into(),
-    line_ending: LineEnding::LineFeed,
-    sort_imports: false,
-  };
-  assert_eq!(
-    crate::format(&ast, config),
-    "from maths import { sin, cos, tan }\n"
   );
 }

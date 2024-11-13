@@ -14,9 +14,6 @@ pub mod stdlib;
 mod value;
 mod vm;
 
-#[cfg(test)]
-mod test;
-
 /// Compile an AST into a bytecode chunk
 ///
 /// # Examples

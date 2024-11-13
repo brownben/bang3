@@ -1,4 +1,8 @@
-use crate::lint as lint_ast;
+//! # Linter Tests
+//!
+//! Check that the linter finds problems where it is supposed to.
+
+use bang_linter::lint as lint_ast;
 use bang_syntax::parse;
 
 fn lint(source: &str) -> Result<(), ()> {

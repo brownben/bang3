@@ -14,9 +14,6 @@ use std::{error, fmt};
 mod helpers;
 mod rules;
 
-#[cfg(test)]
-mod test;
-
 /// Runs the linter against a given AST, returns a list of diagnostics found
 ///
 /// # Examples

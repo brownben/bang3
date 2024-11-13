@@ -10,15 +10,11 @@
 //! Based upon the algorithm described by Philip Wadler in [`A prettier printer`](https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf).
 
 #![feature(let_chains)]
-#![feature(decl_macro)]
 #![deny(unsafe_code)]
 
 mod ast;
 pub mod config;
 mod formatter;
-
-#[cfg(test)]
-mod test;
 
 /// Opinionated formatting of an AST into a string.
 /// Tries to respect the print width given in the config.
