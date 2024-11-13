@@ -75,7 +75,7 @@ fn string_module(types: &mut TypeArena, item: &str) -> ImportResult {
   match item {
     "NEW_LINE" | "TAB" | "CARRIAGE_RETURN" => TypeArena::STRING.into(),
 
-    "length" => string_to_number.into(),
+    "length" | "byteLength" => string_to_number.into(),
     "isEmpty" | "isAscii" => string_to_bool.into(),
     "toLowercase" | "toUppercase" => string_to_string.into(),
 

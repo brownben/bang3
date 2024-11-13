@@ -1066,9 +1066,78 @@ mod builtin_function {
 
       let a = length('  hello  ')
       let b = length('hello')
+      let c = length('')
+      let d = length('🏃')
+      let e = length('🏃‍♂️‍➡️')
     "});
     assert_variable!(length; a, 9.0);
     assert_variable!(length; b, 5.0);
+    assert_variable!(length; c, 0.0);
+    assert_variable!(length; d, 1.0);
+    assert_variable!(length; e, 7.0);
+
+    let byte_length = run(indoc! {"
+      from string import { byteLength }
+
+      let a = byteLength('  hello  ')
+      let b = byteLength('hello')
+      let c = byteLength('')
+      let d = byteLength('🏃')
+      let e = byteLength('🏃‍♂️‍➡️')
+    "});
+    assert_variable!(byte_length; a, 9.0);
+    assert_variable!(byte_length; b, 5.0);
+    assert_variable!(byte_length; c, 0.0);
+    assert_variable!(byte_length; d, 4.0);
+    assert_variable!(byte_length; e, 22.0);
+
+    let is_empty = run(indoc! {"
+      from string import { isEmpty }
+
+      let a = isEmpty('hello')
+      let b = isEmpty('')
+      let c = isEmpty('🏃')
+    "});
+    assert_variable!(is_empty; a, false);
+    assert_variable!(is_empty; b, true);
+    assert_variable!(is_empty; c, false);
+
+    let is_ascii = run(indoc! {"
+      from string import { isAscii }
+
+      let a = isAscii('hello')
+      let b = isAscii('')
+      let c = isAscii('🏃')
+    "});
+    assert_variable!(is_ascii; a, true);
+    assert_variable!(is_ascii; b, true);
+    assert_variable!(is_ascii; c, false);
+
+    let mut change_case = run(indoc! {"
+      from string import { toLowercase, toUppercase }
+
+      let a = toUppercase('hello')
+      let b = toUppercase('')
+      let c = toUppercase('🏃')
+      let d = toUppercase('HELLO')
+      let e = toUppercase('Hello')
+
+      let f = toLowercase('hello')
+      let g = toLowercase('')
+      let h = toLowercase('🏃')
+      let i = toLowercase('HELLO')
+      let j = toLowercase('Hello')
+    "});
+    assert_variable!(change_case; a, string "HELLO");
+    assert_variable!(change_case; b, string "");
+    assert_variable!(change_case; c, string "🏃");
+    assert_variable!(change_case; d, string "HELLO");
+    assert_variable!(change_case; e, string "HELLO");
+    assert_variable!(change_case; f, string "hello");
+    assert_variable!(change_case; g, string "");
+    assert_variable!(change_case; h, string "🏃");
+    assert_variable!(change_case; i, string "hello");
+    assert_variable!(change_case; j, string "hello");
 
     let length_wrong_type = run("from string import { length }\nlet a = length(5)");
     assert!(length_wrong_type.is_err_and(|error| error == super::Error::RuntimeError));

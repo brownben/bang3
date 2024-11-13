@@ -41,6 +41,10 @@ module!(string, STRING_ITEMS, {
 
   fn length(String) -> Number = |s| {
     #[allow(clippy::cast_precision_loss, reason = "max string length < 2^52")]
+    { str::chars(s).count() as f64 }
+  };
+  fn byteLength(String) -> Number = |s| {
+    #[allow(clippy::cast_precision_loss, reason = "max string length < 2^52")]
     { str::len(s) as f64 }
   };
 
