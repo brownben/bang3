@@ -80,6 +80,31 @@ impl<'context> VM<'context> {
     self.globals.insert(name.into(), value.into());
   }
 
+  /// Checks if two [`Value`]s are equal to each other
+  ///
+  /// SAFETY: both `Value`s must be from this [`VM`]
+  #[must_use]
+  pub fn equals(&self, a: Value, b: Value) -> bool {
+    if a == b {
+      return true;
+    }
+
+    if a.is_number() && b.is_number() {
+      return (a.as_number() - b.as_number()).abs() < f64::EPSILON;
+    }
+
+    if a.is_string() && b.is_string() {
+      return a.as_string(&self.heap) == b.as_string(&self.heap);
+    }
+
+    if a.is_object() && b.is_object() && a.object_type() == b.object_type() {
+      let type_descriptor = &self.types[a.object_type()];
+      return (type_descriptor.equals)(self, a.as_object(), b.as_object());
+    }
+
+    false
+  }
+
   #[inline]
   fn pop(&mut self) -> Value {
     // SAFETY: Assume bytecode is valid, so stack is not empty
@@ -309,11 +334,11 @@ impl<'context> VM<'context> {
         // Equalities
         OpCode::Equals => {
           let (right, left) = (self.pop(), self.pop());
-          self.push(left.equals(right, &self.heap).into());
+          self.push(self.equals(left, right).into());
         }
         OpCode::NotEquals => {
           let (right, left) = (self.pop(), self.pop());
-          self.push((!left.equals(right, &self.heap)).into());
+          self.push((!self.equals(left, right)).into());
         }
 
         // Comparisons

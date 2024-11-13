@@ -40,7 +40,7 @@ macro assert_variable {
     let value = vm.get_global(stringify!($name)).unwrap();
     let string = allocate_string(&mut vm.heap, $string);
     assert!(
-      value.equals(string, &vm.heap),
+      vm.equals(value, string),
       "{} (type {}) != {} (type {})",
       value.display(&vm),
       value.get_type(&vm),

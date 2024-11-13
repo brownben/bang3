@@ -20,6 +20,8 @@ pub struct TypeDescriptor {
   pub display: fn(heap: &Heap, object_pointer: Gc<u8>) -> String,
   /// Whether the value is falsy
   pub is_falsy: fn(heap: &Heap, object_pointer: Gc<u8>) -> bool,
+  /// Check if the value is equal to another value (of the same type)
+  pub equals: fn(vm: &VM, a: Gc<u8>, b: Gc<u8>) -> bool,
 }
 type TraceValueFunction = fn(vm: &VM, Value) -> ();
 
@@ -64,6 +66,7 @@ const STRING: TypeDescriptor = TypeDescriptor {
   trace: |vm, value, _trace| vm.heap.mark(value),
   display: |heap, value| heap[value.cast::<BangString>()].as_str(heap).to_owned(),
   is_falsy: |heap, value| heap[value.cast::<BangString>()].as_str(heap).is_empty(),
+  equals: |_vm, _a, _b| unreachable!("Strings handled separately"),
 };
 pub const STRING_TYPE_ID: usize = 0;
 
@@ -92,6 +95,7 @@ const NATIVE_FUNCTION: TypeDescriptor = TypeDescriptor {
   trace: |vm, value, _trace_value| vm.heap.mark(value),
   display: |heap, value| heap[value.cast::<NativeFunction>()].to_string(),
   is_falsy: |_, _| false,
+  equals: |_vm, a, b| a == b,
 };
 pub const NATIVE_FUNCTION_TYPE_ID: usize = 1;
 
@@ -131,6 +135,7 @@ const CLOSURE: TypeDescriptor = TypeDescriptor {
   },
   display: |heap, value| heap[value.cast::<Closure>()].to_string(),
   is_falsy: |_, _| false,
+  equals: |_vm, a, b| a == b,
 };
 pub const CLOSURE_TYPE_ID: usize = 2;
 
@@ -144,6 +149,7 @@ const ALLOCATED: TypeDescriptor = TypeDescriptor {
   },
   display: |_, _| unreachable!("Not accessed as a value"),
   is_falsy: |_, _| unreachable!("Not accessed as a value"),
+  equals: |_, _, _| unreachable!("Not accessed as a value"),
 };
 pub const ALLOCATED_TYPE_ID: usize = 3;
 
@@ -182,6 +188,7 @@ const NATIVE_CLOSURE: TypeDescriptor = TypeDescriptor {
   },
   display: |heap, value| heap[value.cast::<NativeClosure>()].to_string(),
   is_falsy: |_, _| false,
+  equals: |_vm, a, b| a == b,
 };
 pub const NATIVE_CLOSURE_TYPE_ID: usize = 4;
 

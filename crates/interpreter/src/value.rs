@@ -178,25 +178,6 @@ impl fmt::Debug for Value {
 
 /// Methods which work on a generic Value
 impl Value {
-  /// Check if two values are equal
-  /// Checks if they point the same place, are equal numbers or are equal strings
-  #[must_use]
-  pub fn equals(self, other: Value, heap: &Heap) -> bool {
-    if self == other {
-      return true;
-    }
-
-    if self.is_number() && other.is_number() {
-      return (self.as_number() - other.as_number()).abs() < f64::EPSILON;
-    }
-
-    if self.is_string() && other.is_string() {
-      return self.as_string(heap) == other.as_string(heap);
-    }
-
-    false
-  }
-
   /// Check if the current value is falsy
   /// It is falsy if false, 0, or an empty collection
   #[inline]
