@@ -12,13 +12,18 @@ pub fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionL
 
   let ast = parse(&file.source);
 
-  if in_import_module(&ast, position) {
-    return module_completions();
-  };
+  if let Some(import_statement) = in_import_statement(&ast, position) {
+    let first_item_start = import_statement.items(&ast).next().map(|i| i.span.start);
+    let before_items = first_item_start.is_none_or(|start| position.end < start);
+    if before_items {
+      return module_completions();
+    }
 
-  if let Some(module_name) = in_import_items(&ast, position) {
-    return module_item_completions(module_name);
-  };
+    let in_items = import_statement.items_span(&ast).contains(position);
+    if in_items {
+      return module_item_completions(import_statement.module(&ast));
+    }
+  }
 
   variable_completions(&ast, position)
 }
@@ -87,6 +92,7 @@ fn constant_snippets() -> [lsp::CompletionItem; 11] {
     lsp::CompletionItem {
       label: "import".to_owned(),
       insert_text: Some("from $1 import { $0 }".to_owned()),
+      insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
       kind: Some(lsp::CompletionItemKind::SNIPPET),
       ..Default::default()
     },
@@ -194,28 +200,15 @@ fn module_item_completions(module: &str) -> lsp::CompletionList {
   }
 }
 
-fn in_import_module(ast: &AST, position: Span) -> bool {
+fn in_import_statement<'a>(
+  ast: &'a AST,
+  position: Span,
+) -> Option<&'a bang_syntax::ast::statement::Import> {
   for statement in ast.root_statements.iter().chain(ast.statements.iter()) {
     if let Statement::Import(import) = statement
       && import.span(ast).contains(position)
     {
-      if let Some(item) = import.items(ast).next() {
-        return position.start < item.span.start;
-      }
-
-      return true;
-    }
-  }
-
-  false
-}
-
-fn in_import_items<'a>(ast: &'a AST, position: Span) -> Option<&'a str> {
-  for statement in ast.root_statements.iter().chain(ast.statements.iter()) {
-    if let Statement::Import(import) = statement
-      && import.items_span(ast).contains(position)
-    {
-      return Some(import.module(ast));
+      return Some(import);
     }
   }
 
