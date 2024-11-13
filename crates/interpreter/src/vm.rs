@@ -105,6 +105,12 @@ impl<'context> VM<'context> {
     false
   }
 
+  /// Allocates a new string in the [`VM`] returns a [`Value`] pointing to it
+  pub fn allocate_string(&mut self, value: &str) -> Value {
+    let string = self.heap.allocate_list(value.bytes(), value.len());
+    Value::from_object(*string, STRING_TYPE_ID)
+  }
+
   #[inline]
   fn pop(&mut self) -> Value {
     // SAFETY: Assume bytecode is valid, so stack is not empty
@@ -257,7 +263,7 @@ impl<'context> VM<'context> {
           let module = chunk.get_symbol(chunk.get_value(ip + 1).into()).as_str();
           let item = chunk.get_symbol(chunk.get_value(ip + 2).into()).as_str();
 
-          match self.context.import_value(&mut self.heap, module, item) {
+          match self.context.import_value(self, module, item) {
             ImportResult::Value(value) => self.push(value),
             ImportResult::ModuleNotFound => {
               break Some(ErrorKind::ModuleNotFound {
@@ -308,8 +314,7 @@ impl<'context> VM<'context> {
           let string = if value.is_string() {
             value
           } else {
-            let string = value.display(self);
-            allocate_string(&mut self.heap, &string)
+            self.allocate_string(&value.display(self))
           };
           self.push(string);
         }
@@ -506,9 +511,12 @@ impl<'context> VM<'context> {
     };
 
     // move constants from the chunk to the heap
-    for value in self.globals.values_mut() {
-      if value.is_constant_string() {
-        *value = allocate_string(&mut self.heap, value.as_constant_string());
+    for constant in self.globals.values_mut() {
+      if constant.is_constant_string() {
+        // we can't just use [`VM::allocate_string`], as it will borrow VM as mutable
+        let value = constant.as_constant_string();
+        let string = self.heap.allocate_list(value.bytes(), value.len());
+        *constant = Value::from_object(*string, STRING_TYPE_ID);
       }
       // TODO: store chunks on the heap, to ensure if they are stored they can be accessed later
     }
@@ -556,12 +564,6 @@ macro comparison_operation(($vm:expr, $chunk:expr), $operator:tt) {{
     });
   }
 }}
-
-/// Allocates a string on the heap and returns a `Value` pointing to it.
-pub(crate) fn allocate_string(heap: &mut Heap, value: &str) -> Value {
-  let string = heap.allocate_list(value.bytes(), value.len());
-  Value::from_object(*string, STRING_TYPE_ID)
-}
 
 /// An error whilst executing bytecode
 #[derive(Debug, Clone)]

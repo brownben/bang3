@@ -1,6 +1,4 @@
-use crate::{object::NativeFunction, Value};
-use bang_gc::Heap;
-
+use crate::{object::NativeFunction, Value, VM};
 use std::fmt;
 
 /// A context is the environment in which the VM runs.
@@ -14,8 +12,8 @@ pub trait Context: fmt::Debug {
   }
 
   /// Import a value from a module
-  fn import_value(&self, heap: &mut Heap, module: &str, item: &str) -> ImportResult {
-    let (_heap, _module, _item) = (heap, module, item);
+  fn import_value(&self, vm: &mut VM, module: &str, item: &str) -> ImportResult {
+    let (_vm, _module, _item) = (vm, module, item);
     ImportResult::ModuleNotFound
   }
 }

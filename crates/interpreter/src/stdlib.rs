@@ -4,9 +4,8 @@
 use crate::{
   context::{Context, ImportResult},
   object::NativeFunction,
-  vm::allocate_string,
+  vm::VM,
 };
-use bang_gc::Heap;
 
 /// A context which provides the standard library
 #[derive(Clone, Debug)]
@@ -20,15 +19,15 @@ impl Context for StandardContext {
       }),
       NativeFunction::new("type", |vm, arg| {
         let type_string = arg.get_type(vm);
-        Ok(allocate_string(&mut vm.heap, type_string))
+        Ok(vm.allocate_string(type_string))
       }),
     ]
   }
 
-  fn import_value(&self, heap: &mut Heap, module: &str, item: &str) -> ImportResult {
+  fn import_value(&self, vm: &mut VM, module: &str, item: &str) -> ImportResult {
     match module {
-      "maths" => maths(heap, item),
-      "string" => string(heap, item),
+      "maths" => maths(vm, item),
+      "string" => string(vm, item),
       _ => ImportResult::ModuleNotFound,
     }
   }
@@ -94,10 +93,8 @@ mod macros {
   use crate::{
     context::ImportResult,
     object::{NativeClosure, NativeFunction, NATIVE_CLOSURE_TYPE_ID},
-    vm::{allocate_string, VM},
-    Value,
+    Value, VM,
   };
-  use bang_gc::Heap;
 
   pub macro module($module_name:ident, $module_items_name:ident, {
     $(const $constant_name:ident : $constant_type:ident = $constant:expr;)*
@@ -105,11 +102,11 @@ mod macros {
   }) {
     #[allow(unused_variables)]
     /// A module of Bang's Standard Library
-    pub fn $module_name(heap: &mut Heap, item: &str) -> ImportResult {
+    pub fn $module_name(vm: &mut VM, item: &str) -> ImportResult {
       match item {
-        $(stringify!($constant_name) => wrap_value!($constant_type, heap, $constant),)*
+        $(stringify!($constant_name) => wrap_value!($constant_type, vm, $constant),)*
         $(
-          stringify!($function_name) => wrap_value!(fn, heap,
+          stringify!($function_name) => wrap_value!(fn, vm,
             native_function!($function_name, $($function_type)+, $function_return, $function)
           ),
         )*
@@ -124,16 +121,16 @@ mod macros {
   }
 
   macro wrap_value {
-    (fn, $heap:expr, $native_function:expr) => {
+    (fn, $vm:expr, $native_function:expr) => {
       ImportResult::Value(Value::from_object(
-        $heap.allocate($native_function),
+        $vm.heap.allocate($native_function),
         crate::object::NATIVE_FUNCTION_TYPE_ID,
       ))
     },
-    (String, $heap:expr, $value:expr) => {
-      allocate_string($heap, $value).into()
+    (String, $vm:expr, $value:expr) => {
+      $vm.allocate_string($value).into()
     },
-    (f64, $heap:expr, $value:expr) => {
+    (f64, $vm:expr, $value:expr) => {
       $value.into()
     }
   }
@@ -194,7 +191,7 @@ mod macros {
       NativeFunction::new(stringify!($name), |vm, arg| {
         if arg.is_string() {
           let result = $native_function(arg.as_string(&vm.heap));
-          Ok(allocate_string(&mut vm.heap, &result).into())
+          Ok(vm.allocate_string(&result).into())
         } else {
           Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) })
         }
