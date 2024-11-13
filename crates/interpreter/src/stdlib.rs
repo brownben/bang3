@@ -39,17 +39,11 @@ module!(string, STRING_ITEMS, {
   const TAB: String = "\t";
   const CARRIAGE_RETURN: String = "\r";
 
-  fn length(String) -> Number = |s| {
-    #[allow(clippy::cast_precision_loss, reason = "max string length < 2^52")]
-    { str::chars(s).count() as f64 }
-  };
-  fn byteLength(String) -> Number = |s| {
-    #[allow(clippy::cast_precision_loss, reason = "max string length < 2^52")]
-    { str::len(s) as f64 }
-  };
+  fn length(String) -> usize = |s: &str| s.chars().count();
+  fn byteLength(String) -> usize = str::len;
 
-  fn isEmpty(String) -> Boolean = str::is_empty;
-  fn isAscii(String) -> Boolean = str::is_ascii;
+  fn isEmpty(String) -> bool = str::is_empty;
+  fn isAscii(String) -> bool = str::is_ascii;
 
   fn toLowercase(String) -> String = str::to_lowercase;
   fn toUppercase(String) -> String = str::to_uppercase;
@@ -60,29 +54,33 @@ module!(maths, MATHS_ITEMS, {
   const E: Number = std::f64::consts::E;
   const INFINITY: Number = f64::INFINITY;
 
-  fn floor(Number) -> Number = f64::floor;
-  fn ceil(Number) -> Number = f64::ceil;
-  fn round(Number) -> Number = f64::round;
-  fn abs(Number) -> Number = f64::abs;
-  fn sqrt(Number) -> Number = f64::sqrt;
-  fn cbrt(Number) -> Number = f64::cbrt;
-  fn sin(Number) -> Number = f64::sin;
-  fn cos(Number) -> Number = f64::cos;
-  fn tan(Number) -> Number = f64::tan;
-  fn asin(Number) -> Number = f64::asin;
-  fn acos(Number) -> Number = f64::acos;
-  fn atan(Number) -> Number = f64::atan;
-  fn sinh(Number) -> Number = f64::sinh;
-  fn cosh(Number) -> Number = f64::cosh;
-  fn tanh(Number) -> Number = f64::tanh;
-  fn asinh(Number) -> Number = f64::asinh;
-  fn acosh(Number) -> Number = f64::acosh;
-  fn atanh(Number) -> Number = f64::atanh;
-  fn isNan(Number) -> Number = f64::is_nan;
-  fn exp(Number) -> Number = f64::exp;
-  fn ln(Number) -> Number = f64::ln;
-  fn radiansToDegrees(Number) -> Number = f64::to_degrees;
-  fn degreesToRadians(Number) -> Number = f64::to_radians;
+  fn floor(Number) -> f64 = f64::floor;
+  fn ceil(Number) -> f64 = f64::ceil;
+  fn round(Number) -> f64 = f64::round;
+  fn abs(Number) -> f64 = f64::abs;
+  fn isNan(Number) -> f64 = f64::is_nan;
+
+  fn sin(Number) -> f64 = f64::sin;
+  fn cos(Number) -> f64 = f64::cos;
+  fn tan(Number) -> f64 = f64::tan;
+  fn asin(Number) -> f64 = f64::asin;
+  fn acos(Number) -> f64 = f64::acos;
+  fn atan(Number) -> f64 = f64::atan;
+  fn sinh(Number) -> f64 = f64::sinh;
+  fn cosh(Number) -> f64 = f64::cosh;
+  fn tanh(Number) -> f64 = f64::tanh;
+  fn asinh(Number) -> f64 = f64::asinh;
+  fn acosh(Number) -> f64 = f64::acosh;
+  fn atanh(Number) -> f64 = f64::atanh;
+
+
+  fn sqrt(Number) -> f64 = f64::sqrt;
+  fn cbrt(Number) -> f64 = f64::cbrt;
+  fn exp(Number) -> f64 = f64::exp;
+  fn ln(Number) -> f64 = f64::ln;
+
+  fn radiansToDegrees(Number) -> f64 = f64::to_degrees;
+  fn degreesToRadians(Number) -> f64 = f64::to_radians;
 });
 
 mod macros {
@@ -124,13 +122,13 @@ mod macros {
     (String, $heap:expr, $value:expr) => {
       allocate_string($heap, $value).into()
     },
-    (Number, $heap:expr, $value:expr) => {
+    (f64, $heap:expr, $value:expr) => {
       $value.into()
     }
   }
 
   macro native_function {
-    ($name:ident, Number, Number, $native_function:expr) => {
+    ($name:ident, Number, f64, $native_function:expr) => {
       NativeFunction::new(stringify!($name), |vm, arg| {
         if arg.is_number() {
           Ok($native_function(arg.as_number()).into())
@@ -140,17 +138,19 @@ mod macros {
       })
     },
 
-    ($name:ident, String, Number, $native_function:expr) => {
+    ($name:ident, String, usize, $native_function:expr) => {
       NativeFunction::new(stringify!($name), |vm, arg| {
         if arg.is_string() {
-          Ok($native_function(arg.as_string(&vm.heap)).into())
+          let result = $native_function(arg.as_string(&vm.heap));
+          #[allow(clippy::cast_precision_loss, reason = "value < 2^52")]
+          Ok((result as f64).into())
         } else {
           Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) })
         }
       })
     },
 
-    ($name:ident, String, Boolean, $native_function:expr) => {
+    ($name:ident, String, bool, $native_function:expr) => {
       NativeFunction::new(stringify!($name), |vm, arg| {
         if arg.is_string() {
           Ok($native_function(arg.as_string(&vm.heap)).into())
