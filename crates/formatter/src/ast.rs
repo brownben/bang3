@@ -6,10 +6,16 @@ use bang_syntax::{
 
 impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for AST<'_> {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
-    let mut last_line = 0;
+    if self.root_statements.is_empty() {
+      return IR::Empty;
+    }
+
+    let line_index = ast.line_index();
+    let mut last_line = line_index.line(self.root_statements.first().unwrap().span(ast));
+
     f.concat_iterator(self.root_statements.iter().map(|statement| {
-      let gap_to_previous = ast.line_index().line(statement.span(ast)) > last_line + 1;
-      last_line = ast.line_index().final_line(statement.span(ast));
+      let gap_to_previous = line_index.line(statement.span(ast)) > last_line + 1;
+      last_line = line_index.final_line(statement.span(ast));
 
       if gap_to_previous {
         f.concat([IR::AlwaysLine, statement.format(f, ast), IR::AlwaysLine])

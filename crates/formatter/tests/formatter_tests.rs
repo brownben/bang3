@@ -20,8 +20,8 @@ fn format(source: &str, print_width: u16) -> String {
 macro_rules! assert_format {
   ($source:expr, $expected:expr, $print_width:expr) => {
     let output = format($source, $print_width);
-    assert_eq!(output.trim(), $expected.trim());
-    assert_eq!(format(&output, $print_width).trim(), output.trim());
+    assert_eq!(output.trim_end(), $expected.trim_end());
+    assert_eq!(format(&output, $print_width).trim_end(), output.trim_end());
   };
 }
 
@@ -512,4 +512,23 @@ fn import_statement() {
     "from maths import { abs }",
     80
   );
+}
+
+#[test]
+fn no_leading_space_before_first_statement() {
+  let before = "\n\nlet a = 5\nlet b = 6";
+  let after = "let a = 5\nlet b = 6";
+  assert_format!(before, after, 80);
+
+  let before = "\n\nlet a = 5\n\n\nlet b = 6";
+  let after = "let a = 5\n\nlet b = 6";
+  assert_format!(before, after, 80);
+
+  let before = "{\n\n\n\nlet a = 5\nlet b = 6}";
+  let after = "{\n  let a = 5\n  let b = 6\n}";
+  assert_format!(before, after, 80);
+
+  let before = "{\n\n\n\nlet a = 5\n\n\nlet b = 6}";
+  let after = "{\n  let a = 5\n  \n  let b = 6\n}";
+  assert_format!(before, after, 80);
 }
