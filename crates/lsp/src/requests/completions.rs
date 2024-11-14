@@ -4,7 +4,10 @@ use crate::locations::span_from_lsp_position;
 use lsp_types as lsp;
 
 use bang_interpreter::stdlib::{MATHS_ITEMS, STRING_ITEMS};
-use bang_syntax::{ast::Statement, parse, Span, AST};
+use bang_syntax::{
+  ast::{Expression, Statement},
+  parse, Span, AST,
+};
 use bang_typechecker::{get_enviroment, import_type_info, VariableKind};
 
 pub fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionList {
@@ -21,8 +24,12 @@ pub fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionL
 
     let in_items = import_statement.items_span(&ast).contains(position);
     if in_items {
-      return module_item_completions(import_statement.module(&ast));
+      return module_item_completions(import_statement.module(&ast), true);
     }
+  }
+
+  if let Some(module_access) = in_module_access(&ast, position) {
+    return module_item_completions(module_access.module(&ast), false);
   }
 
   variable_completions(&ast, position)
@@ -81,7 +88,7 @@ fn constant_snippets() -> [lsp::CompletionItem; 11] {
     lsp::CompletionItem {
       label: "from ".to_owned(),
       label_details: Some(lsp::CompletionItemLabelDetails {
-        detail: Some("_ import { }".to_owned()),
+        detail: Some("_ import { … }".to_owned()),
         description: None,
       }),
       insert_text: Some("from $1 import { $0 }".to_owned()),
@@ -122,7 +129,7 @@ fn variable_completions(ast: &AST, position: Span) -> lsp::CompletionList {
         kind: Some(lsp::CompletionItemKind::FUNCTION),
         insert_text: Some(format!("{name}($0)")),
         insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-        label: name,
+        label: format!("{name}(…)"),
         label_details: Some(lsp::CompletionItemLabelDetails {
           detail: None,
           description: Some(type_info.string.clone()),
@@ -144,11 +151,12 @@ fn variable_completions(ast: &AST, position: Span) -> lsp::CompletionList {
       },
     })
     .chain(constant_snippets())
+    .chain(module_access_snippets())
     .collect();
 
   lsp::CompletionList {
-    is_incomplete: false,
     items,
+    is_incomplete: false,
   }
 }
 
@@ -168,7 +176,32 @@ fn module_completions() -> lsp::CompletionList {
   }
 }
 
-fn module_item_completions(module: &str) -> lsp::CompletionList {
+fn module_access_snippets() -> impl Iterator<Item = lsp::CompletionItem> {
+  ["maths", "string"]
+    .iter()
+    .map(|module| lsp::CompletionItem {
+      label: (*module).to_owned(),
+      label_details: Some(lsp::CompletionItemLabelDetails {
+        detail: Some("::".to_owned()),
+        description: None,
+      }),
+      insert_text: Some(format!("{module}::$0")),
+      insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+      kind: Some(lsp::CompletionItemKind::MODULE),
+
+      // Trigger a suggestions for the items in the module
+      // TODO: make this generic and not reliant on VSCode
+      command: Some(lsp::Command {
+        title: "Trigger Suggestions".to_owned(),
+        command: "editor.action.triggerSuggest".to_owned(),
+        arguments: None,
+      }),
+
+      ..Default::default()
+    })
+}
+
+fn module_item_completions(module: &str, in_import: bool) -> lsp::CompletionList {
   let item_names = match module {
     "maths" => MATHS_ITEMS.iter(),
     "string" => STRING_ITEMS.iter(),
@@ -177,20 +210,30 @@ fn module_item_completions(module: &str) -> lsp::CompletionList {
 
   let items = item_names
     .map(|item| (*item, import_type_info(module, item)))
-    .map(|(name, type_info)| lsp::CompletionItem {
-      kind: Some(if type_info.kind == VariableKind::Function {
-        lsp::CompletionItemKind::FUNCTION
-      } else if is_screaming_snake_case(name) {
-        lsp::CompletionItemKind::VARIABLE
-      } else {
-        lsp::CompletionItemKind::CONSTANT
-      }),
-      label: name.to_string(),
-      label_details: Some(lsp::CompletionItemLabelDetails {
-        detail: None,
-        description: Some(type_info.string.clone()),
-      }),
-      ..Default::default()
+    .map(|(name, type_info)| match type_info.kind {
+      VariableKind::Function if !in_import => lsp::CompletionItem {
+        kind: Some(lsp::CompletionItemKind::FUNCTION),
+        insert_text: Some(format!("{name}($0)")),
+        insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+        label: format!("{name}(…)"),
+        label_details: Some(lsp::CompletionItemLabelDetails {
+          detail: None,
+          description: Some(type_info.string.clone()),
+        }),
+        ..Default::default()
+      },
+      _ => lsp::CompletionItem {
+        kind: match type_info.kind {
+          VariableKind::Function => Some(lsp::CompletionItemKind::FUNCTION),
+          VariableKind::Variable => Some(lsp::CompletionItemKind::CONSTANT),
+        },
+        label: name.to_owned(),
+        label_details: Some(lsp::CompletionItemLabelDetails {
+          detail: None,
+          description: Some(type_info.string.clone()),
+        }),
+        ..Default::default()
+      },
     })
     .collect();
 
@@ -209,6 +252,21 @@ fn in_import_statement<'a>(
       && import.span(ast).contains(position)
     {
       return Some(import);
+    }
+  }
+
+  None
+}
+
+fn in_module_access<'a>(
+  ast: &'a AST,
+  position: Span,
+) -> Option<&'a bang_syntax::ast::expression::ModuleAccess> {
+  for expression in &ast.expressions {
+    if let Expression::ModuleAccess(module_access) = expression {
+      if module_access.span(ast).contains(position) {
+        return Some(module_access);
+      }
     }
   }
 

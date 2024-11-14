@@ -194,6 +194,7 @@ impl<'source> Parser<'source> {
       TokenKind::FormatStringStart => Ok(self.format_string(token)),
 
       TokenKind::Identifier if self.matches(TokenKind::FatRightArrow) => Ok(self.function(token)),
+      TokenKind::Identifier if self.matches(TokenKind::ColonColon) => Ok(self.module_access(token)),
       TokenKind::Identifier => Ok(self.ast.add_expression(Variable { token })),
 
       TokenKind::LeftCurly => Ok(self.block(token)),
@@ -477,6 +478,12 @@ impl Parser<'_> {
       value,
       arms,
     })
+  }
+
+  fn module_access(&mut self, module: TokenIdx) -> ExpressionIdx {
+    let item = self.expect(TokenKind::Identifier);
+
+    self.ast.add_expression(ModuleAccess { module, item })
   }
 
   fn pattern(&mut self) -> Pattern {

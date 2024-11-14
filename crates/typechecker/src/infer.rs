@@ -220,6 +220,7 @@ impl InferType for Expression {
       Expression::If(if_) => if_.infer(t, ast),
       Expression::Literal(literal) => literal.infer(t, ast),
       Expression::Match(match_) => match_.infer(t, ast),
+      Expression::ModuleAccess(module_access) => module_access.infer(t, ast),
       Expression::Unary(unary) => unary.infer(t, ast),
       Expression::Variable(variable) => variable.infer(t, ast),
       Expression::Invalid(_) => TypeArena::UNKNOWN.into(),
@@ -521,6 +522,28 @@ impl InferType for Match {
     };
 
     return_type
+  }
+}
+impl InferType for ModuleAccess {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
+    match stdlib::import_value(&mut t.types, self.module(ast), self.item(ast)) {
+      ImportResult::Value(type_) => type_.type_.into(),
+      ImportResult::ModuleNotFound => {
+        t.problems.push(TypeError::ModuleNotFound {
+          module: self.module(ast).to_owned(),
+          span: self.span(ast),
+        });
+        TypeArena::UNKNOWN.into()
+      }
+      ImportResult::ItemNotFound => {
+        t.problems.push(TypeError::ItemNotFound {
+          module: self.module(ast).to_owned(),
+          item: self.item(ast).to_owned(),
+          span: self.span(ast),
+        });
+        TypeArena::UNKNOWN.into()
+      }
+    }
   }
 }
 impl InferType for Unary {

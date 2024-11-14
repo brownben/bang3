@@ -39,6 +39,7 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Expression {
       Expression::If(if_) => if_.format(f, ast),
       Expression::Literal(literal) => literal.format(f, ast),
       Expression::Match(match_) => match_.format(f, ast),
+      Expression::ModuleAccess(module_access) => module_access.format(f, ast),
       Expression::Unary(unary) => unary.format(f, ast),
       Expression::Variable(variable) => variable.format(f, ast),
       Expression::Invalid(_) => IR::Empty,
@@ -322,6 +323,15 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Unary {
     f.concat([
       IR::Text(self.operator(ast).as_str()),
       self.expression(ast).format(f, ast),
+    ])
+  }
+}
+impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for ModuleAccess {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+    f.concat([
+      IR::Text(self.module(ast)),
+      IR::Text("::"),
+      IR::Text(self.item(ast)),
     ])
   }
 }

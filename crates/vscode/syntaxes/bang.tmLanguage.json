@@ -145,6 +145,12 @@
     "variables": {
       "patterns": [
         {
+          "match": "([a-z0-9_]+)::",
+          "captures": {
+            "1": { "name": "entity.name.namespace.bang" }
+          }
+        },
+        {
           "match": "([_a-zA-Z][_a-zA-Z0-9]*?)\\(",
           "captures": {
             "1": { "name": "entity.name.function.call.bang" }

@@ -72,6 +72,7 @@ impl Tokeniser<'_> {
         }
       }
       b',' => (TokenKind::Comma, 1),
+      b':' if matches!(next_character, Some(b':')) => (TokenKind::ColonColon, 2),
 
       // Logical Operators
       b'&' if matches!(next_character, Some(b'&')) => (TokenKind::And, 2),
@@ -290,8 +291,12 @@ pub enum TokenKind {
   LeftCurly,
   /// `}`
   RightCurly,
+
+  // Separators
   /// `,`
   Comma,
+  /// `::`
+  ColonColon,
 
   // Operators
   /// `-`
@@ -426,7 +431,10 @@ impl fmt::Display for TokenKind {
       Self::RightParen => write!(f, ")"),
       Self::LeftCurly => write!(f, "{{"),
       Self::RightCurly => write!(f, "}}"),
+
+      // Separators
       Self::Comma => write!(f, ","),
+      Self::ColonColon => write!(f, "::"),
 
       // Operators
       Self::Minus => write!(f, "-"),

@@ -104,6 +104,9 @@ fn expression_symbols(
       }
     }
     Expression::Unary(unary) => expression_symbols(unary.expression(ast), file, ast, symbols),
-    Expression::Literal(_) | Expression::Variable(_) | Expression::Invalid(_) => {}
+    Expression::Literal(_)
+    | Expression::ModuleAccess(_)
+    | Expression::Variable(_)
+    | Expression::Invalid(_) => {}
   }
 }

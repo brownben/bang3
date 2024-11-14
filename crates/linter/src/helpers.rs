@@ -45,7 +45,7 @@ pub(super) trait IsConstant {
 impl IsConstant for Expression {
   fn is_constant(&self, ast: &AST) -> bool {
     match self {
-      Self::Call(_) | Self::Variable(_) | Self::Invalid(_) => false,
+      Self::Call(_) | Self::ModuleAccess(_) | Self::Variable(_) | Self::Invalid(_) => false,
       Self::Function(_) | Self::Literal(_) => true,
       Self::Binary(x) => x.is_constant(ast),
       Self::Block(x) => x.is_constant(ast),
@@ -345,6 +345,7 @@ impl ReturnAnalysis for Expression {
       Expression::If(if_) => if_.always_returns(ast),
       Expression::Literal(_) => false,
       Expression::Match(match_) => match_.always_returns(ast),
+      Expression::ModuleAccess(_) => false,
       Expression::Unary(unary) => unary.expression(ast).always_returns(ast),
       Expression::Variable(_) => false,
       Expression::Invalid(_) => false,
@@ -363,6 +364,7 @@ impl ReturnAnalysis for Expression {
       // Can never end with a return
       Expression::Function(_)
       | Expression::Literal(_)
+      | Expression::ModuleAccess(_)
       | Expression::Variable(_)
       | Expression::Invalid(_) => None,
 

@@ -199,6 +199,7 @@ impl<'s> Compile<'s> for Expression {
       Expression::If(if_) => if_.compile(compiler, ast),
       Expression::Literal(literal) => literal.compile(compiler, ast),
       Expression::Match(match_) => match_.compile(compiler, ast),
+      Expression::ModuleAccess(module_access) => module_access.compile(compiler, ast),
       Expression::Unary(unary) => unary.compile(compiler, ast),
       Expression::Variable(variable) => variable.compile(compiler, ast),
       Expression::Invalid(_) => Err(CompileError::InvalidAST),
@@ -500,6 +501,14 @@ impl<'s> Compile<'s> for Match {
     Ok(())
   }
 }
+impl<'s> Compile<'s> for ModuleAccess {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
+    compiler.chunk.add_opcode(OpCode::Import, self.span(ast));
+    compiler.add_symbol(self.module(ast), self.span(ast))?;
+    compiler.add_symbol(self.item(ast), self.span(ast))
+  }
+}
+
 impl<'s> Compile<'s> for Unary {
   fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
     self.expression(ast).compile(compiler, ast)?;

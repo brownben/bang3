@@ -37,6 +37,7 @@ impl PrettyPrint for Expression {
       Self::If(x) => x.pretty(f, ast, prefix, last),
       Self::Literal(x) => x.pretty(f, ast, prefix, last),
       Self::Match(x) => x.pretty(f, ast, prefix, last),
+      Self::ModuleAccess(x) => x.pretty(f, ast, prefix, last),
       Self::Unary(x) => x.pretty(f, ast, prefix, last),
       Self::Variable(x) => x.pretty(f, ast, prefix, last),
       Self::Invalid(_) => {
@@ -244,6 +245,15 @@ impl PrettyPrint for Pattern {
     };
 
     writeln!(f)
+  }
+}
+impl PrettyPrint for ModuleAccess {
+  fn pretty(&self, f: &mut fmt::Formatter, ast: &AST, prefix: &str, last: bool) -> fmt::Result {
+    let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
+    let module = self.module(ast);
+    let item = self.item(ast);
+
+    writeln!(f, "{prefix}{connector}Module Access ({module}::{item})",)
   }
 }
 impl PrettyPrint for Unary {

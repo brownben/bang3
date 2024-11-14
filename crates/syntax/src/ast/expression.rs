@@ -33,6 +33,8 @@ pub enum Expression {
   Literal(Literal),
   /// A match expression, e.g. `match x | 1 => 1 | _ => 2`
   Match(Match),
+  /// Accessing an item from a module, e.g. `maths::sin`
+  ModuleAccess(ModuleAccess),
   /// A unary expression, e.g. `!true`, `-1`
   Unary(Unary),
   /// A variable, e.g. `x`
@@ -54,6 +56,7 @@ impl Expression {
       Self::If(if_) => if_.span(ast),
       Self::Literal(literal) => literal.span(ast),
       Self::Match(match_) => match_.span(ast),
+      Self::ModuleAccess(module_access) => module_access.span(ast),
       Self::Unary(unary) => unary.span(ast),
       Self::Variable(variable) => variable.span(ast),
       Self::Invalid(invalid) => invalid.span(ast),
@@ -493,6 +496,38 @@ impl Pattern {
   }
 }
 
+/// Accessing an item from a module, e.g. `maths::sin`
+#[derive(Debug)]
+pub struct ModuleAccess {
+  /// The module being accessed
+  pub(crate) module: TokenIdx,
+  /// The item being accessed in the module
+  pub(crate) item: Option<TokenIdx>,
+}
+impl ModuleAccess {
+  /// The module being accessed
+  pub fn module<'source>(&self, ast: &AST<'source>) -> &'source str {
+    ast.get_token_text(self.module)
+  }
+
+  /// The item being accessed from the module
+  pub fn item<'source>(&self, ast: &AST<'source>) -> &'source str {
+    self.item.map(|i| ast.get_token_text(i)).unwrap_or_default()
+  }
+
+  /// The location of the expression
+  pub fn span(&self, ast: &AST) -> Span {
+    let end = self.item.unwrap_or(self.module.next());
+
+    Span::from(ast[self.module]).merge(ast[end].into())
+  }
+
+  /// The location of the item being accessed from the module
+  pub fn item_span(&self, ast: &AST) -> Span {
+    self.item.map(|i| ast[i]).unwrap_or_default().into()
+  }
+}
+
 /// A unary expression, e.g. `!true`, `-1`
 #[derive(Debug)]
 pub struct Unary {
@@ -597,6 +632,11 @@ impl From<Literal> for Expression {
 impl From<Match> for Expression {
   fn from(value: Match) -> Self {
     Self::Match(value)
+  }
+}
+impl From<ModuleAccess> for Expression {
+  fn from(value: ModuleAccess) -> Self {
+    Self::ModuleAccess(value)
   }
 }
 impl From<Unary> for Expression {

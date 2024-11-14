@@ -776,6 +776,29 @@ fn import_statement() {
   assert!(parse("from maths import { sin as 7 }").is_err());
 }
 
+#[test]
+fn module_access() {
+  let ast = parse_to_string("maths::sin");
+  let expected = indoc! {"
+    ├─ Module Access (maths::sin)
+  "};
+  assert_eq!(ast, expected);
+
+  let ast = parse_to_string("string::length('hello')");
+  let expected = indoc! {"
+    ├─ Call
+    │  ├─ Callee
+    │  │  ╰─ Module Access (string::length)
+    │  ╰─ Argument
+    │     ╰─ String 'hello'
+  "};
+  assert_eq!(ast, expected);
+
+  assert!(parse("::sin").is_err());
+  assert!(parse("maths::5").is_err());
+  assert!(parse("maths::").is_err());
+}
+
 mod fault_tolerant {
   use super::parse;
   use indoc::indoc;

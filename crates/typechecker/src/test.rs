@@ -603,10 +603,20 @@ fn unknown_imports() {
     synthesize_has_error("from unknown_goo import { unknown_aaa }\n unknown_aaa"),
     "unknown"
   );
+
+  // unknown module acccess
+  assert!(has_type_error("maths::unknown_aaa"));
+  assert!(has_type_error("unknown_module__aaa::unknown_aaa"));
 }
 
 mod stdlib {
   use super::*;
+
+  #[test]
+  fn module_access() {
+    assert_eq!(synthesize("string::NEW_LINE"), "string");
+    assert_eq!(synthesize("maths::pow"), "number => number => number");
+  }
 
   #[test]
   fn maths() {

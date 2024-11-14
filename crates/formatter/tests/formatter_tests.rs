@@ -532,3 +532,18 @@ fn no_leading_space_before_first_statement() {
   let after = "{\n  let a = 5\n  \n  let b = 6\n}";
   assert_format!(before, after, 80);
 }
+
+#[test]
+fn module_access() {
+  let code = indoc! {"
+    from maths import { PI }
+
+    let a = maths::sin(PI)
+    print(`
+    {string::TAB}{a}
+    `)
+  "};
+  assert_format!(code, code, 80);
+
+  assert_format!("maths  :: sin ", "maths::sin", 80);
+}

@@ -881,11 +881,30 @@ fn imports() {
   let same_item_imported_but_renamed = run("from maths import { PI, PI as pi }");
   assert_variable!(same_item_imported_but_renamed; pi, std::f64::consts::PI);
   assert_variable!(same_item_imported_but_renamed; PI, std::f64::consts::PI);
+
+  let unknown_module_access = run("unknown_module_aaa::abs");
+  assert!(unknown_module_access.is_err());
+
+  let unknown_item_access = run("maths::unknown_goo_goo_gaa_gaa");
+  assert!(unknown_item_access.is_err());
+
+  let same_item_imported_and_module_access = run(indoc! {"
+    from maths import { PI as a }
+    let b = maths::PI
+  "});
+  assert_variable!(same_item_imported_and_module_access; a, std::f64::consts::PI);
+  assert_variable!(same_item_imported_and_module_access; b, std::f64::consts::PI);
 }
 
 #[test]
 fn cant_import_anything_with_empty_context() {
   let ast = parse("from maths import { abs }");
+  assert!(ast.is_valid());
+  let chunk = compile(&ast).unwrap();
+  let mut vm = VM::new(HeapSize::Small, &EmptyContext).unwrap();
+  assert!(vm.run(&chunk).is_err());
+
+  let ast = parse("maths::abs");
   assert!(ast.is_valid());
   let chunk = compile(&ast).unwrap();
   let mut vm = VM::new(HeapSize::Small, &EmptyContext).unwrap();

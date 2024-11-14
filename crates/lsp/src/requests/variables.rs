@@ -3,13 +3,17 @@ use crate::locations::{lsp_range_from_span, span_from_lsp_position};
 use lsp_types as lsp;
 use std::collections::HashMap;
 
-use bang_syntax::{parse, Span};
-use bang_typechecker::{get_enviroment, Enviroment, Variable};
+use bang_syntax::{ast::expression, parse, Span, AST};
+use bang_typechecker::{get_enviroment, import_type_info, Enviroment, Variable};
 
 pub fn hover(file: &Document, position: lsp::Position) -> Option<lsp::Hover> {
   let position = span_from_lsp_position(position, file);
-
   let ast = parse(&file.source);
+
+  if let Some(module_access) = in_module_access_item(&ast, position) {
+    return Some(hover_module_access_item(&ast, module_access));
+  }
+
   let variables = get_enviroment(&ast);
   let variable = find_variable(position, &variables)?;
 
@@ -20,6 +24,18 @@ pub fn hover(file: &Document, position: lsp::Position) -> Option<lsp::Hover> {
     )),
     range: None,
   })
+}
+
+fn hover_module_access_item(ast: &AST, module_access: &expression::ModuleAccess) -> lsp::Hover {
+  let type_ = import_type_info(module_access.module(ast), module_access.item(ast));
+
+  lsp::Hover {
+    contents: lsp::HoverContents::Scalar(lsp::MarkedString::from_language_code(
+      "bang-types".to_owned(),
+      type_.string,
+    )),
+    range: None,
+  }
 }
 
 pub fn goto_definition(file: &Document, position: lsp::Position) -> Option<lsp::Location> {
@@ -104,4 +120,16 @@ fn find_variable(position: Span, variables: &Enviroment) -> Option<&Variable> {
         || var.alias.is_some_and(|x| x.contains(position))
         || var.used.iter().any(|used| used.contains(position))
     })
+}
+
+fn in_module_access_item<'a>(ast: &'a AST, position: Span) -> Option<&'a expression::ModuleAccess> {
+  for expression in &ast.expressions {
+    if let expression::Expression::ModuleAccess(module_access) = expression
+      && module_access.item_span(ast).contains(position)
+    {
+      return Some(module_access);
+    }
+  }
+
+  None
 }
