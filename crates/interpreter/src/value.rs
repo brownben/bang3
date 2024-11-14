@@ -1,6 +1,6 @@
 use super::{
   bytecode::Chunk,
-  object::{BangString, STRING_TYPE_ID},
+  object::{BangString, StringSlice, STRING_SLICE_TYPE_ID, STRING_TYPE_ID},
   vm::VM,
 };
 use bang_gc::{Gc, Heap};
@@ -115,7 +115,7 @@ impl Value {
   /// Is the [Value] a string?
   #[must_use]
   pub fn is_string(&self) -> bool {
-    self.is_object_type(STRING_TYPE_ID)
+    self.is_object_type(STRING_TYPE_ID) || self.is_object_type(STRING_SLICE_TYPE_ID)
   }
   /// View the [Value] as a string.
   /// It can be a constant string or a string on the heap.
@@ -124,7 +124,11 @@ impl Value {
   /// Use [`Value::is_string`] to check if it is a string
   #[must_use]
   pub(crate) fn as_string<'a>(&'a self, heap: &'a Heap) -> &'a str {
-    BangString::from(self.as_object()).as_str(heap)
+    if self.is_object_type(STRING_TYPE_ID) {
+      BangString::from(self.as_object()).as_str(heap)
+    } else {
+      heap[self.as_object::<StringSlice>()].as_str(heap)
+    }
   }
 
   /// View the [Value] as a function.

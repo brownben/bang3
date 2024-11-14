@@ -1225,6 +1225,54 @@ mod builtin_function {
     assert_variable!(contains; g, false);
     assert_variable!(contains; h, false);
 
+    let mut trim = run(indoc! {"
+      from string import { trim, trimStart, trimEnd }
+
+      let a = trim('  hello  ')
+      let b = trim('  hello')
+      let c = trim('hello  ')
+      let d = trim('hello')
+      let e = trim('')
+
+      let f = trimStart('  hello  ')
+      let g = trimStart('  hello')
+      let h = trimStart('hello  ')
+      let i = trimStart('hello')
+      let j = trimStart('')
+
+      let k = trimEnd('  hello  ')
+      let l = trimEnd('  hello')
+      let m = trimEnd('hello  ')
+      let n = trimEnd('hello')
+      let o = trimEnd('')
+
+      let p = 'hello' == trim('hello  ')
+      let q = trim('hello') == 'hello'
+      let r = trim('hello  ') ++ 'world'
+      let s = trim('  ' ++ 'hello  ')
+      let t = (' hello ' >> trimStart >> trimEnd) == 'hello'
+    "});
+    assert_variable!(trim; a, string "hello");
+    assert_variable!(trim; b, string "hello");
+    assert_variable!(trim; c, string "hello");
+    assert_variable!(trim; d, string "hello");
+    assert_variable!(trim; e, string "");
+    assert_variable!(trim; f, string "hello  ");
+    assert_variable!(trim; g, string "hello");
+    assert_variable!(trim; h, string "hello  ");
+    assert_variable!(trim; i, string "hello");
+    assert_variable!(trim; j, string "");
+    assert_variable!(trim; k, string "  hello");
+    assert_variable!(trim; l, string "  hello");
+    assert_variable!(trim; m, string "hello");
+    assert_variable!(trim; n, string "hello");
+    assert_variable!(trim; o, string "");
+    assert_variable!(trim; p, true);
+    assert_variable!(trim; q, true);
+    assert_variable!(trim; r, string "helloworld");
+    assert_variable!(trim; s, string "hello");
+    assert_variable!(trim; t, true);
+
     let length_wrong_type = run("from string import { length }\nlet a = length(5)");
     assert!(length_wrong_type.is_err_and(|error| error == super::Error::RuntimeError));
 

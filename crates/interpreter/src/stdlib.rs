@@ -85,6 +85,10 @@ module!(string, STRING_ITEMS, {
   fn contains(String, String) -> bool = |pattern, string| str::contains(string, pattern);
   fn startsWith(String, String) -> bool = |pattern, string| str::starts_with(string, pattern);
   fn endsWith(String, String) -> bool = |pattern, string| str::ends_with(string, pattern);
+
+  fn trim(String) -> StringSlice = str::trim;
+  fn trimStart(String) -> StringSlice = str::trim_start;
+  fn trimEnd(String) -> StringSlice = str::trim_end;
 });
 
 module!(maths, MATHS_ITEMS, {
@@ -126,7 +130,9 @@ module!(maths, MATHS_ITEMS, {
 mod macros {
   use super::ImportResult;
   use crate::{
-    object::{NativeClosure, NativeFunction, NATIVE_CLOSURE_TYPE_ID},
+    object::NativeFunction,
+    object::{NativeClosure, NATIVE_CLOSURE_TYPE_ID},
+    object::{StringSlice, STRING_SLICE_TYPE_ID},
     value::Value,
     vm::{ErrorKind, VM},
   };
@@ -227,6 +233,27 @@ mod macros {
         if arg.is_string() {
           let result = $native_function(arg.as_string(&vm.heap));
           Ok(vm.allocate_string(&result).into())
+        } else {
+          Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) })
+        }
+      })
+    },
+
+    ($name:ident, String, StringSlice, $native_function:expr) => {
+      NativeFunction::new(stringify!($name), |vm, arg| {
+        if arg.is_string() {
+          let arg_string = arg.as_string(&vm.heap);
+          let result = $native_function(arg_string);
+
+          let start = result.as_ptr().addr() - arg_string.as_ptr().addr();
+          let end = start + result.len();
+
+          if start == 0 && end == arg_string.len() {
+            Ok(arg)
+          } else {
+            let closure = vm.heap.allocate(StringSlice::new(arg, start, end));
+            Ok(Value::from_object(closure, STRING_SLICE_TYPE_ID))
+          }
         } else {
           Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) })
         }

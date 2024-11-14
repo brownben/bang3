@@ -25,8 +25,14 @@ pub struct TypeDescriptor {
 }
 type TraceValueFunction = fn(vm: &VM, Value) -> ();
 
-pub const DEFAULT_TYPE_DESCRIPTORS: &[TypeDescriptor] =
-  &[STRING, CLOSURE, NATIVE_FUNCTION, NATIVE_CLOSURE, ALLOCATED];
+pub const DEFAULT_TYPE_DESCRIPTORS: &[TypeDescriptor] = &[
+  STRING,
+  STRING_SLICE,
+  CLOSURE,
+  NATIVE_FUNCTION,
+  NATIVE_CLOSURE,
+  ALLOCATED,
+];
 
 /// A string on the heap
 #[repr(C)]
@@ -70,6 +76,36 @@ const STRING: TypeDescriptor = TypeDescriptor {
 };
 pub const STRING_TYPE_ID: usize = 0;
 
+/// A string slice - a reference to part of a string
+#[derive(Clone)]
+pub struct StringSlice {
+  pub(crate) string: Value,
+  pub(crate) start: usize,
+  pub(crate) end: usize,
+}
+impl StringSlice {
+  pub fn new(string: Value, start: usize, end: usize) -> Self {
+    debug_assert!(string.is_string());
+    Self { string, start, end }
+  }
+
+  pub fn as_str<'a>(&'a self, heap: &'a Heap) -> &'a str {
+    &self.string.as_string(heap)[self.start..self.end]
+  }
+}
+const STRING_SLICE: TypeDescriptor = TypeDescriptor {
+  type_name: "string",
+  trace: |vm, value, trace_value| {
+    vm.heap.mark(value);
+    let slice = &vm.heap[value.cast::<StringSlice>()];
+    trace_value(vm, slice.string);
+  },
+  display: |heap, value| heap[value.cast::<StringSlice>()].as_str(heap).to_owned(),
+  is_falsy: |heap, value| heap[value.cast::<StringSlice>()].as_str(heap).is_empty(),
+  equals: |_vm, _a, _b| unreachable!("Strings handled separately"),
+};
+pub const STRING_SLICE_TYPE_ID: usize = 1;
+
 /// A closure - a function which has captured variables from the surrounding scope.
 #[derive(Clone, Debug)]
 pub struct Closure {
@@ -108,7 +144,7 @@ const CLOSURE: TypeDescriptor = TypeDescriptor {
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
 };
-pub const CLOSURE_TYPE_ID: usize = 1;
+pub const CLOSURE_TYPE_ID: usize = 2;
 
 /// A native function
 #[derive(Clone, Debug, PartialEq)]
@@ -117,7 +153,7 @@ pub struct NativeFunction {
   pub(crate) func: fn(&mut VM, Value) -> Result<Value, ErrorKind>,
 }
 impl NativeFunction {
-  /// Create a new naative function
+  /// Create a new native function
   pub(crate) fn new(
     name: &'static str,
     func: fn(&mut VM, Value) -> Result<Value, ErrorKind>,
@@ -137,7 +173,7 @@ const NATIVE_FUNCTION: TypeDescriptor = TypeDescriptor {
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
 };
-pub const NATIVE_FUNCTION_TYPE_ID: usize = 2;
+pub const NATIVE_FUNCTION_TYPE_ID: usize = 3;
 
 /// A native closure - a native function which has got a value from a previous call
 #[derive(Clone, Debug)]
@@ -176,7 +212,7 @@ const NATIVE_CLOSURE: TypeDescriptor = TypeDescriptor {
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
 };
-pub const NATIVE_CLOSURE_TYPE_ID: usize = 3;
+pub const NATIVE_CLOSURE_TYPE_ID: usize = 4;
 
 /// A value which has been moved from the stack to the heap, as it has been captured by a closure
 const ALLOCATED: TypeDescriptor = TypeDescriptor {
@@ -190,7 +226,7 @@ const ALLOCATED: TypeDescriptor = TypeDescriptor {
   is_falsy: |_, _| unreachable!("Not accessed as a value"),
   equals: |_, _, _| unreachable!("Not accessed as a value"),
 };
-pub const ALLOCATED_TYPE_ID: usize = 4;
+pub const ALLOCATED_TYPE_ID: usize = 5;
 
 #[cfg(test)]
 mod test {
@@ -203,6 +239,7 @@ mod test {
     let objects = &DEFAULT_TYPE_DESCRIPTORS;
 
     assert_eq!(objects[STRING_TYPE_ID].type_name, "string");
+    assert_eq!(objects[STRING_SLICE_TYPE_ID].type_name, "string");
     assert_eq!(objects[CLOSURE_TYPE_ID].type_name, "function");
     assert_eq!(objects[NATIVE_FUNCTION_TYPE_ID].type_name, "function");
     assert_eq!(objects[NATIVE_CLOSURE_TYPE_ID].type_name, "function");
@@ -214,6 +251,7 @@ mod test {
     let vm = VM::new(HeapSize::Small, &EmptyContext).unwrap();
 
     assert_eq!(vm.types[STRING_TYPE_ID].type_name, "string");
+    assert_eq!(vm.types[STRING_SLICE_TYPE_ID].type_name, "string");
     assert_eq!(vm.types[CLOSURE_TYPE_ID].type_name, "function");
     assert_eq!(vm.types[NATIVE_FUNCTION_TYPE_ID].type_name, "function");
     assert_eq!(vm.types[NATIVE_CLOSURE_TYPE_ID].type_name, "function");

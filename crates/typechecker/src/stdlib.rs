@@ -81,7 +81,7 @@ fn string_module(types: &mut TypeArena, item: &str) -> ImportResult {
 
     "length" | "byteLength" => string_to_number.into(),
     "isEmpty" | "isAscii" => string_to_bool.into(),
-    "toLowercase" | "toUppercase" => string_to_string.into(),
+    "toLowercase" | "toUppercase" | "trim" | "trimStart" | "trimEnd" => string_to_string.into(),
     "contains" | "startsWith" | "endsWith" => string_string_to_bool.into(),
 
     _ => ImportResult::ItemNotFound,
