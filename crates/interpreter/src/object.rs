@@ -26,7 +26,7 @@ pub struct TypeDescriptor {
 type TraceValueFunction = fn(vm: &VM, Value) -> ();
 
 pub const DEFAULT_TYPE_DESCRIPTORS: &[TypeDescriptor] =
-  &[STRING, NATIVE_FUNCTION, CLOSURE, ALLOCATED, NATIVE_CLOSURE];
+  &[STRING, CLOSURE, NATIVE_FUNCTION, NATIVE_CLOSURE, ALLOCATED];
 
 /// A string on the heap
 #[repr(C)]
@@ -70,35 +70,6 @@ const STRING: TypeDescriptor = TypeDescriptor {
 };
 pub const STRING_TYPE_ID: usize = 0;
 
-/// A native function
-#[derive(Clone, Debug, PartialEq)]
-pub struct NativeFunction {
-  pub(crate) name: &'static str,
-  pub(crate) func: fn(&mut VM, Value) -> Result<Value, ErrorKind>,
-}
-impl NativeFunction {
-  /// Create a new naative function
-  pub(crate) fn new(
-    name: &'static str,
-    func: fn(&mut VM, Value) -> Result<Value, ErrorKind>,
-  ) -> Self {
-    Self { name, func }
-  }
-}
-impl fmt::Display for NativeFunction {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "<function {}>", self.name)
-  }
-}
-const NATIVE_FUNCTION: TypeDescriptor = TypeDescriptor {
-  type_name: "function",
-  trace: |vm, value, _trace_value| vm.heap.mark(value),
-  display: |heap, value| heap[value.cast::<NativeFunction>()].to_string(),
-  is_falsy: |_, _| false,
-  equals: |_vm, a, b| a == b,
-};
-pub const NATIVE_FUNCTION_TYPE_ID: usize = 1;
-
 /// A closure - a function which has captured variables from the surrounding scope.
 #[derive(Clone, Debug)]
 pub struct Closure {
@@ -137,21 +108,36 @@ const CLOSURE: TypeDescriptor = TypeDescriptor {
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
 };
-pub const CLOSURE_TYPE_ID: usize = 2;
+pub const CLOSURE_TYPE_ID: usize = 1;
 
-/// A value which has been moved from the stack to the heap, as it has been captured by a closure
-const ALLOCATED: TypeDescriptor = TypeDescriptor {
-  type_name: "allocated",
-  trace: |vm, value, trace_value| {
-    vm.heap.mark(value);
-    // If the allocated value is a compound value, we may need to trace the value inside
-    trace_value(vm, vm.heap[value.cast::<Value>()]);
-  },
-  display: |_, _| unreachable!("Not accessed as a value"),
-  is_falsy: |_, _| unreachable!("Not accessed as a value"),
-  equals: |_, _, _| unreachable!("Not accessed as a value"),
+/// A native function
+#[derive(Clone, Debug, PartialEq)]
+pub struct NativeFunction {
+  pub(crate) name: &'static str,
+  pub(crate) func: fn(&mut VM, Value) -> Result<Value, ErrorKind>,
+}
+impl NativeFunction {
+  /// Create a new naative function
+  pub(crate) fn new(
+    name: &'static str,
+    func: fn(&mut VM, Value) -> Result<Value, ErrorKind>,
+  ) -> Self {
+    Self { name, func }
+  }
+}
+impl fmt::Display for NativeFunction {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "<function {}>", self.name)
+  }
+}
+const NATIVE_FUNCTION: TypeDescriptor = TypeDescriptor {
+  type_name: "function",
+  trace: |vm, value, _trace_value| vm.heap.mark(value),
+  display: |heap, value| heap[value.cast::<NativeFunction>()].to_string(),
+  is_falsy: |_, _| false,
+  equals: |_vm, a, b| a == b,
 };
-pub const ALLOCATED_TYPE_ID: usize = 3;
+pub const NATIVE_FUNCTION_TYPE_ID: usize = 2;
 
 /// A native closure - a native function which has got a value from a previous call
 #[derive(Clone, Debug)]
@@ -190,7 +176,21 @@ const NATIVE_CLOSURE: TypeDescriptor = TypeDescriptor {
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
 };
-pub const NATIVE_CLOSURE_TYPE_ID: usize = 4;
+pub const NATIVE_CLOSURE_TYPE_ID: usize = 3;
+
+/// A value which has been moved from the stack to the heap, as it has been captured by a closure
+const ALLOCATED: TypeDescriptor = TypeDescriptor {
+  type_name: "allocated",
+  trace: |vm, value, trace_value| {
+    vm.heap.mark(value);
+    // If the allocated value is a compound value, we may need to trace the value inside
+    trace_value(vm, vm.heap[value.cast::<Value>()]);
+  },
+  display: |_, _| unreachable!("Not accessed as a value"),
+  is_falsy: |_, _| unreachable!("Not accessed as a value"),
+  equals: |_, _, _| unreachable!("Not accessed as a value"),
+};
+pub const ALLOCATED_TYPE_ID: usize = 4;
 
 #[cfg(test)]
 mod test {
@@ -203,10 +203,10 @@ mod test {
     let objects = &DEFAULT_TYPE_DESCRIPTORS;
 
     assert_eq!(objects[STRING_TYPE_ID].type_name, "string");
-    assert_eq!(objects[NATIVE_FUNCTION_TYPE_ID].type_name, "function");
     assert_eq!(objects[CLOSURE_TYPE_ID].type_name, "function");
-    assert_eq!(objects[ALLOCATED_TYPE_ID].type_name, "allocated");
+    assert_eq!(objects[NATIVE_FUNCTION_TYPE_ID].type_name, "function");
     assert_eq!(objects[NATIVE_CLOSURE_TYPE_ID].type_name, "function");
+    assert_eq!(objects[ALLOCATED_TYPE_ID].type_name, "allocated");
   }
 
   #[test]
@@ -214,9 +214,9 @@ mod test {
     let vm = VM::new(HeapSize::Small, &EmptyContext).unwrap();
 
     assert_eq!(vm.types[STRING_TYPE_ID].type_name, "string");
-    assert_eq!(vm.types[NATIVE_FUNCTION_TYPE_ID].type_name, "function");
     assert_eq!(vm.types[CLOSURE_TYPE_ID].type_name, "function");
-    assert_eq!(vm.types[ALLOCATED_TYPE_ID].type_name, "allocated");
+    assert_eq!(vm.types[NATIVE_FUNCTION_TYPE_ID].type_name, "function");
     assert_eq!(vm.types[NATIVE_CLOSURE_TYPE_ID].type_name, "function");
+    assert_eq!(vm.types[ALLOCATED_TYPE_ID].type_name, "allocated");
   }
 }
