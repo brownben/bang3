@@ -10,6 +10,8 @@ pub enum Problem {
     identifier: String,
     /// The location of the variable
     span: Span,
+    /// Suggestion for which variable could be used instead
+    did_you_mean: Option<String>,
   },
   /// Expected a type, but recieved a different one
   ExpectedDifferentType {
@@ -98,6 +100,8 @@ pub enum Problem {
     module: String,
     /// The location of the error
     span: Span,
+    /// Suggestion for which module could be meant instead
+    did_you_mean: Option<String>,
   },
   /// Item not found in module
   ItemNotFound {
@@ -136,7 +140,7 @@ impl Problem {
   pub fn message(&self) -> String {
     match self {
       Self::UndefinedVariable { identifier, .. } => {
-        format!("undefined variable `{identifier}`")
+        format!("no variable defined with the name `{identifier}`")
       }
       Self::ExpectedDifferentType {
         expected, given, ..
@@ -181,12 +185,39 @@ impl Problem {
     }
   }
 
+  /// A suggestion for how to fix the error
+  #[must_use]
+  pub fn suggestion(&self) -> Option<String> {
+    match self {
+      Self::UndefinedVariable {
+        did_you_mean: Some(did_you_mean),
+        ..
+      } => Some(format!(
+        "a variable with a similar name exists, did you mean `{did_you_mean}`?",
+      )),
+      Self::ModuleNotFound {
+        did_you_mean: Some(did_you_mean),
+        ..
+      } => Some(format!(
+        "a module with a similar name exists, did you mean `{did_you_mean}`?",
+      )),
+      _ => None,
+    }
+  }
+
   /// The title and message of the lint in a combined string
   #[must_use]
   pub fn full_message(&self) -> String {
     let mut message = self.title().to_owned();
     message.push('\n');
     message.push_str(&self.message());
+
+    if let Some(suggestion) = self.suggestion() {
+      message.push('\n');
+      message.push_str("hint: ");
+      message.push_str(&suggestion);
+    }
+
     message
   }
 

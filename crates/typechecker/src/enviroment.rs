@@ -6,7 +6,7 @@ use bang_syntax::{ast::statement::ImportItem, Span};
 /// Holds variables and where they are defined and used
 #[derive(Debug)]
 pub struct Enviroment {
-  variables: Vec<Variable>,
+  pub(crate) variables: Vec<Variable>,
   finished_variables: Vec<Variable>,
   builtin_variables: Vec<BuiltinVariable>,
   depth: u32,

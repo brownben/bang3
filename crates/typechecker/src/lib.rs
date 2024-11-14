@@ -7,6 +7,7 @@ mod enviroment;
 mod error;
 mod exhaustive;
 mod infer;
+mod similarity;
 mod stdlib;
 mod types;
 

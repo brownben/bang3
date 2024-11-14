@@ -10,6 +10,7 @@ pub enum Severity {
 pub struct Message {
   pub title: String,
   pub body: String,
+  pub hint: Option<String>,
   pub severity: Severity,
 }
 impl Message {
@@ -17,6 +18,7 @@ impl Message {
     Self {
       title: message,
       body: String::new(),
+      hint: None,
       severity: Severity::Error,
     }
   }
@@ -24,6 +26,7 @@ impl Message {
     Self {
       title: message,
       body: String::new(),
+      hint: None,
       severity: Severity::Warning,
     }
   }
@@ -40,6 +43,10 @@ impl fmt::Display for Message {
       writeln!(f, "{}", &self.body)?;
     }
 
+    if let Some(hint) = &self.hint {
+      writeln!(f, "{} {}", "hint:".italic().cyan(), hint)?;
+    }
+
     Ok(())
   }
 }
@@ -48,6 +55,7 @@ impl From<&bang_syntax::ParseError> for Message {
     Self {
       title: error.title(),
       body: error.message(),
+      hint: None,
       severity: Severity::Error,
     }
   }
@@ -57,6 +65,7 @@ impl From<&bang_interpreter::CompileError> for Message {
     Self {
       title: error.title().to_owned(),
       body: error.message().to_owned(),
+      hint: None,
       severity: Severity::Error,
     }
   }
@@ -66,6 +75,7 @@ impl From<&bang_interpreter::RuntimeError> for Message {
     Self {
       title: error.title().to_owned(),
       body: error.message(),
+      hint: None,
       severity: Severity::Error,
     }
   }
@@ -75,6 +85,7 @@ impl From<&bang_linter::LintDiagnostic> for Message {
     Self {
       title: error.title.to_owned(),
       body: error.message.to_owned(),
+      hint: None,
       severity: Severity::Warning,
     }
   }
@@ -84,6 +95,7 @@ impl From<&bang_typechecker::TypeError> for Message {
     Self {
       title: error.title().to_string(),
       body: error.message(),
+      hint: error.suggestion(),
       severity: if error.is_warning() {
         Severity::Warning
       } else {

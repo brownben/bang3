@@ -1,6 +1,7 @@
 use crate::{
   enviroment::Enviroment,
   exhaustive,
+  similarity::similarly_named,
   stdlib::{self, ImportResult},
   types::{Type, TypeArena, TypeRef, TypeScheme},
   TypeError,
@@ -156,6 +157,7 @@ impl InferType for Import {
           t.problems.push(TypeError::ModuleNotFound {
             module: self.module(ast).to_owned(),
             span: self.module_span(ast),
+            did_you_mean: similarly_named(self.module(ast), stdlib::MODULES),
           });
         }
         ImportResult::ItemNotFound => {
@@ -532,6 +534,7 @@ impl InferType for ModuleAccess {
         t.problems.push(TypeError::ModuleNotFound {
           module: self.module(ast).to_owned(),
           span: self.span(ast),
+          did_you_mean: similarly_named(self.module(ast), stdlib::MODULES),
         });
         TypeArena::UNKNOWN.into()
       }
@@ -569,6 +572,10 @@ impl InferType for Variable {
       t.problems.push(TypeError::UndefinedVariable {
         identifier: self.name(ast).to_owned(),
         span: self.span(ast),
+        did_you_mean: similarly_named(
+          self.name(ast),
+          t.env.variables.iter().map(|v| v.name.as_str()),
+        ),
       });
       TypeArena::UNKNOWN.into()
     }

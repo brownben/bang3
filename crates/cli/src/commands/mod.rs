@@ -133,6 +133,7 @@ pub fn format(options: &FormatOptions) -> Result<CommandStatus, ()> {
       Message {
         title: "File is not formatted".into(),
         body: format!("`{}` is not formatted", options.file),
+        hint: None,
         severity: Severity::Error,
       }
     );
