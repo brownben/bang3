@@ -3,6 +3,7 @@
 
 #![feature(let_chains)]
 #![deny(unsafe_code)]
+#![deny(clippy::print_stdout)] // interferes with lsp protocol over stdout
 
 mod documents;
 mod locations;
