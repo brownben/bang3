@@ -4,7 +4,6 @@ use super::{
   vm::VM,
 };
 use bang_gc::{Gc, Heap};
-use smartstring::alias::String as SmartString;
 use std::{fmt, mem, ptr};
 
 /// A value on the stack of the interpreter.
@@ -52,23 +51,6 @@ impl Value {
 
     // SAFETY: All u64 should be valid f64s
     unsafe { mem::transmute(self.0) }
-  }
-
-  /// Is the [Value] a constant string stored in the bytecode?
-  #[must_use]
-  pub(crate) fn is_constant_string(&self) -> bool {
-    (self.0.addr() & TO_POINTER) == TO_POINTER && self.0.addr() & TAG == CONSTANT_STRING
-  }
-  /// View the [Value] as a constant string, from the bytecode
-  ///
-  /// SAFETY: Undefined behaviour if the [Value] is not a constant string.
-  /// Use [`Value::is_constant_string`] to check if it is a constant string.
-  #[must_use]
-  pub(crate) fn as_constant_string(&self) -> &SmartString {
-    debug_assert!(self.is_constant_string());
-
-    let pointer = self.0.map_addr(|ptr| ptr & FROM_POINTER);
-    unsafe { &*pointer.cast::<SmartString>() }
   }
 
   /// Is the [Value] a constant function stored in the bytecode?
@@ -133,7 +115,7 @@ impl Value {
   /// Is the [Value] a string?
   #[must_use]
   pub fn is_string(&self) -> bool {
-    self.is_constant_string() || self.is_object_type(STRING_TYPE_ID)
+    self.is_object_type(STRING_TYPE_ID)
   }
   /// View the [Value] as a string.
   /// It can be a constant string or a string on the heap.
@@ -142,11 +124,7 @@ impl Value {
   /// Use [`Value::is_string`] to check if it is a string
   #[must_use]
   pub(crate) fn as_string<'a>(&'a self, heap: &'a Heap) -> &'a str {
-    if self.is_constant_string() {
-      self.as_constant_string().as_str()
-    } else {
-      BangString::from(self.as_object()).as_str(heap)
-    }
+    BangString::from(self.as_object()).as_str(heap)
   }
 
   /// View the [Value] as a function.
@@ -169,7 +147,6 @@ impl fmt::Debug for Value {
       Self(FALSE) => write!(f, "false"),
       Self(NULL) => write!(f, "null"),
       x if x.is_number() => write!(f, "{}", x.as_number()),
-      x if x.is_constant_string() => write!(f, "\"{}\"", x.as_constant_string()),
       x if x.is_constant_function() => f.write_str(&x.as_constant_function().display()),
       x => write!(f, "{:?}", x.as_object::<()>()),
     }
@@ -200,7 +177,6 @@ impl Value {
       Self(TRUE | FALSE) => "boolean",
       Self(NULL) => "null",
       x if x.is_number() => "number",
-      x if x.is_constant_string() => "string",
       x if x.is_constant_function() => "function",
       x => vm.types[x.object_type()].type_name,
     }
@@ -236,15 +212,6 @@ impl From<f64> for Value {
     Self(ptr::without_provenance(value.to_bits().try_into().unwrap()))
   }
 }
-impl From<*const SmartString> for Value {
-  fn from(value: *const SmartString) -> Self {
-    Self(
-      value
-        .map_addr(|ptr| ptr | TO_POINTER | CONSTANT_STRING)
-        .cast(),
-    )
-  }
-}
 impl From<*const Chunk> for Value {
   fn from(value: *const Chunk) -> Self {
     Self(
@@ -269,8 +236,7 @@ const TO_POINTER: usize = 0xFFFF_0000_0000_0000;
 const FROM_POINTER: usize = 0x0000_FFFF_FFFF_FFF8;
 const TAG: usize = 0x7;
 const OBJECT: usize = 1;
-const CONSTANT_STRING: usize = 2;
-const CONSTANT_FUNCTION: usize = 3;
+const CONSTANT_FUNCTION: usize = 2;
 const _SINGLETONS: usize = 7;
 
 // Singleton Constants
@@ -278,27 +244,24 @@ pub const TRUE: *const () = ptr::without_provenance(0xFFFF_0000_0000_0017);
 pub const FALSE: *const () = ptr::without_provenance(0xFFFF_0000_0000_0027);
 pub const NULL: *const () = ptr::without_provenance(0xFFFF_0000_0000_0037);
 
+// We store bits at the end of the pointer, to tag different values
+// Check that the alignment is greater than 8, so we can use the last 3 bits
+const _FUNCTION_ALIGNMENT_ASSERT: () = assert!(mem::align_of::<Chunk>() >= 8);
+
 #[cfg(test)]
 mod test {
   use super::*;
-
-  // We store bits at the end of the pointer, to tag different values
-  // Check that the alignment is greater than 8, so we can use the last 3 bits
-  const _STRING_ALIGNMENT_ASSERT: () = assert!(mem::align_of::<SmartString>() >= 8);
-  const _FUNCTION_ALIGNMENT_ASSERT: () = assert!(mem::align_of::<Chunk>() >= 8);
 
   #[test]
   fn boolean() {
     let true_ = Value::TRUE;
     assert!(!true_.is_number());
-    assert!(!true_.is_constant_string());
     assert!(!true_.is_constant_function());
     assert!(!true_.is_object());
     assert!(!true_.is_string());
 
     let false_ = Value::FALSE;
     assert!(!false_.is_number());
-    assert!(!false_.is_constant_string());
     assert!(!false_.is_constant_function());
     assert!(!false_.is_object());
     assert!(!false_.is_string());
@@ -311,7 +274,6 @@ mod test {
   fn null() {
     let null = Value::NULL;
     assert!(!null.is_number());
-    assert!(!null.is_constant_string());
     assert!(!null.is_constant_function());
     assert!(!null.is_object());
     assert!(!null.is_string());
@@ -322,7 +284,6 @@ mod test {
     for number in [0.0, 1.0, 2.0, 4.0, 8.0, 123.0, -0.0, -2.0, 123.45] {
       let num = Value::from(number);
       assert!(num.is_number());
-      assert!(!num.is_constant_string());
       assert!(!num.is_constant_function());
       assert!(!num.is_object());
       assert!(!num.is_string());
@@ -332,7 +293,6 @@ mod test {
 
     let num = Value::from(f64::NAN);
     assert!(num.is_number());
-    assert!(!num.is_constant_string());
     assert!(!num.is_constant_function());
     assert!(!num.is_object());
     assert!(!num.is_string());
@@ -340,7 +300,6 @@ mod test {
 
     let num = Value::from(f64::INFINITY);
     assert!(num.is_number());
-    assert!(!num.is_constant_string());
     assert!(!num.is_constant_function());
     assert!(!num.is_object());
     assert!(!num.is_string());
@@ -349,7 +308,6 @@ mod test {
 
     let num = Value::from(-f64::INFINITY);
     assert!(num.is_number());
-    assert!(!num.is_constant_string());
     assert!(!num.is_constant_function());
     assert!(!num.is_object());
     assert!(!num.is_string());
@@ -358,7 +316,6 @@ mod test {
 
     let num = Value::from(f64::asin(55.0));
     assert!(num.is_number());
-    assert!(!num.is_constant_string());
     assert!(!num.is_constant_function());
     assert!(!num.is_object());
     assert!(!num.is_string());
@@ -366,32 +323,10 @@ mod test {
   }
 
   #[test]
-  fn constant_string() {
-    let raw_constant_string = SmartString::from("hello");
-    let constant_string = Value::from(ptr::from_ref(&raw_constant_string));
-    assert!(!constant_string.is_number());
-    assert!(constant_string.is_constant_string());
-    assert!(!constant_string.is_constant_function());
-    assert!(!constant_string.is_object());
-    assert!(constant_string.is_string());
-
-    // same length as max inline string length
-    let raw_long_constant_string = SmartString::from("helloworldhelloworld123");
-    assert!(raw_long_constant_string.is_inline());
-    let long_constant = Value::from(ptr::from_ref(&raw_long_constant_string));
-    assert!(!long_constant.is_number());
-    assert!(long_constant.is_constant_string());
-    assert!(!long_constant.is_constant_function());
-    assert!(!long_constant.is_object());
-    assert!(long_constant.is_string());
-  }
-
-  #[test]
   fn constant_function() {
     let function = crate::ChunkBuilder::new("".into()).finalize();
     let function = Value::from(ptr::from_ref(&function));
     assert!(!function.is_number());
-    assert!(!function.is_constant_string());
     assert!(function.is_constant_function());
     assert!(!function.is_object());
     assert!(!function.is_string());

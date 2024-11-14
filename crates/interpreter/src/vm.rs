@@ -238,19 +238,21 @@ impl<'context> VM<'context> {
           let constant_position = chunk.get_value(ip + 1);
           let constant = chunk.get_constant(constant_position.into());
 
-          self.push(match constant {
-            ConstantValue::String(string) => Value::from(ptr::from_ref(string)),
+          let value = match constant {
+            ConstantValue::String(string) => self.allocate_string(string),
             ConstantValue::Function(function) => Value::from(ptr::from_ref(function)),
-          });
+          };
+          self.push(value);
         }
         OpCode::ConstantLong => {
           let constant_position = chunk.get_long_value(ip + 1);
           let constant = chunk.get_constant(constant_position.into());
 
-          self.push(match constant {
-            ConstantValue::String(string) => Value::from(ptr::from_ref(string)),
+          let value = match constant {
+            ConstantValue::String(string) => self.allocate_string(string),
             ConstantValue::Function(function) => Value::from(ptr::from_ref(function)),
-          });
+          };
+          self.push(value);
         }
         OpCode::Number => self.push(chunk.get_number(ip + 1).into()),
         OpCode::True => self.push(Value::TRUE),
@@ -509,16 +511,7 @@ impl<'context> VM<'context> {
       }
     };
 
-    // move constants from the chunk to the heap
-    for constant in self.globals.values_mut() {
-      if constant.is_constant_string() {
-        // we can't just use [`VM::allocate_string`], as it will borrow VM as mutable
-        let value = constant.as_constant_string();
-        let string = self.heap.allocate_list(value.bytes(), value.len());
-        *constant = Value::from_object(*string, object::STRING_TYPE_ID);
-      }
-      // TODO: store chunks on the heap, to ensure if they are stored they can be accessed later
-    }
+    // TODO: store constant chunks on the heap, to ensure if they are stored they can be accessed later
 
     if let Some(error) = error {
       let traceback = std::iter::once(StackTraceLocation::from_chunk_ip(chunk, ip, offset))
