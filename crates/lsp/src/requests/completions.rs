@@ -3,7 +3,7 @@ use crate::documents::Document;
 use crate::locations::span_from_lsp_position;
 use lsp_types as lsp;
 
-use bang_interpreter::stdlib::{MATHS_ITEMS, STRING_ITEMS};
+use bang_interpreter::stdlib::{MATHS_ITEMS, MODULES, STRING_ITEMS};
 use bang_syntax::{
   ast::{Expression, Statement},
   parse, Span, AST,
@@ -161,7 +161,7 @@ fn variable_completions(ast: &AST, position: Span) -> lsp::CompletionList {
 }
 
 fn module_completions() -> lsp::CompletionList {
-  let items = ["maths", "string"]
+  let items = MODULES
     .into_iter()
     .map(|module| lsp::CompletionItem {
       kind: Some(lsp::CompletionItemKind::MODULE),
@@ -177,28 +177,26 @@ fn module_completions() -> lsp::CompletionList {
 }
 
 fn module_access_snippets() -> impl Iterator<Item = lsp::CompletionItem> {
-  ["maths", "string"]
-    .iter()
-    .map(|module| lsp::CompletionItem {
-      label: (*module).to_owned(),
-      label_details: Some(lsp::CompletionItemLabelDetails {
-        detail: Some("::".to_owned()),
-        description: None,
-      }),
-      insert_text: Some(format!("{module}::$0")),
-      insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-      kind: Some(lsp::CompletionItemKind::MODULE),
+  MODULES.iter().map(|module| lsp::CompletionItem {
+    label: (*module).to_owned(),
+    label_details: Some(lsp::CompletionItemLabelDetails {
+      detail: Some("::".to_owned()),
+      description: None,
+    }),
+    insert_text: Some(format!("{module}::$0")),
+    insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+    kind: Some(lsp::CompletionItemKind::MODULE),
 
-      // Trigger a suggestions for the items in the module
-      // TODO: make this generic and not reliant on VSCode
-      command: Some(lsp::Command {
-        title: "Trigger Suggestions".to_owned(),
-        command: "editor.action.triggerSuggest".to_owned(),
-        arguments: None,
-      }),
+    // Trigger a suggestions for the items in the module
+    // TODO: make this generic and not reliant on VSCode
+    command: Some(lsp::Command {
+      title: "Trigger Suggestions".to_owned(),
+      command: "editor.action.triggerSuggest".to_owned(),
+      arguments: None,
+    }),
 
-      ..Default::default()
-    })
+    ..Default::default()
+  })
 }
 
 fn module_item_completions(module: &str, in_import: bool) -> lsp::CompletionList {

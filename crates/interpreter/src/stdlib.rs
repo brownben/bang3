@@ -68,6 +68,9 @@ impl Context for StandardContext {
   }
 }
 
+/// The names of all the modules in the standard library
+pub const MODULES: [&str; 2] = ["maths", "string"];
+
 module!(string, STRING_ITEMS, {
   const NEW_LINE: String = "\n";
   const TAB: String = "\t";

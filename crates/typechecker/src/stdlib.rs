@@ -53,6 +53,9 @@ pub fn import_type_info(module: &str, item: &str) -> StaticTypeInfo {
   }
 }
 
+/// The names of all the modules in the standard library
+pub const MODULES: [&str; 2] = ["maths", "string"];
+
 fn maths_module(types: &mut TypeArena, item: &str) -> ImportResult {
   let number_to_number = types.new_type(Type::Function(TypeArena::NUMBER, TypeArena::NUMBER));
   let number_number_to_number = types.new_type(Type::Function(TypeArena::NUMBER, number_to_number));
@@ -90,12 +93,16 @@ fn string_module(types: &mut TypeArena, item: &str) -> ImportResult {
 
 #[cfg(test)]
 mod test {
-  use super::{maths_module, string_module, ImportResult, TypeArena};
+  use super::{maths_module, string_module, ImportResult, TypeArena, MODULES};
   use bang_interpreter::stdlib::{MATHS_ITEMS, STRING_ITEMS};
 
   #[test]
   fn all_items_present() {
     let mut types = TypeArena::new();
+
+    for module in MODULES {
+      assert!(bang_interpreter::stdlib::MODULES.contains(&module));
+    }
 
     for item in STRING_ITEMS {
       let ty = string_module(&mut types, item);
