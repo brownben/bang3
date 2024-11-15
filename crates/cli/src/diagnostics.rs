@@ -171,6 +171,7 @@ pub fn highlight_source(output: &mut dyn fmt::Write, source: &str) -> fmt::Resul
       | TokenKind::FormatStringStart
       | TokenKind::FormatStringPart
       | TokenKind::FormatStringEnd
+      | TokenKind::FormatStringUnterminated
       | TokenKind::UnterminatedString => Style::new().green(),
       TokenKind::As
       | TokenKind::Else
