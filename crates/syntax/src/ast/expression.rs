@@ -197,7 +197,7 @@ impl Call {
       Span::from(ast[self.opening])
     };
 
-    Span::from(ast[self.opening]).merge(end)
+    self.callee(ast).span(ast).merge(end)
   }
 }
 
