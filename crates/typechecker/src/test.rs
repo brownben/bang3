@@ -234,53 +234,6 @@ fn match_() {
 }
 
 #[test]
-fn match_exhaustiveness() {
-  let source = "match 4 > 5 | true -> 1 | false -> 3";
-  assert_eq!(synthesize(source), "number");
-
-  let source = "match 4 > 5 | true -> 1 | _ -> 3";
-  assert_eq!(synthesize(source), "number");
-
-  let no_false = "match 4 > 5 | true -> 1";
-  assert!(has_type_error(no_false));
-  let no_true = "match 4 > 5 | false -> 1";
-  assert!(has_type_error(no_true));
-  let no_true_or_false = "match 4 > 5 | 1 -> 2 | 4 -> 7";
-  assert!(has_type_error(no_true_or_false));
-
-  let extra_catch_all = "match 4 > 5 | true -> 1 | false -> 3 | _ -> 5";
-  assert!(has_type_error(extra_catch_all));
-  let arms_after_catch_all = "match 4 > 5 | _ -> 1 | false -> 3 | true -> 5";
-  assert!(has_type_error(arms_after_catch_all));
-  let arms_after_catch_all = "match 5 | _ -> 1 | 1 -> 3 | 2 -> 5";
-  assert!(has_type_error(arms_after_catch_all));
-
-  let function_needs_catch_all = "match (_ => 7) | _ -> 3";
-  assert_eq!(synthesize(function_needs_catch_all), "number");
-
-  let extra_catch_all = "match 4 > 5 | _ -> 5 | true -> 1 | false -> 3";
-  assert!(has_type_error(extra_catch_all));
-
-  let needs_catch_all = "match 555 | 1 -> 1";
-  assert!(has_type_error(needs_catch_all));
-}
-
-#[test]
-fn match_exhaustiveness_with_guard() {
-  let missing_possible_true = "match 4 > 5 | true if 3 > 4 -> 1 | false -> 3";
-  assert!(has_type_error(missing_possible_true));
-
-  let missing_possible_false = "match 4 > 5 | true -> 1 | false if 3 > 4 -> 3";
-  assert!(has_type_error(missing_possible_false));
-
-  let with_true_catch_guard = "match 4 > 5 | true if 3 > 4 -> 1 | false -> 3 | _ -> 5";
-  assert_eq!(synthesize(with_true_catch_guard), "number");
-
-  let needs_catch_all = "match 555 | _ if 4 > 5 -> 1";
-  assert!(has_type_error(needs_catch_all));
-}
-
-#[test]
 fn unary() {
   assert_eq!(synthesize("!true"), "boolean");
   assert_eq!(synthesize("!false"), "boolean");
@@ -607,6 +560,97 @@ fn unknown_imports() {
   // unknown module acccess
   assert!(has_type_error("maths::unknown_aaa"));
   assert!(has_type_error("unknown_module__aaa::unknown_aaa"));
+}
+
+mod exhaustive {
+  use super::*;
+
+  #[test]
+  fn boolean() {
+    let source = "match 4 > 5 | true -> 1 | false -> 3";
+    assert_eq!(synthesize(source), "number");
+
+    let source = "match 4 > 5 | true -> 1 | _ -> 3";
+    assert_eq!(synthesize(source), "number");
+
+    let no_false = "match 4 > 5 | true -> 1";
+    assert!(has_type_error(no_false));
+    let no_true = "match 4 > 5 | false -> 1";
+    assert!(has_type_error(no_true));
+    let no_true_or_false = "match 4 > 5 | 1 -> 2 | 4 -> 7";
+    assert!(has_type_error(no_true_or_false));
+
+    let extra_catch_all = "match 4 > 5 | true -> 1 | false -> 3 | _ -> 5";
+    assert!(has_type_error(extra_catch_all));
+    let arms_after_catch_all = "match 4 > 5 | _ -> 1 | false -> 3 | true -> 5";
+    assert!(has_type_error(arms_after_catch_all));
+  }
+
+  #[test]
+  fn function() {
+    let function_needs_catch_all = "match (_ => 7) | _ -> 3";
+    assert_eq!(synthesize(function_needs_catch_all), "number");
+
+    let function_doesnt_match_number = "match (_ => 7) | 7 -> 7 ";
+    assert!(has_type_error(function_doesnt_match_number));
+
+    let arms_after_catch_all = "match (_ => 7) | _ -> 1 | a -> 3";
+    assert!(has_type_error(arms_after_catch_all));
+  }
+
+  #[test]
+  fn string() {
+    let string_with_catch_all = "match 'hello' | _ -> 'world'";
+    assert_eq!(synthesize(string_with_catch_all), "string");
+
+    let string_doesnt_match_number = "match 'hello' | 7 -> 'world' ";
+    assert!(has_type_error(string_doesnt_match_number));
+
+    let arms_after_catch_all = "match 'hello' | a -> 'world' | b -> 'earth'";
+    assert!(has_type_error(arms_after_catch_all));
+  }
+
+  #[test]
+  fn number() {
+    let number_covered = "match 5 | 0 -> 'zero' | ..0 -> 'negative' | 0.. -> 'positive'";
+    assert_eq!(synthesize(number_covered), "string");
+
+    let missing_start = "match 5 | 0 -> 'zero' | 0.. -> 'positive'";
+    assert!(has_type_error(missing_start));
+
+    let missing_end = "match 5 | 0 -> 'zero' | ..0 -> 'negative' | 0..1000 -> 'positive'";
+    assert!(has_type_error(missing_end));
+
+    let missing_some = "match 5 | 0 -> 'zero' | 1 -> 'one'";
+    assert!(has_type_error(missing_some));
+    let missing_many =
+      "match 5 | 0 -> 'zero' | 1 -> 'one' | 2 -> 'two' | 3 -> 'three' | 4 -> 'four'";
+    assert!(has_type_error(missing_many));
+
+    let missing_some_with_catch_all = "match 5 | 0 -> 'zero' | 1 -> 'one' | _ -> 'many'";
+    assert_eq!(synthesize(missing_some_with_catch_all), "string");
+    let missing_many =
+      "match 5 | 0 -> 'zero' | 1 -> 'one' | 2 -> 'two' | 3 -> 'three' | 4 -> 'four' | _ -> 'many'";
+    assert_eq!(synthesize(missing_many), "string");
+
+    let arms_after_catch_all = "match 4 | _ -> 1 | 1 -> 3 | 2 -> 5";
+    assert!(has_type_error(arms_after_catch_all));
+  }
+
+  #[test]
+  fn with_guard() {
+    let missing_possible_true = "match 4 > 5 | true if 3 > 4 -> 1 | false -> 3";
+    assert!(has_type_error(missing_possible_true));
+
+    let missing_possible_false = "match 4 > 5 | true -> 1 | false if 3 > 4 -> 3";
+    assert!(has_type_error(missing_possible_false));
+
+    let with_true_catch_guard = "match 4 > 5 | true if 3 > 4 -> 1 | false -> 3 | _ -> 5";
+    assert_eq!(synthesize(with_true_catch_guard), "number");
+
+    let needs_catch_all = "match 'stuff' | _ if 4 > 5 -> 1";
+    assert!(has_type_error(needs_catch_all));
+  }
 }
 
 mod stdlib {
