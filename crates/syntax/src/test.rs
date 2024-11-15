@@ -393,6 +393,14 @@ fn literal() {
   let expected = "├─ Number (0.6)\n";
   assert_eq!(ast, expected);
 
+  let ast = parse_to_string("01.6");
+  let expected = "├─ Number (1.6)\n";
+  assert_eq!(ast, expected);
+
+  let ast = parse_to_string("-4.5");
+  let expected = "├─ Number (-4.5)\n";
+  assert_eq!(ast, expected);
+
   assert!(parse("1.").is_err());
   assert!(parse("01.").is_err());
   assert!(parse("55.").is_err());
@@ -511,6 +519,45 @@ fn match_with_guard() {
 }
 
 #[test]
+fn pattern_negative_numbers() {
+  let ast = parse_to_string("match n | -4.6 -> 0");
+  let expected = indoc! {"
+    ├─ Match
+    │  ├─ Variable (n)
+    │  ╰─ Cases:
+    │     ╰─ Pattern ─ -4.6
+    │        ╰─ Number (0)
+  "};
+  assert_eq!(ast, expected);
+
+  let ast = parse_to_string("match n | -1 if x -> 0");
+  let expected = indoc! {"
+    ├─ Match
+    │  ├─ Variable (n)
+    │  ╰─ Cases:
+    │     ╰─ Pattern ─ -1
+    │        ├─ Guard
+    │        │  ╰─ Variable (x)
+    │        ╰─ Number (0)
+  "};
+  assert_eq!(ast, expected);
+
+  let ast = parse_to_string("match n | -4.6.. -> 0 | -4.6..-56 -> 1 | ..-5.5544 -> 2");
+  let expected = indoc! {"
+    ├─ Match
+    │  ├─ Variable (n)
+    │  ╰─ Cases:
+    │     ├─ Pattern ─ -4.6 ..
+    │     │  ╰─ Number (0)
+    │     ├─ Pattern ─ -4.6 .. -56
+    │     │  ╰─ Number (1)
+    │     ╰─ Pattern ─ .. -5.5544
+    │        ╰─ Number (2)
+  "};
+  assert_eq!(ast, expected);
+}
+
+#[test]
 fn match_missing_parts() {
   assert!(parse("match | 1 -> 2").is_err());
   assert!(parse("match 3 | -5").is_err());
@@ -536,7 +583,7 @@ fn unary() {
   "};
   assert_eq!(ast, expected);
 
-  let ast = parse_to_string("-.5");
+  let ast = parse_to_string("- .5");
   let expected = indoc! {"
     ├─ Unary (-)
     │  ╰─ Number (0.5)

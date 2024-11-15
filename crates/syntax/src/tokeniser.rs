@@ -52,6 +52,7 @@ impl Tokeniser<'_> {
       // Values
       quote @ (b'"' | b'\'' | b'`') => self.string(*quote),
       b'0'..=b'9' => self.number(),
+      b'-' if matches!(next_character, Some(b'0'..=b'9')) => self.number(),
       b'_' | b'a'..=b'z' | b'A'..=b'Z' => self.identifier(),
       b'.' if matches!(next_character, Some(b'0'..=b'9')) => self.number(),
 

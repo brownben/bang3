@@ -267,7 +267,7 @@ fn literal() {
   assert_format!(".14", "0.14", 25);
   assert_format!(".140000", "0.14", 25);
 
-  // trim leading zeros
+  // trim leading/ trailing zeros
   assert_format!("0", "0", 25);
   assert_format!("0.0", "0.0", 25);
   assert_format!("000.0", "0.0", 25);
@@ -278,6 +278,18 @@ fn literal() {
   assert_format!("00.14", "0.14", 25);
   assert_format!("003.14", "3.14", 25);
   assert_format!("003.140000", "3.14", 25);
+
+  // trim leading/ trailing zeros with negative numbers
+  assert_format!("-0", "-0", 25);
+  assert_format!("-0.0", "-0.0", 25);
+  assert_format!("-000.0", "-0.0", 25);
+  assert_format!("-000.000", "-0.0", 25);
+  assert_format!("-0.000", "-0.0", 25);
+  assert_format!("-0.01400", "-0.014", 25);
+  assert_format!("-0.14", "-0.14", 25);
+  assert_format!("-00.14", "-0.14", 25);
+  assert_format!("-003.14", "-3.14", 25);
+  assert_format!("-003.140000", "-3.14", 25);
 
   // if there are separators, just bail out
   assert_format!("0001_000", "0001_000", 25);

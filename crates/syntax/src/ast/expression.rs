@@ -477,6 +477,8 @@ pub enum Pattern {
   /// A literal value, e.g. `1`, `true`, `"hello"`
   Literal(Literal),
   /// A range, e.g. `1..2`, `..'b'` - is a comparison against the start and end
+  /// The start or end missing indicates an open range. It is inclusive of both values.
+  /// The only literals which can be used as part of a range are numbers and strings (ordered).
   Range(Option<Literal>, Option<Literal>),
   /// An invalid pattern
   Invalid,

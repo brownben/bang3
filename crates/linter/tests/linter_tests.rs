@@ -34,6 +34,10 @@ fn negative_zero() {
   assert!(lint("-0.0").is_err());
   assert!(lint("x == -0.0").is_err());
 
+  assert!(lint("- 0").is_err());
+  assert!(lint("- 0.0").is_err());
+  assert!(lint("x == - 0.0").is_err());
+
   assert!(lint("0").is_ok());
   assert!(lint("5 - 0").is_ok());
   assert!(lint("!0").is_ok());
@@ -248,6 +252,9 @@ fn loss_of_precision() {
   assert!(lint("5123000000000000000000000000001").is_err());
   assert!(lint("0.1234567890123456789").is_err());
   assert!(lint(".1234567890123456789").is_err());
+
+  assert!(lint("-1234567890123456789").is_err());
+  assert!(lint("-9007199254740993").is_err());
 
   assert!(lint("0").is_ok());
   assert!(lint("0.0").is_ok());

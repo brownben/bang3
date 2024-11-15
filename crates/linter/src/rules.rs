@@ -74,6 +74,14 @@ impl LintRule for NegativeZero {
     {
       context.add_diagnostic(&Self, unary.span(ast));
     }
+
+    if let Expression::Literal(literal) = &expression
+      && let LiteralValue::Number(value) = literal.value(ast)
+      && value == 0.0
+      && value.is_sign_negative()
+    {
+      context.add_diagnostic(&Self, literal.span(ast));
+    }
   }
 }
 

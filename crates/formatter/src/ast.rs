@@ -314,10 +314,20 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Unary {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
     if let Expression::Unary(unary2) = &self.expression(ast)
       && self.operator(ast) == unary2.operator(ast)
-      && let Expression::Unary(unary3) = &unary2.expression(ast)
-      && unary2.operator(ast) == unary3.operator(ast)
     {
-      return unary3.format(f, ast);
+      if let Expression::Unary(unary3) = &unary2.expression(ast)
+        && unary2.operator(ast) == unary3.operator(ast)
+      {
+        return unary3.format(f, ast);
+      }
+
+      if self.operator(ast) == UnaryOperator::Minus
+        && let Expression::Literal(literal) = &unary2.expression(ast)
+        && let LiteralValue::Number(number) = literal.value(ast)
+        && number.is_sign_negative()
+      {
+        return literal.format(f, ast);
+      }
     }
 
     f.concat([
@@ -451,9 +461,16 @@ fn unwrap<'a>(expression: &'a Expression, ast: &'a AST) -> &'a Expression {
 /// Also ensure numbers don't start with a decimal point
 fn remove_leading_trailing_zeros<'a, 'b>(f: &Formatter<'a, 'b>, raw: &'a str) -> IR<'a, 'b> {
   // if it doesn't have unnecessary zeros, return it
-  if !raw.starts_with('0') && !raw.starts_with('.') && !raw.ends_with('0') {
+  if !raw.starts_with('0') && !raw.starts_with('-') && !raw.starts_with('.') && !raw.ends_with('0')
+  {
     return IR::Text(raw);
   }
+
+  let (raw, negative) = if let Some(raw) = raw.strip_prefix('-') {
+    (raw, true)
+  } else {
+    (raw, false)
+  };
 
   // If it is a decimal, we make sure that there is at least one digit each side of the point
   if let Some((before, after)) = raw.split_once('.') {
@@ -463,6 +480,7 @@ fn remove_leading_trailing_zeros<'a, 'b>(f: &Formatter<'a, 'b>, raw: &'a str) ->
     // If there is no leading zeros, we add a 0 before the point
     if before.is_empty() {
       return f.concat([
+        if negative { IR::Text("-") } else { IR::Empty },
         IR::Text("0"),
         IR::Text(&raw[leading_zeros..(raw.len() - trailing_zeros)]),
       ]);
@@ -476,13 +494,21 @@ fn remove_leading_trailing_zeros<'a, 'b>(f: &Formatter<'a, 'b>, raw: &'a str) ->
       leading_zeros -= 1;
     }
 
-    return IR::Text(&raw[leading_zeros..(raw.len() - trailing_zeros)]);
+    return f.concat([
+      if negative { IR::Text("-") } else { IR::Empty },
+      IR::Text(&raw[leading_zeros..(raw.len() - trailing_zeros)]),
+    ]);
   }
 
   // Otherwise its just an integer, and we check there is atleast one digit
-  if raw.trim_start_matches('0').is_empty() {
+  let integer_part = if raw.trim_start_matches('0').is_empty() {
     IR::Text("0")
   } else {
     IR::Text(raw.trim_start_matches('0'))
-  }
+  };
+
+  f.concat([
+    if negative { IR::Text("-") } else { IR::Empty },
+    integer_part,
+  ])
 }

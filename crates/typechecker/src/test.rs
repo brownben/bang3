@@ -615,7 +615,7 @@ mod exhaustive {
     let number_covered = "match 5 | 0 -> 'zero' | ..0 -> 'negative' | 0.. -> 'positive'";
     assert_eq!(synthesize(number_covered), "string");
 
-    let missing_start = "match 5 | 0 -> 'zero' | 0.. -> 'positive'";
+    let missing_start = "match 5 | -100..0 -> 'zero' | 0.. -> 'positive'";
     assert!(has_type_error(missing_start));
 
     let missing_end = "match 5 | 0 -> 'zero' | ..0 -> 'negative' | 0..1000 -> 'positive'";
