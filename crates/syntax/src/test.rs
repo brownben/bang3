@@ -963,6 +963,17 @@ mod fault_tolerant {
   }
 
   #[test]
+  fn empty_group() {
+    let ast = parse("()");
+    let expected = indoc! {"
+      ├─ Group
+      │  ╰─ Invalid
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+  }
+
+  #[test]
   fn let_statement_recovers() {
     let ast = parse("let x = ¬\nlet b = 8");
     let expected = indoc! {"

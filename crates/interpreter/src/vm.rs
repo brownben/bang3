@@ -365,7 +365,11 @@ impl<'context> VM<'context> {
 
           match self.globals.get(name) {
             Some(value) => self.push(*value),
-            None => break Some(ErrorKind::UndefinedVariable(name.to_string())),
+            None => {
+              break Some(ErrorKind::UndefinedVariable {
+                name: name.to_string(),
+              })
+            }
           }
         }
         OpCode::GetLocal => {
@@ -416,7 +420,9 @@ impl<'context> VM<'context> {
 
             ip += 1;
           } else {
-            break Some(ErrorKind::NotCallable(callee.get_type(self)));
+            break Some(ErrorKind::NotCallable {
+              type_: callee.get_type(self),
+            });
           }
 
           continue; // skip the ip increment, as we're jumping to a new chunk
@@ -552,7 +558,7 @@ macro comparison_operation(($vm:expr, $chunk:expr), $operator:tt) {{
   } else {
     break Some(ErrorKind::TypeErrorBinary {
       expected: "two numbers or two strings",
-      got: format!("a {} and a {}", left.get_type(&$vm), right.get_type(&$vm)),
+      got: format!("a `{}` and a `{}`", left.get_type(&$vm), right.get_type(&$vm)),
     });
   }
 }}
@@ -627,8 +633,12 @@ pub(crate) enum ErrorKind {
     expected: &'static str,
     got: String,
   },
-  UndefinedVariable(String),
-  NotCallable(&'static str),
+  UndefinedVariable {
+    name: String,
+  },
+  NotCallable {
+    type_: &'static str,
+  },
   OutOfMemory,
   ModuleNotFound {
     module: String,
@@ -643,8 +653,8 @@ impl ErrorKind {
   fn title(&self) -> &'static str {
     match self {
       Self::TypeError { .. } | Self::TypeErrorBinary { .. } => "Type Error",
-      Self::UndefinedVariable(_) => "Undefined Variable",
-      Self::NotCallable(_) => "Not Callable",
+      Self::UndefinedVariable { .. } => "Undefined Variable",
+      Self::NotCallable { .. } => "Not Callable",
       Self::OutOfMemory => "Out of Memory",
       Self::ModuleNotFound { .. } => "Module Not Found",
       Self::ItemNotFound { .. } => "Item Not Found",
@@ -655,22 +665,14 @@ impl ErrorKind {
   fn message(&self) -> String {
     match self {
       Self::TypeError { expected, got } => format!("expected `{expected}`, got `{got}`"),
-      Self::TypeErrorBinary { expected, got } => {
-        format!("expected `{expected}`, got `{got}`")
-      }
-      Self::UndefinedVariable(variable_name) => {
-        format!("variable `{variable_name}` is not defined")
-      }
-      Self::NotCallable(type_) => {
+      Self::TypeErrorBinary { expected, got } => format!("expected {expected}, got {got}"),
+      Self::UndefinedVariable { name } => format!("variable `{name}` is not defined"),
+      Self::NotCallable { type_ } => {
         format!("`{type_}` is not callable, only functions are callable")
       }
       Self::OutOfMemory => "could not initialise enough memory for the heap".into(),
-      Self::ModuleNotFound { module } => {
-        format!("could not find module `{module}`")
-      }
-      Self::ItemNotFound { module, item } => {
-        format!("could not find `{item}` in `{module}`")
-      }
+      Self::ModuleNotFound { module } => format!("could not find module `{module}`"),
+      Self::ItemNotFound { module, item } => format!("could not find `{item}` in `{module}`"),
     }
   }
 }

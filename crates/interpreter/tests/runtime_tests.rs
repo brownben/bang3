@@ -294,14 +294,17 @@ fn equals() {
     let x = v => _ => v
     let y = x(7)
     let z = _ => 7
+    let a = v => _ => v
 
     let c = y == z
     let d = y == y
     let e = z == z
+    let f = a == x
   "});
   assert_variable!(closures; c, false);
   assert_variable!(closures; d, true);
   assert_variable!(closures; e, true);
+  assert_variable!(closures; f, false);
 }
 
 #[test]
@@ -553,10 +556,13 @@ fn if_() {
     let a = if (true) 1 else 2
     let b = if (false) 3 else 4
     let c = if (3 < 4) 5 else 6
+    let d = if (_ => _ => 7) 7 else 8
   "});
 
   assert_variable!(vm; a, 1.0);
   assert_variable!(vm; b, 4.0);
+  assert_variable!(vm; c, 5.0);
+  assert_variable!(vm; d, 7.0);
 
   let no_else = run(indoc! {"
     let a = if (false) 4
@@ -1275,7 +1281,10 @@ mod builtin_function {
 
     let length_wrong_type = run("from string import { length }\nlet a = length(5)");
     assert!(length_wrong_type.is_err_and(|error| error == super::Error::RuntimeError));
-
+    let to_uppercase_wrong_type = run("from string import { toUppercase }\nlet a = toUppercase(5)");
+    assert!(to_uppercase_wrong_type.is_err_and(|error| error == super::Error::RuntimeError));
+    let is_empty_wrong_type = run("from string import { isEmpty }\nlet a = isEmpty(5)");
+    assert!(is_empty_wrong_type.is_err_and(|error| error == super::Error::RuntimeError));
     let contains_wrong_type = run("from string import { contains }\nlet a = contains(5)('')");
     assert!(contains_wrong_type.is_err_and(|error| error == super::Error::RuntimeError));
     let contains_wrong_type = run("from string import { contains }\nlet a = contains('')(5)");
