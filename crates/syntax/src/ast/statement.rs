@@ -42,18 +42,24 @@ impl Statement {
 /// A comment on it's own line
 #[derive(Debug)]
 pub struct CommentStmt {
-  pub(crate) token: TokenIdx,
+  pub(crate) start: TokenIdx,
+  pub(crate) end: TokenIdx,
 }
 impl CommentStmt {
   /// The text of the comment
-  #[must_use]
-  pub fn text<'source>(&self, ast: &AST<'source>) -> &'source str {
-    ast.get_token_text(self.token)[2..].trim()
+  pub fn text<'source, 'a>(
+    &'a self,
+    ast: &'a AST<'source>,
+  ) -> impl Iterator<Item = &'source str> + use<'a, 'source> {
+    (self.start.range(self.end))
+      .map(|idx| ast[idx])
+      .filter(|token| token.kind == TokenKind::Comment)
+      .map(|token| Span::from(token).source_text(ast.source)[2..].trim())
   }
 
   /// The location of the statement
   pub fn span(&self, ast: &AST) -> Span {
-    Span::from(ast[self.token])
+    Span::from(ast[self.start]).merge(Span::from(ast[self.end]))
   }
 }
 

@@ -288,7 +288,7 @@ fn in_import_statement<'a>(
   ast: &'a AST,
   position: Span,
 ) -> Option<&'a bang_syntax::ast::statement::Import> {
-  for statement in ast.root_statements.iter().chain(ast.statements.iter()) {
+  for statement in ast.all_statements() {
     if let Statement::Import(import) = statement
       && import.span(ast).contains(position)
     {

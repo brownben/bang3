@@ -80,6 +80,11 @@ impl<'source> AST<'source> {
       .get_or_init(|| LineIndex::from_source(self.source))
   }
 
+  /// All statements in the source
+  pub fn all_statements(&self) -> impl Iterator<Item = &Statement> {
+    self.root_statements.iter().chain(self.statements.iter())
+  }
+
   pub(crate) fn add_expression(&mut self, expression: impl Into<Expression>) -> ExpressionIdx {
     let id = self.expressions.len() + 1;
     self.expressions.push(expression.into());
@@ -161,6 +166,10 @@ pub(crate) struct TokenIdx(NonZero<u32>);
 impl TokenIdx {
   fn next(self) -> Self {
     Self(NonZero::new(self.0.get() + 1).unwrap())
+  }
+
+  fn range(self, end: Self) -> impl Iterator<Item = Self> {
+    (self.0.get()..=end.0.get()).map(|x| Self(NonZero::new(x).unwrap()))
   }
 }
 impl From<usize> for TokenIdx {

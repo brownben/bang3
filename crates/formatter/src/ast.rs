@@ -364,7 +364,14 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Statement {
 }
 impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for CommentStmt {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
-    f.concat([IR::Text("// "), IR::Text(self.text(ast))])
+    let mut lines = self.text(ast);
+    f.concat([
+      IR::Text("// "),
+      IR::Text(lines.next().unwrap()), // There is always at least one line
+      f.concat_iterator(
+        lines.map(|text| f.concat([IR::AlwaysLine, IR::Text("// "), IR::Text(text)])),
+      ),
+    ])
   }
 }
 impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Import {

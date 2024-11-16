@@ -286,7 +286,13 @@ impl PrettyPrint for Statement {
 impl PrettyPrint for CommentStmt {
   fn pretty(&self, f: &mut fmt::Formatter, ast: &AST, prefix: &str, last: bool) -> fmt::Result {
     let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
-    writeln!(f, "{prefix}{connector}Comment ({})", self.text(ast))
+    write!(f, "{prefix}{connector}Comment (",)?;
+    let mut comment_lines = self.text(ast);
+    write!(f, "{}", comment_lines.next().unwrap())?; // There is always at least one line
+    for line in comment_lines {
+      write!(f, " {line}")?;
+    }
+    writeln!(f, ")")
   }
 }
 impl PrettyPrint for Import {

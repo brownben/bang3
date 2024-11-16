@@ -18,14 +18,25 @@ pub fn folding_ranges(file: &Document) -> Vec<lsp::FoldingRange> {
     }
   }
 
-  for statement in ast.root_statements.iter().chain(ast.statements.iter()) {
-    if let Statement::Import(import) = statement {
-      let span = import.items_span(&ast);
-      if file.line_index.line(span) != file.line_index.final_line(span) {
-        let mut range = folding_range_from_span(span, file);
-        range.kind = Some(lsp::FoldingRangeKind::Imports);
-        ranges.push(range);
+  for statement in ast.all_statements() {
+    match statement {
+      Statement::Import(import) => {
+        let span = import.items_span(&ast);
+        if file.line_index.line(span) != file.line_index.final_line(span) {
+          let mut range = folding_range_from_span(span, file);
+          range.kind = Some(lsp::FoldingRangeKind::Imports);
+          ranges.push(range);
+        }
       }
+      Statement::Comment(comment) => {
+        let span = comment.span(&ast);
+        if file.line_index.line(span) != file.line_index.final_line(span) {
+          let mut range = folding_range_from_span(span, file);
+          range.kind = Some(lsp::FoldingRangeKind::Comment);
+          ranges.push(range);
+        }
+      }
+      _ => {}
     }
   }
 

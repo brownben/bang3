@@ -170,6 +170,15 @@ fn comment_statement() {
   assert_format!("//    comment", "// comment", 100);
   assert_format!("   // comment", "// comment", 100);
   assert_format!("   //    comment", "// comment", 100);
+
+  let multiline_comments = indoc! {"
+    // all of these
+    // comments
+    // form a single block
+
+    // this is a different block
+  "};
+  assert_format!(multiline_comments, multiline_comments, 100);
 }
 
 #[test]

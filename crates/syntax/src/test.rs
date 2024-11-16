@@ -619,6 +619,19 @@ fn comment_statement() {
   let ast = parse_to_string("// comments");
   let expected = "├─ Comment (comments)\n";
   assert_eq!(ast, expected);
+
+  let ast = parse_to_string(indoc! {"
+    // all of these
+    // comments
+    // form a single block
+
+    // this is a different block
+  "});
+  let expected = indoc! {"
+    ├─ Comment (all of these comments form a single block)
+    ├─ Comment (this is a different block)
+  "};
+  assert_eq!(ast, expected);
 }
 
 #[test]

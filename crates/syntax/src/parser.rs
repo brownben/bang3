@@ -573,10 +573,18 @@ impl Parser<'_> {
   }
 
   fn comment_statement(&mut self) -> Statement {
-    let (_, token) = self.advance();
-    self.skip_newline();
+    let (_, start) = self.advance();
+    let mut end = start;
 
-    CommentStmt { token }.into()
+    while self.matches(TokenKind::EndOfLine) {
+      if self.current_kind() == TokenKind::Comment {
+        (_, end) = self.advance();
+      } else {
+        break;
+      }
+    }
+
+    CommentStmt { start, end }.into()
   }
 
   fn expression_statement(&mut self) -> Statement {
