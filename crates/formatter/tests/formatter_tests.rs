@@ -559,3 +559,73 @@ fn module_access() {
 
   assert_format!("maths  :: sin ", "maths::sin", 80);
 }
+
+mod types {
+  use super::*;
+
+  #[test]
+  fn primitives() {
+    assert_format!("let a: boolean = true", "let a: boolean = true", 80);
+    assert_format!("let a: string = 'hello'", "let a: string = 'hello'", 80);
+    assert_format!("let a:number = 3.324", "let a: number = 3.324", 80);
+    assert_format!("let a    :unknown = 3.324", "let a: unknown = 3.324", 80);
+    assert_format!(
+      "let a      :         never =       3.324",
+      "let a: never = 3.324",
+      80
+    );
+  }
+
+  #[test]
+  fn type_variable() {
+    assert_format!("let a: ^a = 'hello'", "let a: ^a = 'hello'", 80);
+    assert_format!("let a:     ^a = 'hello'", "let a: ^a = 'hello'", 80);
+    assert_format!("let a:    ^    a = 'hello'", "let a: ^a = 'hello'", 80);
+    assert_format!("let a  :   ^  a  = 'hello'", "let a: ^a = 'hello'", 80);
+    assert_format!("let a  :^a = 'hello'", "let a: ^a = 'hello'", 80);
+    assert_format!("let hello: ^did = 5", "let hello: ^did = 5", 80);
+  }
+
+  #[test]
+  fn functions() {
+    assert_format!(
+      "let a: number => number = a => a",
+      "let a: number => number = a => a",
+      80
+    );
+    assert_format!(
+      "let a: number     =>number = a => a",
+      "let a: number => number = a => a",
+      80
+    );
+    assert_format!(
+      "let a: number=>   number = a => a",
+      "let a: number => number = a => a",
+      80
+    );
+    assert_format!(
+      "let a:number    =>    number=a=>a",
+      "let a: number => number = a => a",
+      80
+    );
+  }
+
+  #[test]
+  fn groups() {
+    assert_format!("let a: (^a) = 'hello'", "let a: ^a = 'hello'", 80);
+    assert_format!("let a: ((^a)) = 'hello'", "let a: ^a = 'hello'", 80);
+    assert_format!("let a: (number) = 'hello'", "let a: number = 'hello'", 80);
+    assert_format!("let a: ((number)) = 'hello'", "let a: number = 'hello'", 80);
+
+    assert_format!(
+      "let a: (number => number) = a => a",
+      "let a: (number => number) = a => a",
+      80
+    );
+    assert_format!(
+      "let a: ((number => number)) = a => a",
+      "let a: (number => number) = a => a",
+      80
+    );
+  }
+}

@@ -3,7 +3,8 @@
 use crate::{
   ast::{
     expression::{Expression, Variable},
-    ExpressionIdx, TokenIdx, AST,
+    types::Type,
+    ExpressionIdx, TokenIdx, TypeIdx, AST,
   },
   span::Span,
   tokeniser::TokenKind,
@@ -219,6 +220,7 @@ impl<'source> Iterator for ImportItemIterator<'source, '_> {
 #[derive(Debug)]
 pub struct Let {
   pub(crate) keyword: TokenIdx,
+  pub(crate) annotation: Option<TypeIdx>,
   pub(crate) identifier: Option<Variable>,
   pub(crate) value: ExpressionIdx,
 }
@@ -243,6 +245,10 @@ impl Let {
   /// The expression that is to be assigned to the variable
   pub fn value<'a>(&self, ast: &'a AST) -> &'a Expression {
     &ast[self.value]
+  }
+  /// The type annotation  of the variable
+  pub fn annotation<'a>(&self, ast: &'a AST) -> Option<&'a Type> {
+    self.annotation.as_ref().map(|type_| &ast[*type_])
   }
 
   /// The location of the statement

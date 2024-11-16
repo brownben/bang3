@@ -12,9 +12,11 @@ use std::{cell::OnceCell, num::NonZero, ops, str};
 pub mod expression;
 mod prettyprint;
 pub mod statement;
+pub mod types;
 
 pub use expression::Expression;
 pub use statement::Statement;
+pub use types::Type;
 
 /// Abstract Syntax Tree representing the source
 #[must_use]
@@ -33,6 +35,8 @@ pub struct AST<'source> {
   pub statements: Vec<Statement>,
   /// The expressions in the source
   pub expressions: Vec<Expression>,
+  /// The types in the source
+  pub types: Vec<Type>,
 
   /// Errors found during parsing
   pub errors: Vec<ParseError>,
@@ -47,6 +51,7 @@ impl<'source> AST<'source> {
       root_statements: Vec::new(),
       statements: Vec::new(),
       expressions: Vec::new(),
+      types: Vec::new(),
 
       errors: Vec::new(),
     }
@@ -87,6 +92,12 @@ impl<'source> AST<'source> {
     StatementIdx(NonZero::new(u32::try_from(id).unwrap()).unwrap())
   }
 
+  pub(crate) fn add_type(&mut self, type_: impl Into<Type>) -> TypeIdx {
+    let id = self.types.len() + 1;
+    self.types.push(type_.into());
+    TypeIdx(NonZero::new(u32::try_from(id).unwrap()).unwrap())
+  }
+
   pub(crate) fn get_token_text(&self, token: TokenIdx) -> &'source str {
     let token = self[token];
 
@@ -111,6 +122,14 @@ impl ops::IndexMut<ExpressionIdx> for AST<'_> {
   }
 }
 
+impl ops::Index<TypeIdx> for AST<'_> {
+  type Output = Type;
+
+  fn index(&self, index: TypeIdx) -> &Self::Output {
+    let index = usize::try_from(index.0.get()).unwrap() - 1;
+    &self.types[index]
+  }
+}
 impl ops::Index<StatementIdx> for AST<'_> {
   type Output = Statement;
 
@@ -133,6 +152,9 @@ pub(crate) struct ExpressionIdx(NonZero<u32>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct StatementIdx(NonZero<u32>);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct TypeIdx(NonZero<u32>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct TokenIdx(NonZero<u32>);

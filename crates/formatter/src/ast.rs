@@ -1,6 +1,6 @@
 use super::formatter::{Formattable, Formatter, IR};
 use bang_syntax::{
-  ast::{expression::*, statement::*},
+  ast::{expression::*, statement::*, types::*},
   AST,
 };
 
@@ -428,6 +428,11 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Let {
     f.concat([
       IR::Text("let "),
       IR::Text(self.identifier(ast)),
+      if let Some(annotation) = self.annotation(ast) {
+        f.concat([IR::Text(": "), annotation.format(f, ast)])
+      } else {
+        IR::Empty
+      },
       IR::Text(" = "),
       self.value(ast).format(f, ast),
     ])
@@ -436,6 +441,55 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Let {
 impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Return {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
     f.concat([IR::Text("return "), self.expression(ast).format(f, ast)])
+  }
+}
+
+impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Type {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+    match self {
+      Type::Primitive(type_primitive) => type_primitive.format(f, ast),
+      Type::Variable(type_variable) => type_variable.format(f, ast),
+      Type::Function(type_function) => type_function.format(f, ast),
+      Type::Group(type_group) => type_group.format(f, ast),
+      Type::Invalid(_) => IR::Empty,
+    }
+  }
+}
+impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for TypePrimitive {
+  fn format(&self, _: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+    IR::Text(self.name(ast))
+  }
+}
+impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for TypeVariable {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+    f.concat([IR::Text("^"), IR::Text(self.name(ast))])
+  }
+}
+impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for TypeFunction {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+    f.concat([
+      self.parameter(ast).format(f, ast),
+      IR::Text(" => "),
+      self.return_(ast).format(f, ast),
+    ])
+  }
+}
+impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for TypeGroup {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+    let inner = self.type_(ast);
+    match inner {
+      Type::Group(group) => return group.format(f, ast),
+      Type::Primitive(primitive) => return primitive.format(f, ast),
+      Type::Variable(variable) => return variable.format(f, ast),
+      _ => {}
+    }
+
+    f.group([
+      IR::Text("("),
+      f.indent([IR::Line, inner.format(f, ast)]),
+      IR::Line,
+      IR::Text(")"),
+    ])
   }
 }
 

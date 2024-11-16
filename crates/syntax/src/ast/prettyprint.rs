@@ -2,7 +2,7 @@
 //!
 //! Based upon this [blog post](https://www.georgevreilly.com/blog/2023/01/24/TreeInRust2PrintingTrees.html)
 
-use super::{expression::*, statement::*, AST};
+use super::{expression::*, statement::*, types::*, AST};
 use std::fmt;
 
 impl fmt::Display for AST<'_> {
@@ -322,6 +322,12 @@ impl PrettyPrint for Let {
     let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
     writeln!(f, "{prefix}{connector}Let '{}' =", self.identifier(ast))?;
 
+    if let Some(annotation) = self.annotation(ast) {
+      write!(f, "{prefix}{OTHER_CHILD}{OTHER_ENTRY}Type: ")?;
+      annotation.pretty(f, ast, "", false)?;
+      writeln!(f)?;
+    }
+
     let new_prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
     self.value(ast).pretty(f, ast, &new_prefix, true)
   }
@@ -333,5 +339,41 @@ impl PrettyPrint for Return {
 
     let new_prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
     self.expression(ast).pretty(f, ast, &new_prefix, true)
+  }
+}
+
+impl PrettyPrint for Type {
+  fn pretty(&self, f: &mut fmt::Formatter, ast: &AST, prefix: &str, last: bool) -> fmt::Result {
+    match self {
+      Type::Primitive(type_primitive) => type_primitive.pretty(f, ast, prefix, last),
+      Type::Variable(type_variable) => type_variable.pretty(f, ast, prefix, last),
+      Type::Function(type_function) => type_function.pretty(f, ast, prefix, last),
+      Type::Group(type_group) => type_group.pretty(f, ast, prefix, last),
+      Type::Invalid(_) => write!(f, "Invalid"),
+    }
+  }
+}
+impl PrettyPrint for TypePrimitive {
+  fn pretty(&self, f: &mut fmt::Formatter, ast: &AST, _: &str, _: bool) -> fmt::Result {
+    write!(f, "{}", self.name(ast))
+  }
+}
+impl PrettyPrint for TypeVariable {
+  fn pretty(&self, f: &mut fmt::Formatter, ast: &AST, _: &str, _: bool) -> fmt::Result {
+    write!(f, "^{}", self.name(ast))
+  }
+}
+impl PrettyPrint for TypeFunction {
+  fn pretty(&self, f: &mut fmt::Formatter, ast: &AST, prefix: &str, last: bool) -> fmt::Result {
+    self.parameter(ast).pretty(f, ast, prefix, last)?;
+    write!(f, " => ")?;
+    self.return_(ast).pretty(f, ast, prefix, last)
+  }
+}
+impl PrettyPrint for TypeGroup {
+  fn pretty(&self, f: &mut fmt::Formatter, ast: &AST, prefix: &str, last: bool) -> fmt::Result {
+    write!(f, "(")?;
+    self.type_(ast).pretty(f, ast, prefix, last)?;
+    write!(f, ")")
   }
 }

@@ -142,7 +142,7 @@ fn expected_import_item() {
 fn unknown_character() {
   let file = indoc! {"
     $
-    2 ^ 3
+    2 £ 3
   "};
   let output = run_stderr(file);
   let expected = indoc! {"
@@ -156,7 +156,7 @@ fn unknown_character() {
     got unknown character
 
         ╭─[STDIN:2]
-      2 │ 2 ^ 3
+      2 │ 2 £ 3
     ────╯
   "};
 

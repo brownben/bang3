@@ -1150,3 +1150,153 @@ fn multibyte_utf8_characters() {
   let error_span = parse(four_byte).errors.first().unwrap().span();
   assert_eq!(error_span.source_text(four_byte), "🌈");
 }
+
+mod types {
+  use super::*;
+
+  #[test]
+  fn primitives() {
+    let ast = parse("let x: boolean = true");
+    let expected = indoc! {"
+      ├─ Let 'x' =
+      │  ├─ Type: boolean
+      │  ╰─ Boolean (true)
+    "};
+    assert!(ast.is_ok());
+    assert_eq!(ast.to_string(), expected);
+
+    let ast = parse("let x: number = 5");
+    let expected = indoc! {"
+      ├─ Let 'x' =
+      │  ├─ Type: number
+      │  ╰─ Number (5)
+     "};
+    assert!(ast.is_ok());
+    assert_eq!(ast.to_string(), expected);
+
+    let ast = parse("let x: string = 'hello'");
+    let expected = indoc! {"
+      ├─ Let 'x' =
+      │  ├─ Type: string
+      │  ╰─ String 'hello'
+     "};
+    assert!(ast.is_ok());
+    assert_eq!(ast.to_string(), expected);
+
+    let ast = parse("let x: unknown = 'hello'");
+    let expected = indoc! {"
+      ├─ Let 'x' =
+      │  ├─ Type: unknown
+      │  ╰─ String 'hello'
+     "};
+    assert!(ast.is_ok());
+    assert_eq!(ast.to_string(), expected);
+
+    let ast = parse("let x: never = 'hello'");
+    let expected = indoc! {"
+      ├─ Let 'x' =
+      │  ├─ Type: never
+      │  ╰─ String 'hello'
+     "};
+    assert!(ast.is_ok());
+    assert_eq!(ast.to_string(), expected);
+  }
+
+  #[test]
+  fn type_variable() {
+    let ast = parse("let x: ^a = 4");
+    let expected = indoc! {"
+      ├─ Let 'x' =
+      │  ├─ Type: ^a
+      │  ╰─ Number (4)
+    "};
+    assert!(ast.is_ok());
+    assert_eq!(ast.to_string(), expected);
+
+    let ast = parse("let x: ^ = 4");
+    let expected = indoc! {"
+      ├─ Let 'x' =
+      │  ├─ Type: Invalid
+      │  ╰─ Number (4)
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+  }
+
+  #[test]
+  fn group() {
+    let ast = parse("let x: (number) = true");
+    let expected = indoc! {"
+      ├─ Let 'x' =
+      │  ├─ Type: (number)
+      │  ╰─ Boolean (true)
+    "};
+    assert!(ast.is_ok());
+    assert_eq!(ast.to_string(), expected);
+
+    let ast = parse("let x: (number => string) = true");
+    let expected = indoc! {"
+      ├─ Let 'x' =
+      │  ├─ Type: (number => string)
+      │  ╰─ Boolean (true)
+    "};
+    assert!(ast.is_ok());
+    assert_eq!(ast.to_string(), expected);
+
+    let ast = parse("let x: (number => string = true");
+    let expected = indoc! {"
+      ├─ Let 'x' =
+      │  ├─ Type: (number => string)
+      │  ╰─ Boolean (true)
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+  }
+
+  #[test]
+  fn empty_group() {
+    let ast = parse("let x: () = true");
+    let expected = indoc! {"
+      ├─ Let 'x' =
+      │  ├─ Type: (Invalid)
+      │  ╰─ Boolean (true)
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+  }
+
+  #[test]
+  fn function() {
+    let ast = parse("let x: _ => number = _ => 4");
+    let expected = indoc! {"
+      ├─ Let 'x' =
+      │  ├─ Type: _ => number
+      │  ╰─ Function (x): _ =>
+      │     ╰─ Number (4)
+    "};
+    assert!(ast.is_ok());
+    assert_eq!(ast.to_string(), expected);
+
+    let ast = parse("let x: _ => number => number = _ => 4");
+    let expected = indoc! {"
+      ├─ Let 'x' =
+      │  ├─ Type: _ => number => number
+      │  ╰─ Function (x): _ =>
+      │     ╰─ Number (4)
+    "};
+    assert!(ast.is_ok());
+    assert_eq!(ast.to_string(), expected);
+  }
+
+  #[test]
+  fn invalid() {
+    let ast = parse("let x: >= = true");
+    let expected = indoc! {"
+      ├─ Let 'x' =
+      │  ├─ Type: Invalid
+      │  ╰─ Invalid
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+  }
+}

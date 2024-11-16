@@ -627,6 +627,7 @@ impl Parser<'_> {
   fn let_statement(&mut self) -> Statement {
     let (_, keyword) = self.advance();
     let identifier = self.possibly_missing_identifier(TokenKind::Equal);
+    let annotation = self.matches(TokenKind::Colon).then(|| self.parse_type());
     self.expect(TokenKind::Equal);
     let value = self.parse_expression_with_newline();
 
@@ -636,6 +637,7 @@ impl Parser<'_> {
 
     Statement::Let(Let {
       keyword,
+      annotation,
       identifier,
       value,
     })
@@ -652,6 +654,74 @@ impl Parser<'_> {
     Statement::Return(Return {
       keyword,
       expression,
+    })
+  }
+}
+// Types
+impl Parser<'_> {
+  fn parse_type(&mut self) -> TypeIdx {
+    let type_ = match self.current_kind() {
+      TokenKind::Identifier => self.primitive_type(),
+      TokenKind::LeftParen => self.type_group(),
+      TokenKind::Caret => self.type_variable(),
+      _ => {
+        self.add_error(ParseError::ExpectedType(self.current_token()));
+        self.ast.add_type(TypeInvalid {
+          token: self.current_token_id(),
+        })
+      }
+    };
+
+    if self.matches(TokenKind::FatRightArrow) {
+      self.function_type(type_)
+    } else {
+      type_
+    }
+  }
+
+  fn primitive_type(&mut self) -> TypeIdx {
+    let (_, identifier) = self.advance();
+    self.ast.add_type(TypePrimitive::from(identifier))
+  }
+
+  fn type_variable(&mut self) -> TypeIdx {
+    let (_, caret) = self.advance();
+    match self.expect(TokenKind::Identifier) {
+      Some(name) => self.ast.add_type(TypeVariable { caret, name }),
+      None => self.ast.add_type(TypeInvalid { token: caret }),
+    }
+  }
+
+  fn function_type(&mut self, parameter: TypeIdx) -> TypeIdx {
+    let return_ = self.parse_type();
+    self.ast.add_type(TypeFunction { parameter, return_ })
+  }
+
+  fn type_group(&mut self) -> TypeIdx {
+    let (_, start) = self.advance();
+    self.skip_newline();
+
+    if self.current_kind() == TokenKind::RightParen {
+      return self.empty_type_group(start);
+    }
+
+    let type_ = self.parse_type();
+    self.skip_newline();
+    self.resync_if_error(TokenKind::RightParen);
+    let end = self.expect(TokenKind::RightParen);
+
+    self.ast.add_type(TypeGroup { start, type_, end })
+  }
+
+  fn empty_type_group(&mut self, start: TokenIdx) -> TypeIdx {
+    let (_, end) = self.advance();
+    let type_ = self.ast.add_type(TypeInvalid { token: end });
+    self.add_error(ParseError::ExpectedExpression(self.ast[end]));
+
+    self.ast.add_type(TypeGroup {
+      start,
+      type_,
+      end: Some(end),
     })
   }
 }
@@ -732,6 +802,8 @@ pub enum ParseError {
   ExpectedPatternRangeEnd(Token),
   /// Missing Import Item
   ExpectedImportItem(Token),
+  /// Expected Type
+  ExpectedType(Token),
   /// Unknown Character
   UnknownCharacter(Token),
 
@@ -768,6 +840,7 @@ impl ParseError {
       Self::ExpectedPattern(_) => "Expected Pattern".into(),
       Self::ExpectedPatternRangeEnd(_) => "Expected End of Pattern Range".into(),
       Self::ExpectedImportItem(_) => "Expected Import Item".into(),
+      Self::ExpectedType(_) => "Expected Type".into(),
       Self::UnknownCharacter(_) => "Unknown Character".into(),
       Self::MissingIdentifier(_) => "Missing Identifier".into(),
       Self::MissingModuleName(_) => "Missing Module Name in Import".into(),
@@ -797,6 +870,9 @@ impl ParseError {
        }
        Self::ExpectedImportItem(t) => {
         format!("expected import item but got {}", t.kind)
+      },
+      Self::ExpectedType(t) => {
+        format!("expected type but got {}", t.kind)
       },
       Self::UnknownCharacter(_) => "got unknown character".into(),
       Self::MissingIdentifier(_) => "expected identifier for variable name".into(),
@@ -834,6 +910,7 @@ impl ParseError {
       ParseError::ExpectedPattern(token) => token.into(),
       ParseError::ExpectedPatternRangeEnd(token) => token.into(),
       ParseError::ExpectedImportItem(token) => token.into(),
+      ParseError::ExpectedType(token) => token.into(),
       ParseError::UnknownCharacter(token) => token.into(),
       ParseError::MissingIdentifier(token) => token.into(),
       ParseError::MissingModuleName(token) => token.into(),

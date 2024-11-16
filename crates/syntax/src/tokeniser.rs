@@ -56,7 +56,7 @@ impl Tokeniser<'_> {
       b'_' | b'a'..=b'z' | b'A'..=b'Z' => self.identifier(),
       b'.' if matches!(next_character, Some(b'0'..=b'9')) => self.number(),
 
-      // Brackets + Separators
+      // Brackets
       b'(' => (TokenKind::LeftParen, 1),
       b')' => (TokenKind::RightParen, 1),
       b'{' => {
@@ -72,8 +72,12 @@ impl Tokeniser<'_> {
           (TokenKind::RightCurly, 1)
         }
       }
+
+      // Separators
       b',' => (TokenKind::Comma, 1),
       b':' if matches!(next_character, Some(b':')) => (TokenKind::ColonColon, 2),
+      b':' => (TokenKind::Colon, 1),
+      b'^' => (TokenKind::Caret, 1),
 
       // Logical Operators
       b'&' if matches!(next_character, Some(b'&')) => (TokenKind::And, 2),
@@ -296,8 +300,12 @@ pub enum TokenKind {
   // Separators
   /// `,`
   Comma,
+  /// `:`
+  Colon,
   /// `::`
   ColonColon,
+  /// `^`
+  Caret,
 
   // Operators
   /// `-`
@@ -435,7 +443,9 @@ impl fmt::Display for TokenKind {
 
       // Separators
       Self::Comma => write!(f, ","),
+      Self::Colon => write!(f, ":"),
       Self::ColonColon => write!(f, "::"),
+      Self::Caret => write!(f, "^"),
 
       // Operators
       Self::Minus => write!(f, "-"),
