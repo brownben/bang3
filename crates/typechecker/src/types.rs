@@ -1,4 +1,7 @@
-use std::{collections::BTreeMap, iter, ops};
+use std::{
+  collections::{btree_map, BTreeMap},
+  iter, ops,
+};
 
 #[derive(Debug)]
 pub struct TypeArena {
@@ -144,14 +147,18 @@ impl TypeArena {
   }
 
   pub fn generalize(&mut self, type_: TypeRef, level: u32) -> TypeScheme {
-    let type_vars = self.type_vars_in(type_);
+    let mut generalized_type_vars = BTreeMap::new();
+    let mut type_var_id = 0;
 
-    let generalized_type_vars: BTreeMap<TypeVarRef, usize> = type_vars
-      // only generalize type vars from functions nested below the current level
+    for type_var in self
+      .type_vars_in(type_)
       .filter(|type_var| self.get_type_var(*type_var).level > level)
-      .enumerate()
-      .map(|(quantified_index, type_var)| (type_var, quantified_index))
-      .collect();
+    {
+      if let btree_map::Entry::Vacant(e) = generalized_type_vars.entry(type_var) {
+        e.insert(type_var_id);
+        type_var_id += 1;
+      }
+    }
 
     TypeScheme {
       number_quantified_vars: u32::try_from(generalized_type_vars.len()).unwrap(),

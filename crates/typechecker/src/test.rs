@@ -399,7 +399,7 @@ fn infer_function() {
   );
   assert_eq!(
     synthesize("a => b => c => if (a) b else c"),
-    "a' => d' => d' => d'"
+    "a' => b' => b' => b'"
   );
   assert_eq!(
     synthesize("let x = (a => b => c => if (a) b() else c + 1)\nx"),
