@@ -382,11 +382,11 @@ fn empty_ast() {
 #[test]
 fn expression_has_error() {
   assert_eq!(synthesize_has_error("let a = -false\na"), "number");
-  assert_eq!(synthesize_has_error("_ => -false"), "a' => number");
+  assert_eq!(synthesize_has_error("_ => -false"), "^a => number");
 
   assert_eq!(
     synthesize_has_error("let a = _ => -false\na"),
-    "a' => number"
+    "^a => number"
   );
 }
 
@@ -395,15 +395,15 @@ fn infer_function() {
   assert_eq!(synthesize("a => b => a + b"), "number => number => number");
   assert_eq!(
     synthesize("a => b => if (a) b else b + 1"),
-    "a' => number => number"
+    "^a => number => number"
   );
   assert_eq!(
     synthesize("a => b => c => if (a) b else c"),
-    "a' => b' => b' => b'"
+    "^a => ^b => ^b => ^b"
   );
   assert_eq!(
     synthesize("let x = (a => b => c => if (a) b() else c + 1)\nx"),
-    "a' => (never => number) => number => number"
+    "^a => (_ => number) => number => number"
   );
   assert_eq!(
     synthesize("let x = (a => b => c => if (a == 1) b(a) else c ++ '')\nx"),

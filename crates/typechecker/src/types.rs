@@ -214,8 +214,12 @@ impl TypeArena {
         _ => unreachable!("not a primitive type"),
       },
       Type::Function(argument, return_type) => {
-        let argument_ = self.type_to_string(argument);
+        let mut argument_ = self.type_to_string(argument);
         let return_ = self.type_to_string(return_type);
+
+        if argument_ == "never" {
+          "_".clone_into(&mut argument_);
+        }
 
         if matches!(self[argument], Type::Function(_, _)) {
           format!("({argument_}) => {return_}")
@@ -223,12 +227,12 @@ impl TypeArena {
           format!("{argument_} => {return_}")
         }
       }
-      Type::Quantified(idx) => format!("{}'", integer_to_identifier(idx)),
+      Type::Quantified(idx) => format!("^{}", integer_to_identifier(idx)),
       Type::Variable(type_var_ref) => {
         let type_var = self.get_type_var(type_var_ref);
         match type_var.link {
           TypeVarLink::Link(type_ref) => self.type_to_string(type_ref),
-          TypeVarLink::NoLink => format!("{}'", integer_to_identifier(type_var_ref.0)),
+          TypeVarLink::NoLink => format!("^{}", integer_to_identifier(type_var_ref.0)),
         }
       }
     }

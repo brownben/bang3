@@ -17,22 +17,26 @@ pub fn hover(file: &Document, position: lsp::Position) -> Option<lsp::Hover> {
   let variables = get_enviroment(&ast);
   let variable = find_variable(position, &variables)?;
 
+  let variable_name = &variable.name;
+  let variable_type = &variable.type_info.as_ref().unwrap().string;
+
   Some(lsp::Hover {
     contents: lsp::HoverContents::Scalar(lsp::MarkedString::from_language_code(
-      "bang-types".to_owned(),
-      variable.type_info.as_ref().unwrap().string.clone(),
+      "bang".to_owned(),
+      format!("let {variable_name}: {variable_type}",),
     )),
     range: None,
   })
 }
 
 fn hover_module_access_item(ast: &AST, module_access: &expression::ModuleAccess) -> lsp::Hover {
-  let type_ = import_type_info(module_access.module(ast), module_access.item(ast));
+  let item_name = module_access.item(ast);
+  let type_ = import_type_info(module_access.module(ast), item_name);
 
   lsp::Hover {
     contents: lsp::HoverContents::Scalar(lsp::MarkedString::from_language_code(
-      "bang-types".to_owned(),
-      type_.string,
+      "bang".to_owned(),
+      format!("let {item_name}: {}", type_.string),
     )),
     range: None,
   }
