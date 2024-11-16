@@ -1,5 +1,5 @@
 use crate::{
-  ast::{expression::*, statement::*, ExpressionIdx, TokenIdx, AST},
+  ast::{expression::*, statement::*, types::*, ExpressionIdx, TokenIdx, TypeIdx, AST},
   span::Span,
   tokeniser::{Token, TokenKind},
 };
@@ -856,19 +856,19 @@ impl ParseError {
   #[must_use]
   pub fn message(&self) -> String {
     match self {
-       Self::Expected { expected, recieved } => {
-         format!("expected {expected} but got {}", recieved.kind)
-       }
-       Self::ExpectedExpression(t) => {
-         format!("expected expression but got {}", t.kind)
-       }
-       Self::ExpectedPattern(t) => {
-         format!("expected pattern but got {}", t.kind)
-       }
-       Self::ExpectedPatternRangeEnd(t) => {
-         format!("expected end of range pattern but got {}", t.kind)
-       }
-       Self::ExpectedImportItem(t) => {
+      Self::Expected { expected, recieved } => {
+        format!("expected {expected} but got {}", recieved.kind)
+      }
+      Self::ExpectedExpression(t) => {
+        format!("expected expression but got {}", t.kind)
+      }
+      Self::ExpectedPattern(t) => {
+        format!("expected pattern but got {}", t.kind)
+      }
+      Self::ExpectedPatternRangeEnd(t) => {
+        format!("expected end of range pattern but got {}", t.kind)
+      }
+      Self::ExpectedImportItem(t) => {
         format!("expected import item but got {}", t.kind)
       },
       Self::ExpectedType(t) => {
@@ -878,19 +878,19 @@ impl ParseError {
       Self::MissingIdentifier(_) => "expected identifier for variable name".into(),
       Self::MissingModuleName(_) => "expected module name for import".into(),
       Self::MissingPattern(_) => "expected pattern to match on".into(),
-       Self::UnterminatedString(_) => "missing closing quote for string".into(),
-       Self::BlockMustEndWithExpression(_) => {
-         "a block must return a value, so must end with an expression rather than a declaration"
-         .into()
-        }
-        Self::ReturnOutsideFunction(_) => "can only return a value from a function".into(),
-       Self::NoSingleEqualOperator { possible_assignment: false, .. } => {
-         "a single equal is not an operator. use `==` for equality".into()
-       }
-       Self::NoSingleEqualOperator { possible_assignment: true, .. } => {
-         "a single equal is not an operator. start line with `let` for variable declaration, or use `==` for equality".into()
-       }
-     }
+      Self::UnterminatedString(_) => "missing closing quote for string".into(),
+      Self::BlockMustEndWithExpression(_) => {
+        "a block must return a value, so must end with an expression rather than a declaration"
+        .into()
+      }
+      Self::ReturnOutsideFunction(_) => "can only return a value from a function".into(),
+      Self::NoSingleEqualOperator { possible_assignment: false, .. } => {
+        "a single equal is not an operator. use `==` for equality".into()
+      }
+      Self::NoSingleEqualOperator { possible_assignment: true, .. } => {
+        "a single equal is not an operator. start line with `let` for variable declaration, or use `==` for equality".into()
+      }
+    }
   }
 
   /// The title and message of the lint in a combined string

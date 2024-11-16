@@ -396,7 +396,7 @@ impl ReturnAnalysis for Block {
 impl ReturnAnalysis for Call {
   fn always_returns(&self, ast: &AST) -> bool {
     self.callee(ast).always_returns(ast)
-      || self.argument(ast).map_or(false, |x| x.always_returns(ast))
+      || self.argument(ast).is_some_and(|x| x.always_returns(ast))
   }
 }
 impl ReturnAnalysis for FormatString {
@@ -411,7 +411,7 @@ impl ReturnAnalysis for If {
     self.then(ast).always_returns(ast)
       && self
         .otherwise(ast)
-        .map_or(false, |otherwise| otherwise.always_returns(ast))
+        .is_some_and(|otherwise| otherwise.always_returns(ast))
   }
 
   fn ends_with_return(&self, ast: &AST) -> Option<Span> {
