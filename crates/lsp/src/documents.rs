@@ -1,4 +1,4 @@
-use bang_syntax::LineIndex;
+use bang_syntax::{parse, AST};
 pub use lsp_types::Uri as FileIdentfier;
 use std::collections::HashMap;
 
@@ -20,22 +20,17 @@ impl DocumentIndex {
 
 pub struct Document {
   pub id: FileIdentfier,
-  pub source: String,
-  pub line_index: LineIndex,
+  pub ast: AST,
 }
 impl Document {
   fn new(id: FileIdentfier, source: String) -> Self {
-    let line_index = LineIndex::from_source(&source);
-
     Self {
       id,
-      source,
-      line_index,
+      ast: parse(source),
     }
   }
 
   pub fn update(&mut self, new_source: String) {
-    self.source = new_source;
-    self.line_index = LineIndex::from_source(&self.source);
+    self.ast = parse(new_source);
   }
 }

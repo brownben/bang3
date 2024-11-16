@@ -3,22 +3,20 @@ use crate::locations::lsp_range_from_span;
 use lsp_types as lsp;
 
 use bang_linter::{lint, LintDiagnostic};
-use bang_syntax::{parse, ParseError};
+use bang_syntax::ParseError;
 use bang_typechecker::{typecheck, TypeError};
 
 pub fn file_diagnostics(file: &Document) -> lsp::DocumentDiagnosticReport {
-  let ast = parse(&file.source);
-
   let mut diagnostics = Vec::new();
 
-  let parse_errors = ast.errors.iter();
+  let parse_errors = file.ast.errors.iter();
   diagnostics.extend(parse_errors.map(|error| diagnostic_from_parse_error(error, file)));
 
-  let lints = lint(&ast);
+  let lints = lint(&file.ast);
   diagnostics.extend(lints.iter().map(|lint| diagnostic_from_lint(lint, file)));
 
-  if ast.is_valid() {
-    let type_problems = typecheck(&ast);
+  if file.ast.is_valid() {
+    let type_problems = typecheck(&file.ast);
     diagnostics.extend(
       type_problems
         .iter()

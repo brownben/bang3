@@ -4,14 +4,12 @@ use crate::locations::lsp_range_from_span;
 use lsp_types as lsp;
 
 use bang_syntax::ast::{expression::*, statement::*};
-use bang_syntax::{parse, AST};
+use bang_syntax::AST;
 
 pub fn document_symbols(file: &Document) -> lsp::DocumentSymbolResponse {
-  let ast = parse(&file.source);
-
   let mut symbols = Vec::new();
-  for statement in &ast.root_statements {
-    statement_symbols(statement, file, &ast, &mut symbols);
+  for statement in &file.ast.root_statements {
+    statement_symbols(statement, file, &file.ast, &mut symbols);
   }
 
   lsp::DocumentSymbolResponse::Nested(symbols)

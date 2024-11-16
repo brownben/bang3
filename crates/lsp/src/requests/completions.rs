@@ -6,40 +6,41 @@ use lsp_types as lsp;
 use bang_interpreter::stdlib::{MATHS_ITEMS, MODULES, STRING_ITEMS};
 use bang_syntax::{
   ast::{Expression, Statement},
-  parse, Span, AST,
+  Span, AST,
 };
 use bang_typechecker::{get_enviroment, import_type_info, VariableKind};
 
 pub fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionList {
   let position = span_from_lsp_position(position, file);
 
-  let ast = parse(&file.source);
-
-  if let Some(import_statement) = in_import_statement(&ast, position) {
-    let first_item_start = import_statement.items(&ast).next().map(|i| i.span.start);
+  if let Some(import_statement) = in_import_statement(&file.ast, position) {
+    let first_item_start = import_statement
+      .items(&file.ast)
+      .next()
+      .map(|i| i.span.start);
     let before_items = first_item_start.is_none_or(|start| position.end < start);
     if before_items {
       return module_completions();
     }
 
-    let in_items = import_statement.items_span(&ast).contains(position);
+    let in_items = import_statement.items_span(&file.ast).contains(position);
     if in_items {
-      return module_item_completions(import_statement.module(&ast), true);
+      return module_item_completions(import_statement.module(&file.ast), true);
     }
   }
 
-  if let Some(module_access) = in_module_access(&ast, position) {
-    return module_item_completions(module_access.module(&ast), false);
+  if let Some(module_access) = in_module_access(&file.ast, position) {
+    return module_item_completions(module_access.module(&file.ast), false);
   }
 
-  if in_type_annotation(&ast, position) {
+  if in_type_annotation(&file.ast, position) {
     return lsp::CompletionList {
       is_incomplete: false,
       items: type_annotation_snippets().into(),
     };
   }
 
-  variable_completions(&ast, position)
+  variable_completions(&file.ast, position)
 }
 
 fn constant_snippets() -> [lsp::CompletionItem; 11] {

@@ -3,34 +3,34 @@ use lsp_types::{self as lsp};
 
 use bang_syntax::{
   ast::{Expression, Statement},
-  parse, Span, AST,
+  Span, AST,
 };
 
 pub fn folding_ranges(file: &Document) -> Vec<lsp::FoldingRange> {
-  let ast = parse(&file.source);
   let mut ranges = Vec::new();
+  let line_index = file.ast.line_index();
 
-  for expression in &ast.expressions {
-    if let Some(span) = expression_folding_range(expression, &ast) {
-      if file.line_index.line(span) != file.line_index.final_line(span) {
+  for expression in &file.ast.expressions {
+    if let Some(span) = expression_folding_range(expression, &file.ast) {
+      if line_index.line(span) != line_index.final_line(span) {
         ranges.push(folding_range_from_span(span, file));
       }
     }
   }
 
-  for statement in ast.all_statements() {
+  for statement in file.ast.all_statements() {
     match statement {
       Statement::Import(import) => {
-        let span = import.items_span(&ast);
-        if file.line_index.line(span) != file.line_index.final_line(span) {
+        let span = import.items_span(&file.ast);
+        if line_index.line(span) != line_index.final_line(span) {
           let mut range = folding_range_from_span(span, file);
           range.kind = Some(lsp::FoldingRangeKind::Imports);
           ranges.push(range);
         }
       }
       Statement::Comment(comment) => {
-        let span = comment.span(&ast);
-        if file.line_index.line(span) != file.line_index.final_line(span) {
+        let span = comment.span(&file.ast);
+        if line_index.line(span) != line_index.final_line(span) {
           let mut range = folding_range_from_span(span, file);
           range.kind = Some(lsp::FoldingRangeKind::Comment);
           ranges.push(range);

@@ -2,7 +2,7 @@ use crate::documents::Document;
 use bang_syntax::Span;
 
 pub fn span_from_lsp_position(position: lsp_types::Position, file: &Document) -> Span {
-  let line_index = &file.line_index;
+  let line_index = &file.ast.line_index();
   let line = usize::try_from(position.line).unwrap() + 1;
 
   let start = if line_index.is_ascii {
@@ -10,7 +10,7 @@ pub fn span_from_lsp_position(position: lsp_types::Position, file: &Document) ->
     return line_index.span_from_position(line - 1, position.character);
   } else {
     let line_start = line_index.get_line_start(line - 1);
-    let line_source = line_index.line_span(line).source_text(&file.source);
+    let line_source = line_index.line_span(line).source_text(&file.ast.source);
 
     line_start + byte_offset_from_utf16_offset(position.character, line_source)
   };
@@ -35,19 +35,19 @@ fn byte_offset_from_utf16_offset(utf16_position: u32, string: &str) -> u32 {
 }
 
 pub fn lsp_range_from_span(span: Span, file: &Document) -> lsp_types::Range {
-  let lines = &file.line_index;
+  let lines = &file.ast.line_index();
 
-  let start_line = lines.line(span) - 1;
-  let start_char = span.start - lines.get_line_start(start_line);
+  let start = lines.line(span) - 1;
+  let start_char = span.start - lines.get_line_start(start);
 
-  let end_line = lines.final_line(span) - 1;
-  let end_char = span.end - lines.get_line_start(end_line);
+  let end = lines.final_line(span) - 1;
+  let end_char = span.end - lines.get_line_start(end);
 
   let (start_char, end_char) = if lines.is_ascii {
     (start_char, end_char)
   } else {
-    let start_line_source = lines.line_span(start_line + 1).source_text(&file.source);
-    let end_line_source = lines.line_span(end_line + 1).source_text(&file.source);
+    let start_line_source = lines.line_span(start + 1).source_text(&file.ast.source);
+    let end_line_source = lines.line_span(end + 1).source_text(&file.ast.source);
 
     (
       byte_offset_to_utf16(start_char, start_line_source),
@@ -55,8 +55,8 @@ pub fn lsp_range_from_span(span: Span, file: &Document) -> lsp_types::Range {
     )
   };
 
-  let start = lsp_types::Position::new(start_line.try_into().unwrap(), start_char);
-  let end = lsp_types::Position::new(end_line.try_into().unwrap(), end_char);
+  let start = lsp_types::Position::new(start.try_into().unwrap(), start_char);
+  let end = lsp_types::Position::new(end.try_into().unwrap(), end_char);
 
   lsp_types::Range::new(start, end)
 }
@@ -133,8 +133,8 @@ mod test {
   fn byte_offset_from_utf16_offset_constructed_span() {
     let source = "let var = '🏃' ++ string";
 
-    let start = byte_offset_from_utf16_offset(18, &source);
-    let end = byte_offset_from_utf16_offset(24, &source);
+    let start = byte_offset_from_utf16_offset(18, source);
+    let end = byte_offset_from_utf16_offset(24, source);
     let span = Span { start, end };
 
     assert_eq!(span.source_text(source), "string");

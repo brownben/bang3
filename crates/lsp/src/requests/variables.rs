@@ -3,18 +3,17 @@ use crate::locations::{lsp_range_from_span, span_from_lsp_position};
 use lsp_types as lsp;
 use std::collections::HashMap;
 
-use bang_syntax::{ast::expression, parse, Span, AST};
+use bang_syntax::{ast::expression, Span, AST};
 use bang_typechecker::{get_enviroment, import_type_info, Enviroment, Variable};
 
 pub fn hover(file: &Document, position: lsp::Position) -> Option<lsp::Hover> {
   let position = span_from_lsp_position(position, file);
-  let ast = parse(&file.source);
 
-  if let Some(module_access) = in_module_access_item(&ast, position) {
-    return Some(hover_module_access_item(&ast, module_access));
+  if let Some(module_access) = in_module_access_item(&file.ast, position) {
+    return Some(hover_module_access_item(&file.ast, module_access));
   }
 
-  let variables = get_enviroment(&ast);
+  let variables = get_enviroment(&file.ast);
   let variable = find_variable(position, &variables)?;
 
   let variable_name = &variable.name;
@@ -45,8 +44,7 @@ fn hover_module_access_item(ast: &AST, module_access: &expression::ModuleAccess)
 pub fn goto_definition(file: &Document, position: lsp::Position) -> Option<lsp::Location> {
   let position = span_from_lsp_position(position, file);
 
-  let ast = parse(&file.source);
-  let variables = get_enviroment(&ast);
+  let variables = get_enviroment(&file.ast);
   let declaration = find_variable(position, &variables)?;
 
   Some(lsp::Location::new(
@@ -58,8 +56,7 @@ pub fn goto_definition(file: &Document, position: lsp::Position) -> Option<lsp::
 pub fn get_references(file: &Document, position: lsp::Position) -> Option<Vec<lsp::Location>> {
   let position = span_from_lsp_position(position, file);
 
-  let ast = parse(&file.source);
-  let variables = get_enviroment(&ast);
+  let variables = get_enviroment(&file.ast);
 
   let declaration = find_variable(position, &variables)?;
   let references = declaration
@@ -74,8 +71,7 @@ pub fn get_references(file: &Document, position: lsp::Position) -> Option<Vec<ls
 pub fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::WorkspaceEdit {
   let position = span_from_lsp_position(position, file);
 
-  let ast = parse(&file.source);
-  let variables = get_enviroment(&ast);
+  let variables = get_enviroment(&file.ast);
 
   let Some(declaration) = find_variable(position, &variables) else {
     return lsp::WorkspaceEdit::default();
