@@ -32,6 +32,13 @@ pub fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionL
     return module_item_completions(module_access.module(&ast), false);
   }
 
+  if in_type_annotation(&ast, position) {
+    return lsp::CompletionList {
+      is_incomplete: false,
+      items: type_annotation_snippets().into(),
+    };
+  }
+
   variable_completions(&ast, position)
 }
 
@@ -59,30 +66,30 @@ fn constant_snippets() -> [lsp::CompletionItem; 11] {
     },
     lsp::CompletionItem {
       label: "if".to_owned(),
+      kind: Some(lsp::CompletionItemKind::KEYWORD),
       insert_text: Some("if ($1) $2 else $0".to_owned()),
       insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-      kind: Some(lsp::CompletionItemKind::KEYWORD),
       ..Default::default()
     },
     lsp::CompletionItem {
       label: "match".to_owned(),
+      kind: Some(lsp::CompletionItemKind::KEYWORD),
       insert_text: Some("match $1 | $2 -> $0".to_owned()),
       insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-      kind: Some(lsp::CompletionItemKind::KEYWORD),
       ..Default::default()
     },
     lsp::CompletionItem {
       label: "let".to_owned(),
+      kind: Some(lsp::CompletionItemKind::KEYWORD),
       insert_text: Some("let $1 = $0".to_owned()),
       insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-      kind: Some(lsp::CompletionItemKind::KEYWORD),
       ..Default::default()
     },
     lsp::CompletionItem {
       label: "return".to_owned(),
+      kind: Some(lsp::CompletionItemKind::KEYWORD),
       insert_text: Some("return $0".to_owned()),
       insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-      kind: Some(lsp::CompletionItemKind::KEYWORD),
       ..Default::default()
     },
     lsp::CompletionItem {
@@ -91,21 +98,20 @@ fn constant_snippets() -> [lsp::CompletionItem; 11] {
         detail: Some("_ import { … }".to_owned()),
         description: None,
       }),
+      kind: Some(lsp::CompletionItemKind::KEYWORD),
       insert_text: Some("from $1 import { $0 }".to_owned()),
       insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-      kind: Some(lsp::CompletionItemKind::KEYWORD),
       ..Default::default()
     },
     lsp::CompletionItem {
       label: "import".to_owned(),
+      kind: Some(lsp::CompletionItemKind::SNIPPET),
       insert_text: Some("from $1 import { $0 }".to_owned()),
       insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-      kind: Some(lsp::CompletionItemKind::SNIPPET),
       ..Default::default()
     },
     lsp::CompletionItem {
       label: "as".to_owned(),
-      insert_text: Some("as".to_owned()),
       kind: Some(lsp::CompletionItemKind::KEYWORD),
       ..Default::default()
     },
@@ -239,6 +245,43 @@ fn module_item_completions(module: &str, in_import: bool) -> lsp::CompletionList
     is_incomplete: false,
     items,
   }
+}
+
+fn type_annotation_snippets() -> [lsp::CompletionItem; 4] {
+  [
+    lsp::CompletionItem {
+      label: "string".to_owned(),
+      kind: Some(lsp::CompletionItemKind::KEYWORD),
+      ..Default::default()
+    },
+    lsp::CompletionItem {
+      label: "number".to_owned(),
+      kind: Some(lsp::CompletionItemKind::KEYWORD),
+      ..Default::default()
+    },
+    lsp::CompletionItem {
+      label: "boolean".to_owned(),
+      kind: Some(lsp::CompletionItemKind::KEYWORD),
+      ..Default::default()
+    },
+    lsp::CompletionItem {
+      label: "function".to_owned(),
+      kind: Some(lsp::CompletionItemKind::SNIPPET),
+      insert_text: Some("$0 => $1".to_owned()),
+      insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+      ..Default::default()
+    },
+  ]
+}
+
+fn in_type_annotation(ast: &AST, position: Span) -> bool {
+  for ty in &ast.types {
+    if ty.span(ast).contains(position) {
+      return true;
+    }
+  }
+
+  false
 }
 
 fn in_import_statement<'a>(
