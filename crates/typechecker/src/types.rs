@@ -51,6 +51,16 @@ impl TypeArena {
 
   /// Unifies types `a` and `b`, returning `Ok` if they are unifiable
   pub fn unify(&mut self, a: TypeRef, b: TypeRef) -> Result<(), ()> {
+    self.unify_inner(a, b, false)
+  }
+
+  /// Unifies types `a` and `b`, returning `Ok` if they are unifiable
+  /// `a` must always match `b`, for example a type variable can't be unified with a concrete type.
+  pub fn unify_strict(&mut self, a: TypeRef, b: TypeRef) -> Result<(), ()> {
+    self.unify_inner(a, b, true)
+  }
+
+  fn unify_inner(&mut self, a: TypeRef, b: TypeRef, strict: bool) -> Result<(), ()> {
     let a = self.normalize(a);
     let b = self.normalize(b);
 
@@ -58,8 +68,8 @@ impl TypeArena {
       (Type::Primitive(a), Type::Primitive(b)) if a == b => {}
 
       (Type::Function(a_param, a_return), Type::Function(b_param, b_return)) => {
-        self.unify(a_param, b_param)?;
-        self.unify(a_return, b_return)?;
+        self.unify_inner(a_param, b_param, strict)?;
+        self.unify_inner(a_return, b_return, strict)?;
       }
 
       (Type::Variable(var1), Type::Variable(var2)) => {
@@ -69,7 +79,7 @@ impl TypeArena {
 
         self.link(var1, b);
       }
-      (Type::Variable(var), _) => self.link(var, b),
+      (Type::Variable(var), _) if !strict => self.link(var, b),
       (_, Type::Variable(var)) => self.link(var, a),
 
       (_, _) => return Err(()),

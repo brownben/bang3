@@ -7,9 +7,11 @@ use crate::{
   TypeError,
 };
 use bang_syntax::{
-  ast::{expression::*, statement::*},
+  ast::{self as ast, expression::*, statement::*},
   Span, AST,
 };
+use std::collections::BTreeMap;
+
 pub struct TypeChecker {
   pub types: TypeArena,
   pub env: Enviroment,
@@ -50,14 +52,71 @@ impl TypeChecker {
       }
     }
   }
-}
-impl TypeChecker {
+
+  pub fn type_from_annotation(&mut self, ty: &ast::Type, ast: &AST) -> TypeRef {
+    let mut variables = BTreeMap::new();
+    self.type_from_annotation_inner(ty, ast, &mut variables)
+  }
+
+  fn type_from_annotation_inner<'source>(
+    &mut self,
+    ty: &ast::Type,
+    ast: &AST<'source>,
+    variables: &mut BTreeMap<&'source str, TypeRef>,
+  ) -> TypeRef {
+    use bang_syntax::ast::types::{PrimitiveType, Type as Annotation};
+
+    match ty {
+      Annotation::Primitive(primitive) => match primitive.type_(ast) {
+        PrimitiveType::Number => TypeArena::NUMBER,
+        PrimitiveType::String => TypeArena::STRING,
+        PrimitiveType::Boolean => TypeArena::BOOLEAN,
+        PrimitiveType::Never => TypeArena::NEVER,
+        PrimitiveType::Unknown => {
+          self.problems.push(TypeError::UnknownTypeAnnotation {
+            span: primitive.span(ast),
+          });
+          TypeArena::UNKNOWN
+        }
+      },
+      Annotation::Variable(variable) => {
+        let type_ = variables.get(variable.name(ast));
+        if let Some(type_) = type_ {
+          *type_
+        } else {
+          let type_var = self.new_type_var();
+          variables.insert(variable.name(ast), type_var);
+          type_var
+        }
+      }
+      Annotation::Function(function) => {
+        let parameter = self.type_from_annotation_inner(function.parameter(ast), ast, variables);
+        let return_ = self.type_from_annotation_inner(function.return_(ast), ast, variables);
+        self.types.new_type(Type::Function(parameter, return_))
+      }
+      Annotation::Group(group) => self.type_from_annotation_inner(group.type_(ast), ast, variables),
+      Annotation::Invalid(_) => TypeArena::UNKNOWN,
+    }
+  }
+
   /// Asserts that type `a` is applicable to type `b`
   fn assert_type(&mut self, a: TypeRef, b: TypeRef, span: Span) {
     if self.types.unify(a, b).is_err() {
       self.problems.push(TypeError::ExpectedDifferentType {
         expected: self.types.type_to_string(b),
         given: self.types.type_to_string(a),
+        span,
+      });
+    }
+  }
+
+  /// Asserts that type `a` is always applicable to type `b`
+  /// Ensures that type variables cannot be passed to a concrete type `b`
+  fn assert_type_strict(&mut self, a: TypeRef, b: TypeRef, span: Span) {
+    if self.types.unify_strict(a, b).is_err() {
+      self.problems.push(TypeError::ExpectedDifferentType {
+        expected: self.types.type_to_string(a),
+        given: self.types.type_to_string(b),
         span,
       });
     }
@@ -184,7 +243,12 @@ impl InferType for Let {
       );
 
       // Infer the function type
-      let expression_type = self.value(ast).infer(t, ast).expression();
+      let mut expression_type = self.value(ast).infer(t, ast).expression();
+      if let Some(annotation) = self.annotation(ast) {
+        let annotation_type = t.type_from_annotation(annotation, ast);
+        t.assert_type_strict(annotation_type, expression_type, self.value(ast).span(ast));
+        expression_type = annotation_type;
+      }
 
       // Update the variable type to be the inferred type
       t.env
@@ -192,7 +256,12 @@ impl InferType for Let {
       return TypeArena::NEVER.into();
     }
 
-    let type_ = self.value(ast).infer(t, ast).expression();
+    let mut type_ = self.value(ast).infer(t, ast).expression();
+    if let Some(annotation) = self.annotation(ast) {
+      let annotation_type = t.type_from_annotation(annotation, ast);
+      t.assert_type_strict(annotation_type, type_, self.value(ast).span(ast));
+      type_ = annotation_type;
+    }
     t.env.define_variable(
       self.identifier(ast),
       self.identifier_span(ast),

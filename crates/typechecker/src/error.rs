@@ -112,6 +112,11 @@ pub enum Problem {
     /// The location of the error
     span: Span,
   },
+  /// Use of unknown type annotation
+  UnknownTypeAnnotation {
+    /// The location of the error
+    span: Span,
+  },
 }
 impl Problem {
   /// The title of the error message
@@ -132,6 +137,7 @@ impl Problem {
       Self::FunctionReturnsNever { .. } => "Function Returns `Never`",
       Self::ModuleNotFound { .. } => "Module Not Found",
       Self::ItemNotFound { .. } => "Item Not Found",
+      Self::UnknownTypeAnnotation { .. } => "Unknown Type Annotation",
     }
   }
 
@@ -182,6 +188,7 @@ impl Problem {
       Self::ItemNotFound { module, item, .. } => {
         format!("could not find `{item}` in `{module}`")
       }
+      Self::UnknownTypeAnnotation { .. } => "type annotation is not a valid type".to_string(),
     }
   }
 
@@ -246,7 +253,8 @@ impl Problem {
       | Self::PatternNeverMatches { span, .. }
       | Self::FunctionReturnsNever { span }
       | Self::ModuleNotFound { span, .. }
-      | Self::ItemNotFound { span, .. } => *span,
+      | Self::ItemNotFound { span, .. }
+      | Self::UnknownTypeAnnotation { span } => *span,
     }
   }
 }

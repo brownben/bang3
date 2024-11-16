@@ -562,6 +562,46 @@ fn unknown_imports() {
   assert!(has_type_error("unknown_module__aaa::unknown_aaa"));
 }
 
+#[test]
+fn annotations() {
+  assert!(!has_type_error("let _x: number = 5"));
+  assert!(has_type_error("let _x: number = 'string'"));
+  assert!(has_type_error("let _x: number = false"));
+
+  assert!(!has_type_error("let _x: number => number = x => x + 1"));
+  assert!(has_type_error("let _x: number => string = x => x + 1"));
+  assert!(has_type_error("let _x: string => number = x => x + 1"));
+
+  assert!(!has_type_error(indoc! {"
+    let identity = x => x
+    let _x: number => number = identity
+    let _y: string => string = identity
+    let _z: ^s => ^s = identity
+  "}));
+  assert!(has_type_error(indoc! {"
+    let identity: number => number = x => x
+    let _y: string => string = identity
+  "}));
+
+  assert!(!has_type_error(indoc! {"
+    let _x: ^a => ^b => ^b => ^b = a => b => c => if (a) b else c
+    let _y: ^a => (_ => ^b) => ^b => ^b = a => b => c => if (a) b() else c
+  "}));
+
+  assert!(has_type_error(indoc! {"
+    let addOne: number => number = x => x + 1
+    let _y: ^a => ^a = addOne
+    let _z: string => string = _y
+  "}));
+  assert!(has_type_error(indoc! {"
+    let addOne: number => number = x => x + 1
+    let _y: ^a => ^a = addOne
+  "}));
+
+  // Unknown Type Annotation
+  assert!(has_type_error("let _x: unknown = 5"));
+}
+
 mod exhaustive {
   use super::*;
 
