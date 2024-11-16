@@ -109,7 +109,7 @@ impl TypeChecker {
   }
 
   fn new_type_var(&mut self) -> TypeRef {
-    self.types.new_type_var(self.env.depth())
+    self.types.new_type_var()
   }
 }
 
@@ -187,10 +187,8 @@ impl InferType for Let {
       let expression_type = self.value(ast).infer(t, ast).expression();
 
       // Update the variable type to be the inferred type
-      t.env.update_variable(
-        self.identifier(ast),
-        t.types.generalize(expression_type, t.env.depth()),
-      );
+      t.env
+        .update_variable(self.identifier(ast), t.types.generalize(expression_type));
       return TypeArena::NEVER.into();
     }
 
@@ -567,7 +565,7 @@ impl InferType for Variable {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     if let Some(type_) = t.env.get_variable(self.name(ast)) {
       t.env.mark_variable_use(self.name(ast), self.span(ast));
-      t.types.instantiate(type_, t.env.depth()).into()
+      t.types.instantiate(type_).into()
     } else {
       t.problems.push(TypeError::UndefinedVariable {
         identifier: self.name(ast).to_owned(),

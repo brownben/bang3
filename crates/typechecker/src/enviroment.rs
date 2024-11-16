@@ -144,10 +144,6 @@ impl Enviroment {
     }
   }
 
-  pub(crate) fn depth(&self) -> u32 {
-    self.depth
-  }
-
   /// An iterator over all the variables that are defined
   pub fn defined_variables(&self) -> impl Iterator<Item = &Variable> {
     self.finished_variables.iter()

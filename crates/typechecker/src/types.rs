@@ -34,10 +34,9 @@ impl TypeArena {
     ref_
   }
 
-  pub fn new_type_var(&mut self, level: u32) -> TypeRef {
+  pub fn new_type_var(&mut self) -> TypeRef {
     let ref_ = TypeVarRef(u32::try_from(self.type_vars.len()).unwrap());
     self.type_vars.push(TypeVar {
-      level,
       link: TypeVarLink::NoLink,
     });
     self.new_type(Type::Variable(ref_))
@@ -68,11 +67,7 @@ impl TypeArena {
           return Ok(());
         }
 
-        if self.get_type_var(var1).level < self.get_type_var(var2).level {
-          self.link(var1, b);
-        } else {
-          self.link(var2, a);
-        }
+        self.link(var1, b);
       }
       (Type::Variable(var), _) => self.link(var, b),
       (_, Type::Variable(var)) => self.link(var, a),
@@ -114,7 +109,7 @@ impl TypeArena {
   }
 
   /// Replace all the Quantified types with new type variables
-  pub fn instantiate(&mut self, scheme: TypeScheme, level: u32) -> TypeRef {
+  pub fn instantiate(&mut self, scheme: TypeScheme) -> TypeRef {
     if scheme.number_quantified_vars == 0 {
       // No quantified variables, so just return the type.
       return scheme.type_;
@@ -122,7 +117,7 @@ impl TypeArena {
 
     // Create a new type var for each quantified variable
     let substitutes: Vec<TypeRef> = (0..=(scheme.number_quantified_vars))
-      .map(|_| self.new_type_var(level))
+      .map(|_| self.new_type_var())
       .collect();
 
     self.replace_quantified_vars(scheme.type_, &substitutes)
@@ -146,14 +141,11 @@ impl TypeArena {
     }
   }
 
-  pub fn generalize(&mut self, type_: TypeRef, level: u32) -> TypeScheme {
+  pub fn generalize(&mut self, type_: TypeRef) -> TypeScheme {
     let mut generalized_type_vars = BTreeMap::new();
     let mut type_var_id = 0;
 
-    for type_var in self
-      .type_vars_in(type_)
-      .filter(|type_var| self.get_type_var(*type_var).level > level)
-    {
+    for type_var in self.type_vars_in(type_) {
       if let btree_map::Entry::Vacant(e) = generalized_type_vars.entry(type_var) {
         e.insert(type_var_id);
         type_var_id += 1;
@@ -278,7 +270,6 @@ pub enum Type {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TypeVar {
   link: TypeVarLink,
-  level: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -11,7 +11,7 @@ fn synthesize(source: &str) -> String {
   let result = checker.check_ast(&ast);
   assert!(checker.problems.is_empty());
 
-  let generalized_type = checker.types.generalize(result, 0).type_;
+  let generalized_type = checker.types.generalize(result).type_;
   checker.types.type_to_string(generalized_type)
 }
 
@@ -23,7 +23,7 @@ fn synthesize_has_error(source: &str) -> String {
   let result = checker.check_ast(&ast);
   assert!(!checker.problems.is_empty());
 
-  let generalized_type = checker.types.generalize(result, 0).type_;
+  let generalized_type = checker.types.generalize(result).type_;
   checker.types.type_to_string(generalized_type)
 }
 
