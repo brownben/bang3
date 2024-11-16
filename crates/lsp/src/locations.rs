@@ -106,7 +106,7 @@ mod test {
   fn byte_offset_to_utf16_unknown_character_span() {
     let source = "let string = '🏃' &";
 
-    let ast = bang_syntax::parse(source);
+    let ast = bang_syntax::parse(source.to_owned());
     let span = ast.errors.first().unwrap().span();
 
     let start = byte_offset_to_utf16(span.start, source).try_into().unwrap();
@@ -119,7 +119,7 @@ mod test {
   fn byte_offset_to_utf16_unused_variable_span() {
     let source = "let string = '🏃'";
 
-    let ast = bang_syntax::parse(source);
+    let ast = bang_syntax::parse(source.to_owned());
     let errors = bang_typechecker::typecheck(&ast);
     let span = errors.first().unwrap().span();
 

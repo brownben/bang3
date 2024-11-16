@@ -23,7 +23,7 @@ mod formatter;
 /// ```
 /// use bang_formatter::{format, FormatterConfig};
 /// use bang_syntax::parse;
-/// let source = "5 + 3";
+/// let source = "5 + 3".to_owned();
 /// let ast = parse(source);
 /// let config = FormatterConfig::default();
 /// let formatted = format(&ast, config);

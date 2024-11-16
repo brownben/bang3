@@ -215,7 +215,7 @@ impl Comment {
 
   /// The text of the comment
   #[must_use]
-  pub fn text<'source>(&self, ast: &AST<'source>) -> &'source str {
+  pub fn text<'a>(&self, ast: &'a AST) -> &'a str {
     ast.get_token_text(self.comment)[2..].trim()
   }
 
@@ -234,10 +234,7 @@ pub struct FormatString {
 }
 impl FormatString {
   /// The strings which appear within the format string
-  pub fn strings<'a, 'source>(
-    &'a self,
-    ast: &'a AST<'source>,
-  ) -> impl Iterator<Item = &'source str> + use<'a, 'source> {
+  pub fn strings<'a>(&self, ast: &'a AST) -> impl Iterator<Item = &'a str> + use<'_, 'a> {
     self.strings.iter().map(|token| {
       let string = ast.get_token_text(*token);
 
@@ -249,10 +246,7 @@ impl FormatString {
     })
   }
   /// The strings in the format string and their spans
-  pub fn strings_with_spans<'a, 'source>(
-    &'a self,
-    ast: &'a AST<'source>,
-  ) -> impl Iterator<Item = (&'source str, Span)> + use<'a, 'source> {
+  pub fn strings_with_spans<'a>(&'a self, ast: &'a AST) -> impl Iterator<Item = (&'a str, Span)> {
     let spans = self.strings.iter().map(|token| ast[*token].into());
     self.strings(ast).zip(spans)
   }
@@ -283,7 +277,7 @@ pub struct Function {
 impl Function {
   /// The name of the function, if it has one
   #[must_use]
-  pub fn name<'source>(&self, ast: &AST<'source>) -> Option<&'source str> {
+  pub fn name<'a>(&self, ast: &'a AST) -> Option<&'a str> {
     self.name.as_ref().map(|name| name.name(ast))
   }
   /// The body of the function
@@ -329,7 +323,7 @@ pub struct Literal {
 }
 impl Literal {
   /// The value of the literal
-  pub fn value<'source>(&self, ast: &AST<'source>) -> LiteralValue<'source> {
+  pub fn value<'a>(&self, ast: &'a AST) -> LiteralValue<'a> {
     let token = ast[self.token];
     match token.kind {
       TokenKind::Number => LiteralValue::Number(self.number_value(ast)),
@@ -340,7 +334,7 @@ impl Literal {
     }
   }
   /// The underlying raw string contents of the literal
-  pub fn raw_value<'source>(&self, ast: &AST<'source>) -> &'source str {
+  pub fn raw_value<'a>(&self, ast: &'a AST) -> &'a str {
     ast.get_token_text(self.token)
   }
 
@@ -355,7 +349,7 @@ impl Literal {
     .expect("string to be valid number representation")
   }
 
-  fn string_value<'source>(&self, ast: &AST<'source>) -> &'source str {
+  fn string_value<'a>(&self, ast: &'a AST) -> &'a str {
     let string = ast.get_token_text(self.token);
     &string[1..(string.len() - 1)]
   }
@@ -508,12 +502,12 @@ pub struct ModuleAccess {
 }
 impl ModuleAccess {
   /// The module being accessed
-  pub fn module<'source>(&self, ast: &AST<'source>) -> &'source str {
+  pub fn module<'a>(&self, ast: &'a AST) -> &'a str {
     ast.get_token_text(self.module)
   }
 
   /// The item being accessed from the module
-  pub fn item<'source>(&self, ast: &AST<'source>) -> &'source str {
+  pub fn item<'a>(&self, ast: &'a AST) -> &'a str {
     self.item.map(|i| ast.get_token_text(i)).unwrap_or_default()
   }
 
@@ -564,7 +558,7 @@ pub struct Variable {
 impl Variable {
   /// The name of the variable
   #[must_use]
-  pub fn name<'source>(&self, ast: &AST<'source>) -> &'source str {
+  pub fn name<'a>(&self, ast: &'a AST) -> &'a str {
     ast.get_token_text(self.token)
   }
 

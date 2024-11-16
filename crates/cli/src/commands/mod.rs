@@ -4,7 +4,7 @@ use super::FormatOptions;
 use bang_formatter::FormatterConfig;
 use bang_interpreter::{HeapSize, StandardContext, VM};
 use bang_lsp::LanguageServer;
-use bang_syntax::{tokenise, LineIndex, AST};
+use bang_syntax::{tokenise, AST};
 
 use anstream::{eprintln, println};
 use std::fs;
@@ -57,7 +57,7 @@ fn read_stdin() -> Result<String, ()> {
   }
 }
 
-fn parse<'source>(filename: &str, source: &'source str) -> Result<AST<'source>, ()> {
+fn parse(filename: &str, source: String) -> Result<AST, ()> {
   let ast = bang_syntax::parse(source);
 
   if ast.is_valid() {
@@ -65,7 +65,7 @@ fn parse<'source>(filename: &str, source: &'source str) -> Result<AST<'source>, 
   } else {
     for error in ast.errors {
       eprintln!("{}", Message::from(&error));
-      eprintln!("{}", CodeFrame::new(filename, source, error.span()));
+      eprintln!("{}", CodeFrame::new(filename, &ast.source, error.span()));
     }
     Err(())
   }
@@ -83,7 +83,7 @@ fn compile(ast: &AST) -> Result<bang_interpreter::Chunk, ()> {
 
 pub fn run(filename: &str) -> Result<CommandStatus, ()> {
   let source = read_file(filename)?;
-  let ast = parse(filename, &source)?;
+  let ast = parse(filename, source)?;
   let chunk = compile(&ast)?;
 
   let mut vm = match VM::new(HeapSize::Standard, &StandardContext) {
@@ -96,10 +96,10 @@ pub fn run(filename: &str) -> Result<CommandStatus, ()> {
 
   if let Err(error) = vm.run(&chunk) {
     eprintln!("{}", Message::from(&error));
-    eprintln!("{}", CodeFrame::new(filename, &source, error.span()));
+    eprintln!("{}", CodeFrame::new(filename, &ast.source, error.span()));
 
-    let line_index = LineIndex::from_source(&source);
-    if let Some(traceback) = error.traceback(&line_index) {
+    let line_index = ast.line_index();
+    if let Some(traceback) = error.traceback(line_index) {
       eprintln!("\n{traceback}");
     }
 
@@ -119,7 +119,7 @@ pub fn format(options: &FormatOptions) -> Result<CommandStatus, ()> {
   };
 
   let source = read_file(&options.file)?;
-  let ast = parse(&options.file, &source)?;
+  let ast = parse(&options.file, source)?;
   let formatted_source = bang_formatter::format(&ast, config);
 
   if options.dryrun {
@@ -127,7 +127,7 @@ pub fn format(options: &FormatOptions) -> Result<CommandStatus, ()> {
     return Ok(CommandStatus::Success);
   }
 
-  if options.check && formatted_source != source {
+  if options.check && formatted_source != ast.source {
     eprintln!(
       "{}",
       Message {
@@ -145,7 +145,7 @@ pub fn format(options: &FormatOptions) -> Result<CommandStatus, ()> {
     return Ok(CommandStatus::Success);
   }
 
-  if formatted_source != source && fs::write(&options.file, formatted_source).is_err() {
+  if formatted_source != ast.source && fs::write(&options.file, formatted_source).is_err() {
     eprintln!("{}", Message::error("Problem writing to file".into()));
     return Err(());
   };
@@ -155,12 +155,15 @@ pub fn format(options: &FormatOptions) -> Result<CommandStatus, ()> {
 
 pub fn lint(filename: &str) -> Result<CommandStatus, ()> {
   let source = read_file(filename)?;
-  let ast = parse(filename, &source)?;
+  let ast = parse(filename, source)?;
   let diagnostics = bang_linter::lint(&ast);
 
   for diagnostic in &diagnostics {
     println!("{}", Message::from(diagnostic));
-    println!("{}", CodeFrame::new(filename, &source, diagnostic.span()));
+    println!(
+      "{}",
+      CodeFrame::new(filename, &ast.source, diagnostic.span())
+    );
   }
 
   if diagnostics.is_empty() {
@@ -172,12 +175,12 @@ pub fn lint(filename: &str) -> Result<CommandStatus, ()> {
 
 pub fn typecheck(filename: &str) -> Result<CommandStatus, ()> {
   let source = read_file(filename)?;
-  let ast = parse(filename, &source)?;
+  let ast = parse(filename, source)?;
   let errors = bang_typechecker::typecheck(&ast);
 
   for error in &errors {
     println!("{}", Message::from(error));
-    println!("{}", CodeFrame::new(filename, &source, error.span()));
+    println!("{}", CodeFrame::new(filename, &ast.source, error.span()));
   }
 
   if errors.is_empty() {
@@ -206,12 +209,12 @@ pub fn print_tokens(filename: &str) -> Result<CommandStatus, ()> {
 
 pub fn print_ast(filename: &str) -> Result<CommandStatus, ()> {
   let source = read_file(filename)?;
-  let ast = bang_syntax::parse(&source);
+  let ast = bang_syntax::parse(source);
 
   if !ast.is_valid() {
     for error in &ast.errors {
       eprintln!("{}", Message::from(error));
-      eprintln!("{}", CodeFrame::new(filename, &source, error.span()));
+      eprintln!("{}", CodeFrame::new(filename, &ast.source, error.span()));
     }
     println!();
   }
@@ -226,7 +229,7 @@ pub fn print_ast(filename: &str) -> Result<CommandStatus, ()> {
 
 pub fn print_chunk(filename: &str) -> Result<CommandStatus, ()> {
   let source = read_file(filename)?;
-  let ast = parse(filename, &source)?;
+  let ast = parse(filename, source)?;
   let chunk = compile(&ast)?;
 
   print!("{chunk}");

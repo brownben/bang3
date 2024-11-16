@@ -5,10 +5,14 @@ use std::{fmt, marker, mem};
 /// An item which can be formatted
 pub trait Formattable<'source, 'allocator, AST> {
   /// Convert the item into the formatting intermediate representation
-  fn format(&self, f: &Formatter<'source, 'allocator>, ast: &AST) -> IR<'source, 'allocator>;
+  fn format(
+    &self,
+    f: &Formatter<'source, 'allocator>,
+    ast: &'source AST,
+  ) -> IR<'source, 'allocator>;
 }
 impl<'a, 'b, T: Formattable<'a, 'b, AST>, AST> Formattable<'a, 'b, AST> for Option<T> {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST) -> IR<'a, 'b> {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     self.as_ref().map(|x| x.format(f, ast)).unwrap_or_default()
   }
 }
@@ -19,9 +23,9 @@ pub struct Formatter<'source, 'allocator> {
   pub(crate) allocator: &'allocator Allocator,
   _source: marker::PhantomData<&'source ()>,
 }
-impl<'source: 'allocator, 'allocator> Formatter<'source, 'allocator> {
+impl<'ast: 'allocator, 'allocator> Formatter<'ast, 'allocator> {
   pub(crate) fn format(
-    ast: &bang_syntax::AST<'source>,
+    ast: &bang_syntax::AST,
     config: Config,
     allocator: &'allocator Allocator,
   ) -> String {
@@ -34,7 +38,7 @@ impl<'source: 'allocator, 'allocator> Formatter<'source, 'allocator> {
   }
 
   /// Format the AST Node into a string
-  fn print<AST>(&self, item: &dyn Formattable<'source, 'allocator, AST>, ast: &AST) -> String {
+  fn print<AST>(&self, item: &dyn Formattable<'ast, 'allocator, AST>, ast: &'ast AST) -> String {
     let ir = item.format(self, ast);
     let display_ir = ir.display(0, 0, true, self.config, self.allocator);
     format!("{display_ir}")
@@ -43,8 +47,8 @@ impl<'source: 'allocator, 'allocator> Formatter<'source, 'allocator> {
   /// Create a new indentation node
   pub(crate) fn indent<const N: usize>(
     &self,
-    mut ir: [IR<'source, 'allocator>; N],
-  ) -> IR<'source, 'allocator> {
+    mut ir: [IR<'ast, 'allocator>; N],
+  ) -> IR<'ast, 'allocator> {
     let ir = match N {
       1 => mem::take(&mut ir[0]),
       _ => IR::Concat(Vec::from_iter_in(ir, self.allocator)),
@@ -56,17 +60,17 @@ impl<'source: 'allocator, 'allocator> Formatter<'source, 'allocator> {
   /// Create a new group, an option for the formatter to break the source on
   pub(crate) fn group<const N: usize>(
     &self,
-    ir: [IR<'source, 'allocator>; N],
-  ) -> IR<'source, 'allocator> {
+    ir: [IR<'ast, 'allocator>; N],
+  ) -> IR<'ast, 'allocator> {
     IR::Group(Box::new_in(self.concat(ir), self.allocator))
   }
 
   /// Create a new group, an option for the formatter to break the source on
   pub(crate) fn option(
     &self,
-    a: IR<'source, 'allocator>,
-    b: IR<'source, 'allocator>,
-  ) -> IR<'source, 'allocator> {
+    a: IR<'ast, 'allocator>,
+    b: IR<'ast, 'allocator>,
+  ) -> IR<'ast, 'allocator> {
     IR::Option(
       Box::new_in(a, self.allocator),
       Box::new_in(b, self.allocator),
@@ -76,16 +80,16 @@ impl<'source: 'allocator, 'allocator> Formatter<'source, 'allocator> {
   /// Merge multiple IRs into a single IR
   pub(crate) fn concat<const N: usize>(
     &self,
-    ir: [IR<'source, 'allocator>; N],
-  ) -> IR<'source, 'allocator> {
+    ir: [IR<'ast, 'allocator>; N],
+  ) -> IR<'ast, 'allocator> {
     IR::Concat(Vec::from_iter_in(ir, self.allocator))
   }
 
   /// Merge multiple IRs together from an iterator
   pub(crate) fn concat_iterator(
     &self,
-    ir: impl Iterator<Item = IR<'source, 'allocator>>,
-  ) -> IR<'source, 'allocator> {
+    ir: impl Iterator<Item = IR<'ast, 'allocator>>,
+  ) -> IR<'ast, 'allocator> {
     IR::Concat(Vec::from_iter_in(ir, self.allocator))
   }
 }

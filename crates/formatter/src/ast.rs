@@ -4,8 +4,8 @@ use bang_syntax::{
   AST,
 };
 
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for AST<'_> {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for AST {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     if self.root_statements.is_empty() {
       return IR::Empty;
     }
@@ -26,8 +26,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for AST<'_> {
   }
 }
 
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Expression {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for Expression {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     match self {
       Expression::Binary(binary) => binary.format(f, ast),
       Expression::Block(block) => block.format(f, ast),
@@ -46,8 +46,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Expression {
     }
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Binary {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for Binary {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     if self.operator(ast) == BinaryOperator::Pipeline {
       return f.group([
         self.left(ast).format(f, ast),
@@ -68,8 +68,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Binary {
     ])
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Block {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for Block {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     if self.len() == 1
       && let Statement::Expression(expression) = self.statement(0, ast)
       && let Expression::Block(block) = expression.expression(ast)
@@ -123,8 +123,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Block {
     ])
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Call {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for Call {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     if let Some(argument) = self.argument(ast) {
       // If it contains a comment, we have to break to preserve the comment.
       let line = if let Expression::Comment(_) = argument {
@@ -145,8 +145,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Call {
     }
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Comment {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for Comment {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     f.concat([
       self.expression(ast).format(f, ast),
       IR::Text(" // "),
@@ -154,8 +154,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Comment {
     ])
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for FormatString {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for FormatString {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     let mut strings = self.strings(ast);
     let first_string = strings.next().unwrap();
 
@@ -179,8 +179,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for FormatString {
     ])
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Function {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for Function {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     f.concat([
       IR::Text(self.parameter.name(ast)),
       IR::Text(" => "),
@@ -188,8 +188,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Function {
     ])
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Group {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for Group {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     if let Expression::Block(_) | Expression::Function(_) = self.expression(ast) {
       return f.concat([
         IR::Text("("),
@@ -217,8 +217,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Group {
     ])
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for If {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for If {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     // If it contains a comment, we have to break to preserve the comment.
     let line = if let Expression::Comment(_) = self.condition(ast) {
       IR::AlwaysLine
@@ -242,8 +242,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for If {
     ])
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Literal {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for Literal {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     match self.value(ast) {
       LiteralValue::Boolean(true) => IR::Text("true"),
       LiteralValue::Boolean(false) => IR::Text("false"),
@@ -268,8 +268,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Literal {
     }
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Match {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for Match {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     f.concat([
       IR::Text("match "),
       self.value(ast).format(f, ast),
@@ -281,8 +281,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Match {
     ])
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for MatchArm {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for MatchArm {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     f.concat([
       IR::Text("| "),
       self.pattern.format(f, ast),
@@ -296,8 +296,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for MatchArm {
     ])
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Pattern {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for Pattern {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     match self {
       Pattern::Identifier(variable) => variable.format(f, ast),
       Pattern::Literal(literal) => literal.format(f, ast),
@@ -310,8 +310,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Pattern {
     }
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Unary {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for Unary {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     if let Expression::Unary(unary2) = &self.expression(ast)
       && self.operator(ast) == unary2.operator(ast)
     {
@@ -336,8 +336,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Unary {
     ])
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for ModuleAccess {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for ModuleAccess {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     f.concat([
       IR::Text(self.module(ast)),
       IR::Text("::"),
@@ -345,14 +345,14 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for ModuleAccess {
     ])
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Variable {
-  fn format(&self, _: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for Variable {
+  fn format(&self, _: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     IR::Text(self.name(ast))
   }
 }
 
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Statement {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for Statement {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     match self {
       Statement::Comment(comment) => comment.format(f, ast),
       Statement::Expression(expression) => expression.expression(ast).format(f, ast),
@@ -362,8 +362,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Statement {
     }
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for CommentStmt {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for CommentStmt {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     let mut lines = self.text(ast);
     f.concat([
       IR::Text("// "),
@@ -374,8 +374,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for CommentStmt {
     ])
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Import {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for Import {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     let mut items: Vec<_> = self.items(ast).collect();
     if f.config.sort_imports && !items.is_sorted_by_key(|item| item.name) {
       items.sort_by_key(|item| item.name);
@@ -416,8 +416,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Import {
     ])
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for ImportItem<'a> {
-  fn format(&self, f: &Formatter<'a, 'b>, _ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for ImportItem<'a> {
+  fn format(&self, f: &Formatter<'a, 'b>, _ast: &'a AST) -> IR<'a, 'b> {
     f.concat([
       IR::Text(self.name),
       if let Some(alias) = &self.alias
@@ -430,8 +430,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for ImportItem<'a> {
     ])
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Let {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for Let {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     f.concat([
       IR::Text("let "),
       IR::Text(self.identifier(ast)),
@@ -445,14 +445,14 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Let {
     ])
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Return {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for Return {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     f.concat([IR::Text("return "), self.expression(ast).format(f, ast)])
   }
 }
 
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Type {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for Type {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     match self {
       Type::Primitive(type_primitive) => type_primitive.format(f, ast),
       Type::Variable(type_variable) => type_variable.format(f, ast),
@@ -462,18 +462,18 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for Type {
     }
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for TypePrimitive {
-  fn format(&self, _: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for TypePrimitive {
+  fn format(&self, _: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     IR::Text(self.name(ast))
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for TypeVariable {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for TypeVariable {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     f.concat([IR::Text("^"), IR::Text(self.name(ast))])
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for TypeFunction {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for TypeFunction {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     f.concat([
       self.parameter(ast).format(f, ast),
       IR::Text(" => "),
@@ -481,8 +481,8 @@ impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for TypeFunction {
     ])
   }
 }
-impl<'a, 'b> Formattable<'a, 'b, AST<'a>> for TypeGroup {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &AST<'a>) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, AST> for TypeGroup {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     let inner = self.type_(ast);
     match inner {
       Type::Group(group) => return group.format(f, ast),

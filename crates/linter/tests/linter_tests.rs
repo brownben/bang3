@@ -6,7 +6,7 @@ use bang_linter::lint as lint_ast;
 use bang_syntax::parse;
 
 fn lint(source: &str) -> Result<(), ()> {
-  let diagnostics = lint_ast(&parse(source));
+  let diagnostics = lint_ast(&parse(source.to_owned()));
 
   if diagnostics.is_empty() {
     Ok(())

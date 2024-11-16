@@ -12,7 +12,7 @@ fn format(source: &str, print_width: u16) -> String {
     line_ending: LineEnding::LineFeed,
     ..Config::default()
   };
-  let ast = parse(source);
+  let ast = parse(source.to_owned());
 
   bang_formatter::format(&ast, config)
 }
@@ -27,7 +27,7 @@ macro_rules! assert_format {
 
 #[test]
 fn config_indentation() {
-  let ast = parse("(a)");
+  let ast = parse("(a)".to_owned());
 
   let mut config = Config {
     print_width: 1,
@@ -46,7 +46,7 @@ fn config_indentation() {
 
 #[test]
 fn config_quote() {
-  let ast = parse("'string'");
+  let ast = parse("'string'".to_owned());
 
   let mut config = Config {
     print_width: 1,
@@ -65,7 +65,7 @@ fn config_quote() {
 
 #[test]
 fn config_sort_imports() {
-  let ast = parse("from maths import { sin, cos, tan, }");
+  let ast = parse("from maths import { sin, cos, tan, }".to_owned());
   let mut config = Config {
     print_width: 100,
     single_quotes: true,

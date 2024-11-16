@@ -126,7 +126,7 @@ fn find_variable(position: Span, variables: &Enviroment) -> Option<&Variable> {
     })
 }
 
-fn in_module_access_item<'a>(ast: &'a AST, position: Span) -> Option<&'a expression::ModuleAccess> {
+fn in_module_access_item(ast: &AST, position: Span) -> Option<&expression::ModuleAccess> {
   for expression in &ast.expressions {
     if let expression::Expression::ModuleAccess(module_access) = expression
       && module_access.item_span(ast).contains(position)

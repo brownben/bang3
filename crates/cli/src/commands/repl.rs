@@ -68,13 +68,13 @@ pub fn repl() -> Result<CommandStatus, ()> {
 
   while let Ok(line) = rl.readline(">> ") {
     rl.add_history_entry(line.as_str()).unwrap();
-    _ = run_repl_entry(&mut vm, &line);
+    _ = run_repl_entry(&mut vm, line);
   }
 
   Ok(CommandStatus::Success)
 }
 
-fn run_repl_entry(vm: &mut VM, line: &str) -> Result<(), ()> {
+fn run_repl_entry(vm: &mut VM, line: String) -> Result<(), ()> {
   let ast = parse("REPL", line)?;
 
   // If it is an expression, print the result, else just compile it.

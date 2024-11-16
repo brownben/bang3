@@ -4,7 +4,7 @@ use bang_syntax::parse;
 use indoc::indoc;
 
 fn synthesize(source: &str) -> String {
-  let ast = parse(source);
+  let ast = parse(source.to_owned());
   assert!(ast.errors.is_empty());
 
   let mut checker = TypeChecker::new();
@@ -16,7 +16,7 @@ fn synthesize(source: &str) -> String {
 }
 
 fn synthesize_has_error(source: &str) -> String {
-  let ast = parse(source);
+  let ast = parse(source.to_owned());
   assert!(ast.errors.is_empty());
 
   let mut checker = TypeChecker::new();
@@ -28,7 +28,7 @@ fn synthesize_has_error(source: &str) -> String {
 }
 
 fn has_type_error(source: &str) -> bool {
-  let ast = parse(source);
+  let ast = parse(source.to_owned());
   assert!(ast.errors.is_empty());
 
   !typecheck(&ast).is_empty()

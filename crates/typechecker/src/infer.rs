@@ -58,11 +58,11 @@ impl TypeChecker {
     self.type_from_annotation_inner(ty, ast, &mut variables)
   }
 
-  fn type_from_annotation_inner<'source>(
+  fn type_from_annotation_inner<'a>(
     &mut self,
     ty: &ast::Type,
-    ast: &AST<'source>,
-    variables: &mut BTreeMap<&'source str, TypeRef>,
+    ast: &'a AST,
+    variables: &mut BTreeMap<&'a str, TypeRef>,
   ) -> TypeRef {
     use bang_syntax::ast::types::{PrimitiveType, Type as Annotation};
 
@@ -176,7 +176,7 @@ pub(crate) trait InferType {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType;
 }
 
-impl InferType for AST<'_> {
+impl InferType for AST {
   fn infer(&self, t: &mut TypeChecker, _ast: &AST) -> ExpressionType {
     if self.root_statements.is_empty() {
       return TypeArena::NEVER.into();

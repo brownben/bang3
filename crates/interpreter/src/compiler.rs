@@ -183,7 +183,7 @@ enum VariableStatus {
 }
 
 trait Compile<'s> {
-  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST<'s>) -> Result<(), CompileError>;
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError>;
 }
 
 impl<'s> Compile<'s> for Expression {

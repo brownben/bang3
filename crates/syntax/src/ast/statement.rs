@@ -47,14 +47,11 @@ pub struct CommentStmt {
 }
 impl CommentStmt {
   /// The text of the comment
-  pub fn text<'source, 'a>(
-    &'a self,
-    ast: &'a AST<'source>,
-  ) -> impl Iterator<Item = &'source str> + use<'a, 'source> {
+  pub fn text<'a>(&self, ast: &'a AST) -> impl Iterator<Item = &'a str> {
     (self.start.range(self.end))
       .map(|idx| ast[idx])
       .filter(|token| token.kind == TokenKind::Comment)
-      .map(|token| Span::from(token).source_text(ast.source)[2..].trim())
+      .map(|token| Span::from(token).source_text(&ast.source)[2..].trim())
   }
 
   /// The location of the statement
@@ -103,7 +100,7 @@ pub struct ImportItem<'source> {
 impl Import {
   /// The name of the module being imported
   #[must_use]
-  pub fn module<'source>(&self, ast: &AST<'source>) -> &'source str {
+  pub fn module<'a>(&self, ast: &'a AST) -> &'a str {
     self
       .module
       .as_ref()
@@ -120,10 +117,7 @@ impl Import {
   }
 
   /// The items being imported
-  pub fn items<'source, 'a>(
-    &'a self,
-    ast: &'a AST<'source>,
-  ) -> impl Iterator<Item = ImportItem<'source>> + use<'source, 'a> {
+  pub fn items<'a>(&self, ast: &'a AST) -> impl Iterator<Item = ImportItem<'a>> {
     ImportItemIterator {
       position: self.start.unwrap_or(self.end).next(),
       end: self.end,
@@ -161,12 +155,12 @@ impl Import {
     Span::from(ast[self.keyword]).merge(ast[self.end].into())
   }
 }
-struct ImportItemIterator<'source, 'ast> {
+struct ImportItemIterator<'ast> {
   position: TokenIdx,
   end: TokenIdx,
-  ast: &'ast AST<'source>,
+  ast: &'ast AST,
 }
-impl ImportItemIterator<'_, '_> {
+impl ImportItemIterator<'_> {
   fn current_kind(&self) -> TokenKind {
     if self.position <= self.end {
       self.ast[self.position].kind
@@ -198,8 +192,8 @@ impl ImportItemIterator<'_, '_> {
     result
   }
 }
-impl<'source> Iterator for ImportItemIterator<'source, '_> {
-  type Item = ImportItem<'source>;
+impl<'a> Iterator for ImportItemIterator<'a> {
+  type Item = ImportItem<'a>;
 
   fn next(&mut self) -> Option<Self::Item> {
     while let TokenKind::Comma | TokenKind::EndOfLine = self.current_kind() {
@@ -211,8 +205,8 @@ impl<'source> Iterator for ImportItemIterator<'source, '_> {
       let alias_span = self.matches(TokenKind::As).then(|| self.advance());
 
       Some(ImportItem {
-        name: span.source_text(self.ast.source),
-        alias: alias_span.map(|span| span.source_text(self.ast.source)),
+        name: span.source_text(&self.ast.source),
+        alias: alias_span.map(|span| span.source_text(&self.ast.source)),
         span,
         alias_span,
       })
@@ -233,7 +227,7 @@ pub struct Let {
 impl Let {
   /// The name of the variable being declared
   #[must_use]
-  pub fn identifier<'source>(&self, ast: &AST<'source>) -> &'source str {
+  pub fn identifier<'a>(&self, ast: &'a AST) -> &'a str {
     self
       .identifier
       .as_ref()

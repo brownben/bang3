@@ -18,7 +18,7 @@ mod vm;
 /// # Examples
 /// ```
 /// use bang_syntax::parse;
-/// let ast = parse("5 + 3");
+/// let ast = parse("5 + 3".to_owned());
 /// let chunk = bang_interpreter::compile(&ast).unwrap();
 /// ```
 ///

@@ -284,10 +284,7 @@ fn in_type_annotation(ast: &AST, position: Span) -> bool {
   false
 }
 
-fn in_import_statement<'a>(
-  ast: &'a AST,
-  position: Span,
-) -> Option<&'a bang_syntax::ast::statement::Import> {
+fn in_import_statement(ast: &AST, position: Span) -> Option<&bang_syntax::ast::statement::Import> {
   for statement in ast.all_statements() {
     if let Statement::Import(import) = statement
       && import.span(ast).contains(position)
@@ -299,10 +296,10 @@ fn in_import_statement<'a>(
   None
 }
 
-fn in_module_access<'a>(
-  ast: &'a AST,
+fn in_module_access(
+  ast: &AST,
   position: Span,
-) -> Option<&'a bang_syntax::ast::expression::ModuleAccess> {
+) -> Option<&bang_syntax::ast::expression::ModuleAccess> {
   for expression in &ast.expressions {
     if let Expression::ModuleAccess(module_access) = expression {
       if module_access.span(ast).contains(position) {

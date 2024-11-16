@@ -29,11 +29,11 @@ mod test;
 /// # Examples
 /// ```
 /// use bang_syntax::parse;
-/// let ast = parse("5 + 3");
+/// let ast = parse("5 + 3".to_owned());
 ///
 /// assert!(ast.is_valid());
 /// ```
-pub fn parse(source: &str) -> AST {
+pub fn parse(source: String) -> AST {
   parser::Parser::new(source).parse()
 }
 

@@ -5,7 +5,7 @@
 use super::{expression::*, statement::*, types::*, AST};
 use std::fmt;
 
-impl fmt::Display for AST<'_> {
+impl fmt::Display for AST {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     for statement in &self.root_statements {
       statement.pretty(f, self, "", false)?;

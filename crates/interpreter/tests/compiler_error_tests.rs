@@ -22,7 +22,7 @@ fn integer_to_identifier(integer: u32) -> String {
 #[test]
 fn invalid_ast() {
   // expression
-  let ast = parse("&hello");
+  let ast = parse("&hello".to_owned());
   match compile(&ast) {
     Ok(_) => panic!("Expected an error"),
     Err(CompileError::InvalidAST) => {}
@@ -30,7 +30,7 @@ fn invalid_ast() {
   }
 
   // binary operator
-  let ast = parse("hello = 5");
+  let ast = parse("hello = 5".to_owned());
   match compile(&ast) {
     Ok(_) => panic!("Expected an error"),
     Err(CompileError::InvalidAST) => {}
@@ -38,7 +38,7 @@ fn invalid_ast() {
   }
 
   // pattern
-  let ast = parse("match x | £ -> 5 | _ -> 4");
+  let ast = parse("match x | £ -> 5 | _ -> 4".to_owned());
   match compile(&ast) {
     Ok(_) => panic!("Expected an error"),
     Err(CompileError::InvalidAST) => {}
@@ -59,11 +59,11 @@ fn too_many_local_variables() {
   }
 
   let source = generate_local_variables(254);
-  let ast = parse(&source);
+  let ast = parse(source);
   assert!(compile(&ast).is_ok());
 
   let source = generate_local_variables(257);
-  let ast = parse(&source);
+  let ast = parse(source);
   match compile(&ast) {
     Ok(_) => panic!("Expected an error"),
     Err(CompileError::TooManyLocalVariables) => {}
@@ -83,11 +83,11 @@ fn too_many_symbols() {
   }
 
   let source = generate_symbols(255);
-  let ast = parse(&source);
+  let ast = parse(source);
   assert!(compile(&ast).is_ok());
 
   let source = generate_symbols(256);
-  let ast = parse(&source);
+  let ast = parse(source);
   match compile(&ast) {
     Ok(_) => panic!("Expected an error"),
     Err(CompileError::TooManySymbols) => {}
@@ -107,11 +107,11 @@ fn too_many_constants() {
   }
 
   let source = generate_constants(u32::from(u16::MAX));
-  let ast = parse(&source);
+  let ast = parse(source);
   assert!(compile(&ast).is_ok());
 
   let source = generate_constants(u32::from(u16::MAX) + 1);
-  let ast = parse(&source);
+  let ast = parse(source);
   match compile(&ast) {
     Ok(_) => panic!("Expected an error"),
     Err(CompileError::TooManyConstants) => {}
@@ -128,7 +128,7 @@ fn too_big_jump() {
   }
   source.push_str("true }");
 
-  let ast = parse(&source);
+  let ast = parse(source);
   match compile(&ast) {
     Ok(_) => panic!("Expected an error"),
     Err(CompileError::TooBigJump) => {}

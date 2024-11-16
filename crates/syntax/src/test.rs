@@ -1,7 +1,10 @@
-use crate::{ast::AST, parse};
+use crate::ast::AST;
 use indoc::indoc;
 
-impl AST<'_> {
+fn parse(source: &str) -> AST {
+  crate::parse(source.to_owned())
+}
+impl AST {
   fn is_ok(&self) -> bool {
     self.errors.is_empty()
   }
@@ -12,7 +15,7 @@ impl AST<'_> {
 }
 
 fn parse_to_string(source: &str) -> String {
-  parse(source).to_string()
+  crate::parse(source.to_owned()).to_string()
 }
 
 #[test]

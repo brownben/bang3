@@ -40,7 +40,7 @@ pub struct TypePrimitive {
 }
 impl TypePrimitive {
   /// The name of the primitive
-  pub fn name<'source>(&self, ast: &AST<'source>) -> &'source str {
+  pub fn name<'a>(&self, ast: &'a AST) -> &'a str {
     ast.get_token_text(self.token)
   }
 
@@ -75,7 +75,7 @@ pub struct TypeVariable {
 impl TypeVariable {
   /// The name of the variable
   #[must_use]
-  pub fn name<'source>(&self, ast: &AST<'source>) -> &'source str {
+  pub fn name<'a>(&self, ast: &'a AST) -> &'a str {
     ast.get_token_text(self.name)
   }
 

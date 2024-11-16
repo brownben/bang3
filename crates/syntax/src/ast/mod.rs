@@ -21,9 +21,9 @@ pub use types::Type;
 /// Abstract Syntax Tree representing the source
 #[must_use]
 #[derive(Debug)]
-pub struct AST<'source> {
+pub struct AST {
   /// The source code which the AST is for
-  pub source: &'source str,
+  pub source: String,
   /// Index of line locations, lazily constructed when required
   line_index: OnceCell<LineIndex>,
   /// The tokens of the source
@@ -41,12 +41,14 @@ pub struct AST<'source> {
   /// Errors found during parsing
   pub errors: Vec<ParseError>,
 }
-impl<'source> AST<'source> {
-  pub(crate) fn new(source: &'source str) -> Self {
+impl AST {
+  pub(crate) fn new(source: String) -> Self {
+    let tokens = Tokeniser::from(source.as_str()).collect();
+
     Self {
       source,
       line_index: OnceCell::new(),
-      tokens: Tokeniser::from(source).collect(),
+      tokens,
 
       root_statements: Vec::new(),
       statements: Vec::new(),
@@ -77,7 +79,7 @@ impl<'source> AST<'source> {
   pub fn line_index(&self) -> &LineIndex {
     self
       .line_index
-      .get_or_init(|| LineIndex::from_source(self.source))
+      .get_or_init(|| LineIndex::from_source(&self.source))
   }
 
   /// All statements in the source
@@ -103,7 +105,7 @@ impl<'source> AST<'source> {
     TypeIdx(NonZero::new(u32::try_from(id).unwrap()).unwrap())
   }
 
-  pub(crate) fn get_token_text(&self, token: TokenIdx) -> &'source str {
+  pub(crate) fn get_token_text(&self, token: TokenIdx) -> &str {
     let token = self[token];
 
     let start = usize::try_from(token.start).unwrap();
@@ -113,7 +115,7 @@ impl<'source> AST<'source> {
   }
 }
 
-impl ops::Index<ExpressionIdx> for AST<'_> {
+impl ops::Index<ExpressionIdx> for AST {
   type Output = Expression;
 
   fn index(&self, index: ExpressionIdx) -> &Self::Output {
@@ -121,13 +123,13 @@ impl ops::Index<ExpressionIdx> for AST<'_> {
     &self.expressions[index]
   }
 }
-impl ops::IndexMut<ExpressionIdx> for AST<'_> {
+impl ops::IndexMut<ExpressionIdx> for AST {
   fn index_mut(&mut self, index: ExpressionIdx) -> &mut Self::Output {
     &mut self.expressions[usize::try_from(index.0.get()).unwrap() - 1]
   }
 }
 
-impl ops::Index<TypeIdx> for AST<'_> {
+impl ops::Index<TypeIdx> for AST {
   type Output = Type;
 
   fn index(&self, index: TypeIdx) -> &Self::Output {
@@ -135,7 +137,7 @@ impl ops::Index<TypeIdx> for AST<'_> {
     &self.types[index]
   }
 }
-impl ops::Index<StatementIdx> for AST<'_> {
+impl ops::Index<StatementIdx> for AST {
   type Output = Statement;
 
   fn index(&self, index: StatementIdx) -> &Self::Output {
@@ -143,7 +145,7 @@ impl ops::Index<StatementIdx> for AST<'_> {
     &self.statements[index]
   }
 }
-impl ops::Index<TokenIdx> for AST<'_> {
+impl ops::Index<TokenIdx> for AST {
   type Output = Token;
 
   fn index(&self, index: TokenIdx) -> &Self::Output {

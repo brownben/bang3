@@ -24,7 +24,7 @@ impl From<bang_interpreter::RuntimeError> for Error {
 }
 
 fn run(source: &str) -> Result<VM, Error> {
-  let ast = parse(source);
+  let ast = parse(source.to_owned());
   assert!(ast.is_valid());
   let chunk = compile(&ast)?;
   let mut vm = VM::new(HeapSize::Small, &StandardContext).unwrap();
@@ -904,13 +904,13 @@ fn imports() {
 
 #[test]
 fn cant_import_anything_with_empty_context() {
-  let ast = parse("from maths import { abs }");
+  let ast = parse("from maths import { abs }".to_owned());
   assert!(ast.is_valid());
   let chunk = compile(&ast).unwrap();
   let mut vm = VM::new(HeapSize::Small, &EmptyContext).unwrap();
   assert!(vm.run(&chunk).is_err());
 
-  let ast = parse("maths::abs");
+  let ast = parse("maths::abs".to_owned());
   assert!(ast.is_valid());
   let chunk = compile(&ast).unwrap();
   let mut vm = VM::new(HeapSize::Small, &EmptyContext).unwrap();

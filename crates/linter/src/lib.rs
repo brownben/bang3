@@ -20,7 +20,8 @@ mod rules;
 /// ```
 /// use bang_linter::lint;
 /// use bang_syntax::parse;
-/// let source = "5 + 3";
+///
+/// let source = "5 + 3".to_owned();
 /// let ast = parse(source);
 /// let diagnostics = lint(&ast);
 /// ```
