@@ -328,7 +328,7 @@ mod test {
 
   #[test]
   fn constant_function() {
-    let function = crate::ChunkBuilder::new("".into()).finalize();
+    let function = crate::ChunkBuilder::new("").finalize();
     let function = Value::from(ptr::from_ref(&function));
     assert!(!function.is_number());
     assert!(function.is_constant_function());

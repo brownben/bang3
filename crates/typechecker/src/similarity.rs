@@ -121,7 +121,7 @@ mod test {
   fn wikipedia_example() {
     // https://en.wikipedia.org/wiki/Jaro%E2%80%93Winkler_distance
     assert_similar!(jaro_similarity("FAREMVIEL", "FARMVILLE"), 0.88);
-    assert_similar!(jaro_winkler_similarity("FAREMVIEL", "FARMVILLE"), 0.92)
+    assert_similar!(jaro_winkler_similarity("FAREMVIEL", "FARMVILLE"), 0.92);
   }
 
   #[test]

@@ -52,7 +52,7 @@ fn too_many_local_variables() {
   fn generate_local_variables(count: u32) -> String {
     let mut source = "{\n".to_owned();
     for _ in 0..=count {
-      source.push_str(&format!("let a = 1\n"));
+      source.push_str(&"let a = 1\n");
     }
     source.push_str("  a\n}");
     source
@@ -124,7 +124,7 @@ fn too_many_constants() {
 fn too_big_jump() {
   let mut source = "if (x) {".to_owned();
   for _ in 0..=u16::MAX {
-    source.push_str(&format!("  true == true\n"));
+    source.push_str(&"  true == true\n");
   }
   source.push_str("true }");
 

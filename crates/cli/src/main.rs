@@ -5,6 +5,7 @@
 //! Complete with linter, formatter, typechecker, and language server.
 
 #![feature(let_chains)]
+#![allow(clippy::print_stdout)]
 
 mod commands;
 mod diagnostics;

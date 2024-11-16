@@ -48,6 +48,7 @@ pub struct StandardContext;
 impl Context for StandardContext {
   fn global_functions(&self) -> Vec<NativeFunction> {
     vec![
+      #[allow(clippy::print_stdout)]
       NativeFunction::new("print", |vm, arg| {
         println!("{}", arg.display(vm));
         Ok(arg)
