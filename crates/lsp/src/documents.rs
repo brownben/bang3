@@ -1,6 +1,7 @@
 use bang_syntax::{parse, AST};
+use bang_typechecker::TypeChecker;
 pub use lsp_types::Uri as FileIdentfier;
-use std::collections::HashMap;
+use std::{cell::OnceCell, collections::HashMap};
 
 #[derive(Default)]
 pub struct DocumentIndex {
@@ -21,16 +22,25 @@ impl DocumentIndex {
 pub struct Document {
   pub id: FileIdentfier,
   pub ast: AST,
+  typechecker: OnceCell<TypeChecker>,
 }
 impl Document {
   fn new(id: FileIdentfier, source: String) -> Self {
     Self {
       id,
       ast: parse(source),
+      typechecker: OnceCell::new(),
     }
   }
 
   pub fn update(&mut self, new_source: String) {
     self.ast = parse(new_source);
+    self.typechecker = OnceCell::new();
+  }
+
+  pub fn typechecker(&self) -> &TypeChecker {
+    self
+      .typechecker
+      .get_or_init(|| TypeChecker::check(&self.ast))
   }
 }

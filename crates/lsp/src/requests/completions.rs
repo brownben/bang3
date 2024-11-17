@@ -8,7 +8,7 @@ use bang_syntax::{
   ast::{Expression, Statement},
   Span, AST,
 };
-use bang_typechecker::{import_type_info, TypeChecker, VariableKind};
+use bang_typechecker::{import_type_info, VariableKind};
 
 pub fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionList {
   let position = span_from_lsp_position(position, file);
@@ -40,7 +40,7 @@ pub fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionL
     };
   }
 
-  variable_completions(&file.ast, position)
+  variable_completions(file, position)
 }
 
 fn constant_snippets() -> [lsp::CompletionItem; 11] {
@@ -119,8 +119,8 @@ fn constant_snippets() -> [lsp::CompletionItem; 11] {
   ]
 }
 
-fn variable_completions(ast: &AST, position: Span) -> lsp::CompletionList {
-  let typechecker = TypeChecker::check(ast);
+fn variable_completions(file: &Document, position: Span) -> lsp::CompletionList {
+  let typechecker = file.typechecker();
 
   let items = typechecker
     .defined_variables()

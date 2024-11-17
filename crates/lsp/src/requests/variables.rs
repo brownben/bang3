@@ -13,8 +13,8 @@ pub fn hover(file: &Document, position: lsp::Position) -> Option<lsp::Hover> {
     return Some(hover_module_access_item(&file.ast, module_access));
   }
 
-  let typechecker = TypeChecker::check(&file.ast);
-  let variable = find_variable(position, &typechecker)?;
+  let typechecker = file.typechecker();
+  let variable = find_variable(position, typechecker)?;
 
   let variable_name = &variable.name;
   let variable_type = &variable.get_type_info().unwrap().string;
@@ -44,8 +44,8 @@ fn hover_module_access_item(ast: &AST, module_access: &expression::ModuleAccess)
 pub fn goto_definition(file: &Document, position: lsp::Position) -> Option<lsp::Location> {
   let position = span_from_lsp_position(position, file);
 
-  let typechecker = TypeChecker::check(&file.ast);
-  let declaration = find_variable(position, &typechecker)?;
+  let typechecker = file.typechecker();
+  let declaration = find_variable(position, typechecker)?;
 
   Some(lsp::Location::new(
     file.id.clone(),
@@ -56,8 +56,8 @@ pub fn goto_definition(file: &Document, position: lsp::Position) -> Option<lsp::
 pub fn get_references(file: &Document, position: lsp::Position) -> Option<Vec<lsp::Location>> {
   let position = span_from_lsp_position(position, file);
 
-  let typechecker = TypeChecker::check(&file.ast);
-  let declaration = find_variable(position, &typechecker)?;
+  let typechecker = file.typechecker();
+  let declaration = find_variable(position, typechecker)?;
 
   let references = declaration
     .used
@@ -71,9 +71,9 @@ pub fn get_references(file: &Document, position: lsp::Position) -> Option<Vec<ls
 pub fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::WorkspaceEdit {
   let position = span_from_lsp_position(position, file);
 
-  let typechecker = TypeChecker::check(&file.ast);
+  let typechecker = file.typechecker();
 
-  let Some(declaration) = find_variable(position, &typechecker) else {
+  let Some(declaration) = find_variable(position, typechecker) else {
     return lsp::WorkspaceEdit::default();
   };
 
