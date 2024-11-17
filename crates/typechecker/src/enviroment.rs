@@ -2,11 +2,12 @@
 
 use crate::types::{Type, TypeArena, TypeRef, TypeScheme};
 use bang_syntax::{ast::statement::ImportItem, Span};
+use std::cell::OnceCell;
 
 /// Holds variables and where they are defined and used
 #[derive(Debug)]
 pub struct Enviroment {
-  pub(crate) variables: Vec<Variable>,
+  variables: Vec<Variable>,
   finished_variables: Vec<Variable>,
   builtin_variables: Vec<BuiltinVariable>,
   depth: u32,
@@ -78,7 +79,7 @@ impl Enviroment {
       depth: self.depth,
       type_,
 
-      type_info: None,
+      type_info: OnceCell::new(),
     });
   }
 
@@ -101,7 +102,7 @@ impl Enviroment {
       depth: self.depth,
       type_,
 
-      type_info: None,
+      type_info: OnceCell::new(),
     });
   }
 
@@ -144,26 +145,19 @@ impl Enviroment {
     }
   }
 
+  /// An iterator over all active variables in the current scope
+  pub(crate) fn variables(&self) -> impl Iterator<Item = &Variable> {
+    self.variables.iter()
+  }
+
   /// An iterator over all the variables that are defined
-  pub fn defined_variables(&self) -> impl Iterator<Item = &Variable> {
+  pub(crate) fn defined_variables(&self) -> impl Iterator<Item = &Variable> {
     self.finished_variables.iter()
   }
 
   /// An iterator over all the builtin variables that are defined
-  pub fn builtin_variables(&self) -> impl Iterator<Item = &BuiltinVariable> {
+  pub(crate) fn builtin_variables(&self) -> impl Iterator<Item = &BuiltinVariable> {
     self.builtin_variables.iter()
-  }
-
-  pub(crate) fn add_static_type_info(&mut self, types: &mut TypeArena) {
-    for variable in &mut self.finished_variables {
-      variable.type_info = Some(StaticTypeInfo {
-        string: types.type_to_string(variable.type_()),
-        kind: match types[variable.type_.type_] {
-          Type::Function(_, _) => VariableKind::Function,
-          _ => VariableKind::Variable,
-        },
-      });
-    }
   }
 }
 
@@ -191,7 +185,7 @@ pub struct Variable {
 
   /// the type of the variable, as static independant information
   /// is not automatically added, using [`Enviroment::add_static_type_info`]
-  pub type_info: Option<StaticTypeInfo>,
+  type_info: OnceCell<StaticTypeInfo>,
 }
 impl Variable {
   /// Checks if the variable is used
@@ -207,6 +201,21 @@ impl Variable {
 
   pub(crate) fn type_(&self) -> TypeRef {
     self.type_.type_
+  }
+
+  pub(crate) fn add_static_type_info(&self, types: &TypeArena) {
+    _ = self.type_info.set(StaticTypeInfo {
+      string: types.type_to_string(self.type_()),
+      kind: match types[self.type_.type_] {
+        Type::Function(_, _) => VariableKind::Function,
+        _ => VariableKind::Variable,
+      },
+    });
+  }
+
+  /// The information about the type of the variable
+  pub fn get_type_info(&self) -> Option<&StaticTypeInfo> {
+    self.type_info.get()
   }
 
   /// The location of the variable definition
@@ -227,6 +236,8 @@ pub struct BuiltinVariable {
   pub type_info: StaticTypeInfo,
 }
 
+/// The static information about the type of a variable
+/// (including the string representation of the type)
 #[derive(Debug, Clone)]
 pub struct StaticTypeInfo {
   pub string: String,

@@ -4,7 +4,7 @@ use lsp_types as lsp;
 
 use bang_linter::{lint, LintDiagnostic};
 use bang_syntax::ParseError;
-use bang_typechecker::{typecheck, TypeError};
+use bang_typechecker::{TypeChecker, TypeError};
 
 pub fn file_diagnostics(file: &Document) -> lsp::DocumentDiagnosticReport {
   let mut diagnostics = Vec::new();
@@ -16,9 +16,10 @@ pub fn file_diagnostics(file: &Document) -> lsp::DocumentDiagnosticReport {
   diagnostics.extend(lints.iter().map(|lint| diagnostic_from_lint(lint, file)));
 
   if file.ast.is_valid() {
-    let type_problems = typecheck(&file.ast);
+    let typechecker = TypeChecker::check(&file.ast);
     diagnostics.extend(
-      type_problems
+      typechecker
+        .problems()
         .iter()
         .map(|error| diagnostic_from_type_error(error, file)),
     );

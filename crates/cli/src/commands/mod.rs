@@ -176,9 +176,10 @@ pub fn lint(filename: &str) -> Result<CommandStatus, ()> {
 pub fn typecheck(filename: &str) -> Result<CommandStatus, ()> {
   let source = read_file(filename)?;
   let ast = parse(filename, source)?;
-  let errors = bang_typechecker::typecheck(&ast);
+  let typechecker = bang_typechecker::TypeChecker::check(&ast);
+  let errors = typechecker.problems();
 
-  for error in &errors {
+  for error in errors {
     println!("{}", Message::from(error));
     println!("{}", CodeFrame::new(filename, &ast.source, error.span()));
   }

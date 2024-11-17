@@ -1,10 +1,9 @@
 use crate::{
-  enviroment::Enviroment,
   exhaustive,
   similarity::similarly_named,
   stdlib::{self, ImportResult},
   types::{Type, TypeArena, TypeRef, TypeScheme},
-  TypeError,
+  TypeChecker, TypeError,
 };
 use bang_syntax::{
   ast::{self as ast, expression::*, statement::*},
@@ -12,30 +11,8 @@ use bang_syntax::{
 };
 use std::collections::BTreeMap;
 
-pub struct TypeChecker {
-  pub types: TypeArena,
-  pub env: Enviroment,
-  pub problems: Vec<TypeError>,
-}
 impl TypeChecker {
-  pub fn new() -> Self {
-    let mut types = TypeArena::new();
-    let mut env = Enviroment::new();
-
-    env.define_builtin_variables(&mut types);
-
-    Self {
-      types,
-      env,
-      problems: Vec::new(),
-    }
-  }
-
-  pub fn check_ast(&mut self, ast: &AST) -> TypeRef {
-    ast.infer(self, ast).expression()
-  }
-
-  pub fn check_unused_variables(&mut self) {
+  fn check_unused_variables(&mut self) {
     for variable in self.env.defined_variables() {
       if !variable.name.starts_with('_') && !variable.is_used() {
         if variable.is_import {
@@ -53,7 +30,11 @@ impl TypeChecker {
     }
   }
 
-  pub fn type_from_annotation(&mut self, ty: &ast::Type, ast: &AST) -> TypeRef {
+  fn new_type_var(&mut self) -> TypeRef {
+    self.types.new_type_var()
+  }
+
+  pub(crate) fn type_from_annotation(&mut self, ty: &ast::Type, ast: &AST) -> TypeRef {
     let mut variables = BTreeMap::new();
     self.type_from_annotation_inner(ty, ast, &mut variables)
   }
@@ -122,6 +103,7 @@ impl TypeChecker {
     }
   }
 
+  /// Merges two branches together, to get the combined [`ExpressionType`]
   fn merge_branches(
     &mut self,
     then_type: &ExpressionType,
@@ -166,10 +148,6 @@ impl TypeChecker {
       (None, None) => unreachable!(),
     }
   }
-
-  fn new_type_var(&mut self) -> TypeRef {
-    self.types.new_type_var()
-  }
 }
 
 pub(crate) trait InferType {
@@ -189,8 +167,11 @@ impl InferType for AST {
       statement.infer(t, self);
     }
     let result = last_statement.infer(t, self);
-    t.env
-      .exit_scope(self.root_statements.last().unwrap().span(self));
+    let end_span = self.root_statements.last().unwrap().span(self);
+    t.env.exit_scope(end_span);
+
+    // Check for unused variables
+    t.check_unused_variables();
 
     result
   }
@@ -639,10 +620,7 @@ impl InferType for Variable {
       t.problems.push(TypeError::UndefinedVariable {
         identifier: self.name(ast).to_owned(),
         span: self.span(ast),
-        did_you_mean: similarly_named(
-          self.name(ast),
-          t.env.variables.iter().map(|v| v.name.as_str()),
-        ),
+        did_you_mean: similarly_named(self.name(ast), t.env.variables().map(|v| v.name.as_str())),
       });
       TypeArena::UNKNOWN.into()
     }
@@ -666,7 +644,7 @@ impl ExpressionType {
 
   /// Get the expression type
   /// If it doesn't have an expression type, put unknown
-  fn expression(&self) -> TypeRef {
+  pub(crate) fn expression(&self) -> TypeRef {
     match self {
       Self::Expression(ty) => *ty,
       Self::Return(_) => TypeArena::UNKNOWN,

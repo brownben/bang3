@@ -4,7 +4,7 @@ use lsp_types as lsp;
 use std::collections::HashMap;
 
 use bang_syntax::{ast::expression, Span, AST};
-use bang_typechecker::{get_enviroment, import_type_info, Enviroment, Variable};
+use bang_typechecker::{import_type_info, TypeChecker, Variable};
 
 pub fn hover(file: &Document, position: lsp::Position) -> Option<lsp::Hover> {
   let position = span_from_lsp_position(position, file);
@@ -13,11 +13,11 @@ pub fn hover(file: &Document, position: lsp::Position) -> Option<lsp::Hover> {
     return Some(hover_module_access_item(&file.ast, module_access));
   }
 
-  let variables = get_enviroment(&file.ast);
-  let variable = find_variable(position, &variables)?;
+  let typechecker = TypeChecker::check(&file.ast);
+  let variable = find_variable(position, &typechecker)?;
 
   let variable_name = &variable.name;
-  let variable_type = &variable.type_info.as_ref().unwrap().string;
+  let variable_type = &variable.get_type_info().unwrap().string;
 
   Some(lsp::Hover {
     contents: lsp::HoverContents::Scalar(lsp::MarkedString::from_language_code(
@@ -44,8 +44,8 @@ fn hover_module_access_item(ast: &AST, module_access: &expression::ModuleAccess)
 pub fn goto_definition(file: &Document, position: lsp::Position) -> Option<lsp::Location> {
   let position = span_from_lsp_position(position, file);
 
-  let variables = get_enviroment(&file.ast);
-  let declaration = find_variable(position, &variables)?;
+  let typechecker = TypeChecker::check(&file.ast);
+  let declaration = find_variable(position, &typechecker)?;
 
   Some(lsp::Location::new(
     file.id.clone(),
@@ -56,9 +56,9 @@ pub fn goto_definition(file: &Document, position: lsp::Position) -> Option<lsp::
 pub fn get_references(file: &Document, position: lsp::Position) -> Option<Vec<lsp::Location>> {
   let position = span_from_lsp_position(position, file);
 
-  let variables = get_enviroment(&file.ast);
+  let typechecker = TypeChecker::check(&file.ast);
+  let declaration = find_variable(position, &typechecker)?;
 
-  let declaration = find_variable(position, &variables)?;
   let references = declaration
     .used
     .iter()
@@ -71,9 +71,9 @@ pub fn get_references(file: &Document, position: lsp::Position) -> Option<Vec<ls
 pub fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::WorkspaceEdit {
   let position = span_from_lsp_position(position, file);
 
-  let variables = get_enviroment(&file.ast);
+  let typechecker = TypeChecker::check(&file.ast);
 
-  let Some(declaration) = find_variable(position, &variables) else {
+  let Some(declaration) = find_variable(position, &typechecker) else {
     return lsp::WorkspaceEdit::default();
   };
 
@@ -111,8 +111,8 @@ pub fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::
   lsp::WorkspaceEdit::new(HashMap::from([(file.id.clone(), text_edits)]))
 }
 
-fn find_variable(position: Span, variables: &Enviroment) -> Option<&Variable> {
-  variables
+fn find_variable(position: Span, typechecker: &TypeChecker) -> Option<&Variable> {
+  typechecker
     .defined_variables()
     .filter(|variable| variable.is_active(position))
     .find(|var| {

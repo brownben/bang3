@@ -120,7 +120,8 @@ mod test {
     let source = "let string = '🏃'";
 
     let ast = bang_syntax::parse(source.to_owned());
-    let errors = bang_typechecker::typecheck(&ast);
+    let typechecker = bang_typechecker::TypeChecker::check(&ast);
+    let errors = typechecker.problems();
     let span = errors.first().unwrap().span();
 
     let start = byte_offset_to_utf16(span.start, source).try_into().unwrap();
