@@ -6,9 +6,9 @@ use crate::{
 use std::{error, fmt};
 use thin_vec::ThinVec;
 
-pub struct Parser {
+pub struct Parser<'ast> {
   /// The AST being built up by the parser
-  ast: AST,
+  ast: &'ast mut AST,
 
   /// The current token
   position: usize,
@@ -20,10 +20,10 @@ pub struct Parser {
   /// Have we encountered an error, and want to resync at the next chance?
   should_resync: bool,
 }
-impl Parser {
-  pub fn new(source: String) -> Self {
+impl<'ast> Parser<'ast> {
+  pub fn new(ast: &'ast mut AST) -> Self {
     Self {
-      ast: AST::new(source),
+      ast,
       position: 0,
       skipped_newline: false,
       function_depth: 0,
@@ -31,15 +31,13 @@ impl Parser {
     }
   }
 
-  pub fn parse(mut self) -> AST {
+  pub fn parse(mut self) {
     self.skip_newline();
 
     while !self.is_finished() {
       let statement = self.parse_statement();
       self.ast.root_statements.push(statement);
     }
-
-    self.ast
   }
 
   fn add_error(&mut self, error: ParseError) {
@@ -263,7 +261,7 @@ impl Parser {
   }
 }
 // Expressions
-impl Parser {
+impl Parser<'_> {
   fn binary(&mut self, left: ExpressionIdx, kind: TokenKind, operator: TokenIdx) -> ExpressionIdx {
     if kind == TokenKind::Equal {
       let possible_assignment = matches!(self.ast[left], Expression::Variable(_));
@@ -559,7 +557,7 @@ impl Parser {
   }
 }
 // Statements
-impl Parser {
+impl Parser<'_> {
   fn parse_statement(&mut self) -> Statement {
     self.skip_newline();
 
@@ -666,7 +664,7 @@ impl Parser {
   }
 }
 // Types
-impl Parser {
+impl Parser<'_> {
   fn parse_type(&mut self) -> TypeIdx {
     let type_ = match self.current_kind() {
       TokenKind::Identifier => self.primitive_type(),

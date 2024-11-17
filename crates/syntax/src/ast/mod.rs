@@ -24,8 +24,6 @@ pub use types::Type;
 pub struct AST {
   /// The source code which the AST is for
   pub source: String,
-  /// Index of line locations, lazily constructed when required
-  line_index: OnceCell<LineIndex>,
   /// The tokens of the source
   pub tokens: Vec<Token>,
 
@@ -40,6 +38,8 @@ pub struct AST {
 
   /// Errors found during parsing
   pub errors: Vec<ParseError>,
+  /// Index of line locations, lazily constructed when required
+  line_index: OnceCell<LineIndex>,
 }
 impl AST {
   pub(crate) fn new(source: String) -> Self {
@@ -47,7 +47,6 @@ impl AST {
 
     Self {
       source,
-      line_index: OnceCell::new(),
       tokens,
 
       root_statements: Vec::new(),
@@ -56,7 +55,22 @@ impl AST {
       types: Vec::new(),
 
       errors: Vec::new(),
+      line_index: OnceCell::new(),
     }
+  }
+
+  /// Reset the AST into an new state, so the allocation can be reused
+  pub(crate) fn reuse(&mut self, source: String) {
+    self.source = source;
+    self.tokens.clear();
+    self.tokens.extend(Tokeniser::from(self.source.as_str()));
+
+    self.line_index = OnceCell::new();
+    self.root_statements.clear();
+    self.statements.clear();
+    self.expressions.clear();
+    self.types.clear();
+    self.errors.clear();
   }
 
   /// Is the parsed AST valid, with no errors found during parsing?

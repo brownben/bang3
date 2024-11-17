@@ -34,7 +34,26 @@ mod test;
 /// assert!(ast.is_valid());
 /// ```
 pub fn parse(source: String) -> AST {
-  parser::Parser::new(source).parse()
+  let mut ast = AST::new(source);
+  parser::Parser::new(&mut ast).parse();
+  ast
+}
+
+/// Parses a source code string into an AST, reusing the allocation of a previous AST.
+///
+/// # Examples
+/// ```
+/// use bang_syntax::{parse, parse_into};
+///
+/// let mut ast = parse("5 + 3".to_owned());
+/// assert!(ast.is_valid());
+///
+/// parse_into("let x = 5 + 3".to_owned(), &mut ast);
+/// assert!(ast.is_valid());
+/// ```
+pub fn parse_into(source: String, ast: &mut AST) {
+  ast.reuse(source);
+  parser::Parser::new(ast).parse();
 }
 
 /// Get the tokens from a source code string

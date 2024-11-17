@@ -1,4 +1,4 @@
-use bang_syntax::{parse, AST};
+use bang_syntax::{parse, parse_into, AST};
 use bang_typechecker::TypeChecker;
 pub use lsp_types::Uri as FileIdentfier;
 use std::{cell::OnceCell, collections::HashMap};
@@ -34,7 +34,7 @@ impl Document {
   }
 
   pub fn update(&mut self, new_source: String) {
-    self.ast = parse(new_source);
+    parse_into(new_source, &mut self.ast);
     self.typechecker = OnceCell::new();
   }
 
