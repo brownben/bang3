@@ -212,6 +212,16 @@ impl LintRule for UnnecessaryClosure {
         context.add_diagnostic(&Self, function.span(ast));
       }
     }
+
+    if let Expression::Function(function) = &expression
+      && let Expression::Binary(binary) = unwrap(function.body(ast), ast)
+      && let BinaryOperator::Pipeline = binary.operator(ast)
+      && let Expression::Variable(variable) = unwrap(binary.left(ast), ast)
+      && variable.name(ast) == function.parameter.name(ast)
+    {
+      // Pipeline operator always has an argument so we don't have additional checks
+      context.add_diagnostic(&Self, function.span(ast));
+    }
   }
 }
 
