@@ -123,7 +123,7 @@ impl Value {
   /// SAFETY: Undefined behaviour if [Value] is not a string
   /// Use [`Value::is_string`] to check if it is a string
   #[must_use]
-  pub(crate) fn as_string<'a>(&'a self, heap: &'a Heap) -> &'a str {
+  pub(crate) fn as_string(self, heap: &Heap) -> &str {
     if self.is_object_type(STRING_TYPE_ID) {
       BangString::from(self.as_object()).as_str(heap)
     } else {

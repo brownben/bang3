@@ -75,106 +75,112 @@ macro wrap_value {
   }
 }
 
+#[allow(clippy::inline_always, reason = "function exists to simplify macros")]
+#[inline(always)]
+pub fn get_number(value: Value, vm: &VM) -> Result<f64, ErrorKind> {
+  if value.is_number() {
+    Ok(value.as_number())
+  } else {
+    Err(ErrorKind::TypeError {
+      expected: "number",
+      got: value.get_type(vm),
+    })
+  }
+}
+
+#[allow(clippy::inline_always, reason = "function exists to simplify macros")]
+#[inline(always)]
+pub fn get_string<'a>(value: Value, vm: &'a VM) -> Result<&'a str, ErrorKind> {
+  if value.is_string() {
+    Ok(value.as_string(&vm.heap))
+  } else {
+    Err(ErrorKind::TypeError {
+      expected: "string",
+      got: value.get_type(vm),
+    })
+  }
+}
+
 macro native_function {
   ($name:ident, Number, f64, $native_function:expr) => {
     NativeFunction::new(stringify!($name), |vm, arg| {
-      if arg.is_number() {
-        Ok($native_function(arg.as_number()).into())
-      } else {
-        Err(ErrorKind::TypeError { expected: "number", got: arg.get_type(vm) })
-      }
+      Ok($native_function(get_number(arg, vm)?).into())
     })
   },
 
   ($name:ident, Number Number, f64, $native_function:expr) => {
     NativeFunction::new(stringify!($name), |vm, arg| {
-      if arg.is_number() {
-        fn func(vm: &mut VM, a: Value, b: Value) -> Result<Value, ErrorKind> {
-          if b.is_number() {
-            Ok($native_function(a.as_number(), b.as_number()).into())
-          } else {
-            Err(ErrorKind::TypeError { expected: "number", got: b.get_type(vm) })
-          }
+      fn func(vm: &mut VM, a: Value, b: Value) -> Result<Value, ErrorKind> {
+        if b.is_number() {
+          Ok($native_function(a.as_number(), b.as_number()).into())
+        } else {
+          Err(ErrorKind::TypeError { expected: "number", got: b.get_type(vm) })
         }
-
-        let closure = vm.heap.allocate(NativeClosure::new(stringify!($name), func, arg));
-        Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
-      } else {
-        Err(ErrorKind::TypeError { expected: "number", got: arg.get_type(vm) })
       }
+
+      if !arg.is_number() {
+        return Err(ErrorKind::TypeError { expected: "number", got: arg.get_type(vm) });
+      }
+
+      let closure = vm.heap.allocate(NativeClosure::new(stringify!($name), func, arg));
+      Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
     })
   },
 
   ($name:ident, String, usize, $native_function:expr) => {
     NativeFunction::new(stringify!($name), |vm, arg| {
-      if arg.is_string() {
-        let result = $native_function(arg.as_string(&vm.heap));
-        #[allow(clippy::cast_precision_loss, reason = "value < 2^52")]
-        Ok((result as f64).into())
-      } else {
-        Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) })
-      }
+      let result = $native_function(get_string(arg, vm)?);
+      #[allow(clippy::cast_precision_loss, reason = "value < 2^52")]
+      Ok((result as f64).into())
     })
   },
 
   ($name:ident, String, bool, $native_function:expr) => {
     NativeFunction::new(stringify!($name), |vm, arg| {
-      if arg.is_string() {
-        Ok($native_function(arg.as_string(&vm.heap)).into())
-      } else {
-        Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) })
-      }
+      Ok($native_function(get_string(arg, vm)?).into())
     })
   },
 
   ($name:ident, String, String, $native_function:expr) => {
     NativeFunction::new(stringify!($name), |vm, arg| {
-      if arg.is_string() {
-        let result = $native_function(arg.as_string(&vm.heap));
-        Ok(vm.allocate_string(&result).into())
-      } else {
-        Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) })
-      }
+      let result = $native_function(get_string(arg, vm)?);
+      Ok(vm.allocate_string(&result).into())
     })
   },
 
   ($name:ident, String, StringSlice, $native_function:expr) => {
     NativeFunction::new(stringify!($name), |vm, arg| {
-      if arg.is_string() {
-        let arg_string = arg.as_string(&vm.heap);
-        let result = $native_function(arg_string);
+      let arg_string = get_string(arg, vm)?;
+      let result = $native_function(arg_string);
 
-        let start = result.as_ptr().addr() - arg_string.as_ptr().addr();
-        let end = start + result.len();
+      let start = result.as_ptr().addr() - arg_string.as_ptr().addr();
+      let end = start + result.len();
 
-        if start == 0 && end == arg_string.len() {
-          Ok(arg)
-        } else {
-          let closure = vm.heap.allocate(StringSlice::new(arg, start, end));
-          Ok(Value::from_object(closure, STRING_SLICE_TYPE_ID))
-        }
+      if start == 0 && end == arg_string.len() {
+        Ok(arg)
       } else {
-        Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) })
+        let closure = vm.heap.allocate(StringSlice::new(arg, start, end));
+        Ok(Value::from_object(closure, STRING_SLICE_TYPE_ID))
       }
     })
   },
 
   ($name:ident, String String, bool, $native_function:expr) => {
     NativeFunction::new(stringify!($name), |vm, arg| {
-      if arg.is_string() {
-        fn func(vm: &mut VM, a: Value, b: Value) -> Result<Value, ErrorKind> {
-          if b.is_string() {
-            Ok($native_function(a.as_string(&vm.heap), b.as_string(&vm.heap)).into())
-          } else {
-            Err(ErrorKind::TypeError { expected: "string", got: b.get_type(vm) })
-          }
+      fn func(vm: &mut VM, a: Value, b: Value) -> Result<Value, ErrorKind> {
+        if b.is_string() {
+          Ok($native_function(a.as_string(&vm.heap), b.as_string(&vm.heap)).into())
+        } else {
+          Err(ErrorKind::TypeError { expected: "string", got: b.get_type(vm) })
         }
-
-        let closure = vm.heap.allocate(NativeClosure::new(stringify!($name), func, arg));
-        Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
-      } else {
-        Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) })
       }
+
+      if !arg.is_string() {
+        return Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) });
+      }
+
+      let closure = vm.heap.allocate(NativeClosure::new(stringify!($name), func, arg));
+      Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
     })
   },
 }
