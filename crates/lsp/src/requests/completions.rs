@@ -8,7 +8,7 @@ use bang_syntax::{
   ast::{Expression, Statement},
   Span, AST,
 };
-use bang_typechecker::{import_type_info, VariableKind};
+use bang_typechecker::{import_type_info, StaticTypeInfo, VariableKind};
 
 pub fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionList {
   let position = span_from_lsp_position(position, file);
@@ -125,38 +125,17 @@ fn variable_completions(file: &Document, position: Span) -> lsp::CompletionList 
   let items = typechecker
     .defined_variables()
     .filter(|var| var.is_active(position))
-    .map(|var| (var.name.clone(), var.get_type_info().unwrap()))
+    .map(|variable| {
+      let name = &variable.name;
+      let type_info = variable.get_type_info().unwrap();
+
+      variable_completion(name, type_info, false)
+    })
     .chain(
       typechecker
         .builtin_variables()
-        .map(|var| (var.name.to_owned(), &var.type_info)),
+        .map(|variable| variable_completion(variable.name, &variable.type_info, false)),
     )
-    .map(|(name, type_info)| match type_info.kind {
-      VariableKind::Function => lsp::CompletionItem {
-        kind: Some(lsp::CompletionItemKind::FUNCTION),
-        insert_text: Some(format!("{name}($0)")),
-        insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-        label: format!("{name}(…)"),
-        label_details: Some(lsp::CompletionItemLabelDetails {
-          detail: None,
-          description: Some(type_info.string.clone()),
-        }),
-        ..Default::default()
-      },
-      VariableKind::Variable => lsp::CompletionItem {
-        kind: Some(if is_screaming_snake_case(&name) {
-          lsp::CompletionItemKind::VARIABLE
-        } else {
-          lsp::CompletionItemKind::CONSTANT
-        }),
-        label: name,
-        label_details: Some(lsp::CompletionItemLabelDetails {
-          detail: None,
-          description: Some(type_info.string.clone()),
-        }),
-        ..Default::default()
-      },
-    })
     .chain(constant_snippets())
     .chain(module_access_snippets())
     .collect();
@@ -164,6 +143,38 @@ fn variable_completions(file: &Document, position: Span) -> lsp::CompletionList 
   lsp::CompletionList {
     items,
     is_incomplete: false,
+  }
+}
+
+fn variable_completion(
+  name: &str,
+  type_info: &StaticTypeInfo,
+  in_import: bool,
+) -> lsp::CompletionItem {
+  let is_function = type_info.kind == VariableKind::Function;
+
+  lsp::CompletionItem {
+    kind: Some(match type_info.kind {
+      VariableKind::Function => lsp::CompletionItemKind::FUNCTION,
+      VariableKind::Variable if is_screaming_snake_case(name) => lsp::CompletionItemKind::CONSTANT,
+      VariableKind::Variable => lsp::CompletionItemKind::VARIABLE,
+    }),
+
+    label: if is_function && !in_import {
+      format!("{name}(…)")
+    } else {
+      name.to_owned()
+    },
+    label_details: Some(lsp::CompletionItemLabelDetails {
+      detail: None,
+      description: Some(type_info.string.clone()),
+    }),
+
+    // If it is a function, we want to use the function snippet
+    insert_text: (is_function && !in_import).then(|| format!("{name}($0)")),
+    insert_text_format: (is_function && !in_import).then_some(lsp::InsertTextFormat::SNIPPET),
+
+    ..Default::default()
   }
 }
 
@@ -185,14 +196,16 @@ fn module_completions() -> lsp::CompletionList {
 
 fn module_access_snippets() -> impl Iterator<Item = lsp::CompletionItem> {
   MODULES.iter().map(|module| lsp::CompletionItem {
+    kind: Some(lsp::CompletionItemKind::MODULE),
+
     label: (*module).to_owned(),
     label_details: Some(lsp::CompletionItemLabelDetails {
       detail: Some("::".to_owned()),
       description: None,
     }),
+
     insert_text: Some(format!("{module}::$0")),
     insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-    kind: Some(lsp::CompletionItemKind::MODULE),
 
     // Trigger a suggestions for the items in the module
     // TODO: make this generic and not reliant on VSCode
@@ -214,31 +227,10 @@ fn module_item_completions(module: &str, in_import: bool) -> lsp::CompletionList
   };
 
   let items = item_names
-    .map(|item| (*item, import_type_info(module, item)))
-    .map(|(name, type_info)| match type_info.kind {
-      VariableKind::Function if !in_import => lsp::CompletionItem {
-        kind: Some(lsp::CompletionItemKind::FUNCTION),
-        insert_text: Some(format!("{name}($0)")),
-        insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-        label: format!("{name}(…)"),
-        label_details: Some(lsp::CompletionItemLabelDetails {
-          detail: None,
-          description: Some(type_info.string.clone()),
-        }),
-        ..Default::default()
-      },
-      _ => lsp::CompletionItem {
-        kind: match type_info.kind {
-          VariableKind::Function => Some(lsp::CompletionItemKind::FUNCTION),
-          VariableKind::Variable => Some(lsp::CompletionItemKind::CONSTANT),
-        },
-        label: name.to_owned(),
-        label_details: Some(lsp::CompletionItemLabelDetails {
-          detail: None,
-          description: Some(type_info.string.clone()),
-        }),
-        ..Default::default()
-      },
+    .map(|item| {
+      let type_info = import_type_info(module, item);
+
+      variable_completion(item, &type_info, in_import)
     })
     .collect();
 

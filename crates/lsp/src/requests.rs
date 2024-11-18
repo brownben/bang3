@@ -7,6 +7,7 @@ mod completions;
 mod diagnostics;
 mod folding;
 mod format;
+mod hover;
 mod symbols;
 mod variables;
 
@@ -14,8 +15,9 @@ use completions::completions;
 use diagnostics::file_diagnostics;
 use folding::folding_ranges;
 use format::format_file;
+use hover::hover;
 use symbols::document_symbols;
-use variables::{get_references, goto_definition, hover, rename};
+use variables::{get_references, goto_definition, rename};
 
 pub fn handle(
   request: lsp_server::Request,
