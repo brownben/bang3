@@ -8,7 +8,7 @@ use bang_syntax::{
   ast::{Expression, Statement},
   Span, AST,
 };
-use bang_typechecker::{import_type_info, StaticTypeInfo, VariableKind};
+use bang_typechecker::{import_docs, import_type_info, StaticTypeInfo, VariableKind};
 
 pub fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionList {
   let position = span_from_lsp_position(position, file);
@@ -236,8 +236,9 @@ fn module_item_completions(module: &str, in_import: bool) -> lsp::CompletionList
   let items = item_names
     .map(|item| {
       let type_info = import_type_info(module, item);
+      let documentation = import_docs(module, item);
 
-      variable_completion(item, &type_info, None, in_import)
+      variable_completion(item, &type_info, documentation, in_import)
     })
     .collect();
 

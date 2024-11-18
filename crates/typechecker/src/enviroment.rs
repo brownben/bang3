@@ -1,6 +1,9 @@
 //! Tracks variables, their types, and where they are defined and used
 
-use crate::types::{Type, TypeArena, TypeRef, TypeScheme};
+use crate::{
+  stdlib::import_docs,
+  types::{Type, TypeArena, TypeRef, TypeScheme},
+};
 use bang_syntax::{ast::statement::ImportItem, Span};
 use std::cell::OnceCell;
 
@@ -74,7 +77,7 @@ impl Enviroment {
       used: Vec::new(),
       active: variable_span,
 
-      is_import: false,
+      module: None,
       alias: None,
 
       depth: self.depth,
@@ -85,7 +88,12 @@ impl Enviroment {
     });
   }
 
-  pub(crate) fn define_import(&mut self, item: &ImportItem, type_: TypeScheme) {
+  pub(crate) fn define_import(
+    &mut self,
+    item: &ImportItem,
+    type_: TypeScheme,
+    module: &'static str,
+  ) {
     let name = if let Some(alias) = &item.alias {
       alias
     } else {
@@ -98,7 +106,7 @@ impl Enviroment {
       used: Vec::new(),
       active: item.span,
 
-      is_import: true,
+      module: Some(module),
       alias: item.alias_span,
 
       depth: self.depth,
@@ -176,8 +184,8 @@ pub struct Variable {
   /// the span where the variable is active and can be used
   active: Span,
 
-  /// is the variable from an import
-  pub is_import: bool,
+  /// the module the variable is imported from if it is imported
+  pub module: Option<&'static str>,
   /// the location of the alias, if the import is aliased
   pub alias: Option<Span>,
 
@@ -196,6 +204,12 @@ impl Variable {
   /// Checks if the variable is used
   pub(crate) fn is_used(&self) -> bool {
     !self.used.is_empty()
+  }
+
+  /// Is the variable defined from an import
+  #[must_use]
+  pub fn is_import(&self) -> bool {
+    self.module.is_some()
   }
 
   /// Is the variable active at the given position
@@ -225,7 +239,11 @@ impl Variable {
 
   /// The documentation for a variable (it's doc comment)
   pub fn documentation(&self) -> Option<&str> {
-    self.documentation.as_deref()
+    if let Some(module) = self.module {
+      import_docs(module, &self.name)
+    } else {
+      self.documentation.as_deref()
+    }
   }
 
   /// The location of the variable definition

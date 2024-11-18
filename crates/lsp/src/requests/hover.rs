@@ -4,7 +4,7 @@ use crate::locations::span_from_lsp_position;
 use lsp_types as lsp;
 
 use bang_syntax::{ast::expression, Span, AST};
-use bang_typechecker::import_type_info;
+use bang_typechecker::{import_docs, import_type_info};
 
 pub fn hover(file: &Document, position: lsp::Position) -> Option<lsp::Hover> {
   let position = span_from_lsp_position(position, file);
@@ -40,7 +40,11 @@ fn hover_module_access_item(ast: &AST, module_access: &expression::ModuleAccess)
 
   let type_ = import_type_info(module_name, item_name);
 
-  let contents = type_code_block(item_name, &type_.string);
+  let mut contents = type_code_block(item_name, &type_.string);
+  if let Some(documentation) = import_docs(module_name, item_name) {
+    contents.push_str("---\n");
+    contents.push_str(documentation);
+  }
 
   lsp::Hover {
     contents: lsp::HoverContents::Markup(lsp::MarkupContent {

@@ -44,14 +44,14 @@ pub fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::
 
   let mut text_edits = Vec::new();
 
-  if declaration.is_import
+  if declaration.is_import()
     && let Some(alias) = declaration.alias
   {
     text_edits.push(lsp::TextEdit {
       range: lsp_range_from_span(alias, file),
       new_text: new_name.to_owned(),
     });
-  } else if declaration.is_import {
+  } else if declaration.is_import() {
     let mut span = declaration.span();
     span.start = span.end;
 

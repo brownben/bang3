@@ -15,7 +15,7 @@ impl TypeChecker {
   fn check_unused_variables(&mut self) {
     for variable in self.env.defined_variables() {
       if !variable.name.starts_with('_') && !variable.is_used() {
-        if variable.is_import {
+        if variable.is_import() {
           self.problems.push(TypeError::UnusedImport {
             identifier: variable.name.clone(),
             span: variable.span(),
@@ -192,7 +192,7 @@ impl InferType for Import {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     for item in self.items(ast) {
       match stdlib::import_value(&mut t.types, self.module(ast), item.name) {
-        ImportResult::Value(type_) => t.env.define_import(&item, type_),
+        ImportResult::Value { type_, module } => t.env.define_import(&item, type_, module),
         ImportResult::ModuleNotFound => {
           t.problems.push(TypeError::ModuleNotFound {
             module: self.module(ast).to_owned(),
@@ -581,7 +581,7 @@ impl InferType for Match {
 impl InferType for ModuleAccess {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     match stdlib::import_value(&mut t.types, self.module(ast), self.item(ast)) {
-      ImportResult::Value(type_) => type_.type_.into(),
+      ImportResult::Value { type_, .. } => type_.type_.into(),
       ImportResult::ModuleNotFound => {
         t.problems.push(TypeError::ModuleNotFound {
           module: self.module(ast).to_owned(),

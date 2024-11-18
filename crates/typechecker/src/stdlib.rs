@@ -7,15 +7,21 @@ use crate::{
 #[derive(Clone)]
 pub enum ImportResult {
   /// The value which was requested
-  Value(TypeScheme),
+  Value {
+    type_: TypeScheme,
+    module: &'static str,
+  },
   /// The module was not found
   ModuleNotFound,
   /// The item was not found in the module
   ItemNotFound,
 }
-impl From<TypeRef> for ImportResult {
-  fn from(value: TypeRef) -> Self {
-    ImportResult::Value(TypeScheme::monomorphic(value))
+impl From<(&'static str, TypeRef)> for ImportResult {
+  fn from((module, type_): (&'static str, TypeRef)) -> Self {
+    ImportResult::Value {
+      type_: TypeScheme::monomorphic(type_),
+      module,
+    }
   }
 }
 
@@ -25,6 +31,18 @@ pub fn import_value(types: &mut TypeArena, module: &str, item: &str) -> ImportRe
     "maths" => maths_module(types, item),
     "string" => string_module(types, item),
     _ => ImportResult::ModuleNotFound,
+  }
+}
+
+/// Get the documentation of a value imported from a module.
+#[must_use]
+pub fn import_docs(module: &str, item: &str) -> Option<&'static str> {
+  use bang_interpreter::stdlib::{maths_docs, string_docs};
+
+  match module {
+    "maths" => maths_docs(item),
+    "string" => string_docs(item),
+    _ => None,
   }
 }
 
@@ -38,8 +56,8 @@ pub fn import_type_info(module: &str, item: &str) -> StaticTypeInfo {
     "string" => string_module(&mut types, item),
     _ => ImportResult::ModuleNotFound,
   };
-  let result = if let ImportResult::Value(value) = result {
-    value.type_
+  let result = if let ImportResult::Value { type_, .. } = result {
+    type_.type_
   } else {
     TypeArena::UNKNOWN
   };
@@ -60,17 +78,19 @@ fn maths_module(types: &mut TypeArena, item: &str) -> ImportResult {
   let number_to_number = types.new_type(Type::Function(TypeArena::NUMBER, TypeArena::NUMBER));
   let number_number_to_number = types.new_type(Type::Function(TypeArena::NUMBER, number_to_number));
 
-  match item {
-    "PI" | "E" | "INFINITY" => TypeArena::NUMBER.into(),
+  let type_ref = match item {
+    "PI" | "E" | "INFINITY" | "NAN" => TypeArena::NUMBER,
 
     "floor" | "ceil" | "round" | "abs" | "sqrt" | "cbrt" | "sin" | "cos" | "tan" | "asin"
     | "acos" | "atan" | "sinh" | "cosh" | "tanh" | "asinh" | "acosh" | "atanh" | "isNan"
-    | "exp" | "ln" | "radiansToDegrees" | "degreesToRadians" => number_to_number.into(),
+    | "exp" | "ln" | "radiansToDegrees" | "degreesToRadians" => number_to_number,
 
-    "pow" | "log" => number_number_to_number.into(),
+    "pow" | "log" => number_number_to_number,
 
-    _ => ImportResult::ItemNotFound,
-  }
+    _ => return ImportResult::ItemNotFound,
+  };
+
+  ImportResult::from(("maths", type_ref))
 }
 
 fn string_module(types: &mut TypeArena, item: &str) -> ImportResult {
@@ -79,16 +99,18 @@ fn string_module(types: &mut TypeArena, item: &str) -> ImportResult {
   let string_to_string = types.new_type(Type::Function(TypeArena::STRING, TypeArena::STRING));
   let string_string_to_bool = types.new_type(Type::Function(TypeArena::STRING, string_to_bool));
 
-  match item {
-    "NEW_LINE" | "TAB" | "CARRIAGE_RETURN" => TypeArena::STRING.into(),
+  let type_ref = match item {
+    "NEW_LINE" | "TAB" | "CARRIAGE_RETURN" => TypeArena::STRING,
 
-    "length" | "byteLength" => string_to_number.into(),
-    "isEmpty" | "isAscii" => string_to_bool.into(),
-    "toLowercase" | "toUppercase" | "trim" | "trimStart" | "trimEnd" => string_to_string.into(),
-    "contains" | "startsWith" | "endsWith" => string_string_to_bool.into(),
+    "length" | "byteLength" => string_to_number,
+    "isEmpty" | "isAscii" => string_to_bool,
+    "toLowercase" | "toUppercase" | "trim" | "trimStart" | "trimEnd" => string_to_string,
+    "contains" | "startsWith" | "endsWith" => string_string_to_bool,
 
-    _ => ImportResult::ItemNotFound,
-  }
+    _ => return ImportResult::ItemNotFound,
+  };
+
+  ImportResult::from(("string", type_ref))
 }
 
 #[cfg(test)]
@@ -106,12 +128,12 @@ mod test {
 
     for item in STRING_ITEMS {
       let ty = string_module(&mut types, item);
-      assert!(matches!(ty, ImportResult::Value(_)));
+      assert!(matches!(ty, ImportResult::Value { .. }));
     }
 
     for item in MATHS_ITEMS {
       let ty = maths_module(&mut types, item);
-      assert!(matches!(ty, ImportResult::Value(_)));
+      assert!(matches!(ty, ImportResult::Value { .. }));
     }
   }
 }
