@@ -90,13 +90,14 @@ impl StringSlice {
   }
 
   pub fn as_str<'a>(&'a self, heap: &'a Heap) -> &'a str {
+    debug_assert!(self.string.is_string());
+
     &self.string.as_string(heap)[self.start..self.end]
   }
 }
 const STRING_SLICE: TypeDescriptor = TypeDescriptor {
   type_name: "string",
   trace: |vm, value, trace_value| {
-    vm.heap.mark(value);
     let slice = &vm.heap[value.cast::<StringSlice>()];
     trace_value(vm, slice.string);
   },
@@ -133,7 +134,6 @@ impl fmt::Display for Closure {
 const CLOSURE: TypeDescriptor = TypeDescriptor {
   type_name: "function",
   trace: |vm, value, trace_value| {
-    vm.heap.mark(value);
     let closure = &vm.heap[value.cast::<Closure>()];
     vm.heap.mark(*closure.upvalues);
     for upvalue in vm.heap.get_list_buffer(closure.upvalues) {
@@ -168,7 +168,7 @@ impl fmt::Display for NativeFunction {
 }
 const NATIVE_FUNCTION: TypeDescriptor = TypeDescriptor {
   type_name: "function",
-  trace: |vm, value, _trace_value| vm.heap.mark(value),
+  trace: |_vm, _value, _trace_value| {},
   display: |heap, value| heap[value.cast::<NativeFunction>()].to_string(),
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
@@ -204,7 +204,6 @@ impl fmt::Display for NativeClosure {
 const NATIVE_CLOSURE: TypeDescriptor = TypeDescriptor {
   type_name: "function",
   trace: |vm, value, trace_value| {
-    vm.heap.mark(value);
     let closure = &vm.heap[value.cast::<NativeClosure>()];
     trace_value(vm, closure.captured_value);
   },
@@ -218,7 +217,6 @@ pub const NATIVE_CLOSURE_TYPE_ID: usize = 4;
 const ALLOCATED: TypeDescriptor = TypeDescriptor {
   type_name: "allocated",
   trace: |vm, value, trace_value| {
-    vm.heap.mark(value);
     // If the allocated value is a compound value, we may need to trace the value inside
     trace_value(vm, vm.heap[value.cast::<Value>()]);
   },

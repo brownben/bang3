@@ -192,6 +192,7 @@ impl<'context> VM<'context> {
   pub fn garbage_collect(&mut self) {
     fn mark_value(vm: &VM, value: Value) {
       if value.is_object() {
+        vm.heap.mark(value.as_object::<u8>());
         (vm.types[value.object_type()].trace)(vm, value.as_object(), mark_value);
       }
     }
