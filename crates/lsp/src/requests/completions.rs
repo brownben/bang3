@@ -129,12 +129,12 @@ fn variable_completions(file: &Document, position: Span) -> lsp::CompletionList 
       let name = &variable.name;
       let type_info = variable.get_type_info().unwrap();
 
-      variable_completion(name, type_info, false)
+      variable_completion(name, type_info, variable.documentation(), false)
     })
     .chain(
       typechecker
         .builtin_variables()
-        .map(|variable| variable_completion(variable.name, &variable.type_info, false)),
+        .map(|variable| variable_completion(variable.name, &variable.type_info, None, false)),
     )
     .chain(constant_snippets())
     .chain(module_access_snippets())
@@ -149,6 +149,7 @@ fn variable_completions(file: &Document, position: Span) -> lsp::CompletionList 
 fn variable_completion(
   name: &str,
   type_info: &StaticTypeInfo,
+  documentation: Option<&str>,
   in_import: bool,
 ) -> lsp::CompletionItem {
   let is_function = type_info.kind == VariableKind::Function;
@@ -168,6 +169,12 @@ fn variable_completion(
     label_details: Some(lsp::CompletionItemLabelDetails {
       detail: None,
       description: Some(type_info.string.clone()),
+    }),
+    documentation: documentation.map(|docs| {
+      lsp::Documentation::MarkupContent(lsp::MarkupContent {
+        kind: lsp::MarkupKind::Markdown,
+        value: format!("```\n{}\n```\n{docs}", type_info.string),
+      })
     }),
 
     // If it is a function, we want to use the function snippet
@@ -230,7 +237,7 @@ fn module_item_completions(module: &str, in_import: bool) -> lsp::CompletionList
     .map(|item| {
       let type_info = import_type_info(module, item);
 
-      variable_completion(item, &type_info, in_import)
+      variable_completion(item, &type_info, None, in_import)
     })
     .collect();
 

@@ -19,7 +19,7 @@ use enviroment::{BuiltinVariable, Enviroment};
 use infer::InferType;
 use types::TypeArena;
 
-pub use enviroment::{Variable, VariableKind};
+pub use enviroment::{StaticTypeInfo, Variable, VariableKind};
 pub use error::Problem as TypeError;
 pub use stdlib::import_type_info;
 

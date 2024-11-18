@@ -221,6 +221,7 @@ impl InferType for Let {
         self.identifier(ast),
         self.identifier_span(ast),
         TypeScheme::monomorphic(function_type),
+        self.doc_comment(ast).map(|comment| comment.full_text(ast)),
       );
 
       // Infer the function type
@@ -247,6 +248,7 @@ impl InferType for Let {
       self.identifier(ast),
       self.identifier_span(ast),
       TypeScheme::monomorphic(type_),
+      self.doc_comment(ast).map(|comment| comment.full_text(ast)),
     );
     TypeArena::NEVER.into()
   }
@@ -437,6 +439,7 @@ impl InferType for Function {
       self.parameter.name(ast),
       self.parameter.span(ast),
       TypeScheme::monomorphic(parameter),
+      None,
     );
     let return_type = match self.body(ast).infer(t, ast) {
       ExpressionType::Expression(ty) | ExpressionType::Return(ty) => ty,
@@ -540,6 +543,7 @@ impl InferType for Match {
           identifier.name(ast),
           identifier.span(ast),
           TypeScheme::monomorphic(value_type),
+          None,
         );
       }
 

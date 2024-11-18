@@ -66,6 +66,7 @@ impl Enviroment {
     variable_name: &str,
     variable_span: Span,
     type_: TypeScheme,
+    documentation: Option<String>,
   ) {
     self.variables.push(Variable {
       name: variable_name.to_owned(),
@@ -80,6 +81,7 @@ impl Enviroment {
       type_,
 
       type_info: OnceCell::new(),
+      documentation,
     });
   }
 
@@ -103,6 +105,7 @@ impl Enviroment {
       type_,
 
       type_info: OnceCell::new(),
+      documentation: None,
     });
   }
 
@@ -186,6 +189,8 @@ pub struct Variable {
   /// the type of the variable, as static independant information
   /// is not automatically added, using [`Enviroment::add_static_type_info`]
   type_info: OnceCell<StaticTypeInfo>,
+  /// documentation from a doc comment for the variable
+  documentation: Option<String>,
 }
 impl Variable {
   /// Checks if the variable is used
@@ -218,6 +223,11 @@ impl Variable {
     self.type_info.get()
   }
 
+  /// The documentation for a variable (it's doc comment)
+  pub fn documentation(&self) -> Option<&str> {
+    self.documentation.as_deref()
+  }
+
   /// The location of the variable definition
   pub fn span(&self) -> Span {
     self.defined
@@ -240,11 +250,13 @@ pub struct BuiltinVariable {
 /// (including the string representation of the type)
 #[derive(Debug, Clone)]
 pub struct StaticTypeInfo {
+  /// The string representation of the type
   pub string: String,
+  /// The kind of the variable
   pub kind: VariableKind,
 }
 impl StaticTypeInfo {
-  pub fn new_function(string: &str) -> Self {
+  pub(crate) fn new_function(string: &str) -> Self {
     Self {
       string: string.to_owned(),
       kind: VariableKind::Function,

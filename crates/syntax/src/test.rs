@@ -635,6 +635,38 @@ fn comment_statement() {
     ├─ Comment (this is a different block)
   "};
   assert_eq!(ast, expected);
+
+  // doc comments
+  let ast = parse_to_string(indoc! {"
+    // all of these
+    // comments
+    // form a single block
+    let a = 1
+
+    // this is a different block
+    let function = x => x + 1
+
+    // this is not a doc comment
+
+    let b = 1
+    // neither is this
+  "});
+  let expected = indoc! {"
+    ├─ Comment (all of these comments form a single block)
+    ├─ Let 'a' =
+    │  ╰─ Number (1)
+    ├─ Comment (this is a different block)
+    ├─ Let 'function' =
+    │  ╰─ Function (function): x =>
+    │     ╰─ Binary (+)
+    │        ├─ Variable (x)
+    │        ╰─ Number (1)
+    ├─ Comment (this is not a doc comment)
+    ├─ Let 'b' =
+    │  ╰─ Number (1)
+    ├─ Comment (neither is this)
+  "};
+  assert_eq!(ast, expected);
 }
 
 #[test]

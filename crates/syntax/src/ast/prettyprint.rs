@@ -325,6 +325,10 @@ impl PrettyPrint for ImportItem<'_> {
 }
 impl PrettyPrint for Let {
   fn pretty(&self, f: &mut fmt::Formatter, ast: &AST, prefix: &str, last: bool) -> fmt::Result {
+    if let Some(doc_comment) = self.doc_comment(ast) {
+      doc_comment.pretty(f, ast, prefix, false)?;
+    }
+
     let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
     writeln!(f, "{prefix}{connector}Let '{}' =", self.identifier(ast))?;
 

@@ -4,7 +4,7 @@ use crate::{
   ast::{
     expression::{Expression, Variable},
     types::Type,
-    ExpressionIdx, TokenIdx, TypeIdx, AST,
+    ExpressionIdx, StatementIdx, TokenIdx, TypeIdx, AST,
   },
   span::Span,
   tokeniser::TokenKind,
@@ -46,12 +46,27 @@ pub struct CommentStmt {
   pub(crate) end: TokenIdx,
 }
 impl CommentStmt {
-  /// The text of the comment
+  /// The text of the comment, as an iterator for each line
   pub fn text<'a>(&self, ast: &'a AST) -> impl Iterator<Item = &'a str> {
     (self.start.range(self.end))
       .map(|idx| ast[idx])
       .filter(|token| token.kind == TokenKind::Comment)
-      .map(|token| Span::from(token).source_text(&ast.source)[2..].trim())
+      .map(|token| {
+        Span::from(token)
+          .source_text(&ast.source)
+          .trim_start_matches('/')
+          .trim()
+      })
+  }
+
+  /// The full text of the comment, as a `String`
+  pub fn full_text(&self, ast: &AST) -> String {
+    let mut output = String::new();
+    for line in self.text(ast) {
+      output.push_str(line);
+      output.push('\n');
+    }
+    output
   }
 
   /// The location of the statement
@@ -219,6 +234,7 @@ impl<'a> Iterator for ImportItemIterator<'a> {
 /// A variable declaration, e.g. `let x = 1`
 #[derive(Debug)]
 pub struct Let {
+  pub(crate) doc_comment: Option<StatementIdx>,
   pub(crate) keyword: TokenIdx,
   pub(crate) annotation: Option<TypeIdx>,
   pub(crate) identifier: Option<Variable>,
@@ -242,13 +258,23 @@ impl Let {
       .map(|module| module.span(ast))
       .unwrap_or_default()
   }
+
   /// The expression that is to be assigned to the variable
   pub fn value<'a>(&self, ast: &'a AST) -> &'a Expression {
     &ast[self.value]
   }
-  /// The type annotation  of the variable
+
+  /// The type annotation of the variable
   pub fn annotation<'a>(&self, ast: &'a AST) -> Option<&'a Type> {
     self.annotation.as_ref().map(|type_| &ast[*type_])
+  }
+
+  /// The doc comment for the variable
+  pub fn doc_comment<'a>(&self, ast: &'a AST) -> Option<&'a CommentStmt> {
+    self.doc_comment.map(|stmt| match &ast[stmt] {
+      Statement::Comment(comment) => comment,
+      _ => unreachable!("only CommentStmt is used for doc comments"),
+    })
   }
 
   /// The location of the statement

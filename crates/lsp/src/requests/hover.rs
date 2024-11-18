@@ -19,7 +19,11 @@ pub fn hover(file: &Document, position: lsp::Position) -> Option<lsp::Hover> {
   let variable_name = &variable.name;
   let variable_type = &variable.get_type_info().unwrap().string;
 
-  let contents = type_code_block(variable_name, variable_type);
+  let mut contents = type_code_block(variable_name, variable_type);
+  if let Some(documentation) = variable.documentation() {
+    contents.push_str("---\n");
+    contents.push_str(documentation);
+  }
 
   Some(lsp::Hover {
     contents: lsp::HoverContents::Markup(lsp::MarkupContent {

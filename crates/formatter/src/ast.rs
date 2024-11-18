@@ -433,6 +433,11 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for ImportItem<'a> {
 impl<'a, 'b> Formattable<'a, 'b, AST> for Let {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     f.concat([
+      if let Some(doc_comment) = self.doc_comment(ast) {
+        f.concat([doc_comment.format(f, ast), IR::AlwaysLine])
+      } else {
+        IR::Empty
+      },
       IR::Text("let "),
       IR::Text(self.identifier(ast)),
       if let Some(annotation) = self.annotation(ast) {

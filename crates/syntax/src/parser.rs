@@ -1,5 +1,7 @@
 use crate::{
-  ast::{expression::*, statement::*, types::*, ExpressionIdx, TokenIdx, TypeIdx, AST},
+  ast::{
+    expression::*, statement::*, types::*, ExpressionIdx, StatementIdx, TokenIdx, TypeIdx, AST,
+  },
   span::Span,
   tokeniser::{Token, TokenKind},
 };
@@ -564,7 +566,7 @@ impl Parser<'_> {
     match self.current_kind() {
       TokenKind::Comment => self.comment_statement(),
       TokenKind::From => self.import_statement(),
-      TokenKind::Let => self.let_statement(),
+      TokenKind::Let => self.let_statement(None),
       TokenKind::Return => self.return_statement(),
       _ => self.expression_statement(),
     }
@@ -580,6 +582,12 @@ impl Parser<'_> {
       } else {
         break;
       }
+    }
+
+    if self.current_kind() == TokenKind::Let {
+      // this is a doc comment, so we attatch it with the relevant let statement
+      let doc_comment = self.ast.add_statement(CommentStmt { start, end }.into());
+      return self.let_statement(Some(doc_comment));
     }
 
     CommentStmt { start, end }.into()
@@ -630,7 +638,7 @@ impl Parser<'_> {
     })
   }
 
-  fn let_statement(&mut self) -> Statement {
+  fn let_statement(&mut self, doc_comment: Option<StatementIdx>) -> Statement {
     let (_, keyword) = self.advance();
     let identifier = self.possibly_missing_identifier(TokenKind::Equal);
     let annotation = self.matches(TokenKind::Colon).then(|| self.parse_type());
@@ -642,6 +650,7 @@ impl Parser<'_> {
     }
 
     Statement::Let(Let {
+      doc_comment,
       keyword,
       annotation,
       identifier,
