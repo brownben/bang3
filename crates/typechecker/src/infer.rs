@@ -2,7 +2,7 @@ use crate::{
   exhaustive,
   similarity::similarly_named,
   stdlib::{self, ImportResult},
-  types::{Type, TypeArena, TypeRef, TypeScheme},
+  types::{PrimitiveType, Type, TypeArena, TypeRef, TypeScheme},
   TypeChecker, TypeError,
 };
 use bang_syntax::{
@@ -450,7 +450,7 @@ impl InferType for Function {
     };
     t.types.unify(return_type, expected_return).unwrap();
 
-    if t.types[return_type] == Type::Primitive(TypeArena::NEVER) {
+    if t.types[return_type] == Type::Primitive(PrimitiveType::Never) {
       t.problems.push(TypeError::FunctionReturnsNever {
         span: self.span(ast),
       });

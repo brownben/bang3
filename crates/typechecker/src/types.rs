@@ -18,11 +18,11 @@ impl TypeArena {
   pub fn new() -> Self {
     Self {
       types: vec![
-        Type::Primitive(Self::BOOLEAN),
-        Type::Primitive(Self::NUMBER),
-        Type::Primitive(Self::STRING),
-        Type::Primitive(Self::NEVER),
-        Type::Primitive(Self::UNKNOWN),
+        Type::Primitive(PrimitiveType::Boolean),
+        Type::Primitive(PrimitiveType::Number),
+        Type::Primitive(PrimitiveType::String),
+        Type::Primitive(PrimitiveType::Never),
+        Type::Primitive(PrimitiveType::Unknown),
       ],
       type_vars: Vec::new(),
     }
@@ -208,12 +208,11 @@ impl TypeArena {
 
     match type_ {
       Type::Primitive(primitive) => match primitive {
-        TypeArena::BOOLEAN => "boolean".to_owned(),
-        TypeArena::NUMBER => "number".to_owned(),
-        TypeArena::STRING => "string".to_owned(),
-        TypeArena::NEVER => "never".to_owned(),
-        TypeArena::UNKNOWN => "unknown".to_owned(),
-        _ => unreachable!("not a primitive type"),
+        PrimitiveType::Boolean => "boolean".to_owned(),
+        PrimitiveType::Number => "number".to_owned(),
+        PrimitiveType::String => "string".to_owned(),
+        PrimitiveType::Never => "never".to_owned(),
+        PrimitiveType::Unknown => "unknown".to_owned(),
       },
       Type::Function(argument, return_type) => {
         let mut argument_ = self.type_to_string(argument);
@@ -266,7 +265,7 @@ impl ops::Index<TypeRef> for TypeArena {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Type {
   /// A primitive value, e.g. booleans, number, strings
-  Primitive(TypeRef),
+  Primitive(PrimitiveType),
   /// Function type, e.g. `(number -> number)`
   Function(TypeRef, TypeRef),
   /// A type variable, e.g. `'a`
@@ -275,6 +274,15 @@ pub enum Type {
   /// This is only used by types stored in the enviroment. It is replaced with new
   /// type variables when the type is used.
   Quantified(u32),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PrimitiveType {
+  Boolean,
+  Number,
+  String,
+  Never,
+  Unknown,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,4 +1,4 @@
-use crate::types::{Type, TypeArena};
+use crate::types::{PrimitiveType, Type};
 use bang_syntax::{
   ast::expression::{Literal, LiteralValue, MatchArm, Pattern},
   Span, AST,
@@ -45,8 +45,8 @@ pub fn check<'a>(
   ast: &AST,
 ) -> Result {
   match value {
-    Type::Primitive(TypeArena::BOOLEAN) => boolean(arms, ast),
-    Type::Primitive(TypeArena::NUMBER) => number(arms, ast),
+    Type::Primitive(PrimitiveType::Boolean) => boolean(arms, ast),
+    Type::Primitive(PrimitiveType::Number) => number(arms, ast),
     _ => has_catch_all(arms, ast),
   }
 }
