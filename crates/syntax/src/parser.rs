@@ -382,7 +382,7 @@ impl Parser<'_> {
 
   fn function(&mut self, parameter: TokenIdx) -> ExpressionIdx {
     self.function_depth += 1;
-    let expression = self.parse_expression();
+    let expression = self.parse_expression_with_precedence(ParsePrecedence::Function);
     self.function_depth -= 1;
 
     self.ast.add_expression(Function {
@@ -747,6 +747,7 @@ enum ParsePrecedence {
   None = 1,
   Assignment, // =
   Pipeline,   // >>
+  Function,   // =>
   Or,         // or
   And,        // and
   Nullish,    // ??
@@ -766,7 +767,8 @@ impl ParsePrecedence {
     match self {
       Self::None => Self::Assignment,
       Self::Assignment => Self::Pipeline,
-      Self::Pipeline => Self::Or,
+      Self::Pipeline => Self::Function,
+      Self::Function => Self::Or,
       Self::Or => Self::And,
       Self::And => Self::Nullish,
       Self::Nullish => Self::Equality,

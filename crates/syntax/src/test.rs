@@ -715,6 +715,36 @@ fn pipeline_can_break_lines() {
 }
 
 #[test]
+fn chained_pipelines() {
+  let ast = parse_to_string("5 >> x => x * 5 >> addOne");
+  let expected = indoc! {"
+    ├─ Binary (>>)
+    │  ├─ Binary (>>)
+    │  │  ├─ Number (5)
+    │  │  ╰─ Function: x =>
+    │  │     ╰─ Binary (*)
+    │  │        ├─ Variable (x)
+    │  │        ╰─ Number (5)
+    │  ╰─ Variable (addOne)
+  "};
+  assert_eq!(ast, expected);
+
+  let ast = parse_to_string("5 >> x => (x * 5 >> addOne)");
+  let expected = indoc! {"
+    ├─ Binary (>>)
+    │  ├─ Number (5)
+    │  ╰─ Function: x =>
+    │     ╰─ Group
+    │        ╰─ Binary (>>)
+    │           ├─ Binary (*)
+    │           │  ├─ Variable (x)
+    │           │  ╰─ Number (5)
+    │           ╰─ Variable (addOne)
+  "};
+  assert_eq!(ast, expected);
+}
+
+#[test]
 fn format_string() {
   let skip_no_format = parse_to_string("`standard string`");
   let expected = indoc! {"

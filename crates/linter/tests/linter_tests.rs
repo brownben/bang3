@@ -121,9 +121,9 @@ fn unnecessary_closures() {
   assert!(lint("x => y(x) + 1").is_ok());
   assert!(lint("a => another() + a").is_ok());
 
-  assert!(lint("x => x >> y").is_err());
+  assert!(lint("x => (x >> y)").is_err());
   assert!(lint("x => { x >> (y) }").is_err());
-  assert!(lint("x => x + 1 >> y").is_ok());
+  assert!(lint("x => (x + 1 >> y)").is_ok());
 }
 
 #[test]
