@@ -23,7 +23,7 @@ smartstring = "1.0.1"
 anstream = "0.6.15"
 clap = { version = "4.5.20", features = ["derive"] }
 owo-colors = "4.1.0"
-rustyline = { version = "14.0.0", features = ["derive"] }
+rustyline = { version = "15.0.0", features = ["derive"] }
 
 # lsp
 lsp-server = "0.7.7"

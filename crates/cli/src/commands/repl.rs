@@ -6,7 +6,7 @@ use bang_syntax::{ast, tokenise, Span, TokenKind, AST};
 
 use anstream::{eprintln, println};
 use owo_colors::OwoColorize;
-use rustyline::highlight::Highlighter;
+use rustyline::highlight::{CmdKind, Highlighter};
 use rustyline::validate::{ValidationContext, ValidationResult, Validator};
 use std::borrow::Cow;
 
@@ -28,7 +28,7 @@ impl Highlighter for BangRustyLine {
     highlighted_source.into()
   }
 
-  fn highlight_char(&self, _line: &str, _pos: usize, _forced: bool) -> bool {
+  fn highlight_char(&self, _line: &str, _pos: usize, _update_kind: CmdKind) -> bool {
     true
   }
 }
