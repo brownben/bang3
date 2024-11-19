@@ -116,6 +116,9 @@ impl LanguageServer {
       // Folding Ranges
       folding_range_provider: Some(lsp_types::FoldingRangeProviderCapability::Simple(true)),
 
+      // Inlay Hints
+      inlay_hint_provider: Some(lsp_types::OneOf::Left(true)),
+
       // Doesn't provide all capabilities
       ..Default::default()
     }

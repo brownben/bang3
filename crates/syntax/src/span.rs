@@ -22,9 +22,7 @@ impl Span {
 
   /// Combine two `Span`s into one
   pub fn merge(self, other: Self) -> Self {
-    if self == Self::default() {
-      other
-    } else if other == Self::default() {
+    if other == Self::default() {
       self
     } else {
       Self::new(self.start.min(other.start), self.end.max(other.end))

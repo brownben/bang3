@@ -18,6 +18,13 @@ pub fn span_from_lsp_position(position: lsp_types::Position, file: &Document) ->
   Span { start, end: start }
 }
 
+pub fn span_from_lsp_range(range: lsp_types::Range, file: &Document) -> Span {
+  let start = span_from_lsp_position(range.start, file);
+  let end = span_from_lsp_position(range.end, file);
+
+  start.merge(end)
+}
+
 fn byte_offset_from_utf16_offset(utf16_position: u32, string: &str) -> u32 {
   let mut byte_offset = 0;
   let mut utf16_offset = 0u32;
@@ -34,29 +41,40 @@ fn byte_offset_from_utf16_offset(utf16_position: u32, string: &str) -> u32 {
   byte_offset
 }
 
-pub fn lsp_range_from_span(span: Span, file: &Document) -> lsp_types::Range {
+pub fn lsp_position_from_span_start(span: Span, file: &Document) -> lsp_types::Position {
   let lines = &file.ast.line_index();
 
-  let start = lines.line(span) - 1;
-  let start_char = span.start - lines.get_line_start(start);
+  let line = lines.line(span) - 1;
+  let char = span.start - lines.get_line_start(line);
 
-  let end = lines.final_line(span) - 1;
-  let end_char = span.end - lines.get_line_start(end);
-
-  let (start_char, end_char) = if lines.is_ascii {
-    (start_char, end_char)
+  let char = if lines.is_ascii {
+    char
   } else {
-    let start_line_source = lines.line_span(start + 1).source_text(&file.ast.source);
-    let end_line_source = lines.line_span(end + 1).source_text(&file.ast.source);
-
-    (
-      byte_offset_to_utf16(start_char, start_line_source),
-      byte_offset_to_utf16(end_char, end_line_source),
-    )
+    let line_source = lines.line_span(line + 1).source_text(&file.ast.source);
+    byte_offset_to_utf16(char, line_source)
   };
 
-  let start = lsp_types::Position::new(start.try_into().unwrap(), start_char);
-  let end = lsp_types::Position::new(end.try_into().unwrap(), end_char);
+  lsp_types::Position::new(line.try_into().unwrap(), char)
+}
+pub fn lsp_position_from_span_end(span: Span, file: &Document) -> lsp_types::Position {
+  let lines = &file.ast.line_index();
+
+  let line = lines.final_line(span) - 1;
+  let char = span.end - lines.get_line_start(line);
+
+  let char = if lines.is_ascii {
+    char
+  } else {
+    let line_source = lines.line_span(line + 1).source_text(&file.ast.source);
+    byte_offset_to_utf16(char, line_source)
+  };
+
+  lsp_types::Position::new(line.try_into().unwrap(), char)
+}
+
+pub fn lsp_range_from_span(span: Span, file: &Document) -> lsp_types::Range {
+  let start = lsp_position_from_span_start(span, file);
+  let end = lsp_position_from_span_end(span, file);
 
   lsp_types::Range::new(start, end)
 }
