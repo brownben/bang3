@@ -3,6 +3,7 @@ use bang_syntax::{
   ast::{expression::*, statement::*, types::*},
   AST,
 };
+use bumpalo::collections::Vec;
 
 impl<'a, 'b> Formattable<'a, 'b, AST> for AST {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
@@ -49,14 +50,10 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for Expression {
 impl<'a, 'b> Formattable<'a, 'b, AST> for Binary {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     if self.operator(ast) == BinaryOperator::Pipeline {
-      return f.group([
-        self.left(ast).format(f, ast),
-        f.indent([
-          IR::LineOrSpace,
-          IR::Text(">> "),
-          self.right(ast).format(f, ast),
-        ]),
-      ]);
+      // If a pipeline, flatten it so all operators break at the same time
+      let mut output = Vec::new_in(f.allocator);
+      pipeline(f, self, ast, &mut output);
+      return f.group([f.indent([IR::Concat(output)])]);
     }
 
     f.concat([
@@ -376,7 +373,7 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for CommentStmt {
 }
 impl<'a, 'b> Formattable<'a, 'b, AST> for Import {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
-    let mut items: Vec<_> = self.items(ast).collect();
+    let mut items = Vec::from_iter_in(self.items(ast), f.allocator);
     if f.config.sort_imports && !items.is_sorted_by_key(|item| item.name) {
       items.sort_by_key(|item| item.name);
     };
@@ -577,4 +574,26 @@ fn remove_leading_trailing_zeros<'a, 'b>(f: &Formatter<'a, 'b>, raw: &'a str) ->
     if negative { IR::Text("-") } else { IR::Empty },
     integer_part,
   ])
+}
+
+/// Flatten a Pipeline chain into a single group, which all breaks at once
+fn pipeline<'a, 'b>(
+  f: &Formatter<'a, 'b>,
+  expression: &Binary,
+  ast: &'a AST,
+  output: &mut Vec<IR<'a, 'b>>,
+) {
+  if let Expression::Binary(left) = expression.left(ast)
+    && left.operator(ast) == BinaryOperator::Pipeline
+  {
+    pipeline(f, left, ast, output);
+  } else {
+    output.push(expression.left(ast).format(f, ast));
+  }
+
+  output.extend([
+    IR::LineOrSpace,
+    IR::Text(">> "),
+    expression.right(ast).format(f, ast),
+  ]);
 }

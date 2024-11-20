@@ -112,7 +112,32 @@ fn binary_pipeline() {
 
   assert_format!("a >> b", "a\n  >> b", 2);
   assert_format!("a >> b >> c", "a\n  >> b\n  >> c", 2);
-  assert_format!("a >> b >> c", "a >> b\n  >> c", 6);
+  assert_format!("a >> b >> c", "a\n  >> b\n  >> c", 6);
+
+  let new_lines = indoc! {"
+    input
+      >> addOne
+      >> addTwo
+      >> x => x * 5
+      >> addThree
+  "};
+  let single_line = "input >> addOne >> addTwo >> x => x * 5 >> addThree";
+  assert_format!(new_lines, new_lines, 20);
+  assert_format!(single_line, new_lines, 20);
+  assert_format!(new_lines, single_line, 80);
+  assert_format!(single_line, single_line, 80);
+
+  let source = indoc! {"
+    input
+      >> addOne
+      >> x => {
+        let a = x + 1
+        let b = x + 2
+        a / b
+      }
+      >> print
+  "};
+  assert_format!(source, source, 20);
 }
 
 #[test]

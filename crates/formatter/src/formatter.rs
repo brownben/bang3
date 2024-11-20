@@ -51,7 +51,7 @@ impl<'ast: 'allocator, 'allocator> Formatter<'ast, 'allocator> {
   ) -> IR<'ast, 'allocator> {
     let ir = match N {
       1 => mem::take(&mut ir[0]),
-      _ => IR::Concat(Vec::from_iter_in(ir, self.allocator)),
+      _ => self.concat(ir),
     };
 
     IR::Indent(Box::new_in(ir, self.allocator))
@@ -60,9 +60,14 @@ impl<'ast: 'allocator, 'allocator> Formatter<'ast, 'allocator> {
   /// Create a new group, an option for the formatter to break the source on
   pub(crate) fn group<const N: usize>(
     &self,
-    ir: [IR<'ast, 'allocator>; N],
+    mut ir: [IR<'ast, 'allocator>; N],
   ) -> IR<'ast, 'allocator> {
-    IR::Group(Box::new_in(self.concat(ir), self.allocator))
+    let ir = match N {
+      1 => mem::take(&mut ir[0]),
+      _ => self.concat(ir),
+    };
+
+    IR::Group(Box::new_in(ir, self.allocator))
   }
 
   /// Create a new group, an option for the formatter to break the source on
@@ -80,9 +85,12 @@ impl<'ast: 'allocator, 'allocator> Formatter<'ast, 'allocator> {
   /// Merge multiple IRs into a single IR
   pub(crate) fn concat<const N: usize>(
     &self,
-    ir: [IR<'ast, 'allocator>; N],
+    mut ir: [IR<'ast, 'allocator>; N],
   ) -> IR<'ast, 'allocator> {
-    IR::Concat(Vec::from_iter_in(ir, self.allocator))
+    match N {
+      1 => mem::take(&mut ir[0]),
+      _ => IR::Concat(Vec::from_iter_in(ir, self.allocator)),
+    }
   }
 
   /// Merge multiple IRs together from an iterator
