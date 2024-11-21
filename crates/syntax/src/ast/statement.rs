@@ -11,7 +11,9 @@ use crate::{
 };
 
 /// A statement in the source code.
-/// They don't produce a value, and are delimited by newlines.
+///
+/// They don't produce a value, but can perform an action like defining a variable or returning.
+/// They are delimited by newlines.
 #[must_use]
 #[derive(Debug)]
 pub enum Statement {

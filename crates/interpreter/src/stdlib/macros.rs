@@ -18,9 +18,7 @@ pub macro module($module_name:ident, $module_items_name:ident, $module_docs_name
   )*
 }) {
   #[allow(unused_variables)]
-  #[doc = "The `"]
-  #[doc = stringify!($module_name)]
-  #[doc = "` module of Bang's Standard Library"]
+  #[doc = concat!("The `", stringify!($module_name), "` module of Bang's Standard Library")]
   pub fn $module_name(vm: &mut VM, item: &str) -> ImportResult {
     match item {
       $(stringify!($constant_name) => wrap_value!($constant_type, vm, $constant),)*
@@ -33,17 +31,13 @@ pub macro module($module_name:ident, $module_items_name:ident, $module_docs_name
     }
   }
 
-  #[doc = "All the items in the `"]
-  #[doc = stringify!($module_name)]
-  #[doc = "` module"]
+  #[doc = concat!("All the items in the `", stringify!($module_name), "` module")]
   pub const $module_items_name: [&str; ${count($constant_name)} + ${count($function_name)}] = [
     $(stringify!($constant_name),)*
     $(stringify!($function_name),)*
   ];
 
-  #[doc = "Get doc comments for the items in the `"]
-  #[doc = stringify!($module_name)]
-  #[doc = "` module"]
+  #[doc = concat!("Get doc comments for the items in the `", stringify!($module_name), "` module")]
   #[must_use] pub fn $module_docs_name(item: &str) -> Option<&'static str> {
     match item {
       $(

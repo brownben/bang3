@@ -1,5 +1,6 @@
 //! # Standard library
-//! Standard library definition for Bang
+//!
+//! Definitions for modules in the standard library.
 
 use crate::{object::NativeFunction, Value, VM};
 use std::fmt;

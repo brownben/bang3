@@ -3,7 +3,7 @@
 //! A tool to consistently format source code.
 //!
 //! Works in stages:
-//! - Takes the parsed AST and converts it into an intermediate representation ([`formatter::IR`])
+//! - Takes the parsed AST and converts it into an intermediate representation `formatter::IR`
 //! - Then calculates how much of the intermediate representation it can fit in printWidth
 //! - Converts to a second IR which can be directly printed
 //!
@@ -23,14 +23,19 @@ mod formatter;
 /// ```
 /// use bang_formatter::{format, FormatterConfig};
 /// use bang_syntax::parse;
-/// let source = "5 + 3".to_owned();
-/// let ast = parse(source);
+///
+/// let ast = parse("5 + 3".to_owned());
+///
 /// let config = FormatterConfig::default();
 /// let formatted = format(&ast, config);
+///
+/// assert_eq!(formatted.trim(), "5 + 3");
 /// ```
 #[must_use]
 pub fn format(ast: &bang_syntax::AST, config: FormatterConfig) -> String {
   let allocator = bumpalo::Bump::new();
   formatter::Formatter::format(ast, config, &allocator)
 }
+
+#[doc(inline)]
 pub use config::Config as FormatterConfig;

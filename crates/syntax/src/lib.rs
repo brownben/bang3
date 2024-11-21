@@ -61,6 +61,7 @@ pub fn tokenise(source: &str) -> impl Iterator<Item = tokeniser::Token> + '_ {
   tokeniser::Tokeniser::from(source)
 }
 
+#[doc(inline)]
 pub use ast::AST;
 pub use parser::ParseError;
 pub use span::{LineIndex, Span};

@@ -5,7 +5,7 @@ use crate::{
   span::Span,
 };
 
-/// An expression, which can be evaluated to a value
+/// An type annotation for a variable
 #[must_use]
 #[derive(Debug)]
 pub enum Type {

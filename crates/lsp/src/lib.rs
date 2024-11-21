@@ -1,5 +1,20 @@
 //! # Language Server Protocol
 //! Implements the Language Server Protocol for the Bang language.
+//!
+//! Supports the following features:
+//! - Formatting
+//! - Diagnostics
+//! - Folding Ranges
+//! - Go to Definition
+//! - Get References
+//! - Rename Variable
+//! - Document Symbols
+//! - Inlay Hints (for variable declaration types)
+//! - Type and Documentation on Variable Hover
+//! - Completion Suggestions
+//!   - Basic Snippets
+//!   - Variables in Scope
+//!   - Module Items in Import
 
 #![feature(let_chains)]
 #![deny(unsafe_code)]

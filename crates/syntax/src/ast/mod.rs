@@ -14,8 +14,11 @@ mod prettyprint;
 pub mod statement;
 pub mod types;
 
+#[doc(inline)]
 pub use expression::Expression;
+#[doc(inline)]
 pub use statement::Statement;
+#[doc(inline)]
 pub use types::Type;
 
 /// Abstract Syntax Tree representing the source
