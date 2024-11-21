@@ -694,15 +694,16 @@ fn let_statement_missing_parts() {
 
 #[test]
 fn pipeline_can_break_lines() {
-  let ast = parse_to_string("5 \n    >> add3");
+  let ast = parse("5 \n    >> add3");
   let expected = indoc! {"
     ├─ Binary (>>)
     │  ├─ Number (5)
     │  ╰─ Variable (add3)
   "};
-  assert_eq!(ast, expected);
+  assert!(ast.is_ok());
+  assert_eq!(ast.to_string(), expected);
 
-  let ast = parse_to_string("let x = 5 \n    >> add3\n>>times2");
+  let ast = parse("let x = 5 \n    >> add3\n>>times2");
   let expected = indoc! {"
     ├─ Let 'x' =
     │  ╰─ Binary (>>)
@@ -711,7 +712,27 @@ fn pipeline_can_break_lines() {
     │     │  ╰─ Variable (add3)
     │     ╰─ Variable (times2)
   "};
-  assert_eq!(ast, expected);
+  assert!(ast.is_ok());
+  assert_eq!(ast.to_string(), expected);
+
+  let ast = parse(indoc! {"
+    let x = (
+      5
+        >> add3
+        >> times2
+    )
+  "});
+  let expected = indoc! {"
+    ├─ Let 'x' =
+    │  ╰─ Group
+    │     ╰─ Binary (>>)
+    │        ├─ Binary (>>)
+    │        │  ├─ Number (5)
+    │        │  ╰─ Variable (add3)
+    │        ╰─ Variable (times2)
+  "};
+  assert!(ast.is_ok());
+  assert_eq!(ast.to_string(), expected);
 }
 
 #[test]

@@ -86,6 +86,13 @@ impl<'ast> Parser<'ast> {
     }
   }
 
+  fn skip_single_newline(&mut self) {
+    if self.current_kind() == TokenKind::EndOfLine {
+      self.position += 1;
+      self.skipped_newline = true;
+    }
+  }
+
   fn expect(&mut self, kind: TokenKind) -> Option<TokenIdx> {
     if self.current_kind() == kind {
       Some(self.advance().1)
@@ -142,19 +149,15 @@ impl<'ast> Parser<'ast> {
   }
 
   fn parse_expression_with_newline(&mut self) -> ExpressionIdx {
-    let mut expression = self.parse_expression_with_precedence(ParsePrecedence::LOWEST);
+    let expression = self.parse_expression_with_precedence(ParsePrecedence::LOWEST);
     self.resync_if_error(TokenKind::EndOfLine);
 
-    loop {
-      self.skip_newline();
-      match self.current_kind() {
-        // allow block to end without newline
-        TokenKind::RightCurly => break,
-        // allow pipeline operator to start after a newline - different to other operators
-        TokenKind::RightRight => expression = self.pipeline(expression),
-        // else check for a new-line
-        _ => break self.expect_newline(),
-      }
+    self.skip_newline();
+    match self.current_kind() {
+      // allow block to end without newline
+      TokenKind::RightCurly => {}
+      // else check for a new-line
+      _ => self.expect_newline(),
     }
 
     expression
@@ -171,7 +174,10 @@ impl<'ast> Parser<'ast> {
       }
     };
 
-    while precedence <= ParsePrecedence::from(self.current_kind()) && !self.skipped_newline {
+    self.skip_single_newline();
+    while precedence <= ParsePrecedence::from(self.current_kind())
+      && (!self.skipped_newline || self.current_kind() == TokenKind::RightRight)
+    {
       let (kind, token) = self.advance();
       previous = self.infix_expression(previous, kind, token);
     }
@@ -531,22 +537,6 @@ impl Parser<'_> {
         Pattern::Invalid
       }
     }
-  }
-
-  /// Parses a pipeline expression
-  ///
-  /// This is an infix expression, but is the special case where the operator may be on
-  ///  the next line, which is not allowed for other operators and handled in the
-  ///  [`parse_expression_with_newline`] function.
-  fn pipeline(&mut self, left: ExpressionIdx) -> ExpressionIdx {
-    let (_, operator) = self.advance();
-    let right = self.parse_expression_with_precedence(ParsePrecedence::Pipeline.next());
-
-    self.ast.add_expression(Binary {
-      left,
-      operator,
-      right,
-    })
   }
 
   fn unary(&mut self, operator: TokenIdx) -> ExpressionIdx {
