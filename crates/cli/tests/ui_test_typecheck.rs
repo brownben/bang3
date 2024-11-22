@@ -30,6 +30,27 @@ fn fibonacci_example() {
 }
 
 #[test]
+fn unused_variable() {
+  let source = indoc! {"
+    let hello = 5
+  "};
+  let output = run_typecheck(source);
+
+  assert_eq!(
+    output,
+    indoc! {"
+      ⚠ Warning: Unused Variable
+      variable `hello` is declared but never used
+      hint: if this is intentional prefix with a underscore
+
+          ╭─[STDIN:1]
+        1 │ let hello = 5
+      ────╯
+    "}
+  );
+}
+
+#[test]
 fn unknown_variable_with_suggestion() {
   let source = indoc! {"
     let hello = 5
@@ -112,6 +133,88 @@ fn unknown_module_without_suggestion() {
 
           ╭─[STDIN:1]
         1 │ from wiggle import { sin }
+      ────╯
+    "}
+  );
+}
+
+#[test]
+fn unknown_module_item_with_suggestion() {
+  let source = indoc! {"
+    from maths import { sine }
+  "};
+  let output = run_typecheck(source);
+
+  assert_eq!(
+    output,
+    indoc! {"
+      ✕ Error: Item Not Found
+      could not find `sine` in `maths`
+      hint: an item with a similar name exists in `maths`, did you mean `sin`?
+
+          ╭─[STDIN:1]
+        1 │ from maths import { sine }
+      ────╯
+    "}
+  );
+}
+
+#[test]
+fn unknown_module_item_without_suggestion() {
+  let source = indoc! {"
+    from maths import { farty }
+  "};
+  let output = run_typecheck(source);
+
+  assert_eq!(
+    output,
+    indoc! {"
+      ✕ Error: Item Not Found
+      could not find `farty` in `maths`
+
+          ╭─[STDIN:1]
+        1 │ from maths import { farty }
+      ────╯
+    "}
+  );
+}
+
+#[test]
+fn unknown_type_annotation_with_suggestion() {
+  let source = indoc! {"
+    let _x: strings = ''
+  "};
+  let output = run_typecheck(source);
+
+  assert_eq!(
+    output,
+    indoc! {"
+      ✕ Error: Unknown Type Annotation
+      type annotation is not a valid type
+      hint: a type with a similar name exists, did you mean `string`?
+
+          ╭─[STDIN:1]
+        1 │ let _x: strings = ''
+      ────╯
+    "}
+  );
+}
+
+#[test]
+fn unknown_type_annotation_without_suggestion() {
+  let source = indoc! {"
+    let _x: farty = ''
+  "};
+  let output = run_typecheck(source);
+
+  assert_eq!(
+    output,
+    indoc! {"
+      ✕ Error: Unknown Type Annotation
+      type annotation is not a valid type
+
+          ╭─[STDIN:1]
+        1 │ let _x: farty = ''
       ────╯
     "}
   );

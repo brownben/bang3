@@ -1,9 +1,7 @@
 //! Tracks variables, their types, and where they are defined and used
 
-use crate::{
-  stdlib::import_docs,
-  types::{Type, TypeArena, TypeRef, TypeScheme},
-};
+use crate::stdlib::StdlibModule;
+use crate::types::{Type, TypeArena, TypeRef, TypeScheme};
 use bang_syntax::{ast::statement::ImportItem, Span};
 use std::cell::OnceCell;
 
@@ -240,7 +238,7 @@ impl Variable {
   /// The documentation for a variable (it's doc comment)
   pub fn documentation(&self) -> Option<&str> {
     if let Some(module) = self.module {
-      import_docs(module, &self.name)
+      StdlibModule::get(module).docs(&self.name)
     } else {
       self.documentation.as_deref()
     }

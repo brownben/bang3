@@ -21,7 +21,7 @@ use types::TypeArena;
 
 pub use enviroment::{StaticTypeInfo, Variable, VariableKind};
 pub use error::Problem as TypeError;
-pub use stdlib::{import_docs, import_type_info};
+pub use stdlib::StdlibModule;
 
 /// Type checker to infer types of Bang code, and check it is correct
 pub struct TypeChecker {

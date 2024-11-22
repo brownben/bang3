@@ -3,12 +3,12 @@ use crate::documents::Document;
 use crate::locations::span_from_lsp_position;
 use lsp_types as lsp;
 
-use bang_interpreter::stdlib::{MATHS_ITEMS, MODULES, STRING_ITEMS};
+use bang_interpreter::stdlib::MODULES;
 use bang_syntax::{
   ast::{Expression, Statement},
   Span, AST,
 };
-use bang_typechecker::{import_docs, import_type_info, StaticTypeInfo, VariableKind};
+use bang_typechecker::{StaticTypeInfo, StdlibModule, VariableKind};
 
 pub fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionList {
   let position = span_from_lsp_position(position, file);
@@ -227,16 +227,14 @@ fn module_access_snippets() -> impl Iterator<Item = lsp::CompletionItem> {
 }
 
 fn module_item_completions(module: &str, in_import: bool) -> lsp::CompletionList {
-  let item_names = match module {
-    "maths" => MATHS_ITEMS.iter(),
-    "string" => STRING_ITEMS.iter(),
-    _ => [].iter(),
-  };
+  let module = StdlibModule::get(module);
 
-  let items = item_names
+  let items = module
+    .items()
+    .iter()
     .map(|item| {
-      let type_info = import_type_info(module, item);
-      let documentation = import_docs(module, item);
+      let type_info = module.type_info(item);
+      let documentation = module.docs(item);
 
       variable_completion(item, &type_info, documentation, in_import)
     })

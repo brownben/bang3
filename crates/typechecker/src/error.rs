@@ -111,11 +111,15 @@ pub enum Problem {
     item: String,
     /// The location of the error
     span: Span,
+    /// Suggestion for which item could be meant instead
+    did_you_mean: Option<String>,
   },
   /// Use of unknown type annotation
   UnknownTypeAnnotation {
     /// The location of the error
     span: Span,
+    /// Suggestion for which type could be meant instead
+    did_you_mean: Option<String>,
   },
 }
 impl Problem {
@@ -154,7 +158,7 @@ impl Problem {
         format!("expected type `{expected}`, but recieved `{given}`")
       }
       Self::UnusedVariable { identifier, .. } => {
-        format!("variable `{identifier}` is declared but never used. if this is intentional prefix with a underscore")
+        format!("variable `{identifier}` is declared but never used")
       }
       Self::UnusedImport { identifier, .. } => format!("`{identifier}` is imported but never used"),
       Self::MissingPattern { message, .. } => message.clone(),
@@ -196,6 +200,9 @@ impl Problem {
   #[must_use]
   pub fn suggestion(&self) -> Option<String> {
     match self {
+      Self::UnusedVariable { .. } => {
+        Some("if this is intentional prefix with a underscore".to_owned())
+      }
       Self::UndefinedVariable {
         did_you_mean: Some(did_you_mean),
         ..
@@ -207,6 +214,19 @@ impl Problem {
         ..
       } => Some(format!(
         "a module with a similar name exists, did you mean `{did_you_mean}`?",
+      )),
+      Self::UnknownTypeAnnotation {
+        did_you_mean: Some(did_you_mean),
+        ..
+      } => Some(format!(
+        "a type with a similar name exists, did you mean `{did_you_mean}`?",
+      )),
+      Self::ItemNotFound {
+        module,
+        did_you_mean: Some(did_you_mean),
+        ..
+      } => Some(format!(
+        "an item with a similar name exists in `{module}`, did you mean `{did_you_mean}`?",
       )),
       _ => None,
     }
@@ -254,7 +274,7 @@ impl Problem {
       | Self::FunctionReturnsNever { span }
       | Self::ModuleNotFound { span, .. }
       | Self::ItemNotFound { span, .. }
-      | Self::UnknownTypeAnnotation { span } => *span,
+      | Self::UnknownTypeAnnotation { span, .. } => *span,
     }
   }
 }

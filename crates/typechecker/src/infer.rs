@@ -1,7 +1,7 @@
 use crate::{
   exhaustive,
   similarity::similarly_named,
-  stdlib::{self, ImportResult},
+  stdlib::{self, ImportResult, StdlibModule},
   types::{PrimitiveType, Type, TypeArena, TypeRef, TypeScheme},
   TypeChecker, TypeError,
 };
@@ -46,6 +46,7 @@ impl TypeChecker {
     variables: &mut BTreeMap<&'a str, TypeRef>,
   ) -> TypeRef {
     use bang_syntax::ast::types::{PrimitiveType, Type as Annotation};
+    const TYPE_NAMES: [&str; 4] = ["number", "string", "boolean", "_"];
 
     match ty {
       Annotation::Primitive(primitive) => match primitive.type_(ast) {
@@ -56,6 +57,7 @@ impl TypeChecker {
         PrimitiveType::Unknown => {
           self.problems.push(TypeError::UnknownTypeAnnotation {
             span: primitive.span(ast),
+            did_you_mean: similarly_named(primitive.name(ast), TYPE_NAMES),
           });
           TypeArena::UNKNOWN
         }
@@ -190,9 +192,11 @@ impl InferType for Statement {
 }
 impl InferType for Import {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
+    let module = StdlibModule::get(self.module(ast));
+
     for item in self.items(ast) {
-      match stdlib::import_value(&mut t.types, self.module(ast), item.name) {
-        ImportResult::Value { type_, module } => t.env.define_import(&item, type_, module),
+      match module.import_value(&mut t.types, item.name) {
+        ImportResult::Value(type_) => t.env.define_import(&item, type_, module.name()),
         ImportResult::ModuleNotFound => {
           t.problems.push(TypeError::ModuleNotFound {
             module: self.module(ast).to_owned(),
@@ -205,6 +209,7 @@ impl InferType for Import {
             module: self.module(ast).to_owned(),
             item: item.name.to_owned(),
             span: item.span,
+            did_you_mean: similarly_named(item.name, module.items().iter().copied()),
           });
         }
       };
@@ -228,8 +233,11 @@ impl InferType for Let {
       let mut expression_type = self.value(ast).infer(t, ast).expression();
       if let Some(annotation) = self.annotation(ast) {
         let annotation_type = t.type_from_annotation(annotation, ast);
-        t.assert_type_strict(annotation_type, expression_type, self.value(ast).span(ast));
-        expression_type = annotation_type;
+
+        if annotation_type != TypeArena::UNKNOWN {
+          t.assert_type_strict(annotation_type, expression_type, self.value(ast).span(ast));
+          expression_type = annotation_type;
+        }
       }
 
       // Update the variable type to be the inferred type
@@ -241,8 +249,11 @@ impl InferType for Let {
     let mut type_ = self.value(ast).infer(t, ast).expression();
     if let Some(annotation) = self.annotation(ast) {
       let annotation_type = t.type_from_annotation(annotation, ast);
-      t.assert_type_strict(annotation_type, type_, self.value(ast).span(ast));
-      type_ = annotation_type;
+
+      if annotation_type != TypeArena::UNKNOWN {
+        t.assert_type_strict(annotation_type, type_, self.value(ast).span(ast));
+        type_ = annotation_type;
+      }
     }
     t.env.define_variable(
       self.identifier(ast),
@@ -580,8 +591,10 @@ impl InferType for Match {
 }
 impl InferType for ModuleAccess {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
-    match stdlib::import_value(&mut t.types, self.module(ast), self.item(ast)) {
-      ImportResult::Value { type_, .. } => type_.type_.into(),
+    let module = StdlibModule::get(self.module(ast));
+
+    match module.import_value(&mut t.types, self.item(ast)) {
+      ImportResult::Value(type_) => type_.type_.into(),
       ImportResult::ModuleNotFound => {
         t.problems.push(TypeError::ModuleNotFound {
           module: self.module(ast).to_owned(),
@@ -595,6 +608,7 @@ impl InferType for ModuleAccess {
           module: self.module(ast).to_owned(),
           item: self.item(ast).to_owned(),
           span: self.span(ast),
+          did_you_mean: similarly_named(self.item(ast), module.items().iter().copied()),
         });
         TypeArena::UNKNOWN.into()
       }
