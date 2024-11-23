@@ -94,6 +94,13 @@ fn binary_pipeline() {
 
   let not_callable = "4 >> 5";
   assert!(has_type_error(not_callable));
+
+  let function_didnt_want_arg = indoc! {"
+    let f = _ => 7
+
+    'hello' >> f
+  "};
+  assert!(has_type_error(function_didnt_want_arg));
 }
 
 #[test]
@@ -127,7 +134,7 @@ fn call() {
     let a = _ => 7
     a(55)
   "};
-  assert_eq!(synthesize(no_parameter_with_argument), "number");
+  assert_eq!(synthesize_has_error(no_parameter_with_argument), "number");
 
   assert!(has_type_error("false()"));
   assert!(has_type_error("4.5()"));
@@ -382,11 +389,11 @@ fn empty_ast() {
 #[test]
 fn expression_has_error() {
   assert_eq!(synthesize_has_error("let a = -false\na"), "number");
-  assert_eq!(synthesize_has_error("_ => -false"), "^a => number");
+  assert_eq!(synthesize_has_error("_ => -false"), "_ => number");
 
   assert_eq!(
     synthesize_has_error("let a = _ => -false\na"),
-    "^a => number"
+    "_ => number"
   );
 }
 

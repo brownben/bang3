@@ -182,12 +182,12 @@ impl Enviroment {
   }
 
   /// An iterator over all active variables in the current scope
-  pub(crate) fn variables(&self) -> impl Iterator<Item = &Variable> {
+  pub(crate) fn variables(&self) -> impl DoubleEndedIterator<Item = &Variable> {
     self.variables.iter()
   }
 
   /// An iterator over all the variables that are defined
-  pub(crate) fn finished_variables(&self) -> impl Iterator<Item = &Variable> {
+  pub(crate) fn finished_variables(&self) -> impl DoubleEndedIterator<Item = &Variable> {
     self.finished_variables.iter()
   }
 }
@@ -272,6 +272,7 @@ impl Variable {
     _ = self.type_info.set(StaticTypeInfo {
       string: types.type_to_string(self.type_()),
       kind: match types[self.type_.type_] {
+        Type::Function(arg, _) if types.is_never(arg) => VariableType::FunctionNoArgs,
         Type::Function(_, _) => VariableType::Function,
         _ => VariableType::Variable,
       },
@@ -338,4 +339,16 @@ pub enum VariableType {
   Variable,
   /// A function
   Function,
+  /// A function which expects no arguments
+  FunctionNoArgs,
+}
+impl VariableType {
+  /// Is the variable a function?
+  #[must_use]
+  pub fn is_function(&self) -> bool {
+    match self {
+      VariableType::Variable => false,
+      VariableType::Function | VariableType::FunctionNoArgs => true,
+    }
+  }
 }

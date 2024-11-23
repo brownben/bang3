@@ -147,19 +147,17 @@ fn variable_completion(
   documentation: Option<&str>,
   in_import: bool,
 ) -> lsp::CompletionItem {
-  let is_function = type_info.kind == VariableType::Function;
-
   lsp::CompletionItem {
     kind: Some(match type_info.kind {
-      VariableType::Function => lsp::CompletionItemKind::FUNCTION,
+      VariableType::Function | VariableType::FunctionNoArgs => lsp::CompletionItemKind::FUNCTION,
       VariableType::Variable if is_screaming_snake_case(name) => lsp::CompletionItemKind::CONSTANT,
       VariableType::Variable => lsp::CompletionItemKind::VARIABLE,
     }),
 
-    label: if is_function && !in_import {
-      format!("{name}(…)")
-    } else {
-      name.to_owned()
+    label: match type_info.kind {
+      VariableType::Function if !in_import => format!("{name}(…)"),
+      VariableType::FunctionNoArgs if !in_import => format!("{name}()"),
+      _ => name.to_owned(),
     },
     label_details: Some(lsp::CompletionItemLabelDetails {
       detail: None,
@@ -173,8 +171,15 @@ fn variable_completion(
     }),
 
     // If it is a function, we want to use the function snippet
-    insert_text: (is_function && !in_import).then(|| format!("{name}($0)")),
-    insert_text_format: (is_function && !in_import).then_some(lsp::InsertTextFormat::SNIPPET),
+    insert_text: match type_info.kind {
+      VariableType::Function if !in_import => Some(format!("{name}($0)")),
+      VariableType::FunctionNoArgs if !in_import => Some(format!("{name}()")),
+      _ => Some(name.to_owned()),
+    },
+    insert_text_format: match type_info.kind {
+      VariableType::Function if !in_import => Some(lsp::InsertTextFormat::SNIPPET),
+      _ => None,
+    },
 
     ..Default::default()
   }

@@ -71,6 +71,13 @@ pub enum Problem {
     /// The location of the error
     span: Span,
   },
+  /// Extra argument
+  ExtraArgument {
+    /// The type that was recieved
+    given: String,
+    /// The location of the error
+    span: Span,
+  },
   /// Expected both arms to return the same type, but they don't
   BranchesDontMatch {
     /// The type of the first arm
@@ -136,6 +143,7 @@ impl Problem {
       Self::NotCallable { .. } => "Type Not Callable",
       Self::IncorrectArgument { .. } => "Incorrect Argument",
       Self::MissingArgument { .. } => "Missing Argument",
+      Self::ExtraArgument { .. } => "Extra Argument",
       Self::BranchesDontMatch { .. } => "If Else Branch Type Mismatch",
       Self::PatternNeverMatches { .. } => "Pattern Doesn't Match Value",
       Self::FunctionReturnsNever { .. } => "Function Returns `Never`",
@@ -173,6 +181,9 @@ impl Problem {
       }
       Self::MissingArgument { expected, .. } => {
         format!("expected to be called with type `{expected}`, but no argument was given")
+      }
+      Self::ExtraArgument { given, .. } => {
+        format!("function does not take any arguments, but recieved type `{given}`")
       }
       Self::BranchesDontMatch {
         then, otherwise, ..
@@ -269,6 +280,7 @@ impl Problem {
       | Self::NotCallable { span, .. }
       | Self::IncorrectArgument { span, .. }
       | Self::MissingArgument { span, .. }
+      | Self::ExtraArgument { span, .. }
       | Self::BranchesDontMatch { span, .. }
       | Self::PatternNeverMatches { span, .. }
       | Self::FunctionReturnsNever { span }

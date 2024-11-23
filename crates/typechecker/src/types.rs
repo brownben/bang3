@@ -104,7 +104,7 @@ impl TypeArena {
   }
 
   /// Sets `var` to have type `ty`
-  fn link(&mut self, var: TypeVarRef, ty: TypeRef) {
+  pub(crate) fn link(&mut self, var: TypeVarRef, ty: TypeRef) {
     self.get_type_var_mut(var).link = TypeVarLink::Link(ty);
   }
 
@@ -246,6 +246,19 @@ impl TypeArena {
     } else {
       None
     }
+  }
+  /// Returns the return type of a function type, or None if the type is not a function
+  pub fn function_return(&self, type_ref: TypeRef) -> Option<TypeRef> {
+    if let Type::Function(_, return_type) = self[type_ref] {
+      Some(return_type)
+    } else {
+      None
+    }
+  }
+
+  /// Is the type ref point to the never type?
+  pub fn is_never(&self, type_ref: TypeRef) -> bool {
+    self[type_ref] == Type::Primitive(PrimitiveType::Never)
   }
 }
 impl ops::Index<TypeRef> for TypeArena {

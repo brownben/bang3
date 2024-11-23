@@ -337,6 +337,12 @@ impl InferType for Binary {
 
         if t.types.unify(function_type, callee_type).is_err() {
           match t.types.function_parameter(callee_type) {
+            Some(expected) if t.types.is_never(expected) => {
+              t.problems.push(TypeError::ExtraArgument {
+                given: t.types.type_to_string(argument_type),
+                span: self.left(ast).span(ast),
+              });
+            }
             Some(expected) => t.problems.push(TypeError::IncorrectArgument {
               given: t.types.type_to_string(argument_type),
               expected: t.types.type_to_string(expected),
@@ -405,6 +411,12 @@ impl InferType for Call {
 
     if t.types.unify(function_type, callee_type).is_err() {
       match t.types.function_parameter(callee_type) {
+        Some(expected) if t.types.is_never(expected) && self.argument(ast).is_some() => {
+          t.problems.push(TypeError::ExtraArgument {
+            given: t.types.type_to_string(argument_type),
+            span: self.argument(ast).unwrap().span(ast),
+          });
+        }
         Some(expected) if self.argument(ast).is_none() => {
           t.problems.push(TypeError::MissingArgument {
             expected: t.types.type_to_string(expected),
@@ -423,7 +435,12 @@ impl InferType for Call {
       }
     }
 
-    return_type.into()
+    // If the unification fails, `return_type` may not be unified with the callee return type
+    if let Some(function_return_type) = t.types.function_return(callee_type) {
+      function_return_type.into()
+    } else {
+      return_type.into()
+    }
   }
 }
 impl InferType for Comment {
@@ -470,6 +487,14 @@ impl InferType for Function {
     }
 
     t.env.exit_scope(self.span(ast));
+
+    // If the parameter is not used, it is equivalent to never
+    if let Type::Variable(type_var) = t.types[parameter]
+      && let Some(variable) = t.env.finished_variables().last()
+      && variable.used.is_empty()
+    {
+      t.types.link(type_var, TypeArena::NEVER);
+    }
 
     function_type.into()
   }
