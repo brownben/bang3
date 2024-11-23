@@ -1,5 +1,5 @@
 use crate::{
-  enviroment::{StaticTypeInfo, VariableKind},
+  enviroment::{StaticTypeInfo, VariableType},
   types::{Type, TypeArena, TypeRef, TypeScheme},
 };
 
@@ -61,8 +61,8 @@ impl StdlibModule {
     StaticTypeInfo {
       string: types.type_to_string(result),
       kind: match types[result] {
-        Type::Function(_, _) => VariableKind::Function,
-        _ => VariableKind::Variable,
+        Type::Function(_, _) => VariableType::Function,
+        _ => VariableType::Variable,
       },
     }
   }

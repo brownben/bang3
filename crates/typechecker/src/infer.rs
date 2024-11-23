@@ -3,7 +3,7 @@ use crate::{
   similarity::similarly_named,
   stdlib::{self, ImportResult, StdlibModule},
   types::{PrimitiveType, Type, TypeArena, TypeRef, TypeScheme},
-  TypeChecker, TypeError,
+  TypeChecker, TypeError, VariableKind,
 };
 use bang_syntax::{
   ast::{self as ast, expression::*, statement::*},
@@ -13,21 +13,22 @@ use std::collections::BTreeMap;
 
 impl TypeChecker {
   fn check_unused_variables(&mut self) {
-    for variable in self.env.defined_variables() {
-      if !variable.name.starts_with('_') && !variable.is_used() {
-        if variable.is_import() {
-          self.problems.push(TypeError::UnusedImport {
-            identifier: variable.name.clone(),
-            span: variable.span(),
-          });
-        } else {
-          self.problems.push(TypeError::UnusedVariable {
-            identifier: variable.name.clone(),
-            span: variable.span(),
-          });
-        }
-      }
-    }
+    self.problems.extend(
+      (self.env.finished_variables())
+        .filter(|v| !v.name().starts_with('_'))
+        .filter(|v| !v.is_used())
+        .filter_map(|variable| match variable.kind {
+          VariableKind::Declaration { defined, .. } => Some(TypeError::UnusedVariable {
+            identifier: variable.name().to_owned(),
+            span: defined,
+          }),
+          VariableKind::Import { defined, .. } => Some(TypeError::UnusedImport {
+            identifier: variable.name().to_owned(),
+            span: defined,
+          }),
+          VariableKind::Builtin { .. } => None,
+        }),
+    );
   }
 
   fn new_type_var(&mut self) -> TypeRef {
@@ -162,8 +163,9 @@ impl InferType for AST {
       return TypeArena::NEVER.into();
     }
 
-    // Infer types
     t.env.enter_scope();
+    t.env.define_builtin_variables(&mut t.types);
+
     let (last_statement, statements) = self.root_statements.split_last().unwrap();
     for statement in statements {
       statement.infer(t, self);
@@ -635,10 +637,12 @@ impl InferType for Variable {
       t.env.mark_variable_use(self.name(ast), self.span(ast));
       t.types.instantiate(type_).into()
     } else {
+      use super::enviroment::Variable;
+
       t.problems.push(TypeError::UndefinedVariable {
         identifier: self.name(ast).to_owned(),
         span: self.span(ast),
-        did_you_mean: similarly_named(self.name(ast), t.env.variables().map(|v| v.name.as_str())),
+        did_you_mean: similarly_named(self.name(ast), t.env.variables().map(Variable::name)),
       });
       TypeArena::UNKNOWN.into()
     }

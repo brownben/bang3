@@ -15,11 +15,11 @@ mod types;
 mod test;
 
 use bang_syntax::AST;
-use enviroment::{BuiltinVariable, Enviroment};
+use enviroment::Enviroment;
 use infer::InferType;
 use types::TypeArena;
 
-pub use enviroment::{StaticTypeInfo, Variable, VariableKind};
+pub use enviroment::{StaticTypeInfo, Variable, VariableKind, VariableType};
 pub use error::Problem as TypeError;
 pub use stdlib::StdlibModule;
 
@@ -32,14 +32,9 @@ pub struct TypeChecker {
 impl TypeChecker {
   /// Creates a new typechecker
   fn new() -> Self {
-    let mut types = TypeArena::new();
-    let mut env = Enviroment::new();
-
-    env.define_builtin_variables(&mut types);
-
     Self {
-      types,
-      env,
+      types: TypeArena::new(),
+      env: Enviroment::new(),
       problems: Vec::new(),
     }
   }
@@ -70,15 +65,10 @@ impl TypeChecker {
   }
 
   /// Returns an iterator over all the variables defined
-  pub fn defined_variables(&self) -> impl Iterator<Item = &Variable> {
+  pub fn variables(&self) -> impl Iterator<Item = &Variable> {
     self
       .env
-      .defined_variables()
+      .finished_variables()
       .inspect(|variable| variable.add_static_type_info(&self.types))
-  }
-
-  /// Returns an iterator over all the builtin variables
-  pub fn builtin_variables(&self) -> impl Iterator<Item = &BuiltinVariable> {
-    self.env.builtin_variables()
   }
 }

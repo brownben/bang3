@@ -3,6 +3,7 @@
 use crate::stdlib::StdlibModule;
 use crate::types::{Type, TypeArena, TypeRef, TypeScheme};
 use bang_syntax::{ast::statement::ImportItem, Span};
+use indoc::indoc;
 use std::cell::OnceCell;
 
 /// Holds variables and where they are defined and used
@@ -10,7 +11,6 @@ use std::cell::OnceCell;
 pub struct Enviroment {
   variables: Vec<Variable>,
   finished_variables: Vec<Variable>,
-  builtin_variables: Vec<BuiltinVariable>,
   depth: u32,
 }
 impl Enviroment {
@@ -18,7 +18,6 @@ impl Enviroment {
     Self {
       variables: Vec::new(),
       finished_variables: Vec::new(),
-      builtin_variables: Vec::new(),
       depth: 0,
     }
   }
@@ -35,15 +34,53 @@ impl Enviroment {
       type_: types.new_type(Type::Function(generic, TypeArena::STRING)),
     };
 
-    self.builtin_variables.push(BuiltinVariable {
-      name: "print",
+    self.variables.push(Variable {
+      kind: VariableKind::Builtin {
+        name: "print",
+        documentation: Some(indoc! {"
+          Prints a value to stdout.
+
+          Returns the value so it can be used inplace to inspect values.
+
+          ## Example
+          ```
+          print('Hello, world!') // 'Hello, world!' written to stdout
+          let x = print(10) // x = 10, and '10' written to stdout
+          ```
+        "}),
+      },
+
+      used: Vec::new(),
+      active: None,
+
+      depth: self.depth,
       type_: print_function,
-      type_info: StaticTypeInfo::new_function("(a' -> a')"),
+
+      type_info: OnceCell::from(StaticTypeInfo::new_function("^a => ^a")),
     });
-    self.builtin_variables.push(BuiltinVariable {
-      name: "type",
+    self.variables.push(Variable {
+      kind: VariableKind::Builtin {
+        name: "type",
+        documentation: Some(indoc! {"
+          Gets the type of a value as a string
+
+          ## Example
+          ```
+          type(10) // 'number'
+          type('Hello, world!') // 'string'
+          type(true) // 'boolean'
+          type(x => x) // 'function'
+          ```
+        "}),
+      },
+
+      used: Vec::new(),
+      active: None,
+
+      depth: self.depth,
       type_: x_string_function,
-      type_info: StaticTypeInfo::new_function("(a' -> string)"),
+
+      type_info: OnceCell::from(StaticTypeInfo::new_function("^a => string")),
     });
   }
 
@@ -55,7 +92,7 @@ impl Enviroment {
       && *depth == self.depth
     {
       let mut finished_var = self.variables.pop().unwrap();
-      finished_var.active = finished_var.active.merge(end_span);
+      finished_var.active = finished_var.active.map(|span| span.merge(end_span));
       self.finished_variables.push(finished_var);
     }
 
@@ -70,19 +107,19 @@ impl Enviroment {
     documentation: Option<String>,
   ) {
     self.variables.push(Variable {
-      name: variable_name.to_owned(),
-      defined: variable_span,
-      used: Vec::new(),
-      active: variable_span,
+      kind: VariableKind::Declaration {
+        name: variable_name.to_owned(),
+        defined: variable_span,
+        documentation,
+      },
 
-      module: None,
-      alias: None,
+      used: Vec::new(),
+      active: Some(variable_span),
 
       depth: self.depth,
       type_,
 
       type_info: OnceCell::new(),
-      documentation,
     });
   }
 
@@ -92,26 +129,22 @@ impl Enviroment {
     type_: TypeScheme,
     module: &'static str,
   ) {
-    let name = if let Some(alias) = &item.alias {
-      alias
-    } else {
-      item.name
-    };
-
     self.variables.push(Variable {
-      name: name.to_owned(),
-      defined: item.span,
-      used: Vec::new(),
-      active: item.span,
+      kind: VariableKind::Import {
+        module,
+        item: item.name.to_owned(),
+        alias: item.alias.map(ToOwned::to_owned),
+        alias_span: item.alias_span,
+        defined: item.span,
+      },
 
-      module: Some(module),
-      alias: item.alias_span,
+      used: Vec::new(),
+      active: Some(item.span),
 
       depth: self.depth,
       type_,
 
       type_info: OnceCell::new(),
-      documentation: None,
     });
   }
 
@@ -120,7 +153,7 @@ impl Enviroment {
       .variables
       .iter_mut()
       .rev()
-      .find(|variable| variable.name == identifier)
+      .find(|variable| variable.name() == identifier)
       .unwrap();
 
     variable.type_ = type_;
@@ -128,13 +161,7 @@ impl Enviroment {
 
   pub(crate) fn get_variable(&mut self, identifier: &str) -> Option<TypeScheme> {
     for variable in self.variables.iter().rev() {
-      if variable.name == identifier {
-        return Some(variable.type_);
-      }
-    }
-
-    for variable in &self.builtin_variables {
-      if variable.name == identifier {
+      if variable.name() == identifier {
         return Some(variable.type_);
       }
     }
@@ -147,7 +174,7 @@ impl Enviroment {
       .variables
       .iter_mut()
       .rev()
-      .find(|variable| variable.name == identifier);
+      .find(|variable| variable.name() == identifier);
 
     if let Some(variable) = &mut variable {
       variable.used.push(span);
@@ -160,32 +187,23 @@ impl Enviroment {
   }
 
   /// An iterator over all the variables that are defined
-  pub(crate) fn defined_variables(&self) -> impl Iterator<Item = &Variable> {
+  pub(crate) fn finished_variables(&self) -> impl Iterator<Item = &Variable> {
     self.finished_variables.iter()
-  }
-
-  /// An iterator over all the builtin variables that are defined
-  pub(crate) fn builtin_variables(&self) -> impl Iterator<Item = &BuiltinVariable> {
-    self.builtin_variables.iter()
   }
 }
 
 /// A variable which is defined and all the times it is used
 #[derive(Debug)]
 pub struct Variable {
-  /// the identifier of the variable
-  pub name: String,
-  /// the span where the variable was defined
-  pub defined: Span,
+  /// the kind of the variable, either builtin, declaration, or import
+  pub kind: VariableKind,
+
   /// the spans where the variable was used
   pub used: Vec<Span>,
   /// the span where the variable is active and can be used
-  active: Span,
-
-  /// the module the variable is imported from if it is imported
-  pub module: Option<&'static str>,
-  /// the location of the alias, if the import is aliased
-  pub alias: Option<Span>,
+  ///
+  /// `None` if the variable can always be used
+  active: Option<Span>,
 
   /// the depth of the variable, used to track the scope of the variable
   depth: u32,
@@ -195,25 +213,55 @@ pub struct Variable {
   /// the type of the variable, as static independant information
   /// is not automatically added, using [`Enviroment::add_static_type_info`]
   type_info: OnceCell<StaticTypeInfo>,
-  /// documentation from a doc comment for the variable
-  documentation: Option<String>,
 }
+
+/// Is a variable defined by a builtin, a declaration, or an import
+#[derive(Debug)]
+pub enum VariableKind {
+  /// a variable that is defined by the user, in a `let` statement
+  Declaration {
+    /// the identifier of the variable
+    name: String,
+
+    /// documentation from a doc comment for the variable
+    documentation: Option<String>,
+
+    /// the span where the variable was defined
+    defined: Span,
+  },
+  /// a variable that is defined by the runtime
+  Builtin {
+    /// the identifier of the variable
+    name: &'static str,
+    /// documentation for the builtin
+    documentation: Option<&'static str>,
+  },
+  /// a variable that is defined from an import statement
+  Import {
+    /// the module the item is imported from
+    module: &'static str,
+    /// the name of the item imported
+    item: String,
+    /// the alias of the imported item
+    alias: Option<String>,
+    /// the span of the alias
+    alias_span: Option<Span>,
+
+    /// the span where the variable was imported
+    defined: Span,
+  },
+}
+
 impl Variable {
   /// Checks if the variable is used
   pub(crate) fn is_used(&self) -> bool {
     !self.used.is_empty()
   }
 
-  /// Is the variable defined from an import
-  #[must_use]
-  pub fn is_import(&self) -> bool {
-    self.module.is_some()
-  }
-
   /// Is the variable active at the given position
   #[must_use]
   pub fn is_active(&self, position: Span) -> bool {
-    self.active.contains(position)
+    self.active.is_none_or(|active| active.contains(position))
   }
 
   pub(crate) fn type_(&self) -> TypeRef {
@@ -224,8 +272,8 @@ impl Variable {
     _ = self.type_info.set(StaticTypeInfo {
       string: types.type_to_string(self.type_()),
       kind: match types[self.type_.type_] {
-        Type::Function(_, _) => VariableKind::Function,
-        _ => VariableKind::Variable,
+        Type::Function(_, _) => VariableType::Function,
+        _ => VariableType::Variable,
       },
     });
   }
@@ -235,31 +283,35 @@ impl Variable {
     self.type_info.get()
   }
 
+  /// The name of a variable
+  pub fn name(&self) -> &str {
+    match &self.kind {
+      VariableKind::Declaration { name, .. } => name,
+      VariableKind::Builtin { name, .. } => name,
+      VariableKind::Import {
+        alias: Some(alias), ..
+      } => alias,
+      VariableKind::Import { item, .. } => item,
+    }
+  }
+
   /// The documentation for a variable (it's doc comment)
   pub fn documentation(&self) -> Option<&str> {
-    if let Some(module) = self.module {
-      StdlibModule::get(module).docs(&self.name)
-    } else {
-      self.documentation.as_deref()
+    match &self.kind {
+      VariableKind::Declaration { documentation, .. } => documentation.as_deref(),
+      VariableKind::Builtin { documentation, .. } => documentation.as_deref(),
+      VariableKind::Import { module, item, .. } => StdlibModule::get(module).docs(item),
     }
   }
 
   /// The location of the variable definition
-  pub fn span(&self) -> Span {
-    self.defined
+  pub fn span(&self) -> Option<Span> {
+    match self.kind {
+      VariableKind::Declaration { defined, .. } => Some(defined),
+      VariableKind::Builtin { .. } => None,
+      VariableKind::Import { defined, .. } => Some(defined),
+    }
   }
-}
-
-/// A variable which is builtin and defined by the runtime
-#[derive(Debug)]
-pub struct BuiltinVariable {
-  /// the identifier of the variable
-  pub name: &'static str,
-  /// the type of the variable
-  type_: TypeScheme,
-  /// the type of the variable, as static independant information
-  /// is not automatically added, using [`Enviroment::add_static_type_info`]
-  pub type_info: StaticTypeInfo,
 }
 
 /// The static information about the type of a variable
@@ -269,19 +321,19 @@ pub struct StaticTypeInfo {
   /// The string representation of the type
   pub string: String,
   /// The kind of the variable
-  pub kind: VariableKind,
+  pub kind: VariableType,
 }
 impl StaticTypeInfo {
   pub(crate) fn new_function(string: &str) -> Self {
     Self {
       string: string.to_owned(),
-      kind: VariableKind::Function,
+      kind: VariableType::Function,
     }
   }
 }
-/// The type of a variable
+/// An overview of the variable type, is it a function or a standard value
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum VariableKind {
+pub enum VariableType {
   /// A regular variable
   Variable,
   /// A function

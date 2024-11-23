@@ -8,7 +8,7 @@ use bang_syntax::{
   ast::{Expression, Statement},
   Span, AST,
 };
-use bang_typechecker::{StaticTypeInfo, StdlibModule, VariableKind};
+use bang_typechecker::{StaticTypeInfo, StdlibModule, VariableType};
 
 pub fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionList {
   let position = span_from_lsp_position(position, file);
@@ -123,19 +123,14 @@ fn variable_completions(file: &Document, position: Span) -> lsp::CompletionList 
   let typechecker = file.typechecker();
 
   let items = typechecker
-    .defined_variables()
+    .variables()
     .filter(|var| var.is_active(position))
     .map(|variable| {
-      let name = &variable.name;
+      let name = variable.name();
       let type_info = variable.get_type_info().unwrap();
 
       variable_completion(name, type_info, variable.documentation(), false)
     })
-    .chain(
-      typechecker
-        .builtin_variables()
-        .map(|variable| variable_completion(variable.name, &variable.type_info, None, false)),
-    )
     .chain(constant_snippets())
     .chain(module_access_snippets())
     .collect();
@@ -152,13 +147,13 @@ fn variable_completion(
   documentation: Option<&str>,
   in_import: bool,
 ) -> lsp::CompletionItem {
-  let is_function = type_info.kind == VariableKind::Function;
+  let is_function = type_info.kind == VariableType::Function;
 
   lsp::CompletionItem {
     kind: Some(match type_info.kind {
-      VariableKind::Function => lsp::CompletionItemKind::FUNCTION,
-      VariableKind::Variable if is_screaming_snake_case(name) => lsp::CompletionItemKind::CONSTANT,
-      VariableKind::Variable => lsp::CompletionItemKind::VARIABLE,
+      VariableType::Function => lsp::CompletionItemKind::FUNCTION,
+      VariableType::Variable if is_screaming_snake_case(name) => lsp::CompletionItemKind::CONSTANT,
+      VariableType::Variable => lsp::CompletionItemKind::VARIABLE,
     }),
 
     label: if is_function && !in_import {

@@ -4,17 +4,18 @@ use lsp_types as lsp;
 use std::collections::HashMap;
 
 use bang_syntax::Span;
-use bang_typechecker::{TypeChecker, Variable};
+use bang_typechecker::{TypeChecker, Variable, VariableKind};
 
 pub fn goto_definition(file: &Document, position: lsp::Position) -> Option<lsp::Location> {
   let position = span_from_lsp_position(position, file);
 
   let typechecker = file.typechecker();
   let declaration = find_variable(position, typechecker)?;
+  let span = declaration.span()?;
 
   Some(lsp::Location::new(
     file.id.clone(),
-    lsp_range_from_span(declaration.span(), file),
+    lsp_range_from_span(span, file),
   ))
 }
 
@@ -44,26 +45,30 @@ pub fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::
 
   let mut text_edits = Vec::new();
 
-  if declaration.is_import()
-    && let Some(alias) = declaration.alias
-  {
-    text_edits.push(lsp::TextEdit {
-      range: lsp_range_from_span(alias, file),
+  match declaration.kind {
+    // Builtins cannot be renamed
+    VariableKind::Builtin { .. } => return lsp::WorkspaceEdit::default(),
+    // Regular rename of variable
+    VariableKind::Declaration { defined, .. } => text_edits.push(lsp::TextEdit {
+      range: lsp_range_from_span(defined, file),
       new_text: new_name.to_owned(),
-    });
-  } else if declaration.is_import() {
-    let mut span = declaration.span();
-    span.start = span.end;
+    }),
+    // If an import has an alias, rename the alias
+    VariableKind::Import { alias_span, .. } if alias_span.is_some() => {
+      text_edits.push(lsp::TextEdit {
+        range: lsp_range_from_span(alias_span.unwrap(), file),
+        new_text: new_name.to_owned(),
+      });
+    }
+    // If an import has no alias, add an alias
+    VariableKind::Import { mut defined, .. } => {
+      defined.start = defined.end;
 
-    text_edits.push(lsp::TextEdit {
-      range: lsp_range_from_span(span, file),
-      new_text: format!(" as {new_name}"),
-    });
-  } else {
-    text_edits.push(lsp::TextEdit {
-      range: lsp_range_from_span(declaration.span(), file),
-      new_text: new_name.to_owned(),
-    });
+      text_edits.push(lsp::TextEdit {
+        range: lsp_range_from_span(defined, file),
+        new_text: format!(" as {new_name}"),
+      });
+    }
   };
 
   for used in &declaration.used {
@@ -78,11 +83,19 @@ pub fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::
 
 pub fn find_variable(position: Span, typechecker: &TypeChecker) -> Option<&Variable> {
   typechecker
-    .defined_variables()
+    .variables()
     .filter(|variable| variable.is_active(position))
     .find(|var| {
-      var.defined.contains(position)
-        || var.alias.is_some_and(|x| x.contains(position))
-        || var.used.iter().any(|used| used.contains(position))
+      let in_declaration = match var.kind {
+        VariableKind::Builtin { .. } => false,
+        VariableKind::Declaration { defined, .. } => defined.contains(position),
+        VariableKind::Import {
+          defined,
+          alias_span,
+          ..
+        } => defined.contains(position) || alias_span.is_some_and(|x| x.contains(position)),
+      };
+
+      in_declaration || var.used.iter().any(|x| x.contains(position))
     })
 }

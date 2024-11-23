@@ -16,7 +16,7 @@ pub fn hover(file: &Document, position: lsp::Position) -> Option<lsp::Hover> {
   let typechecker = file.typechecker();
   let variable = find_variable(position, typechecker)?;
 
-  let variable_name = &variable.name;
+  let variable_name = &variable.name();
   let variable_type = &variable.get_type_info().unwrap().string;
 
   let mut contents = type_code_block(variable_name, variable_type);
