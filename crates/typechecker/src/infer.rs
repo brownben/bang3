@@ -1,13 +1,12 @@
 use crate::{
-  exhaustive,
+  TypeChecker, TypeError, VariableKind, exhaustive,
   similarity::similarly_named,
   stdlib::{self, ImportResult, StdlibModule},
   types::{PrimitiveType, Type, TypeArena, TypeRef, TypeScheme},
-  TypeChecker, TypeError, VariableKind,
 };
 use bang_syntax::{
+  AST, Span,
   ast::{self as ast, expression::*, statement::*},
-  Span, AST,
 };
 use std::collections::BTreeMap;
 

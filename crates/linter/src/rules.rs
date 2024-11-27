@@ -1,11 +1,11 @@
 //! Definitions of the lint rules
 use super::{
-  helpers::{is_zero, unwrap, ASTEquality, IsConstant, ReturnAnalysis},
   Context, LintRule,
+  helpers::{ASTEquality, IsConstant, ReturnAnalysis, is_zero, unwrap},
 };
 use bang_syntax::{
+  AST, Span,
   ast::{expression::*, statement::*},
-  Span, AST,
 };
 use std::borrow::Cow;
 

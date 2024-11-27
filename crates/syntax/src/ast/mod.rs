@@ -3,9 +3,9 @@
 //! The definition of the  Abstract Syntax Tree (AST)
 
 use crate::{
+  LineIndex,
   parser::ParseError,
   tokeniser::{Token, Tokeniser},
-  LineIndex,
 };
 use std::{cell::OnceCell, num::NonZero, ops, str};
 

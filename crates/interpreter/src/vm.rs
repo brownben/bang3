@@ -369,7 +369,7 @@ impl<'context> VM<'context> {
             None => {
               break Some(ErrorKind::UndefinedVariable {
                 name: name.to_string(),
-              })
+              });
             }
           }
         }

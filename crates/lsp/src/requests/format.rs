@@ -2,7 +2,7 @@ use crate::documents::Document;
 use crate::locations::lsp_range_from_span;
 use lsp_types as lsp;
 
-use bang_formatter::{format, FormatterConfig};
+use bang_formatter::{FormatterConfig, format};
 
 pub fn format_file(file: &Document) -> Option<Vec<lsp::TextEdit>> {
   if !file.ast.is_formattable() {

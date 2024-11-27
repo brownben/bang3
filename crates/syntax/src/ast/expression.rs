@@ -2,7 +2,7 @@
 
 use crate::{
   ast::statement::Statement,
-  ast::{ExpressionIdx, StatementIdx, TokenIdx, AST},
+  ast::{AST, ExpressionIdx, StatementIdx, TokenIdx},
   span::Span,
   tokeniser::TokenKind,
 };
@@ -138,7 +138,7 @@ impl Block {
   pub fn statements<'a>(
     &'a self,
     ast: &'a AST,
-  ) -> impl DoubleEndedIterator<Item = &'a Statement> + ExactSizeIterator + use<'a> {
+  ) -> impl DoubleEndedIterator<Item = &'a Statement> + ExactSizeIterator {
     self
       .statements
       .iter()
@@ -234,7 +234,7 @@ pub struct FormatString {
 }
 impl FormatString {
   /// The strings which appear within the format string
-  pub fn strings<'a>(&self, ast: &'a AST) -> impl Iterator<Item = &'a str> + use<'_, 'a> {
+  pub fn strings<'a>(&self, ast: &'a AST) -> impl Iterator<Item = &'a str> {
     self.strings.iter().map(|token| {
       let string = ast.get_token_text(*token);
 
@@ -252,7 +252,7 @@ impl FormatString {
   }
 
   /// The expressions which appear within the format string
-  pub fn expressions<'a>(&'a self, ast: &'a AST) -> impl Iterator<Item = &'a Expression> + use<'a> {
+  pub fn expressions<'a>(&'a self, ast: &'a AST) -> impl Iterator<Item = &'a Expression> {
     self.expressions.iter().map(|expression| &ast[*expression])
   }
 

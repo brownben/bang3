@@ -1,8 +1,8 @@
-use super::{compile, parse, CommandStatus};
-use crate::diagnostics::{highlight_source, Message};
+use super::{CommandStatus, compile, parse};
+use crate::diagnostics::{Message, highlight_source};
 
 use bang_interpreter::{Chunk, ChunkBuilder, HeapSize, OpCode, StandardContext, VM};
-use bang_syntax::{ast, tokenise, Span, TokenKind, AST};
+use bang_syntax::{AST, Span, TokenKind, ast, tokenise};
 
 use anstream::{eprintln, println};
 use owo_colors::OwoColorize;

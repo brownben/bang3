@@ -35,9 +35,7 @@ fn fibonacci_example() {
 fn undefined_variable() {
   let output = run("a");
 
-  assert_eq!(
-    output,
-    indoc! {"
+  assert_eq!(output, indoc! {"
       ✕ Error: Undefined Variable
       variable `a` is not defined
 
@@ -47,16 +45,13 @@ fn undefined_variable() {
 
       at line 1
 
-    "}
-  );
+    "});
 }
 
 #[test]
 fn expected_number() {
   let output = run("5 + 'hello'");
-  assert_eq!(
-    output,
-    indoc! {"
+  assert_eq!(output, indoc! {"
       ✕ Error: Type Error
       expected `number`, got `string`
 
@@ -66,13 +61,10 @@ fn expected_number() {
 
       at line 1
 
-    "}
-  );
+    "});
 
   let output = run("false + 5");
-  assert_eq!(
-    output,
-    indoc! {"
+  assert_eq!(output, indoc! {"
       ✕ Error: Type Error
       expected `number`, got `boolean`
 
@@ -82,16 +74,13 @@ fn expected_number() {
 
       at line 1
 
-    "}
-  );
+    "});
 }
 
 #[test]
 fn expected_ordered() {
   let output = run("5 > 'hello'");
-  assert_eq!(
-    output,
-    indoc! {"
+  assert_eq!(output, indoc! {"
       ✕ Error: Type Error
       expected two numbers or two strings, got a `number` and a `string`
 
@@ -101,13 +90,10 @@ fn expected_ordered() {
 
       at line 1
 
-    "}
-  );
+    "});
 
   let output = run("false <= 5");
-  assert_eq!(
-    output,
-    indoc! {"
+  assert_eq!(output, indoc! {"
       ✕ Error: Type Error
       expected two numbers or two strings, got a `boolean` and a `number`
 
@@ -117,16 +103,13 @@ fn expected_ordered() {
 
       at line 1
 
-    "}
-  );
+    "});
 }
 
 #[test]
 fn import_not_found() {
   let output = run("from unknown import { item }");
-  assert_eq!(
-    output,
-    indoc! {"
+  assert_eq!(output, indoc! {"
       ✕ Error: Module Not Found
       could not find module `unknown`
 
@@ -136,13 +119,10 @@ fn import_not_found() {
 
       at line 1
 
-    "}
-  );
+    "});
 
   let output = run("from maths import { unknown }");
-  assert_eq!(
-    output,
-    indoc! {"
+  assert_eq!(output, indoc! {"
       ✕ Error: Item Not Found
       could not find `unknown` in `maths`
 
@@ -152,16 +132,13 @@ fn import_not_found() {
 
       at line 1
 
-    "}
-  );
+    "});
 }
 
 #[test]
 fn not_callable() {
   let output = run("5()");
-  assert_eq!(
-    output,
-    indoc! {"
+  assert_eq!(output, indoc! {"
       ✕ Error: Not Callable
       `number` is not callable, only functions are callable
 
@@ -171,8 +148,7 @@ fn not_callable() {
 
       at line 1
 
-    "}
-  );
+    "});
 }
 
 #[test]
@@ -188,9 +164,7 @@ fn traceback() {
     outerFunction()
   "};
   let output = run(source);
-  assert_eq!(
-    output,
-    indoc! {"
+  assert_eq!(output, indoc! {"
       ✕ Error: Type Error
       expected `number`, got `boolean`
 
@@ -203,8 +177,7 @@ fn traceback() {
       in function 'outerFunction' at line 6
       at line 8
 
-    "}
-  );
+    "});
 
   let source = indoc! {"
     let outerFunction = _ => {
@@ -214,9 +187,7 @@ fn traceback() {
     outerFunction()()()
   "};
   let output = run(source);
-  assert_eq!(
-    output,
-    indoc! {"
+  assert_eq!(output, indoc! {"
       ✕ Error: Type Error
       expected `number`, got `boolean`
 
@@ -227,6 +198,5 @@ fn traceback() {
       in anonymous function at line 2
       at line 5
 
-    "}
-  );
+    "});
 }

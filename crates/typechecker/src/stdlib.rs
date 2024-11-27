@@ -128,7 +128,7 @@ fn string_module(types: &mut TypeArena, item: &str) -> ImportResult {
 
 #[cfg(test)]
 mod test {
-  use super::{maths_module, string_module, ImportResult, TypeArena, MODULES};
+  use super::{ImportResult, MODULES, TypeArena, maths_module, string_module};
   use bang_interpreter::stdlib::{MATHS_ITEMS, STRING_ITEMS};
 
   #[test]

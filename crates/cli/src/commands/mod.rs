@@ -1,10 +1,10 @@
-use super::diagnostics::{CodeFrame, Message, Severity};
 use super::FormatOptions;
+use super::diagnostics::{CodeFrame, Message, Severity};
 
 use bang_formatter::FormatterConfig;
 use bang_interpreter::{HeapSize, StandardContext, VM};
 use bang_lsp::LanguageServer;
-use bang_syntax::{tokenise, AST};
+use bang_syntax::{AST, tokenise};
 
 use anstream::{eprintln, println};
 use std::fs;
@@ -128,15 +128,12 @@ pub fn format(options: &FormatOptions) -> Result<CommandStatus, ()> {
   }
 
   if options.check && formatted_source != ast.source {
-    eprintln!(
-      "{}",
-      Message {
-        title: "File is not formatted".into(),
-        body: format!("`{}` is not formatted", options.file),
-        hint: None,
-        severity: Severity::Error,
-      }
-    );
+    eprintln!("{}", Message {
+      title: "File is not formatted".into(),
+      body: format!("`{}` is not formatted", options.file),
+      hint: None,
+      severity: Severity::Error,
+    });
     return Ok(CommandStatus::Failure);
   }
 

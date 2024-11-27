@@ -6,8 +6,8 @@
 #![deny(unsafe_code)]
 
 use bang_syntax::{
+  AST, Span,
   ast::{expression::Expression, statement::Statement},
-  Span, AST,
 };
 use std::{error, fmt};
 

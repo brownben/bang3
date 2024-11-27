@@ -1,7 +1,7 @@
 use crate::types::{PrimitiveType, Type};
 use bang_syntax::{
+  AST, Span,
   ast::expression::{Literal, LiteralValue, MatchArm, Pattern},
-  Span, AST,
 };
 use std::{cmp, fmt};
 

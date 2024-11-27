@@ -154,7 +154,7 @@ impl fmt::Display for CodeFrame<'_> {
 }
 
 pub fn highlight_source(output: &mut dyn fmt::Write, source: &str) -> fmt::Result {
-  use bang_syntax::{tokenise, TokenKind};
+  use bang_syntax::{TokenKind, tokenise};
 
   let mut last = 0;
   for token in tokenise(source) {

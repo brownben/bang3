@@ -1,4 +1,4 @@
-use bang_syntax::{parse, parse_into, AST};
+use bang_syntax::{AST, parse, parse_into};
 use bang_typechecker::TypeChecker;
 pub use lsp_types::Uri as FileIdentfier;
 use std::{cell::OnceCell, collections::HashMap};

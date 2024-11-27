@@ -302,7 +302,7 @@ impl PageList {
   }
 
   /// Iterate over the pages in the list
-  pub fn iter(&self) -> impl Iterator<Item = PageDescriptorRef> {
+  pub fn iter(&self) -> impl Iterator<Item = PageDescriptorRef> + use<> {
     // we get the next page before returning the current page,
     // so if the current page is added to a different list,
     // the iteration can continue through the correct list

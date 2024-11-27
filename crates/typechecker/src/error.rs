@@ -188,7 +188,9 @@ impl Problem {
       Self::BranchesDontMatch {
         then, otherwise, ..
       } => {
-        format!("expected both arms to have the same type. The first branch has type `{then}`, but the later branch has type `{otherwise}`")
+        format!(
+          "expected both arms to have the same type. The first branch has type `{then}`, but the later branch has type `{otherwise}`"
+        )
       }
       Self::PatternNeverMatches { pattern, value, .. } => {
         format!("match value is `{value}` which doesn't match pattern of type `{pattern}``")

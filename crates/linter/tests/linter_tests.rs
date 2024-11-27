@@ -188,8 +188,9 @@ fn unnecessary_return() {
 
 #[test]
 fn unreachable_code() {
-  assert!(lint(
-    "
+  assert!(
+    lint(
+      "
     let function = _ => {
       if (a) {
         return 4
@@ -198,11 +199,13 @@ fn unreachable_code() {
       } else 4
     }
     "
-  )
-  .is_err());
+    )
+    .is_err()
+  );
 
-  assert!(lint(
-    "
+  assert!(
+    lint(
+      "
     let function = _ => {
       if (a) {
         return 4
@@ -211,18 +214,21 @@ fn unreachable_code() {
       } else 4
     }
     "
-  )
-  .is_err());
+    )
+    .is_err()
+  );
 
-  assert!(lint(
-    "
+  assert!(
+    lint(
+      "
     let function = _ => {
       if (a) { return 4 } else { return 4 }
       5
     }
     "
-  )
-  .is_err());
+    )
+    .is_err()
+  );
 }
 
 #[test]

@@ -5,8 +5,8 @@ use lsp_types as lsp;
 
 use bang_interpreter::stdlib::MODULES;
 use bang_syntax::{
+  AST, Span,
   ast::{Expression, Statement},
-  Span, AST,
 };
 use bang_typechecker::{StaticTypeInfo, StdlibModule, VariableType};
 

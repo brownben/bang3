@@ -1,7 +1,7 @@
 [package]
 name = "bang-linter"
 version = "3.0.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 bang-syntax = { path = "../syntax" }

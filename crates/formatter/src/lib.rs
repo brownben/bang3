@@ -21,7 +21,7 @@ mod formatter;
 ///
 /// # Examples
 /// ```
-/// use bang_formatter::{format, FormatterConfig};
+/// use bang_formatter::{FormatterConfig, format};
 /// use bang_syntax::parse;
 ///
 /// let ast = parse("5 + 3".to_owned());

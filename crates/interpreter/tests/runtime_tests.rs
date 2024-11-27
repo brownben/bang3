@@ -3,7 +3,7 @@
 //! Check that the output of the interpreted code is correct.
 
 use bang_gc::HeapSize;
-use bang_interpreter::{compile, EmptyContext, StandardContext, Value, VM};
+use bang_interpreter::{EmptyContext, StandardContext, VM, Value, compile};
 use bang_syntax::parse;
 use indoc::indoc;
 
@@ -918,7 +918,7 @@ fn cant_import_anything_with_empty_context() {
 }
 
 mod builtin_function {
-  use super::{assert_variable, indoc, run, Value};
+  use super::{Value, assert_variable, indoc, run};
 
   #[test]
   fn print() {

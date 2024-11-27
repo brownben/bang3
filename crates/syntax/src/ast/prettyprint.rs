@@ -2,7 +2,7 @@
 //!
 //! Based upon this [blog post](https://www.georgevreilly.com/blog/2023/01/24/TreeInRust2PrintingTrees.html)
 
-use super::{expression::*, statement::*, types::*, AST};
+use super::{AST, expression::*, statement::*, types::*};
 use std::fmt;
 
 impl fmt::Display for AST {

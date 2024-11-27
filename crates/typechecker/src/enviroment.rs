@@ -2,7 +2,7 @@
 
 use crate::stdlib::StdlibModule;
 use crate::types::{Type, TypeArena, TypeRef, TypeScheme};
-use bang_syntax::{ast::statement::ImportItem, Span};
+use bang_syntax::{Span, ast::statement::ImportItem};
 use indoc::indoc;
 use std::cell::OnceCell;
 

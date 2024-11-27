@@ -1,6 +1,6 @@
 use super::{
   bytecode::Chunk,
-  object::{BangString, StringSlice, STRING_SLICE_TYPE_ID, STRING_TYPE_ID},
+  object::{BangString, STRING_SLICE_TYPE_ID, STRING_TYPE_ID, StringSlice},
   vm::VM,
 };
 use bang_gc::{Gc, Heap};
@@ -204,11 +204,7 @@ impl Value {
 // Wrap raw values into a Value
 impl From<bool> for Value {
   fn from(value: bool) -> Self {
-    if value {
-      Self::TRUE
-    } else {
-      Self::FALSE
-    }
+    if value { Self::TRUE } else { Self::FALSE }
   }
 }
 impl From<f64> for Value {

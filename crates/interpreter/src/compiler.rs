@@ -1,7 +1,7 @@
 use super::bytecode::{Chunk, ChunkBuilder, ConstantValue, OpCode};
 use bang_syntax::{
+  AST, Span,
   ast::{expression::*, statement::*},
-  Span, AST,
 };
 use std::{error, fmt, mem};
 

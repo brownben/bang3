@@ -1,6 +1,6 @@
 use crate::{
   ast::{
-    expression::*, statement::*, types::*, ExpressionIdx, StatementIdx, TokenIdx, TypeIdx, AST,
+    AST, ExpressionIdx, StatementIdx, TokenIdx, TypeIdx, expression::*, statement::*, types::*,
   },
   span::Span,
   tokeniser::{Token, TokenKind},

@@ -2,7 +2,7 @@
 //!
 //! Definitions for modules in the standard library.
 
-use crate::{object::NativeFunction, Value, VM};
+use crate::{VM, Value, object::NativeFunction};
 use std::fmt;
 
 /// A context is the environment in which the VM runs.
@@ -76,7 +76,7 @@ mod macros;
 pub const MODULES: [&str; 2] = ["maths", "string"];
 
 mod maths;
-pub use maths::{maths, maths_docs, MATHS_ITEMS};
+pub use maths::{MATHS_ITEMS, maths, maths_docs};
 
 mod string;
-pub use string::{string, string_docs, STRING_ITEMS};
+pub use string::{STRING_ITEMS, string, string_docs};

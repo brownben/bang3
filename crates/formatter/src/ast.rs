@@ -1,7 +1,7 @@
 use super::formatter::{Formattable, Formatter, IR};
 use bang_syntax::{
-  ast::{expression::*, statement::*, types::*},
   AST,
+  ast::{expression::*, statement::*, types::*},
 };
 use bumpalo::collections::Vec;
 

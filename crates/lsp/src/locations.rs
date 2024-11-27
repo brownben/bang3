@@ -91,7 +91,7 @@ fn byte_offset_to_utf16(position: u32, string: &str) -> u32 {
 
 #[cfg(test)]
 mod test {
-  use super::{byte_offset_from_utf16_offset, byte_offset_to_utf16, Span};
+  use super::{Span, byte_offset_from_utf16_offset, byte_offset_to_utf16};
 
   fn utf16_slice(string: &str, start: usize, end: usize) -> String {
     String::from_utf16_lossy(

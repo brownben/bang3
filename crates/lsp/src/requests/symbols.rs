@@ -3,8 +3,8 @@ use crate::documents::Document;
 use crate::locations::lsp_range_from_span;
 use lsp_types as lsp;
 
-use bang_syntax::ast::{expression::*, statement::*};
 use bang_syntax::AST;
+use bang_syntax::ast::{expression::*, statement::*};
 
 pub fn document_symbols(file: &Document) -> lsp::DocumentSymbolResponse {
   let mut symbols = Vec::new();

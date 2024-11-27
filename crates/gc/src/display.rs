@@ -1,4 +1,4 @@
-use crate::{pages::BlockClass, Heap};
+use crate::{Heap, pages::BlockClass};
 use core::fmt;
 
 impl fmt::Display for Heap {

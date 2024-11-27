@@ -1,4 +1,4 @@
-use crate::{infer::InferType, TypeChecker};
+use crate::{TypeChecker, infer::InferType};
 
 use bang_syntax::parse;
 use indoc::indoc;

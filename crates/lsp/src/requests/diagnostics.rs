@@ -2,7 +2,7 @@ use crate::documents::Document;
 use crate::locations::lsp_range_from_span;
 use lsp_types as lsp;
 
-use bang_linter::{lint, LintDiagnostic};
+use bang_linter::{LintDiagnostic, lint};
 use bang_syntax::ParseError;
 use bang_typechecker::TypeError;
 

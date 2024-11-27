@@ -1,7 +1,7 @@
 //! # Types
 
 use crate::{
-  ast::{TokenIdx, TypeIdx, AST},
+  ast::{AST, TokenIdx, TypeIdx},
   span::Span,
 };
 

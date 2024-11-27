@@ -1,8 +1,8 @@
 use super::ImportResult;
 use crate::{
   object::NativeFunction,
-  object::{NativeClosure, NATIVE_CLOSURE_TYPE_ID},
-  object::{StringSlice, STRING_SLICE_TYPE_ID},
+  object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
+  object::{STRING_SLICE_TYPE_ID, StringSlice},
   value::Value,
   vm::{ErrorKind, VM},
 };

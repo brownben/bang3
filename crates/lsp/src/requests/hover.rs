@@ -3,7 +3,7 @@ use crate::documents::Document;
 use crate::locations::span_from_lsp_position;
 use lsp_types as lsp;
 
-use bang_syntax::{ast::expression, Span, AST};
+use bang_syntax::{AST, Span, ast::expression};
 use bang_typechecker::StdlibModule;
 
 pub fn hover(file: &Document, position: lsp::Position) -> Option<lsp::Hover> {

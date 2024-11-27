@@ -2,8 +2,8 @@ use crate::{documents::Document, locations::lsp_range_from_span};
 use lsp_types::{self as lsp};
 
 use bang_syntax::{
+  AST, Span,
   ast::{Expression, Statement},
-  Span, AST,
 };
 
 pub fn folding_ranges(file: &Document) -> Vec<lsp::FoldingRange> {

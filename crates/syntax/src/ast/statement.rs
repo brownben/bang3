@@ -2,9 +2,9 @@
 
 use crate::{
   ast::{
+    AST, ExpressionIdx, StatementIdx, TokenIdx, TypeIdx,
     expression::{Expression, Variable},
     types::Type,
-    ExpressionIdx, StatementIdx, TokenIdx, TypeIdx, AST,
   },
   span::Span,
   tokeniser::TokenKind,
@@ -49,7 +49,7 @@ pub struct CommentStmt {
 }
 impl CommentStmt {
   /// The text of the comment, as an iterator for each line
-  pub fn text<'a>(&self, ast: &'a AST) -> impl Iterator<Item = &'a str> {
+  pub fn text<'a>(&self, ast: &'a AST) -> impl Iterator<Item = &'a str> + use<'a> {
     (self.start.range(self.end))
       .map(|idx| ast[idx])
       .filter(|token| token.kind == TokenKind::Comment)
@@ -134,7 +134,7 @@ impl Import {
   }
 
   /// The items being imported
-  pub fn items<'a>(&self, ast: &'a AST) -> impl Iterator<Item = ImportItem<'a>> {
+  pub fn items<'a>(&self, ast: &'a AST) -> impl Iterator<Item = ImportItem<'a>> + use<'a> {
     ImportItemIterator {
       position: self.start.unwrap_or(self.end).next(),
       end: self.end,

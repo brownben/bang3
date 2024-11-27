@@ -1,7 +1,7 @@
 //! Helpers to simplify the definitions of lint rules
 use bang_syntax::{
-  ast::{expression::*, statement::*, AST},
   Span,
+  ast::{AST, expression::*, statement::*},
 };
 
 pub(super) fn unwrap<'a>(expression: &'a Expression, ast: &'a AST) -> &'a Expression {

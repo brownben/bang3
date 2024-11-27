@@ -3,7 +3,7 @@
 //! Generates inputs (generally pathlogical input cases) which results in a failure to
 //! create bytecode.
 
-use bang_interpreter::{compile, CompileError};
+use bang_interpreter::{CompileError, compile};
 use bang_syntax::parse;
 
 fn integer_to_identifier(integer: u32) -> String {

@@ -46,11 +46,7 @@ impl Indentation {
 impl From<u16> for Indentation {
   /// The number of spaces to use for indentation. If 0 use tabs.
   fn from(n: u16) -> Self {
-    if n == 0 {
-      Self::Tab
-    } else {
-      Self::Space(n)
-    }
+    if n == 0 { Self::Tab } else { Self::Space(n) }
   }
 }
 impl fmt::Display for Indentation {
