@@ -361,14 +361,7 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for Statement {
 }
 impl<'a, 'b> Formattable<'a, 'b, AST> for CommentStmt {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
-    let mut lines = self.text(ast);
-    f.concat([
-      IR::Text("// "),
-      IR::Text(lines.next().unwrap()), // There is always at least one line
-      f.concat_iterator(
-        lines.map(|text| f.concat([IR::AlwaysLine, IR::Text("// "), IR::Text(text)])),
-      ),
-    ])
+    comment(f, self, ast, "// ")
   }
 }
 impl<'a, 'b> Formattable<'a, 'b, AST> for Import {
@@ -431,7 +424,7 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for Let {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     f.concat([
       if let Some(doc_comment) = self.doc_comment(ast) {
-        f.concat([doc_comment.format(f, ast), IR::AlwaysLine])
+        f.concat([comment(f, doc_comment, ast, "/// "), IR::AlwaysLine])
       } else {
         IR::Empty
       },
@@ -596,4 +589,20 @@ fn pipeline<'a, 'b>(
     IR::Text(">> "),
     expression.right(ast).format(f, ast),
   ]);
+}
+fn comment<'a, 'b>(
+  f: &Formatter<'a, 'b>,
+  comment: &CommentStmt,
+  ast: &'a AST,
+  line_start: &'static str,
+) -> IR<'a, 'b> {
+  let mut lines = comment.text(ast);
+
+  f.concat([
+    IR::Text(line_start),
+    IR::Text(lines.next().unwrap()), // There is always at least one line
+    f.concat_iterator(
+      lines.map(|text| f.concat([IR::AlwaysLine, IR::Text(line_start), IR::Text(text)])),
+    ),
+  ])
 }

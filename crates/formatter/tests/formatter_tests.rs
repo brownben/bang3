@@ -187,6 +187,7 @@ fn comment() {
   assert_format!("variable //      comment", "variable // comment", 100);
   assert_format!("variable      // comment", "variable // comment", 100);
   assert_format!("variable       //      comment", "variable // comment", 100);
+  assert_format!("variable //// comment", "variable // comment", 100);
 }
 
 #[test]
@@ -206,12 +207,12 @@ fn comment_statement() {
   assert_format!(multiline_comments, multiline_comments, 100);
 
   let doc_comments = indoc! {"
-    // all of these
-    // comments
-    // form a single block
+    /// all of these
+    /// comments
+    /// form a single block
     let a = 1
 
-    // this is a different block
+    /// this is a different block
     let function = x => x + 1
 
     // this is not a doc comment
@@ -220,6 +221,22 @@ fn comment_statement() {
     // neither is this
   "};
   assert_format!(doc_comments, doc_comments, 100);
+
+  let doc_comments_broken = indoc! {"
+    // all of these
+    /// comments
+    //// form a single block
+    let a = 1
+
+    // this is a different block
+    let function = x => x + 1
+
+    /// this is not a doc comment
+
+    let b = 1
+    //// neither is this
+  "};
+  assert_format!(doc_comments_broken, doc_comments, 100);
 }
 
 #[test]

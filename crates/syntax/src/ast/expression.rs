@@ -216,7 +216,10 @@ impl Comment {
   /// The text of the comment
   #[must_use]
   pub fn text<'a>(&self, ast: &'a AST) -> &'a str {
-    ast.get_token_text(self.comment)[2..].trim()
+    ast
+      .get_token_text(self.comment)
+      .trim_start_matches('/')
+      .trim()
   }
 
   /// The location of the expression

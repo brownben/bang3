@@ -51,14 +51,8 @@ impl CommentStmt {
   /// The text of the comment, as an iterator for each line
   pub fn text<'a>(&self, ast: &'a AST) -> impl Iterator<Item = &'a str> + use<'a> {
     (self.start.range(self.end))
-      .map(|idx| ast[idx])
-      .filter(|token| token.kind == TokenKind::Comment)
-      .map(|token| {
-        Span::from(token)
-          .source_text(&ast.source)
-          .trim_start_matches('/')
-          .trim()
-      })
+      .filter(|token| ast[*token].kind == TokenKind::Comment)
+      .map(|token| ast.get_token_text(token).trim_start_matches('/').trim())
   }
 
   /// The full text of the comment, as a `String`
