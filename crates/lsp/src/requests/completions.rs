@@ -30,7 +30,8 @@ pub fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionL
   }
 
   if let Some(module_access) = in_module_access(&file.ast, position) {
-    return module_item_completions(module_access.module(&file.ast), false);
+    let skip_function_brackets = complete_function_bracket_in_pipeline(&file.ast, position);
+    return module_item_completions(module_access.module(&file.ast), skip_function_brackets);
   }
 
   if in_type_annotation(&file.ast, position) {
@@ -121,6 +122,7 @@ fn constant_snippets() -> [lsp::CompletionItem; 11] {
 
 fn variable_completions(file: &Document, position: Span) -> lsp::CompletionList {
   let typechecker = file.typechecker();
+  let skip_function_brackets = complete_function_bracket_in_pipeline(&file.ast, position);
 
   let items = typechecker
     .variables()
@@ -129,7 +131,12 @@ fn variable_completions(file: &Document, position: Span) -> lsp::CompletionList 
       let name = variable.name();
       let type_info = variable.get_type_info().unwrap();
 
-      variable_completion(name, type_info, variable.documentation(), false)
+      variable_completion(
+        name,
+        type_info,
+        variable.documentation(),
+        skip_function_brackets,
+      )
     })
     .chain(constant_snippets())
     .chain(module_access_snippets())
@@ -145,7 +152,7 @@ fn variable_completion(
   name: &str,
   type_info: &StaticTypeInfo,
   documentation: Option<&str>,
-  in_import: bool,
+  skip_function_brackets: bool,
 ) -> lsp::CompletionItem {
   lsp::CompletionItem {
     kind: Some(match type_info.kind {
@@ -155,8 +162,8 @@ fn variable_completion(
     }),
 
     label: match type_info.kind {
-      VariableType::Function if !in_import => format!("{name}(…)"),
-      VariableType::FunctionNoArgs if !in_import => format!("{name}()"),
+      VariableType::Function if !skip_function_brackets => format!("{name}(…)"),
+      VariableType::FunctionNoArgs if !skip_function_brackets => format!("{name}()"),
       _ => name.to_owned(),
     },
     label_details: Some(lsp::CompletionItemLabelDetails {
@@ -172,12 +179,12 @@ fn variable_completion(
 
     // If it is a function, we want to use the function snippet
     insert_text: match type_info.kind {
-      VariableType::Function if !in_import => Some(format!("{name}($0)")),
-      VariableType::FunctionNoArgs if !in_import => Some(format!("{name}()")),
+      VariableType::Function if !skip_function_brackets => Some(format!("{name}($0)")),
+      VariableType::FunctionNoArgs if !skip_function_brackets => Some(format!("{name}()")),
       _ => Some(name.to_owned()),
     },
     insert_text_format: match type_info.kind {
-      VariableType::Function if !in_import => Some(lsp::InsertTextFormat::SNIPPET),
+      VariableType::Function if !skip_function_brackets => Some(lsp::InsertTextFormat::SNIPPET),
       _ => None,
     },
 
@@ -226,7 +233,7 @@ fn module_access_snippets() -> impl Iterator<Item = lsp::CompletionItem> {
   })
 }
 
-fn module_item_completions(module: &str, in_import: bool) -> lsp::CompletionList {
+fn module_item_completions(module: &str, skip_function_brackets: bool) -> lsp::CompletionList {
   let module = StdlibModule::get(module);
 
   let items = module
@@ -236,7 +243,7 @@ fn module_item_completions(module: &str, in_import: bool) -> lsp::CompletionList
       let type_info = module.type_info(item);
       let documentation = module.docs(item);
 
-      variable_completion(item, &type_info, documentation, in_import)
+      variable_completion(item, &type_info, documentation, skip_function_brackets)
     })
     .collect();
 
@@ -308,4 +315,23 @@ fn in_module_access(
   }
 
   None
+}
+
+/// Should brackets be inserted automatically for functions?
+///
+/// In a pipeline, we don't want brackets as functions may be called an extra time.
+/// However if it is nested in something else, it is not an issue and we want brackets.
+fn complete_function_bracket_in_pipeline(ast: &AST, position: Span) -> bool {
+  for expression in &ast.expressions {
+    if let Expression::Binary(binary) = expression
+      && let bang_syntax::ast::expression::BinaryOperator::Pipeline = binary.operator(ast)
+      && let right = binary.right(ast)
+      && let Expression::Invalid(_) | Expression::ModuleAccess(_) | Expression::Variable(_) = right
+      && right.span(ast).contains(position)
+    {
+      return true;
+    }
+  }
+
+  false
 }
