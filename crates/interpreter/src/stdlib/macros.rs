@@ -33,7 +33,7 @@ pub macro module($module_name:ident, $module_items_name:ident, $module_docs_name
   }
 
   #[doc = concat!("All the items in the `", stringify!($module_name), "` module")]
-  pub const $module_items_name: [&str; ${count($constant_name)} + ${count($function_name)}] = [
+  pub const $module_items_name: [&str; count!($($constant_name)*) + count!($($function_name)*)] = [
     $(stringify!($constant_name),)*
     $(stringify!($function_name),)*
   ];
@@ -207,4 +207,9 @@ macro native_function {
       Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
     })
   },
+}
+
+macro count {
+  () => { 0 },
+  ( $x:tt $($xs:tt)* ) => { 1 + count!($($xs)*) },
 }

@@ -3,7 +3,6 @@
 
 #![feature(let_chains)]
 #![feature(decl_macro)]
-#![feature(macro_metavar_expr)]
 #![allow(unsafe_code)]
 
 mod bytecode;
