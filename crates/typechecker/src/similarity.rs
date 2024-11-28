@@ -80,9 +80,7 @@ fn jaro_winkler_similarity(a: &str, b: &str) -> f64 {
 
 #[cfg(test)]
 mod test {
-  use crate::similarity::jaro_similarity;
-
-  use super::{jaro_winkler_similarity, similarly_named};
+  use super::{jaro_similarity, jaro_winkler_similarity, similarly_named};
 
   macro_rules! assert_similar {
     ($x:expr, $y:expr) => {
@@ -97,24 +95,24 @@ mod test {
 
   #[test]
   fn empty_strings() {
-    assert_eq!(jaro_winkler_similarity("", ""), 1.0);
-    assert_eq!(jaro_winkler_similarity("hello", ""), 0.0);
-    assert_eq!(jaro_winkler_similarity("", "hello"), 0.0);
+    assert_similar!(jaro_winkler_similarity("", ""), 1.0);
+    assert_similar!(jaro_winkler_similarity("hello", ""), 0.0);
+    assert_similar!(jaro_winkler_similarity("", "hello"), 0.0);
   }
 
   #[test]
   fn completely_different_strings() {
-    assert_eq!(jaro_winkler_similarity("abs", "poo"), 0.0);
-    assert_eq!(jaro_winkler_similarity("rude", "laky"), 0.0);
-    assert_eq!(jaro_winkler_similarity("a", "b"), 0.0);
-    assert_eq!(jaro_winkler_similarity("b", "a"), 0.0);
+    assert_similar!(jaro_winkler_similarity("abs", "poo"), 0.0);
+    assert_similar!(jaro_winkler_similarity("rude", "laky"), 0.0);
+    assert_similar!(jaro_winkler_similarity("a", "b"), 0.0);
+    assert_similar!(jaro_winkler_similarity("b", "a"), 0.0);
   }
 
   #[test]
   fn identical_strings() {
-    assert_eq!(jaro_winkler_similarity("Hello World", "Hello World"), 1.0);
-    assert_eq!(jaro_winkler_similarity("a", "a"), 1.0);
-    assert_eq!(jaro_winkler_similarity("Lazy", "Lazy"), 1.0);
+    assert_similar!(jaro_winkler_similarity("Hello World", "Hello World"), 1.0);
+    assert_similar!(jaro_winkler_similarity("a", "a"), 1.0);
+    assert_similar!(jaro_winkler_similarity("Lazy", "Lazy"), 1.0);
   }
 
   #[test]
