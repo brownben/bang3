@@ -1,6 +1,7 @@
 use super::ImportResult;
 use crate::{
   object::NativeFunction,
+  object::{NATIVE_CLOSURE_TWO_TYPE_ID, NativeClosureTwo},
   object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
   object::{STRING_SLICE_TYPE_ID, StringSlice},
   value::Value,
@@ -174,6 +175,35 @@ macro native_function {
       }
 
       let closure = vm.heap.allocate(NativeClosure::new(stringify!($name), func, arg));
+      Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
+    })
+  },
+
+  ($name:ident, String String String, String, $native_function:expr) => {
+    NativeFunction::new(stringify!($name), |vm, arg| {
+      fn func_one(vm: &mut VM, a: Value, b: Value) -> Result<Value, ErrorKind> {
+        if b.is_string() {
+          let closure = vm.heap.allocate(NativeClosureTwo::new(stringify!($name), func_two, a, b));
+          Ok(Value::from_object(closure, NATIVE_CLOSURE_TWO_TYPE_ID))
+        } else {
+          Err(ErrorKind::TypeError { expected: "string", got: b.get_type(vm) })
+        }
+      }
+      fn func_two(vm: &mut VM, a: Value, b: Value, c: Value) -> Result<Value, ErrorKind> {
+        if c.is_string() {
+          let (a, b, c) = (a.as_string(&vm.heap), b.as_string(&vm.heap), c.as_string(&vm.heap));
+          let output = $native_function(a, b, c);
+          Ok(vm.allocate_string(&output).into())
+        } else {
+          Err(ErrorKind::TypeError { expected: "string", got: c.get_type(vm) })
+        }
+      }
+
+      if !arg.is_string() {
+        return Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) });
+      }
+
+      let closure = vm.heap.allocate(NativeClosure::new(stringify!($name), func_one, arg));
       Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
     })
   },

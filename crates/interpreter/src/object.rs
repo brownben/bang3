@@ -34,6 +34,7 @@ pub const DEFAULT_TYPE_DESCRIPTORS: &[TypeDescriptor] = &[
   CLOSURE,
   NATIVE_FUNCTION,
   NATIVE_CLOSURE,
+  NATIVE_CLOSURE_TWO,
   ALLOCATED,
 ];
 
@@ -193,7 +194,7 @@ pub struct NativeClosure {
   pub(crate) arg1: Value,
 }
 impl NativeClosure {
-  /// Create a new naative function
+  /// Create a new native closure
   pub(crate) fn new(
     name: &'static str,
     func: fn(&mut VM, Value, Value) -> Result<Value, ErrorKind>,
@@ -223,6 +224,52 @@ const NATIVE_CLOSURE: TypeDescriptor = TypeDescriptor {
 };
 pub const NATIVE_CLOSURE_TYPE_ID: usize = 4;
 
+/// A native closure with 2 args - a native function which has got two values from a previous calls
+#[derive(Clone, Debug)]
+pub struct NativeClosureTwo {
+  pub(crate) name: &'static str,
+  pub(crate) func: fn(&mut VM, Value, Value, Value) -> Result<Value, ErrorKind>,
+  pub(crate) arg1: Value,
+  pub(crate) arg2: Value,
+}
+impl NativeClosureTwo {
+  /// Create a new native function
+  pub(crate) fn new(
+    name: &'static str,
+    func: fn(&mut VM, Value, Value, Value) -> Result<Value, ErrorKind>,
+    arg1: Value,
+    arg2: Value,
+  ) -> Self {
+    Self {
+      name,
+      func,
+      arg1,
+      arg2,
+    }
+  }
+}
+impl fmt::Display for NativeClosureTwo {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "<closure <function {}>>", self.name)
+  }
+}
+const NATIVE_CLOSURE_TWO: TypeDescriptor = TypeDescriptor {
+  type_name: "function",
+  trace: |vm, value, trace_value| {
+    let closure = &vm.heap[value.cast::<NativeClosureTwo>()];
+    trace_value(vm, closure.arg1);
+    trace_value(vm, closure.arg2);
+  },
+  display: |heap, value| heap[value.cast::<NativeClosureTwo>()].to_string(),
+  is_falsy: |_, _| false,
+  equals: |_vm, a, b| a == b,
+  call: Some(|vm, object, arg3| {
+    let function = &vm.heap[object.cast::<NativeClosureTwo>()];
+    (function.func)(vm, function.arg1, function.arg2, arg3)
+  }),
+};
+pub const NATIVE_CLOSURE_TWO_TYPE_ID: usize = 5;
+
 /// A value which has been moved from the stack to the heap, as it has been captured by a closure
 const ALLOCATED: TypeDescriptor = TypeDescriptor {
   type_name: "allocated",
@@ -235,7 +282,7 @@ const ALLOCATED: TypeDescriptor = TypeDescriptor {
   equals: |_, _, _| unreachable!("Not accessed as a value"),
   call: None,
 };
-pub const ALLOCATED_TYPE_ID: usize = 5;
+pub const ALLOCATED_TYPE_ID: usize = 6;
 
 #[cfg(test)]
 mod test {
@@ -252,6 +299,7 @@ mod test {
     assert_eq!(objects[CLOSURE_TYPE_ID].type_name, "function");
     assert_eq!(objects[NATIVE_FUNCTION_TYPE_ID].type_name, "function");
     assert_eq!(objects[NATIVE_CLOSURE_TYPE_ID].type_name, "function");
+    assert_eq!(objects[NATIVE_CLOSURE_TWO_TYPE_ID].type_name, "function");
     assert_eq!(objects[ALLOCATED_TYPE_ID].type_name, "allocated");
   }
 
@@ -264,6 +312,7 @@ mod test {
     assert_eq!(vm.types[CLOSURE_TYPE_ID].type_name, "function");
     assert_eq!(vm.types[NATIVE_FUNCTION_TYPE_ID].type_name, "function");
     assert_eq!(vm.types[NATIVE_CLOSURE_TYPE_ID].type_name, "function");
+    assert_eq!(vm.types[NATIVE_CLOSURE_TWO_TYPE_ID].type_name, "function");
     assert_eq!(vm.types[ALLOCATED_TYPE_ID].type_name, "allocated");
   }
 }

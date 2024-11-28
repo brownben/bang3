@@ -115,4 +115,25 @@ module!(string, STRING_ITEMS, string_docs, {
   /// string::trimEnd('hello   ') // 'hello'
   /// ```
   fn trimEnd(String) -> StringSlice = str::trim_end;
+
+
+  /// Replace all occurrences of a pattern in a string with a replacement.
+  /// Returns a new string.
+  ///
+  /// ## Example
+  /// ```bang
+  /// 'this is old' >> string::replaceAll('old')('new') // 'this is new'
+  /// 'this is old' >> string::replaceAll('i')('I') // 'thIs Is new'
+  /// ```
+  fn replaceAll(String, String, String) -> String = |pat, rep, str| str::replace(str, pat, rep);
+
+  /// Replace the first occurrence of a pattern in a string with a replacement.
+  /// Returns a new string.
+  ///
+  /// ## Example
+  /// ```bang
+  /// 'this is old' >> string::replaceOne('old')('new') // 'this is new'
+  /// 'this is old' >> string::replaceOne('i')('I') // 'thIs is new'
+  /// ```
+  fn replaceOne(String, String, String) -> String = |pat, rep, str| str::replacen(str, pat, rep, 1);
 });

@@ -113,6 +113,9 @@ fn string_module(types: &mut TypeArena, item: &str) -> ImportResult {
   let string_to_bool = types.new_type(Type::Function(TypeArena::STRING, TypeArena::BOOLEAN));
   let string_to_string = types.new_type(Type::Function(TypeArena::STRING, TypeArena::STRING));
   let string_string_to_bool = types.new_type(Type::Function(TypeArena::STRING, string_to_bool));
+  let string_string_to_string = types.new_type(Type::Function(TypeArena::STRING, string_to_string));
+  let string_string_string_to_string =
+    types.new_type(Type::Function(TypeArena::STRING, string_string_to_string));
 
   match item {
     "NEW_LINE" | "TAB" | "CARRIAGE_RETURN" => TypeArena::STRING.into(),
@@ -121,6 +124,7 @@ fn string_module(types: &mut TypeArena, item: &str) -> ImportResult {
     "isEmpty" | "isAscii" => string_to_bool.into(),
     "toLowercase" | "toUppercase" | "trim" | "trimStart" | "trimEnd" => string_to_string.into(),
     "contains" | "startsWith" | "endsWith" => string_string_to_bool.into(),
+    "replaceAll" | "replaceOne" => string_string_string_to_string.into(),
 
     _ => ImportResult::ItemNotFound,
   }

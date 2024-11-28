@@ -767,5 +767,11 @@ mod stdlib {
       'this is a string' >> contains('is')
     "};
     assert_eq!(synthesize(source), "boolean");
+
+    let source = indoc! {"
+      from string import { replaceAll }
+      'this is a string' >> replaceAll('is')('was')
+    "};
+    assert_eq!(synthesize(source), "string");
   }
 }

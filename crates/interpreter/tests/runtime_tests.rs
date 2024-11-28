@@ -1279,6 +1279,28 @@ mod builtin_function {
     assert_variable!(trim; s, string "hello");
     assert_variable!(trim; t, true);
 
+    let mut replace = run(indoc! {"
+      from string import { replaceAll, replaceOne }
+
+      let a = replaceAll('l')('x')('hello')
+      let b = replaceAll('l')('l')('hello')
+      let c = replaceAll('l')('')('hello')
+      let d = replaceAll('farts')('')('hello')
+
+      let e = replaceOne('l')('x')('hello')
+      let f = replaceOne('l')('l')('hello')
+      let g = replaceOne('l')('')('hello')
+      let h = replaceOne('farts')('')('hello')
+    "});
+    assert_variable!(replace; a, string "hexxo");
+    assert_variable!(replace; b, string "hello");
+    assert_variable!(replace; c, string "heo");
+    assert_variable!(replace; d, string "hello");
+    assert_variable!(replace; e, string "hexlo");
+    assert_variable!(replace; f, string "hello");
+    assert_variable!(replace; g, string "helo");
+    assert_variable!(replace; h, string "hello");
+
     let length_wrong_type = run("from string import { length }\nlet a = length(5)");
     assert!(length_wrong_type.is_err_and(|error| error == super::Error::RuntimeError));
     let to_uppercase_wrong_type = run("from string import { toUppercase }\nlet a = toUppercase(5)");
