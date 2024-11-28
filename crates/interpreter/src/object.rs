@@ -22,7 +22,10 @@ pub struct TypeDescriptor {
   pub is_falsy: fn(heap: &Heap, object_pointer: Gc<u8>) -> bool,
   /// Check if the value is equal to another value (of the same type)
   pub equals: fn(vm: &VM, a: Gc<u8>, b: Gc<u8>) -> bool,
+  /// Call the object as a function
+  pub call: Option<NativeFunctionCall>,
 }
+type NativeFunctionCall = fn(vm: &mut VM, callee: Gc<u8>, arg: Value) -> Result<Value, ErrorKind>;
 type TraceValueFunction = fn(vm: &VM, Value) -> ();
 
 pub const DEFAULT_TYPE_DESCRIPTORS: &[TypeDescriptor] = &[
@@ -73,6 +76,7 @@ const STRING: TypeDescriptor = TypeDescriptor {
   display: |heap, value| heap[value.cast::<BangString>()].as_str(heap).to_owned(),
   is_falsy: |heap, value| heap[value.cast::<BangString>()].as_str(heap).is_empty(),
   equals: |_vm, _a, _b| unreachable!("Strings handled separately"),
+  call: None,
 };
 pub const STRING_TYPE_ID: usize = 0;
 
@@ -104,6 +108,7 @@ const STRING_SLICE: TypeDescriptor = TypeDescriptor {
   display: |heap, value| heap[value.cast::<StringSlice>()].as_str(heap).to_owned(),
   is_falsy: |heap, value| heap[value.cast::<StringSlice>()].as_str(heap).is_empty(),
   equals: |_vm, _a, _b| unreachable!("Strings handled separately"),
+  call: None,
 };
 pub const STRING_SLICE_TYPE_ID: usize = 1;
 
@@ -143,6 +148,7 @@ const CLOSURE: TypeDescriptor = TypeDescriptor {
   display: |heap, value| heap[value.cast::<Closure>()].to_string(),
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
+  call: None,
 };
 pub const CLOSURE_TYPE_ID: usize = 2;
 
@@ -172,6 +178,10 @@ const NATIVE_FUNCTION: TypeDescriptor = TypeDescriptor {
   display: |heap, value| heap[value.cast::<NativeFunction>()].to_string(),
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
+  call: Some(|vm, object, arg| {
+    let function = &vm.heap[object.cast::<NativeFunction>()];
+    (function.func)(vm, arg)
+  }),
 };
 pub const NATIVE_FUNCTION_TYPE_ID: usize = 3;
 
@@ -180,20 +190,16 @@ pub const NATIVE_FUNCTION_TYPE_ID: usize = 3;
 pub struct NativeClosure {
   pub(crate) name: &'static str,
   pub(crate) func: fn(&mut VM, Value, Value) -> Result<Value, ErrorKind>,
-  pub(crate) captured_value: Value,
+  pub(crate) arg1: Value,
 }
 impl NativeClosure {
   /// Create a new naative function
   pub(crate) fn new(
     name: &'static str,
     func: fn(&mut VM, Value, Value) -> Result<Value, ErrorKind>,
-    captured_value: Value,
+    arg1: Value,
   ) -> Self {
-    Self {
-      name,
-      func,
-      captured_value,
-    }
+    Self { name, func, arg1 }
   }
 }
 impl fmt::Display for NativeClosure {
@@ -205,11 +211,15 @@ const NATIVE_CLOSURE: TypeDescriptor = TypeDescriptor {
   type_name: "function",
   trace: |vm, value, trace_value| {
     let closure = &vm.heap[value.cast::<NativeClosure>()];
-    trace_value(vm, closure.captured_value);
+    trace_value(vm, closure.arg1);
   },
   display: |heap, value| heap[value.cast::<NativeClosure>()].to_string(),
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
+  call: Some(|vm, object, arg2| {
+    let function = &vm.heap[object.cast::<NativeClosure>()];
+    (function.func)(vm, function.arg1, arg2)
+  }),
 };
 pub const NATIVE_CLOSURE_TYPE_ID: usize = 4;
 
@@ -223,6 +233,7 @@ const ALLOCATED: TypeDescriptor = TypeDescriptor {
   display: |_, _| unreachable!("Not accessed as a value"),
   is_falsy: |_, _| unreachable!("Not accessed as a value"),
   equals: |_, _, _| unreachable!("Not accessed as a value"),
+  call: None,
 };
 pub const ALLOCATED_TYPE_ID: usize = 5;
 

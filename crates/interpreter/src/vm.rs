@@ -1,8 +1,6 @@
-use crate::object::{BangString, Closure, NativeClosure, NativeFunction};
-
 use super::{
   bytecode::{Chunk, ConstantValue, OpCode},
-  object::{self, TypeDescriptor},
+  object::{self, BangString, Closure, TypeDescriptor},
   stdlib::{Context, ImportResult},
   value::Value,
 };
@@ -389,6 +387,8 @@ impl<'context> VM<'context> {
             ip = 0;
             offset = self.stack.len() - 1;
             chunk = unsafe { &*callee.as_function(&self.heap).as_ptr() };
+
+            continue; // skip the ip increment, as we're jumping to a new chunk
           } else if callee.is_object_type(object::CLOSURE_TYPE_ID) {
             let upvalues = self.heap[callee.as_object::<Closure>()].upvalues;
             self.push_frame(ip, offset, chunk, Some(upvalues));
@@ -396,37 +396,23 @@ impl<'context> VM<'context> {
             ip = 0;
             offset = self.stack.len() - 1;
             chunk = unsafe { &*self.heap[callee.as_object::<Closure>()].function().as_ptr() };
-          } else if callee.is_object_type(object::NATIVE_FUNCTION_TYPE_ID) {
-            let argument = self.pop();
-            let function = &self.heap[callee.as_object::<NativeFunction>()];
 
-            let result = (function.func)(self, argument);
-            self.pop();
-            match result {
+            continue; // skip the ip increment, as we're jumping to a new chunk
+          } else if callee.is_object()
+            && let Some(native_function) = self.types[callee.object_type()].call
+          {
+            let argument = self.pop();
+            let callee = self.pop();
+
+            match native_function(self, callee.as_object(), argument) {
               Ok(value) => self.push(value),
               Err(err) => break Some(err),
             }
-
-            ip += 1;
-          } else if callee.is_object_type(object::NATIVE_CLOSURE_TYPE_ID) {
-            let argument = self.pop();
-            let function = &self.heap[callee.as_object::<NativeClosure>()];
-
-            let result = (function.func)(self, function.captured_value, argument);
-            self.pop();
-            match result {
-              Ok(value) => self.push(value),
-              Err(err) => break Some(err),
-            }
-
-            ip += 1;
           } else {
             break Some(ErrorKind::NotCallable {
               type_: callee.get_type(self),
             });
           }
-
-          continue; // skip the ip increment, as we're jumping to a new chunk
         }
         OpCode::Return => {
           let result = self.pop();
