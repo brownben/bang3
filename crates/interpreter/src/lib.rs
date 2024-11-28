@@ -2,7 +2,6 @@
 //! Bytecode compiler and virtual machine for running Bang code.
 
 #![feature(let_chains)]
-#![feature(decl_macro)]
 #![allow(unsafe_code)]
 
 mod bytecode;

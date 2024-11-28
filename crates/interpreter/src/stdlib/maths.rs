@@ -1,4 +1,4 @@
-use super::macros::module;
+use super::macros::{module, prelude::*};
 
 module!(maths, MATHS_ITEMS, maths_docs, {
   const /// The mathematical constant `π` (~3.141592…)

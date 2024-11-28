@@ -1,4 +1,4 @@
-use super::macros::module;
+use super::macros::{module, prelude::*};
 
 module!(string, STRING_ITEMS, string_docs, {
   const /// A newline character

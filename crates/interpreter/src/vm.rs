@@ -521,34 +521,40 @@ impl<'context> VM<'context> {
   }
 }
 
-macro numeric_operation(($vm:expr, $chunk:expr), $operator:tt) {{
-  let right = $vm.pop();
-  let left = $vm.pop();
+macro_rules! numeric_operation {
+  (($vm:expr, $chunk:expr), $operator:tt) => {{
+    let right = $vm.pop();
+    let left = $vm.pop();
 
-  if left.is_number() && right.is_number() {
-    $vm.push(Value::from(left.as_number() $operator right.as_number()));
-  } else if right.is_number() {
-    break Some(ErrorKind::TypeError { expected: "number", got: left.get_type(&$vm) });
-  } else {
-    break Some(ErrorKind::TypeError { expected: "number", got: right.get_type(&$vm) });
-  }
-}}
+    if left.is_number() && right.is_number() {
+      $vm.push(Value::from(left.as_number() $operator right.as_number()));
+    } else if right.is_number() {
+      break Some(ErrorKind::TypeError { expected: "number", got: left.get_type(&$vm) });
+    } else {
+      break Some(ErrorKind::TypeError { expected: "number", got: right.get_type(&$vm) });
+    }
+  }}
+}
+use numeric_operation;
 
-macro comparison_operation(($vm:expr, $chunk:expr), $operator:tt) {{
-  let right = $vm.pop();
-  let left = $vm.pop();
+macro_rules! comparison_operation {
+  (($vm:expr, $chunk:expr), $operator:tt) => {{
+    let right = $vm.pop();
+    let left = $vm.pop();
 
-  if left.is_number() && right.is_number() {
-    $vm.push(Value::from(left.as_number() $operator right.as_number()));
-  } else if left.is_string() && right.is_string() {
-    $vm.push(Value::from(left.as_string(&$vm.heap) $operator right.as_string(&$vm.heap)));
-  } else {
-    break Some(ErrorKind::TypeErrorBinary {
-      expected: "two numbers or two strings",
-      got: format!("a `{}` and a `{}`", left.get_type(&$vm), right.get_type(&$vm)),
-    });
-  }
-}}
+    if left.is_number() && right.is_number() {
+      $vm.push(Value::from(left.as_number() $operator right.as_number()));
+    } else if left.is_string() && right.is_string() {
+      $vm.push(Value::from(left.as_string(&$vm.heap) $operator right.as_string(&$vm.heap)));
+    } else {
+      break Some(ErrorKind::TypeErrorBinary {
+        expected: "two numbers or two strings",
+        got: format!("a `{}` and a `{}`", left.get_type(&$vm), right.get_type(&$vm)),
+      });
+    }
+  }}
+}
+use comparison_operation;
 
 /// An error whilst executing bytecode
 #[derive(Debug, Clone)]

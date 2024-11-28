@@ -14,7 +14,6 @@
 //! line and try parsing again.
 
 #![feature(let_chains)]
-#![feature(decl_macro)]
 
 pub mod ast;
 mod parser;
