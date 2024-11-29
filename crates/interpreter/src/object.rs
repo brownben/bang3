@@ -17,9 +17,9 @@ pub struct TypeDescriptor {
   /// Trace the value for the garbage collector
   pub trace: fn(vm: &VM, object_pointer: Gc<u8>, trace_value: TraceValueFunction) -> (),
   /// Display the value as a string
-  pub display: fn(heap: &Heap, object_pointer: Gc<u8>) -> String,
+  pub display: fn(vm: &VM, object_pointer: Gc<u8>) -> String,
   /// Whether the value is falsy
-  pub is_falsy: fn(heap: &Heap, object_pointer: Gc<u8>) -> bool,
+  pub is_falsy: fn(vm: &VM, object_pointer: Gc<u8>) -> bool,
   /// Check if the value is equal to another value (of the same type)
   pub equals: fn(vm: &VM, a: Gc<u8>, b: Gc<u8>) -> bool,
   /// Call the object as a function
@@ -43,8 +43,8 @@ pub const DEFAULT_TYPE_DESCRIPTORS: &[TypeDescriptor] = &[
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct BangString(GcList<u8>);
 impl BangString {
-  pub fn as_str(self, heap: &Heap) -> &str {
-    unsafe { str::from_utf8_unchecked(heap.get_list_buffer(self.0)) }
+  pub fn as_str<'a>(self, vm: &'a VM) -> &'a str {
+    unsafe { str::from_utf8_unchecked(vm.heap.get_list_buffer(self.0)) }
   }
 
   /// Concatenate two strings together
@@ -74,8 +74,8 @@ impl From<Gc<usize>> for BangString {
 const STRING: TypeDescriptor = TypeDescriptor {
   type_name: "string",
   trace: |vm, value, _trace| vm.heap.mark(value),
-  display: |heap, value| heap[value.cast::<BangString>()].as_str(heap).to_owned(),
-  is_falsy: |heap, value| heap[value.cast::<BangString>()].as_str(heap).is_empty(),
+  display: |vm, value| vm.heap[value.cast::<BangString>()].as_str(vm).to_owned(),
+  is_falsy: |vm, value| vm.heap[value.cast::<BangString>()].as_str(vm).is_empty(),
   equals: |_vm, _a, _b| unreachable!("Strings handled separately"),
   call: None,
 };
@@ -94,10 +94,10 @@ impl StringSlice {
     Self { string, start, end }
   }
 
-  pub fn as_str<'a>(&'a self, heap: &'a Heap) -> &'a str {
+  pub fn as_str<'a>(&'a self, vm: &'a VM) -> &'a str {
     debug_assert!(self.string.is_string());
 
-    &self.string.as_string(heap)[self.start..self.end]
+    &self.string.as_string(vm)[self.start..self.end]
   }
 }
 const STRING_SLICE: TypeDescriptor = TypeDescriptor {
@@ -106,8 +106,8 @@ const STRING_SLICE: TypeDescriptor = TypeDescriptor {
     let slice = &vm.heap[value.cast::<StringSlice>()];
     trace_value(vm, slice.string);
   },
-  display: |heap, value| heap[value.cast::<StringSlice>()].as_str(heap).to_owned(),
-  is_falsy: |heap, value| heap[value.cast::<StringSlice>()].as_str(heap).is_empty(),
+  display: |vm, value| vm.heap[value.cast::<StringSlice>()].as_str(vm).to_owned(),
+  is_falsy: |vm, value| vm.heap[value.cast::<StringSlice>()].as_str(vm).is_empty(),
   equals: |_vm, _a, _b| unreachable!("Strings handled separately"),
   call: None,
 };
@@ -146,7 +146,7 @@ const CLOSURE: TypeDescriptor = TypeDescriptor {
       trace_value(vm, *upvalue);
     }
   },
-  display: |heap, value| heap[value.cast::<Closure>()].to_string(),
+  display: |vm, value| vm.heap[value.cast::<Closure>()].to_string(),
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
   call: None,
@@ -176,7 +176,7 @@ impl fmt::Display for NativeFunction {
 const NATIVE_FUNCTION: TypeDescriptor = TypeDescriptor {
   type_name: "function",
   trace: |_vm, _value, _trace_value| {},
-  display: |heap, value| heap[value.cast::<NativeFunction>()].to_string(),
+  display: |vm, value| vm.heap[value.cast::<NativeFunction>()].to_string(),
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
   call: Some(|vm, object, arg| {
@@ -214,7 +214,7 @@ const NATIVE_CLOSURE: TypeDescriptor = TypeDescriptor {
     let closure = &vm.heap[value.cast::<NativeClosure>()];
     trace_value(vm, closure.arg1);
   },
-  display: |heap, value| heap[value.cast::<NativeClosure>()].to_string(),
+  display: |vm, value| vm.heap[value.cast::<NativeClosure>()].to_string(),
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
   call: Some(|vm, object, arg2| {
@@ -260,7 +260,7 @@ const NATIVE_CLOSURE_TWO: TypeDescriptor = TypeDescriptor {
     trace_value(vm, closure.arg1);
     trace_value(vm, closure.arg2);
   },
-  display: |heap, value| heap[value.cast::<NativeClosureTwo>()].to_string(),
+  display: |vm, value| vm.heap[value.cast::<NativeClosureTwo>()].to_string(),
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
   call: Some(|vm, object, arg3| {
