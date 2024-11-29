@@ -25,14 +25,11 @@ impl Enviroment {
   pub(crate) fn define_builtin_variables(&mut self, types: &mut TypeArena) {
     let generic = types.new_type(Type::Quantified(0));
 
-    let print_function = TypeScheme {
-      number_quantified_vars: 1,
-      type_: types.new_type(Type::Function(generic, generic)),
-    };
-    let x_string_function = TypeScheme {
-      number_quantified_vars: 1,
-      type_: types.new_type(Type::Function(generic, TypeArena::STRING)),
-    };
+    let print_function = TypeScheme::new(types.new_type(Type::Function(generic, generic)), 1);
+    let x_string_function = TypeScheme::new(
+      types.new_type(Type::Function(generic, TypeArena::STRING)),
+      1,
+    );
 
     self.variables.push(Variable {
       kind: VariableKind::Builtin {
@@ -265,13 +262,13 @@ impl Variable {
   }
 
   pub(crate) fn type_(&self) -> TypeRef {
-    self.type_.type_
+    self.type_.raw_type()
   }
 
   pub(crate) fn add_static_type_info(&self, types: &TypeArena) {
     _ = self.type_info.set(StaticTypeInfo {
       string: types.type_to_string(self.type_()),
-      kind: match types[self.type_.type_] {
+      kind: match types[self.type_.raw_type()] {
         Type::Function(arg, _) if types.is_never(arg) => VariableType::FunctionNoArgs,
         Type::Function(_, _) => VariableType::Function,
         _ => VariableType::Variable,

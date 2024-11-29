@@ -317,15 +317,26 @@ pub struct TypeVarRef(u32);
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct TypeScheme {
-  pub(crate) number_quantified_vars: u32,
-  pub(crate) type_: TypeRef,
+  number_quantified_vars: u32,
+  type_: TypeRef,
 }
 impl TypeScheme {
+  pub fn new(type_: TypeRef, number_quantified_vars: u32) -> Self {
+    TypeScheme {
+      number_quantified_vars,
+      type_,
+    }
+  }
+
   pub fn monomorphic(type_: TypeRef) -> Self {
     TypeScheme {
       number_quantified_vars: 0,
       type_,
     }
+  }
+
+  pub(crate) fn raw_type(self) -> TypeRef {
+    self.type_
   }
 }
 

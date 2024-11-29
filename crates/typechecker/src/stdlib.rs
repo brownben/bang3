@@ -53,7 +53,7 @@ impl StdlibModule {
     let mut types = TypeArena::new();
 
     let result = if let ImportResult::Value(type_) = self.import_value(&mut types, item) {
-      type_.type_
+      type_.raw_type()
     } else {
       TypeArena::UNKNOWN
     };
@@ -122,7 +122,7 @@ fn string_module(types: &mut TypeArena, item: &str) -> ImportResult {
   match item {
     "NEW_LINE" | "TAB" | "CARRIAGE_RETURN" => TypeArena::STRING.into(),
 
-    "from" | "toString" => x_to_string.into(),
+    "from" | "toString" => ImportResult::Value(TypeScheme::new(x_to_string, 1)),
     "length" | "byteLength" => string_to_number.into(),
     "isEmpty" | "isAscii" => string_to_bool.into(),
     "toLowercase" | "toUppercase" | "trim" | "trimStart" | "trimEnd" => string_to_string.into(),

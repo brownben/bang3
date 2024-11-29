@@ -620,7 +620,7 @@ impl InferType for ModuleAccess {
     let module = StdlibModule::get(self.module(ast));
 
     match module.import_value(&mut t.types, self.item(ast)) {
-      ImportResult::Value(type_) => type_.type_.into(),
+      ImportResult::Value(type_) => t.types.instantiate(type_).into(),
       ImportResult::ModuleNotFound => {
         t.problems.push(TypeError::ModuleNotFound {
           module: self.module(ast).to_owned(),
