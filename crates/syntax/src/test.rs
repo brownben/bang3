@@ -23,6 +23,8 @@ fn space_at_end() {
   assert!(parse("22 + 44 ").is_ok());
   assert!(parse("22 + 44    ").is_ok());
   assert!(parse("22 + 44  \t  ").is_ok());
+  assert!(parse("22 + 44\n\n\n").is_ok());
+  assert!(parse("from string import { trim }\n\n\n").is_ok());
 }
 
 #[test]

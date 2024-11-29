@@ -39,6 +39,7 @@ impl<'ast> Parser<'ast> {
     while !self.is_finished() {
       let statement = self.parse_statement();
       self.ast.root_statements.push(statement);
+      self.skip_newline();
     }
   }
 
