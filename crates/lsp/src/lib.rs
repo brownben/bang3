@@ -15,6 +15,7 @@
 //!   - Basic Snippets
 //!   - Variables in Scope
 //!   - Module Items in Import
+//! - Selection Ranges
 
 #![feature(let_chains)]
 #![deny(unsafe_code)]
@@ -133,6 +134,9 @@ impl LanguageServer {
 
       // Inlay Hints
       inlay_hint_provider: Some(lsp_types::OneOf::Left(true)),
+
+      // Selection Ranges
+      selection_range_provider: Some(lsp_types::SelectionRangeProviderCapability::Simple(true)),
 
       // Doesn't provide all capabilities
       ..Default::default()

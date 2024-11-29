@@ -9,6 +9,7 @@ mod folding;
 mod format;
 mod hover;
 mod inlay_hints;
+mod selection_range;
 mod symbols;
 mod variables;
 
@@ -18,6 +19,7 @@ use folding::folding_ranges;
 use format::format_file;
 use hover::hover;
 use inlay_hints::inlay_hints;
+use selection_range::selection_ranges;
 use symbols::document_symbols;
 use variables::{get_references, goto_definition, rename};
 
@@ -105,6 +107,13 @@ pub fn handle(
       let (request_id, params) = get_params::<InlayHintRequest>(request);
       let file = files.get(&params.text_document.uri);
       let result = inlay_hints(file, params.range);
+
+      Some(lsp_server::Response::new_ok(request_id, result))
+    }
+    SelectionRangeRequest::METHOD => {
+      let (request_id, params) = get_params::<SelectionRangeRequest>(request);
+      let file = files.get(&params.text_document.uri);
+      let result = selection_ranges(file, &params.positions);
 
       Some(lsp_server::Response::new_ok(request_id, result))
     }
