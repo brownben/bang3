@@ -2,6 +2,7 @@ use crate::{
   enviroment::{StaticTypeInfo, VariableType},
   types::{Type, TypeArena, TypeRef, TypeScheme},
 };
+pub use bang_interpreter::stdlib::MODULES;
 
 /// The result of importing a value from a module.
 #[derive(Clone)]
@@ -21,29 +22,41 @@ impl From<TypeRef> for ImportResult {
 
 /// Get type and doc information for a module in the standard library.
 #[must_use]
-pub struct StdlibModule(&'static str);
+#[non_exhaustive]
+pub enum StdlibModule {
+  /// The `maths` module
+  Maths,
+  /// The `string` module
+  String,
+  /// The module is unknown
+  Unknown,
+}
 impl StdlibModule {
   /// Gets a module by name.
   pub fn get(module: &str) -> Self {
-    Self(match module {
-      "maths" => "maths",
-      "string" => "string",
-      _ => "",
-    })
+    match module {
+      "maths" => Self::Maths,
+      "string" => Self::String,
+      _ => Self::Unknown,
+    }
   }
 
   /// Get the name of the module.
   #[must_use]
   pub fn name(&self) -> &'static str {
-    self.0
+    match self {
+      Self::Maths => "maths",
+      Self::String => "string",
+      Self::Unknown => "",
+    }
   }
 
   /// Get the type of a value imported from a module.
   pub(crate) fn import_value(&self, types: &mut TypeArena, item: &str) -> ImportResult {
-    match self.name() {
-      "maths" => maths_module(types, item),
-      "string" => string_module(types, item),
-      _ => ImportResult::ModuleNotFound,
+    match self {
+      Self::Maths => maths_module(types, item),
+      Self::String => string_module(types, item),
+      Self::Unknown => ImportResult::ModuleNotFound,
     }
   }
 
@@ -70,26 +83,23 @@ impl StdlibModule {
   /// Get the documentation of a value imported from a module.
   #[must_use]
   pub fn docs(&self, item: &str) -> Option<&'static str> {
-    match self.name() {
-      "maths" => bang_interpreter::stdlib::maths_docs(item),
-      "string" => bang_interpreter::stdlib::string_docs(item),
-      _ => None,
+    match self {
+      Self::Maths => bang_interpreter::stdlib::maths_docs(item),
+      Self::String => bang_interpreter::stdlib::string_docs(item),
+      Self::Unknown => None,
     }
   }
 
   /// Get a list of items in a module
   #[must_use]
   pub fn items(&self) -> &'static [&'static str] {
-    match self.name() {
-      "maths" => &bang_interpreter::stdlib::MATHS_ITEMS,
-      "string" => &bang_interpreter::stdlib::STRING_ITEMS,
-      _ => &[],
+    match self {
+      Self::Maths => &bang_interpreter::stdlib::MATHS_ITEMS,
+      Self::String => &bang_interpreter::stdlib::STRING_ITEMS,
+      Self::Unknown => &[],
     }
   }
 }
-
-/// The names of all the modules in the standard library
-pub const MODULES: [&str; 2] = ["maths", "string"];
 
 fn maths_module(types: &mut TypeArena, item: &str) -> ImportResult {
   let number_to_number = types.new_type(Type::Function(TypeArena::NUMBER, TypeArena::NUMBER));
@@ -145,6 +155,7 @@ mod test {
     for module in MODULES {
       assert!(bang_interpreter::stdlib::MODULES.contains(&module));
     }
+    assert_eq!(MODULES.len(), bang_interpreter::stdlib::MODULES.len());
 
     for item in STRING_ITEMS {
       let ty = string_module(&mut types, item);
