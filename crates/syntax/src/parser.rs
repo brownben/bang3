@@ -48,8 +48,7 @@ impl<'ast> Parser<'ast> {
   }
 
   fn is_finished(&mut self) -> bool {
-    self.position >= self.ast.tokens.len()
-      || self.ast.tokens[self.position].kind == TokenKind::EndOfFile
+    self.current_kind() == TokenKind::EndOfFile
   }
 
   fn current_token_id(&self) -> TokenIdx {
@@ -612,6 +611,16 @@ impl Parser<'_> {
             self.possibly_missing_identifier(TokenKind::Comma);
           }
         }
+        token if token.is_keyword() => {
+          let token = self.current_token();
+          self.position += 1;
+
+          if self.matches(TokenKind::As) {
+            self.possibly_missing_identifier(TokenKind::Comma);
+          } else {
+            self.add_error(ParseError::KeywordAsImportItem(token));
+          }
+        }
         _ => {
           self.should_resync = true;
           break self.add_error(ParseError::ExpectedImportItem(self.current_token()));
@@ -842,6 +851,8 @@ pub enum ParseError {
     /// Is the left hand side a possible assignment target
     possible_assignment: bool,
   },
+  /// Keyword as Import Item
+  KeywordAsImportItem(Token),
 }
 impl ParseError {
   /// The title of the error message
@@ -862,6 +873,7 @@ impl ParseError {
       Self::BlockMustEndWithExpression(_) => "Block Must End With Expression".into(),
       Self::ReturnOutsideFunction(_) => "Return Outside of Function".into(),
       Self::NoSingleEqualOperator { .. } => "No Single Equal Operator".into(),
+      Self::KeywordAsImportItem(_) => "Keyword as Import Item".into(),
     }
   }
 
@@ -903,6 +915,9 @@ impl ParseError {
       Self::NoSingleEqualOperator { possible_assignment: true, .. } => {
         "a single equal is not an operator. start line with `let` for variable declaration, or use `==` for equality".into()
       }
+      Self::KeywordAsImportItem(_) => {
+        "import items may be keywords, but they must be renamed with `as` or accessed using module access".into()
+      },
     }
   }
 
@@ -932,6 +947,7 @@ impl ParseError {
       ParseError::BlockMustEndWithExpression(token) => token.into(),
       ParseError::ReturnOutsideFunction(token) => token.into(),
       ParseError::NoSingleEqualOperator { token, .. } => token.into(),
+      ParseError::KeywordAsImportItem(token) => token.into(),
     }
   }
 
@@ -946,6 +962,7 @@ impl ParseError {
       Self::MissingIdentifier(_) => true,
       Self::MissingModuleName(_) => true,
       Self::MissingPattern(_) => true,
+      Self::KeywordAsImportItem(_) => true,
       _ => false,
     }
   }

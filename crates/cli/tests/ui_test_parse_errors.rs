@@ -317,3 +317,19 @@ fn no_single_equal_operator() {
 
   assert_eq!(output, expected);
 }
+
+#[test]
+fn keyword_as_import_item() {
+  let file = "from string import { from }";
+  let output = run_stderr(file);
+  let expected = indoc! {"
+    ✕ Error: Keyword as Import Item
+    import items may be keywords, but they must be renamed with `as` or accessed using module access
+
+        ╭─[STDIN:1]
+      1 │ from string import { from }
+    ────╯
+  "};
+
+  assert_eq!(output, expected);
+}

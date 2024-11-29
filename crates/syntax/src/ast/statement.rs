@@ -211,7 +211,7 @@ impl<'a> Iterator for ImportItemIterator<'a> {
       self.next_token();
     }
 
-    if self.current_kind() == TokenKind::Identifier {
+    if self.current_kind() == TokenKind::Identifier || self.current_kind().is_keyword() {
       let span = self.advance();
       let alias_span = self.matches(TokenKind::As).then(|| self.advance());
 

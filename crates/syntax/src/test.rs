@@ -922,6 +922,18 @@ fn import_statement() {
   // aliasing imports
   assert!(parse("from maths import { sin as }").is_err());
   assert!(parse("from maths import { sin as 7 }").is_err());
+
+  // keyword imports
+  assert!(parse("from string import { from }").is_err());
+  assert!(parse("from string import { from as }").is_err());
+  assert!(parse("from string import { from as from_ }").is_ok());
+  assert!(parse("from string import { from as from_, }").is_ok());
+  let ast = parse_to_string("from string import { from as toString, trim }");
+  assert_eq!(ast, indoc! {"
+    ├─ From 'string' Import
+    │  ├─ from as toString
+    │  ╰─ trim
+  "});
 }
 
 #[test]
