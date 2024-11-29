@@ -9,7 +9,7 @@ use bang_syntax::{
 };
 use std::borrow::Cow;
 
-pub const RULES: [&dyn LintRule; 16] = [
+pub const RULES: [&dyn LintRule; 17] = [
   &ConstantCondition,
   &ConstantStringInFormatString,
   &DoubleComparisonChain,
@@ -20,6 +20,7 @@ pub const RULES: [&dyn LintRule; 16] = [
   &NegativeZero,
   &SelfAssignment,
   &SelfComparison,
+  &ToStringModuleAccess,
   &UnderscoreVariableUse,
   &UnnecessaryClosure,
   &UnnecessaryReturn,
@@ -314,6 +315,26 @@ impl LintRule for SelfComparison {
       && binary.left(ast).equals(binary.right(ast), ast)
     {
       context.add_diagnostic(&Self, binary.span(ast));
+    }
+  }
+}
+
+pub struct ToStringModuleAccess;
+impl LintRule for ToStringModuleAccess {
+  fn name(&self) -> &'static str {
+    "To String Module Access"
+  }
+
+  fn message(&self) -> &'static str {
+    "`string::from` is preferred when using module access over `string::toString`"
+  }
+
+  fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
+    if let Expression::ModuleAccess(module_access) = &expression
+      && module_access.module(ast) == "string"
+      && module_access.item(ast) == "toString"
+    {
+      context.add_diagnostic(&Self, module_access.span(ast));
     }
   }
 }

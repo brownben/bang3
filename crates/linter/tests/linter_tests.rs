@@ -294,3 +294,14 @@ fn loss_of_precision() {
   assert!(lint("1_000.000_000").is_ok());
   assert!(lint("000_1_000.000_000").is_ok());
 }
+
+#[test]
+fn to_string_module_access() {
+  assert!(lint("string::toString(5)").is_err());
+  assert!(lint("string::toString('some text')").is_err());
+
+  assert!(lint("string::from(5)").is_ok());
+  assert!(lint("string::from('world')").is_ok());
+
+  assert!(lint("from string import { toString }\n toString(5)").is_ok());
+}
