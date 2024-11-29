@@ -138,6 +138,9 @@ impl LanguageServer {
       // Selection Ranges
       selection_range_provider: Some(lsp_types::SelectionRangeProviderCapability::Simple(true)),
 
+      // Code Actions (autofixes)
+      code_action_provider: Some(lsp_types::CodeActionProviderCapability::Simple(true)),
+
       // Doesn't provide all capabilities
       ..Default::default()
     }

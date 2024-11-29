@@ -5,6 +5,7 @@ use lsp_types as lsp;
 
 mod completions;
 mod diagnostics;
+mod fixes;
 mod folding;
 mod format;
 mod hover;
@@ -15,6 +16,7 @@ mod variables;
 
 use completions::completions;
 use diagnostics::file_diagnostics;
+use fixes::fixes;
 use folding::folding_ranges;
 use format::format_file;
 use hover::hover;
@@ -114,6 +116,13 @@ pub fn handle(
       let (request_id, params) = get_params::<SelectionRangeRequest>(request);
       let file = files.get(&params.text_document.uri);
       let result = selection_ranges(file, &params.positions);
+
+      Some(lsp_server::Response::new_ok(request_id, result))
+    }
+    CodeActionRequest::METHOD => {
+      let (request_id, params) = get_params::<CodeActionRequest>(request);
+      let file = files.get(&params.text_document.uri);
+      let result = fixes(file, params.range);
 
       Some(lsp_server::Response::new_ok(request_id, result))
     }
