@@ -30,7 +30,7 @@ pub struct VM<'context> {
   gc_threshold: usize,
 
   context: &'context dyn Context,
-  pub(crate) types: Vec<TypeDescriptor>,
+  types: Vec<TypeDescriptor>,
 }
 impl<'context> VM<'context> {
   /// Create a new VM
@@ -95,7 +95,7 @@ impl<'context> VM<'context> {
     }
 
     if a.is_object() && b.is_object() && a.object_type() == b.object_type() {
-      let type_descriptor = &self.types[a.object_type()];
+      let type_descriptor = &self.get_type_descriptor(a);
       return (type_descriptor.equals)(self, a.as_object(), b.as_object());
     }
 
@@ -106,6 +106,15 @@ impl<'context> VM<'context> {
   pub fn allocate_string(&mut self, value: &str) -> Value {
     let string = self.heap.allocate_list(value.bytes(), value.len());
     Value::from_object(*string, object::STRING_TYPE_ID)
+  }
+
+  #[inline]
+  pub(crate) fn get_type_descriptor(&self, value: Value) -> &TypeDescriptor {
+    debug_assert!(value.is_object());
+    let type_id = value.object_type();
+
+    debug_assert!(type_id.0 < self.types.len());
+    unsafe { self.types.get_unchecked(type_id.0) }
   }
 
   #[inline]
@@ -191,7 +200,7 @@ impl<'context> VM<'context> {
     fn mark_value(vm: &VM, value: Value) {
       if value.is_object() {
         vm.heap.mark(value.as_object::<u8>());
-        (vm.types[value.object_type()].trace)(vm, value.as_object(), mark_value);
+        (vm.get_type_descriptor(value).trace)(vm, value.as_object(), mark_value);
       }
     }
 
@@ -399,7 +408,7 @@ impl<'context> VM<'context> {
 
             continue; // skip the ip increment, as we're jumping to a new chunk
           } else if callee.is_object()
-            && let Some(native_function) = self.types[callee.object_type()].call
+            && let Some(native_function) = self.get_type_descriptor(callee).call
           {
             let argument = self.pop();
             let callee = self.pop();

@@ -71,9 +71,9 @@ impl Value {
 
   /// Create a new [Value] from a pointer to the heap
   #[must_use]
-  pub(crate) fn from_object<T>(object: Gc<T>, type_: usize) -> Self {
+  pub(crate) fn from_object<T>(object: Gc<T>, type_: TypeId) -> Self {
     Self(ptr::without_provenance(
-      TO_POINTER | type_ << 32 | object.addr() | OBJECT,
+      TO_POINTER | type_.0 << 32 | object.addr() | OBJECT,
     ))
   }
   /// Is the [Value] a pointer to the heap?
@@ -83,7 +83,7 @@ impl Value {
   }
   /// Is the [Value] an object of the given type?
   #[must_use]
-  pub(crate) fn is_object_type(self, type_: usize) -> bool {
+  pub(crate) fn is_object_type(self, type_: TypeId) -> bool {
     self.is_object() && self.object_type() == type_
   }
   /// Get the type of a pointer to the heap
@@ -91,11 +91,11 @@ impl Value {
   /// SAFETY: Undefined behaviour if [Value] is not a pointer to the heap.
   /// Use [`Value::is_object`] to check if it is a pointer to the heap.
   #[must_use]
-  pub(crate) fn object_type(self) -> usize {
+  pub(crate) fn object_type(self) -> TypeId {
     debug_assert!(self.is_object());
 
     let raw = self.0.addr() & FROM_POINTER;
-    raw >> 32
+    TypeId(raw >> 32)
   }
   /// View the [Value] as a object
   ///
@@ -170,7 +170,7 @@ impl Value {
       x if x.is_number() => (x.as_number() - 0.0).abs() < f64::EPSILON,
       x if x.is_string() => x.as_string(&vm.heap).is_empty(),
       x if x.is_constant_function() => false,
-      x => (vm.types[x.object_type()].is_falsy)(&vm.heap, x.as_object()),
+      x => (vm.get_type_descriptor(*x).is_falsy)(&vm.heap, x.as_object()),
     }
   }
 
@@ -182,7 +182,7 @@ impl Value {
       Self(NULL) => "null",
       x if x.is_number() => "number",
       x if x.is_constant_function() => "function",
-      x => vm.types[x.object_type()].type_name,
+      x => vm.get_type_descriptor(*x).type_name,
     }
   }
 
@@ -196,7 +196,7 @@ impl Value {
       x if x.is_number() => x.as_number().to_string(),
       x if x.is_string() => x.as_string(&vm.heap).to_owned(),
       x if x.is_constant_function() => x.as_function(&vm.heap).display(),
-      x => (vm.types[x.object_type()].display)(&vm.heap, x.as_object()),
+      x => (vm.get_type_descriptor(*x).display)(&vm.heap, x.as_object()),
     }
   }
 }
@@ -226,6 +226,10 @@ impl From<()> for Value {
     Self::NULL
   }
 }
+
+/// The id of an object type in the VM
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct TypeId(pub(crate) usize);
 
 // To check if a value is a number, or a tagged pointer
 // Sign bit is not set, but all bits of the exponent, and 2 bits of the mantissa are set (so real NaNs can be represented)

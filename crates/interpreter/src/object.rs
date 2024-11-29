@@ -1,6 +1,6 @@
 use crate::{
   bytecode::Chunk,
-  value::Value,
+  value::{TypeId, Value},
   vm::{ErrorKind, VM},
 };
 use bang_gc::{Gc, GcList, Heap};
@@ -79,7 +79,7 @@ const STRING: TypeDescriptor = TypeDescriptor {
   equals: |_vm, _a, _b| unreachable!("Strings handled separately"),
   call: None,
 };
-pub const STRING_TYPE_ID: usize = 0;
+pub const STRING_TYPE_ID: TypeId = TypeId(0);
 
 /// A string slice - a reference to part of a string
 #[derive(Clone)]
@@ -111,7 +111,7 @@ const STRING_SLICE: TypeDescriptor = TypeDescriptor {
   equals: |_vm, _a, _b| unreachable!("Strings handled separately"),
   call: None,
 };
-pub const STRING_SLICE_TYPE_ID: usize = 1;
+pub const STRING_SLICE_TYPE_ID: TypeId = TypeId(1);
 
 /// A closure - a function which has captured variables from the surrounding scope.
 #[derive(Clone, Debug)]
@@ -151,7 +151,7 @@ const CLOSURE: TypeDescriptor = TypeDescriptor {
   equals: |_vm, a, b| a == b,
   call: None,
 };
-pub const CLOSURE_TYPE_ID: usize = 2;
+pub const CLOSURE_TYPE_ID: TypeId = TypeId(2);
 
 /// A native function
 #[derive(Clone, Debug, PartialEq)]
@@ -184,7 +184,7 @@ const NATIVE_FUNCTION: TypeDescriptor = TypeDescriptor {
     (function.func)(vm, arg)
   }),
 };
-pub const NATIVE_FUNCTION_TYPE_ID: usize = 3;
+pub const NATIVE_FUNCTION_TYPE_ID: TypeId = TypeId(3);
 
 /// A native closure - a native function which has got a value from a previous call
 #[derive(Clone, Debug)]
@@ -222,7 +222,7 @@ const NATIVE_CLOSURE: TypeDescriptor = TypeDescriptor {
     (function.func)(vm, function.arg1, arg2)
   }),
 };
-pub const NATIVE_CLOSURE_TYPE_ID: usize = 4;
+pub const NATIVE_CLOSURE_TYPE_ID: TypeId = TypeId(4);
 
 /// A native closure with 2 args - a native function which has got two values from a previous calls
 #[derive(Clone, Debug)]
@@ -268,7 +268,7 @@ const NATIVE_CLOSURE_TWO: TypeDescriptor = TypeDescriptor {
     (function.func)(vm, function.arg1, function.arg2, arg3)
   }),
 };
-pub const NATIVE_CLOSURE_TWO_TYPE_ID: usize = 5;
+pub const NATIVE_CLOSURE_TWO_TYPE_ID: TypeId = TypeId(5);
 
 /// A value which has been moved from the stack to the heap, as it has been captured by a closure
 const ALLOCATED: TypeDescriptor = TypeDescriptor {
@@ -282,7 +282,7 @@ const ALLOCATED: TypeDescriptor = TypeDescriptor {
   equals: |_, _, _| unreachable!("Not accessed as a value"),
   call: None,
 };
-pub const ALLOCATED_TYPE_ID: usize = 6;
+pub const ALLOCATED_TYPE_ID: TypeId = TypeId(6);
 
 #[cfg(test)]
 mod test {
@@ -294,25 +294,43 @@ mod test {
   fn type_ids_match() {
     let objects = &DEFAULT_TYPE_DESCRIPTORS;
 
-    assert_eq!(objects[STRING_TYPE_ID].type_name, "string");
-    assert_eq!(objects[STRING_SLICE_TYPE_ID].type_name, "string");
-    assert_eq!(objects[CLOSURE_TYPE_ID].type_name, "function");
-    assert_eq!(objects[NATIVE_FUNCTION_TYPE_ID].type_name, "function");
-    assert_eq!(objects[NATIVE_CLOSURE_TYPE_ID].type_name, "function");
-    assert_eq!(objects[NATIVE_CLOSURE_TWO_TYPE_ID].type_name, "function");
-    assert_eq!(objects[ALLOCATED_TYPE_ID].type_name, "allocated");
+    assert_eq!(objects[STRING_TYPE_ID.0].type_name, "string");
+    assert_eq!(objects[STRING_SLICE_TYPE_ID.0].type_name, "string");
+    assert_eq!(objects[CLOSURE_TYPE_ID.0].type_name, "function");
+    assert_eq!(objects[NATIVE_FUNCTION_TYPE_ID.0].type_name, "function");
+    assert_eq!(objects[NATIVE_CLOSURE_TYPE_ID.0].type_name, "function");
+    assert_eq!(objects[NATIVE_CLOSURE_TWO_TYPE_ID.0].type_name, "function");
+    assert_eq!(objects[ALLOCATED_TYPE_ID.0].type_name, "allocated");
   }
 
   #[test]
   fn type_ids_match_in_vm() {
-    let vm = VM::new(HeapSize::Small, &EmptyContext).unwrap();
+    let mut vm = VM::new(HeapSize::Small, &EmptyContext).unwrap();
 
-    assert_eq!(vm.types[STRING_TYPE_ID].type_name, "string");
-    assert_eq!(vm.types[STRING_SLICE_TYPE_ID].type_name, "string");
-    assert_eq!(vm.types[CLOSURE_TYPE_ID].type_name, "function");
-    assert_eq!(vm.types[NATIVE_FUNCTION_TYPE_ID].type_name, "function");
-    assert_eq!(vm.types[NATIVE_CLOSURE_TYPE_ID].type_name, "function");
-    assert_eq!(vm.types[NATIVE_CLOSURE_TWO_TYPE_ID].type_name, "function");
-    assert_eq!(vm.types[ALLOCATED_TYPE_ID].type_name, "allocated");
+    let empty_allocation = vm.heap.allocate(());
+
+    let string = Value::from_object(empty_allocation, STRING_TYPE_ID);
+    assert_eq!(vm.get_type_descriptor(string).type_name, "string");
+    let string_slice = Value::from_object(empty_allocation, STRING_SLICE_TYPE_ID);
+    assert_eq!(vm.get_type_descriptor(string_slice).type_name, "string");
+
+    let closure = Value::from_object(empty_allocation, CLOSURE_TYPE_ID);
+    assert_eq!(vm.get_type_descriptor(closure).type_name, "function");
+
+    let native_function = Value::from_object(empty_allocation, NATIVE_FUNCTION_TYPE_ID);
+    assert_eq!(
+      vm.get_type_descriptor(native_function).type_name,
+      "function"
+    );
+    let native_closure = Value::from_object(empty_allocation, NATIVE_CLOSURE_TYPE_ID);
+    assert_eq!(vm.get_type_descriptor(native_closure).type_name, "function");
+    let native_closure_two = Value::from_object(empty_allocation, NATIVE_CLOSURE_TWO_TYPE_ID);
+    assert_eq!(
+      vm.get_type_descriptor(native_closure_two).type_name,
+      "function"
+    );
+
+    let allocated = Value::from_object(empty_allocation, ALLOCATED_TYPE_ID);
+    assert_eq!(vm.get_type_descriptor(allocated).type_name, "allocated");
   }
 }
