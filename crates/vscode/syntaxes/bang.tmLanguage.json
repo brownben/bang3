@@ -19,6 +19,9 @@
           "include": "#types"
         },
         {
+          "include": "#module-access"
+        },
+        {
           "include": "#keywords"
         },
         {
@@ -149,14 +152,27 @@
       }
     },
 
-    "variables": {
+    "module-access": {
       "patterns": [
         {
-          "match": "([_a-zA-Z][_a-zA-Z0-9]*)::",
+          "match": "([_a-zA-Z][_a-zA-Z0-9]*)::([_a-zA-Z][_a-zA-Z0-9]*)\\(",
           "captures": {
-            "1": { "name": "entity.name.namespace.bang" }
+            "1": { "name": "entity.name.namespace.bang" },
+            "2": { "name": "entity.name.function.call.bang" }
           }
         },
+        {
+          "match": "([_a-zA-Z][_a-zA-Z0-9]*)::([_a-zA-Z][_a-zA-Z0-9]*)",
+          "captures": {
+            "1": { "name": "entity.name.namespace.bang" },
+            "2": { "name": "variable.other.bang" }
+          }
+        }
+      ]
+    },
+
+    "variables": {
+      "patterns": [
         {
           "match": "([_a-zA-Z][_a-zA-Z0-9]*?)\\(",
           "captures": {

@@ -487,7 +487,12 @@ impl Parser<'_> {
   }
 
   fn module_access(&mut self, module: TokenIdx) -> ExpressionIdx {
-    let item = self.expect(TokenKind::Identifier);
+    let item = if self.current_kind().is_keyword() {
+      let (_, token) = self.advance();
+      Some(token)
+    } else {
+      self.expect(TokenKind::Identifier)
+    };
 
     self.ast.add_expression(ModuleAccess { module, item })
   }

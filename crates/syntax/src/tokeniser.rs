@@ -431,6 +431,24 @@ impl TokenKind {
         | Self::And // can be `&&` or `and`
     )
   }
+
+  /// Is the token a keyword?
+  #[must_use]
+  pub fn is_keyword(self) -> bool {
+    matches!(
+      self,
+      Self::As
+        | Self::Else
+        | Self::False
+        | Self::From
+        | Self::If
+        | Self::Import
+        | Self::Let
+        | Self::Match
+        | Self::Return
+        | Self::True
+    )
+  }
 }
 impl fmt::Display for TokenKind {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
