@@ -727,7 +727,7 @@ impl Parser<'_> {
   fn empty_type_group(&mut self, start: TokenIdx) -> TypeIdx {
     let (_, end) = self.advance();
     let type_ = self.ast.add_type(TypeInvalid { token: end });
-    self.add_error(ParseError::ExpectedExpression(self.ast[end]));
+    self.add_error(ParseError::ExpectedType(self.ast[end]));
 
     self.ast.add_type(TypeGroup {
       start,

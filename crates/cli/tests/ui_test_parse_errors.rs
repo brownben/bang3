@@ -139,6 +139,22 @@ fn expected_import_item() {
 }
 
 #[test]
+fn expected_type() {
+  let file = "let a: () = 4";
+  let output = run_stderr(file);
+  let expected = indoc! {"
+    ✕ Error: Expected Type
+    expected type but got )
+
+        ╭─[STDIN:1]
+      1 │ let a: () = 4
+    ────╯
+  "};
+
+  assert_eq!(output, expected);
+}
+
+#[test]
 fn unknown_character() {
   let file = indoc! {"
     $
