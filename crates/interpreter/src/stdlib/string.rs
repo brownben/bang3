@@ -8,6 +8,28 @@ module!(string, STRING_ITEMS, string_docs, {
   const // A carriage return character
         CARRIAGE_RETURN: String = "\r";
 
+  /// Converts a value to a string
+  ///
+  /// ```bang
+  /// from string import { toString }
+  ///
+  /// toString(false) // 'false'
+  /// toString('hello') // 'hello'
+  /// toString(x => x + 1) // '<function>'
+  /// ```
+  fn toString(Any) -> StringOrSelf = |vm, value| Value::display(&value, vm);
+  /// Converts a value to a string
+  ///
+  /// Re-export of `string::toString` to make it more natural to use with
+  /// module access expressions. (e.g. `string::from(5)`).
+  ///
+  /// ```bang
+  /// string::from(false) // 'false'
+  /// string::from('hello') // 'hello'
+  /// string::from(x => x + 1) // '<function>'
+  /// ```
+  fn from(Any) -> StringOrSelf = |vm, value| Value::display(&value, vm);
+
   /// The number of characters in the string
   ///
   /// ## Example

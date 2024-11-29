@@ -774,7 +774,7 @@ fn format_string() {
 }
 
 #[test]
-fn to_string() {
+fn format_string_to_string() {
   let mut vm = run(indoc! {"
     let a = `{'hello'}`
     let b = `{55.2}`

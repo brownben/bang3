@@ -247,6 +247,17 @@ macro_rules! native_function {
       Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
     })
   };
+
+  ($name:ident, Any, StringOrSelf, $native_function:expr) => {
+    NativeFunction::new(stringify!($name), |vm, arg| {
+      if arg.is_string() {
+        return Ok(arg);
+      }
+
+      let result = $native_function(vm, arg);
+      Ok(vm.allocate_string(&result).into())
+    })
+  };
 }
 pub(crate) use native_function;
 

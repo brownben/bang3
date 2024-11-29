@@ -109,6 +109,8 @@ fn maths_module(types: &mut TypeArena, item: &str) -> ImportResult {
 }
 
 fn string_module(types: &mut TypeArena, item: &str) -> ImportResult {
+  let generic = types.new_type(Type::Quantified(0));
+  let x_to_string = types.new_type(Type::Function(generic, TypeArena::STRING));
   let string_to_number = types.new_type(Type::Function(TypeArena::STRING, TypeArena::NUMBER));
   let string_to_bool = types.new_type(Type::Function(TypeArena::STRING, TypeArena::BOOLEAN));
   let string_to_string = types.new_type(Type::Function(TypeArena::STRING, TypeArena::STRING));
@@ -120,6 +122,7 @@ fn string_module(types: &mut TypeArena, item: &str) -> ImportResult {
   match item {
     "NEW_LINE" | "TAB" | "CARRIAGE_RETURN" => TypeArena::STRING.into(),
 
+    "from" | "toString" => x_to_string.into(),
     "length" | "byteLength" => string_to_number.into(),
     "isEmpty" | "isAscii" => string_to_bool.into(),
     "toLowercase" | "toUppercase" | "trim" | "trimStart" | "trimEnd" => string_to_string.into(),

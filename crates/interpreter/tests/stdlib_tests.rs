@@ -279,6 +279,36 @@ mod string {
   use super::{Value, assert_variable, indoc, run};
 
   #[test]
+  fn to_string() {
+    let mut vm = run(indoc! {"
+      from string import { toString }
+
+      let a = toString('hello')
+      let b = string::from(55.2)
+      let c = toString(false)
+      let d = string::from(true)
+      let e = toString(print)
+
+      let identity = x => x
+      let f = string::from(identity)
+      let g = toString(x => x)
+      let h = string::from((x => _ => x)())
+
+      from maths import { pow }
+      let i = toString(pow(2))
+    "});
+    assert_variable!(vm; a, string "hello");
+    assert_variable!(vm; b, string "55.2");
+    assert_variable!(vm; c, string "false");
+    assert_variable!(vm; d, string "true");
+    assert_variable!(vm; e, string "<function print>");
+    assert_variable!(vm; f, string "<function identity>");
+    assert_variable!(vm; g, string "<function>");
+    assert_variable!(vm; h, string "<closure <function>>");
+    assert_variable!(vm; i, string "<closure <function pow>>");
+  }
+
+  #[test]
   fn length() {
     let length = run(indoc! {"
       from string import { length }
