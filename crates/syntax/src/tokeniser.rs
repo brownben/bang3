@@ -59,6 +59,8 @@ impl Tokeniser<'_> {
       // Brackets
       b'(' => (TokenKind::LeftParen, 1),
       b')' => (TokenKind::RightParen, 1),
+      b'[' => (TokenKind::LeftSquare, 1),
+      b']' => (TokenKind::RightSquare, 1),
       b'{' => {
         if !self.curly_stack.is_empty() {
           self.curly_stack.push(BlockLocation::Block);
@@ -296,6 +298,10 @@ pub enum TokenKind {
   LeftCurly,
   /// `}`
   RightCurly,
+  /// `[`
+  LeftSquare,
+  /// `]`
+  RightSquare,
 
   // Separators
   /// `,`
@@ -458,6 +464,8 @@ impl fmt::Display for TokenKind {
       Self::RightParen => write!(f, ")"),
       Self::LeftCurly => write!(f, "{{"),
       Self::RightCurly => write!(f, "}}"),
+      Self::LeftSquare => write!(f, "["),
+      Self::RightSquare => write!(f, "]"),
 
       // Separators
       Self::Comma => write!(f, ","),

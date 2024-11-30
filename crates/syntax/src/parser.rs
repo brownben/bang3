@@ -205,6 +205,7 @@ impl<'ast> Parser<'ast> {
 
       TokenKind::LeftCurly => Ok(self.block(token)),
       TokenKind::LeftParen => Ok(self.group(token)),
+      TokenKind::LeftSquare => Ok(self.list(token)),
       TokenKind::Minus | TokenKind::Bang => Ok(self.unary(token)),
 
       TokenKind::If => Ok(self.if_(token)),
@@ -452,6 +453,30 @@ impl Parser<'_> {
       then,
       otherwise,
     })
+  }
+
+  fn list(&mut self, start: TokenIdx) -> ExpressionIdx {
+    self.skip_newline();
+    let mut items = ThinVec::new();
+
+    loop {
+      self.skip_newline();
+
+      if self.is_finished() || self.current_kind() == TokenKind::RightSquare {
+        break;
+      }
+
+      items.push(self.parse_expression());
+
+      match self.current_kind() {
+        TokenKind::RightSquare | TokenKind::EndOfFile => break,
+        TokenKind::Comma => _ = self.advance(),
+        _ => {}
+      }
+    }
+    let end = self.expect(TokenKind::RightSquare);
+
+    self.ast.add_expression(List { start, items, end })
   }
 
   fn match_(&mut self, keyword: TokenIdx) -> ExpressionIdx {

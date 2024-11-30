@@ -959,6 +959,85 @@ fn module_access() {
   assert!(parse("maths::").is_err());
 }
 
+#[test]
+fn list() {
+  let empty_list = parse("[]");
+  assert!(empty_list.is_valid());
+  assert_eq!(empty_list.to_string(), indoc! {"
+    ├─ List
+  "});
+
+  let empty_list_with_space = parse("[\n\n\n  \n]");
+  assert!(empty_list_with_space.is_valid());
+  assert_eq!(empty_list_with_space.to_string(), indoc! {"
+    ├─ List
+  "});
+
+  let single_number = parse("[5]");
+  assert!(single_number.is_valid());
+  assert_eq!(single_number.to_string(), indoc! {"
+    ├─ List
+    │  ╰─ Number (5)
+  "});
+
+  let single_number_trailing_comma = parse("[5,]");
+  assert!(single_number_trailing_comma.is_valid());
+  assert_eq!(single_number_trailing_comma.to_string(), indoc! {"
+    ├─ List
+    │  ╰─ Number (5)
+  "});
+
+  let single_number_new_line = parse("[\n  5,\n]");
+  assert!(single_number_new_line.is_valid());
+  assert_eq!(single_number_new_line.to_string(), indoc! {"
+    ├─ List
+    │  ╰─ Number (5)
+  "});
+
+  let extra_comma = parse("[\n  5,,,\n]");
+  assert!(!extra_comma.is_valid());
+  assert_eq!(extra_comma.to_string(), indoc! {"
+    ├─ List
+    │  ├─ Number (5)
+    │  ╰─ Invalid
+  "});
+
+  let multiple_numbers = parse("[5, 6, 7]");
+  assert!(multiple_numbers.is_valid());
+  assert_eq!(multiple_numbers.to_string(), indoc! {"
+    ├─ List
+    │  ├─ Number (5)
+    │  ├─ Number (6)
+    │  ╰─ Number (7)
+  "});
+
+  let missing_end_bracket = parse("[5, 6, 7");
+  assert!(!missing_end_bracket.is_valid());
+  assert_eq!(missing_end_bracket.to_string(), indoc! {"
+    ├─ List
+    │  ├─ Number (5)
+    │  ├─ Number (6)
+    │  ╰─ Number (7)
+  "});
+
+  let complex_expression = parse("[x => x + 1, print(55 + 2)]");
+  assert!(complex_expression.is_valid());
+  assert_eq!(complex_expression.to_string(), indoc! {"
+    ├─ List
+    │  ├─ Function: x =>
+    │  │  ╰─ Binary (+)
+    │  │     ├─ Variable (x)
+    │  │     ╰─ Number (1)
+    │  ╰─ Call
+    │     ├─ Callee
+    │     │  ╰─ Variable (print)
+    │     ╰─ Argument
+    │        ╰─ Binary (+)
+    │           ├─ Number (55)
+    │           ╰─ Number (2)
+  "});
+}
+
 mod fault_tolerant {
   use super::parse;
   use indoc::indoc;

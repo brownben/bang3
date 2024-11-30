@@ -29,6 +29,8 @@ pub enum Expression {
   Group(Group),
   /// An if expression - based on the condition execute a single branch, e.g. `if (x) 1 else 2`
   If(If),
+  /// A list value
+  List(List),
   /// A literal value (string/ number/ boolean), e.g. `1`, `true`, `"hello"`
   Literal(Literal),
   /// A match expression, e.g. `match x | 1 => 1 | _ => 2`
@@ -54,6 +56,7 @@ impl Expression {
       Self::Function(function) => function.span(ast),
       Self::Group(group) => group.span(ast),
       Self::If(if_) => if_.span(ast),
+      Self::List(list) => list.span(ast),
       Self::Literal(literal) => literal.span(ast),
       Self::Match(match_) => match_.span(ast),
       Self::ModuleAccess(module_access) => module_access.span(ast),
@@ -315,6 +318,40 @@ impl Group {
       start.merge(ast[end].into())
     } else {
       start.merge(self.expression(ast).span(ast))
+    }
+  }
+}
+
+/// A list value
+#[derive(Debug)]
+pub struct List {
+  pub(crate) start: TokenIdx,
+  pub(crate) items: ThinVec<ExpressionIdx>,
+  pub(crate) end: Option<TokenIdx>,
+}
+impl List {
+  /// The items in the list
+  pub fn items<'a>(&self, ast: &'a AST) -> impl DoubleEndedIterator<Item = &'a Expression> {
+    self.items.iter().map(|expression| &ast[*expression])
+  }
+
+  /// The number of items in the list
+  #[must_use]
+  pub fn length(&self) -> usize {
+    self.items.len()
+  }
+
+  /// The location of the expression
+  pub fn span(&self, ast: &AST) -> Span {
+    let start = Span::from(ast[self.start]);
+
+    if let Some(end) = self.end {
+      start.merge(ast[end].into())
+    } else {
+      let last_item = (self.items.last())
+        .map(|expr| ast[*expr].span(ast))
+        .unwrap_or_default();
+      start.merge(last_item)
     }
   }
 }
@@ -621,6 +658,11 @@ impl From<Group> for Expression {
 impl From<If> for Expression {
   fn from(value: If) -> Self {
     Self::If(value)
+  }
+}
+impl From<List> for Expression {
+  fn from(value: List) -> Self {
+    Self::List(value)
   }
 }
 impl From<Literal> for Expression {

@@ -35,6 +35,7 @@ impl PrettyPrint for Expression {
       Self::Function(x) => x.pretty(f, ast, prefix, last),
       Self::Group(x) => x.pretty(f, ast, prefix, last),
       Self::If(x) => x.pretty(f, ast, prefix, last),
+      Self::List(x) => x.pretty(f, ast, prefix, last),
       Self::Literal(x) => x.pretty(f, ast, prefix, last),
       Self::Match(x) => x.pretty(f, ast, prefix, last),
       Self::ModuleAccess(x) => x.pretty(f, ast, prefix, last),
@@ -163,6 +164,24 @@ impl PrettyPrint for If {
     }
 
     Ok(())
+  }
+}
+impl PrettyPrint for List {
+  fn pretty(&self, f: &mut fmt::Formatter, ast: &AST, prefix: &str, last: bool) -> fmt::Result {
+    let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
+    writeln!(f, "{prefix}{connector}List")?;
+
+    let items: Vec<_> = self.items(ast).collect();
+    if items.is_empty() {
+      return Ok(());
+    }
+
+    let new_prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
+    let (last, items) = items.split_last().unwrap();
+    for item in items {
+      item.pretty(f, ast, &new_prefix, false)?;
+    }
+    last.pretty(f, ast, &new_prefix, true)
   }
 }
 impl PrettyPrint for Literal {
