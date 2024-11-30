@@ -190,11 +190,15 @@
       "patterns": [
         {
           "name": "punctuation.brackets.curly.bang",
-          "match": "[{}]"
+          "match": "[\\{\\}]"
         },
         {
           "name": "punctuation.brackets.round.bang",
-          "match": "[()]"
+          "match": "[\\(\\)]"
+        },
+        {
+          "name": "punctuation.brackets.square.bang",
+          "match": "[\\[\\]]"
         }
       ]
     },
@@ -219,6 +223,10 @@
               "name": "support.type.primitive.bang"
             },
             {
+              "match": "\\b(list)\\b",
+              "name": "support.type.structure.bang"
+            },
+            {
               "match": "\\b(never|unknown)\\b",
               "name": "support.type.special.bang"
             },
@@ -229,6 +237,10 @@
             {
               "name": "punctuation.brackets.round.bang",
               "match": "[()]"
+            },
+            {
+              "name": "punctuation.brackets.angle.bang",
+              "match": "[<>]"
             },
             {
               "name": "keyword.operator.function.bang",
