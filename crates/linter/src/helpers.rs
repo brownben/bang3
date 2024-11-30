@@ -95,7 +95,7 @@ impl IsConstant for If {
   fn is_constant(&self, ast: &AST) -> bool {
     self.condition(ast).is_constant(ast)
       && self.then(ast).is_constant(ast)
-      && self.otherwise(ast).map_or(true, |e| e.is_constant(ast))
+      && self.otherwise(ast).is_none_or(|e| e.is_constant(ast))
   }
 }
 impl IsConstant for Match {
@@ -105,7 +105,7 @@ impl IsConstant for Match {
 }
 impl IsConstant for MatchArm {
   fn is_constant(&self, ast: &AST) -> bool {
-    self.expression(ast).is_constant(ast) && self.guard(ast).map_or(true, |x| x.is_constant(ast))
+    self.expression(ast).is_constant(ast) && self.guard(ast).is_none_or(|x| x.is_constant(ast))
   }
 }
 
