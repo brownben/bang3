@@ -200,3 +200,19 @@ fn traceback() {
 
     "});
 }
+
+#[test]
+fn panics() {
+  let output = run("panic('did something wrong')");
+  assert_eq!(output, indoc! {"
+      ✕ Error: Panic
+      did something wrong
+
+          ╭─[STDIN:1]
+        1 │ panic('did something wrong')
+      ────╯
+
+      at line 1
+
+    "});
+}

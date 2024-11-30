@@ -81,6 +81,12 @@ mod builtin_functions {
     let mut native_closure = run("from maths import { pow }\nlet a = type(pow(3))");
     assert_variable!(native_closure; a, string "function");
   }
+
+  #[test]
+  fn panic() {
+    let panics = run("panic('Should end execution')");
+    assert!(panics.is_err());
+  }
 }
 
 mod maths {

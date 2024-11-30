@@ -649,6 +649,10 @@ pub(crate) enum ErrorKind {
     module: String,
     item: String,
   },
+  Custom {
+    title: &'static str,
+    message: String,
+  },
 }
 impl ErrorKind {
   #[must_use]
@@ -660,6 +664,7 @@ impl ErrorKind {
       Self::OutOfMemory => "Out of Memory",
       Self::ModuleNotFound { .. } => "Module Not Found",
       Self::ItemNotFound { .. } => "Item Not Found",
+      Self::Custom { title, .. } => title,
     }
   }
 
@@ -675,6 +680,7 @@ impl ErrorKind {
       Self::OutOfMemory => "could not initialise enough memory for the heap".into(),
       Self::ModuleNotFound { module } => format!("could not find module `{module}`"),
       Self::ItemNotFound { module, item } => format!("could not find `{item}` in `{module}`"),
+      Self::Custom { message, .. } => message.clone(),
     }
   }
 }

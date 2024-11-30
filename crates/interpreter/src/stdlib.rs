@@ -2,7 +2,11 @@
 //!
 //! Definitions for modules in the standard library.
 
-use crate::{VM, Value, object::NativeFunction};
+use crate::{
+  Value,
+  object::NativeFunction,
+  vm::{ErrorKind, VM},
+};
 use std::fmt;
 
 /// A context is the environment in which the VM runs.
@@ -57,6 +61,13 @@ impl Context for StandardContext {
       NativeFunction::new("type", |vm, arg| {
         let type_string = arg.get_type(vm);
         Ok(vm.allocate_string(type_string))
+      }),
+      NativeFunction::new("panic", |vm, arg| {
+        let message = arg.display(vm);
+        Err(ErrorKind::Custom {
+          title: "Panic",
+          message,
+        })
       }),
     ]
   }
