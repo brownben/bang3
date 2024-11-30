@@ -135,3 +135,21 @@ fn too_big_jump() {
     Err(e) => panic!("Expected TooBigJump, got {e}"),
   }
 }
+
+#[test]
+fn too_many_list_items() {
+  use std::fmt::Write;
+
+  let mut source = "[".to_owned();
+  for number in 0..=257 {
+    write!(source, "  {number},\n").unwrap();
+  }
+  source.push_str("]");
+
+  let ast = parse(source);
+  match compile(&ast) {
+    Ok(_) => panic!("Expected an error"),
+    Err(CompileError::TooManyListItems) => {}
+    Err(e) => panic!("Expected TooManyListItems, got {e}"),
+  }
+}

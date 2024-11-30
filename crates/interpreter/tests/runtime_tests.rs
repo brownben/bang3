@@ -900,3 +900,56 @@ fn cant_import_anything_with_empty_context() {
   let mut vm = VM::new(HeapSize::Small, &EmptyContext).unwrap();
   assert!(vm.run(&chunk).is_err());
 }
+
+#[test]
+fn lists() {
+  let mut empty_list = run(indoc! {"
+    let a = type([])
+    let b = if ([]) 1 else 2
+    let c = string::from([])
+    let d = [] == []
+  "});
+  assert_variable!(empty_list; a, string "list");
+  assert_variable!(empty_list; b, 2.0);
+  assert_variable!(empty_list; c, string "[]");
+  assert_variable!(empty_list; d, true);
+
+  let mut one_item = run(indoc! {"
+    let a = type(['hello'])
+    let b = if (['hello']) 1 else 2
+    let c = string::from(['hello'])
+    let d = ['hello'] == []
+    let e = ['hello'] == ['hello']
+  "});
+  assert_variable!(one_item; a, string "list");
+  assert_variable!(one_item; b, 1.0);
+  assert_variable!(one_item; c, string "['hello']");
+  assert_variable!(one_item; d, false);
+  assert_variable!(one_item; e, true);
+
+  let mut multiple_items = run(indoc! {"
+    let a = type(['hello', 2, 5])
+    let b = if (['hello', 2, 5]) 1 else 2
+    let c = string::from(['hello', 2, 5])
+    let d = ['hello', 2, 5] == []
+    let e = ['hello', 2, 5] == ['hello']
+    let f = ['hello', 2, 5] == ['hello', 2, 5]
+  "});
+  assert_variable!(multiple_items; a, string "list");
+  assert_variable!(multiple_items; b, 1.0);
+  assert_variable!(multiple_items; c, string "['hello', 2, 5]");
+  assert_variable!(multiple_items; d, false);
+  assert_variable!(multiple_items; e, false);
+  assert_variable!(multiple_items; f, true);
+
+  let mut nested = run(indoc! {"
+    let stringListNested = ['hello', ['another', ['list']]]
+    let a = string::from(stringListNested)
+    let b = stringListNested != ['hello', 'another', 'list']
+
+    let c = string::from([true, false, x => x, ])
+  "});
+  assert_variable!(nested; a, string "['hello', ['another', ['list']]]");
+  assert_variable!(nested; b, true);
+  assert_variable!(nested; c, string "[true, false, <function>]");
+}

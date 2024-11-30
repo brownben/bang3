@@ -199,6 +199,22 @@ impl Value {
       x => (vm.get_type_descriptor(*x).display)(vm, x.as_object()),
     }
   }
+
+  /// Get the value as a string
+  ///
+  /// Prints quotes around strings, for use in compound structures
+  #[must_use]
+  pub fn debug(&self, vm: &VM) -> String {
+    match self {
+      Self(TRUE) => "true".to_owned(),
+      Self(FALSE) => "false".to_owned(),
+      Self(NULL) => "null".to_owned(),
+      x if x.is_number() => x.as_number().to_string(),
+      x if x.is_string() => format!("'{}'", x.as_string(vm)),
+      x if x.is_constant_function() => x.as_function(vm).display(),
+      x => (vm.get_type_descriptor(*x).debug)(vm, x.as_object()),
+    }
+  }
 }
 
 // Wrap raw values into a Value

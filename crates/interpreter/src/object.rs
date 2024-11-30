@@ -18,6 +18,8 @@ pub struct TypeDescriptor {
   pub trace: fn(vm: &VM, object_pointer: Gc<u8>, trace_value: TraceValueFunction) -> (),
   /// Display the value as a string
   pub display: fn(vm: &VM, object_pointer: Gc<u8>) -> String,
+  /// Display the value as a string for debug, or part of structure
+  pub debug: fn(vm: &VM, object_pointer: Gc<u8>) -> String,
   /// Whether the value is falsy
   pub is_falsy: fn(vm: &VM, object_pointer: Gc<u8>) -> bool,
   /// Check if the value is equal to another value (of the same type)
@@ -35,6 +37,7 @@ pub const DEFAULT_TYPE_DESCRIPTORS: &[TypeDescriptor] = &[
   NATIVE_FUNCTION,
   NATIVE_CLOSURE,
   NATIVE_CLOSURE_TWO,
+  LIST,
   ALLOCATED,
 ];
 
@@ -75,6 +78,7 @@ const STRING: TypeDescriptor = TypeDescriptor {
   type_name: "string",
   trace: |_, _, _| {},
   display: |vm, value| BangString::from(value).as_str(vm).to_owned(),
+  debug: |vm, value| format!("'{}'", BangString::from(value).as_str(vm)),
   is_falsy: |vm, value| BangString::from(value).as_str(vm).is_empty(),
   equals: |_, _, _| unreachable!("Strings handled separately"),
   call: None,
@@ -107,6 +111,7 @@ const STRING_SLICE: TypeDescriptor = TypeDescriptor {
     trace_value(vm, slice.string);
   },
   display: |vm, value| vm.heap[value.cast::<StringSlice>()].as_str(vm).to_owned(),
+  debug: |vm, value| format!("'{}'", vm.heap[value.cast::<StringSlice>()].as_str(vm)),
   is_falsy: |vm, value| vm.heap[value.cast::<StringSlice>()].as_str(vm).is_empty(),
   equals: |_vm, _a, _b| unreachable!("Strings handled separately"),
   call: None,
@@ -147,6 +152,7 @@ const CLOSURE: TypeDescriptor = TypeDescriptor {
     }
   },
   display: |vm, value| vm.heap[value.cast::<Closure>()].to_string(),
+  debug: |vm, value| vm.heap[value.cast::<Closure>()].to_string(),
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
   call: None,
@@ -177,6 +183,7 @@ const NATIVE_FUNCTION: TypeDescriptor = TypeDescriptor {
   type_name: "function",
   trace: |_vm, _value, _trace_value| {},
   display: |vm, value| vm.heap[value.cast::<NativeFunction>()].to_string(),
+  debug: |vm, value| vm.heap[value.cast::<NativeFunction>()].to_string(),
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
   call: Some(|vm, object, arg| {
@@ -215,6 +222,7 @@ const NATIVE_CLOSURE: TypeDescriptor = TypeDescriptor {
     trace_value(vm, closure.arg1);
   },
   display: |vm, value| vm.heap[value.cast::<NativeClosure>()].to_string(),
+  debug: |vm, value| vm.heap[value.cast::<NativeClosure>()].to_string(),
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
   call: Some(|vm, object, arg2| {
@@ -261,6 +269,7 @@ const NATIVE_CLOSURE_TWO: TypeDescriptor = TypeDescriptor {
     trace_value(vm, closure.arg2);
   },
   display: |vm, value| vm.heap[value.cast::<NativeClosureTwo>()].to_string(),
+  debug: |vm, value| vm.heap[value.cast::<NativeClosureTwo>()].to_string(),
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
   call: Some(|vm, object, arg3| {
@@ -270,6 +279,61 @@ const NATIVE_CLOSURE_TWO: TypeDescriptor = TypeDescriptor {
 };
 pub const NATIVE_CLOSURE_TWO_TYPE_ID: TypeId = TypeId(5);
 
+/// A list of values
+#[derive(Clone, Debug)]
+pub struct List(GcList<Value>);
+impl List {
+  pub fn items<'a>(&self, vm: &'a VM) -> &'a [Value] {
+    vm.heap.get_list_buffer(self.0)
+  }
+
+  pub fn to_string(&self, vm: &VM) -> Result<String, fmt::Error> {
+    use std::fmt::Write;
+
+    let mut string = String::new();
+
+    write!(string, "[")?;
+    for (i, item) in self.items(vm).iter().enumerate() {
+      if i > 0 {
+        write!(string, ", ")?;
+      }
+      write!(string, "{}", item.debug(vm))?;
+    }
+    write!(string, "]")?;
+
+    Ok(string)
+  }
+}
+impl<T> From<Gc<T>> for List {
+  fn from(value: Gc<T>) -> Self {
+    Self(value.cast().into())
+  }
+}
+const LIST: TypeDescriptor = TypeDescriptor {
+  type_name: "list",
+  trace: |vm, value, trace_value| {
+    let list = List::from(value);
+    for item in vm.heap.get_list_buffer(list.0) {
+      trace_value(vm, *item);
+    }
+  },
+  display: |vm, value| List::from(value).to_string(vm).unwrap(),
+  debug: |vm, value| List::from(value).to_string(vm).unwrap(),
+  is_falsy: |vm, value| List::from(value).items(vm).is_empty(),
+  equals: |vm, a, b| {
+    let a = List::from(a).items(vm);
+    let b = List::from(b).items(vm);
+
+    if a.len() != b.len() {
+      return false;
+    }
+
+    a.iter().zip(b.iter()).all(|(a, b)| vm.equals(*a, *b))
+  },
+  call: None,
+};
+pub const LIST_TYPE_ID: TypeId = TypeId(6);
+
 /// A value which has been moved from the stack to the heap, as it has been captured by a closure
 const ALLOCATED: TypeDescriptor = TypeDescriptor {
   type_name: "allocated",
@@ -278,11 +342,12 @@ const ALLOCATED: TypeDescriptor = TypeDescriptor {
     trace_value(vm, vm.heap[value.cast::<Value>()]);
   },
   display: |_, _| unreachable!("Not accessed as a value"),
+  debug: |_, _| unreachable!("Not accessed as a value"),
   is_falsy: |_, _| unreachable!("Not accessed as a value"),
   equals: |_, _, _| unreachable!("Not accessed as a value"),
   call: None,
 };
-pub const ALLOCATED_TYPE_ID: TypeId = TypeId(6);
+pub const ALLOCATED_TYPE_ID: TypeId = TypeId(7);
 
 #[cfg(test)]
 mod test {
@@ -300,6 +365,7 @@ mod test {
     assert_eq!(objects[NATIVE_FUNCTION_TYPE_ID.0].type_name, "function");
     assert_eq!(objects[NATIVE_CLOSURE_TYPE_ID.0].type_name, "function");
     assert_eq!(objects[NATIVE_CLOSURE_TWO_TYPE_ID.0].type_name, "function");
+    assert_eq!(objects[LIST_TYPE_ID.0].type_name, "list");
     assert_eq!(objects[ALLOCATED_TYPE_ID.0].type_name, "allocated");
   }
 
@@ -318,17 +384,16 @@ mod test {
     assert_eq!(vm.get_type_descriptor(closure).type_name, "function");
 
     let native_function = Value::from_object(empty_allocation, NATIVE_FUNCTION_TYPE_ID);
-    assert_eq!(
-      vm.get_type_descriptor(native_function).type_name,
-      "function"
-    );
+    let type_name = vm.get_type_descriptor(native_function).type_name;
+    assert_eq!(type_name, "function");
     let native_closure = Value::from_object(empty_allocation, NATIVE_CLOSURE_TYPE_ID);
     assert_eq!(vm.get_type_descriptor(native_closure).type_name, "function");
     let native_closure_two = Value::from_object(empty_allocation, NATIVE_CLOSURE_TWO_TYPE_ID);
-    assert_eq!(
-      vm.get_type_descriptor(native_closure_two).type_name,
-      "function"
-    );
+    let type_name = vm.get_type_descriptor(native_closure_two).type_name;
+    assert_eq!(type_name, "function");
+
+    let list = Value::from_object(empty_allocation, LIST_TYPE_ID);
+    assert_eq!(vm.get_type_descriptor(list).type_name, "list");
 
     let allocated = Value::from_object(empty_allocation, ALLOCATED_TYPE_ID);
     assert_eq!(vm.get_type_descriptor(allocated).type_name, "allocated");

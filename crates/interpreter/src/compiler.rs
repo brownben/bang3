@@ -197,6 +197,7 @@ impl<'s> Compile<'s> for Expression {
       Expression::Function(function) => function.compile(compiler, ast),
       Expression::Group(group) => group.compile(compiler, ast),
       Expression::If(if_) => if_.compile(compiler, ast),
+      Expression::List(list) => list.compile(compiler, ast),
       Expression::Literal(literal) => literal.compile(compiler, ast),
       Expression::Match(match_) => match_.compile(compiler, ast),
       Expression::ModuleAccess(module_access) => module_access.compile(compiler, ast),
@@ -382,6 +383,22 @@ impl<'s> Compile<'s> for If {
     }
 
     compiler.patch_jump(jump_to_end)?;
+
+    Ok(())
+  }
+}
+impl<'s> Compile<'s> for List {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
+    for item in self.items(ast) {
+      item.compile(compiler, ast)?;
+    }
+
+    compiler.chunk.add_opcode(OpCode::List, self.span(ast));
+    if let Ok(length) = u8::try_from(self.length()) {
+      compiler.chunk.add_value(length, self.span(ast));
+    } else {
+      return Err(CompileError::TooManyListItems);
+    }
 
     Ok(())
   }
@@ -652,6 +669,8 @@ pub enum CompileError {
   TooManyClosures,
   /// Too many local variables
   TooManyLocalVariables,
+  /// Too many items in a list
+  TooManyListItems,
   /// AST to compile has an error in it
   InvalidAST,
 }
@@ -665,6 +684,7 @@ impl CompileError {
       Self::TooBigJump => "Too Big Jump",
       Self::TooManyClosures => "Too Many Closures",
       Self::TooManyLocalVariables => "Too Many Local Variables",
+      Self::TooManyListItems => "Too Many List Items",
       Self::InvalidAST => "Invalid AST",
     }
   }
@@ -678,6 +698,7 @@ impl CompileError {
       Self::TooBigJump => "the maximum jump size has been reached (65536)",
       Self::TooManyClosures => "the maximum no. of closures has been reached (256)",
       Self::TooManyLocalVariables => "more than 256 local variables have been defined",
+      Self::TooManyListItems => "the maximum no. of items in a list has been reached (256)",
       Self::InvalidAST => "the AST contains an error, see errors from parser",
     }
   }

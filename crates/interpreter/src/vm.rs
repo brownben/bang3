@@ -479,6 +479,17 @@ impl<'context> VM<'context> {
           self.push(allocated);
         }
 
+        // Lists
+        OpCode::List => {
+          let length = chunk.get_value(ip + 1);
+
+          let start_of_items = self.stack.len() - usize::from(length);
+          let items = self.stack.drain(start_of_items..);
+
+          let list = self.heap.allocate_list(items, length.into());
+          self.push(Value::from_object(*list, object::LIST_TYPE_ID));
+        }
+
         // VM Operations
         OpCode::Pop => {
           self.pop();

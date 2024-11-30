@@ -261,6 +261,10 @@ pub enum OpCode {
   /// Gets the pointer to an allocated value from an upvalue. Arg(u8) - upvalue id
   GetAllocatedPointer,
 
+  // Lists
+  /// Creates a list. Arg(u8) - number of elements
+  List,
+
   // VM Operations
   /// Removes the top element of the stack
   Pop,
@@ -292,7 +296,8 @@ impl OpCode {
       | OpCode::Allocate
       | OpCode::Closure
       | OpCode::GetAllocatedValue
-      | OpCode::GetAllocatedPointer => 2,
+      | OpCode::GetAllocatedPointer
+      | OpCode::List => 2,
       _ => 1,
     }
   }
