@@ -53,6 +53,7 @@ impl IsConstant for Expression {
       Self::Group(x) => x.expression(ast).is_constant(ast),
       Self::FormatString(x) => x.is_constant(ast),
       Self::If(x) => x.is_constant(ast),
+      Self::List(x) => x.items(ast).all(|x| x.is_constant(ast)),
       Self::Match(x) => x.is_constant(ast),
       Self::Unary(x) => x.expression(ast).is_constant(ast),
     }
@@ -343,6 +344,7 @@ impl ReturnAnalysis for Expression {
       Expression::Function(_) => false,
       Expression::Group(group) => group.expression(ast).always_returns(ast),
       Expression::If(if_) => if_.always_returns(ast),
+      Expression::List(list) => list.always_returns(ast),
       Expression::Literal(_) => false,
       Expression::Match(match_) => match_.always_returns(ast),
       Expression::ModuleAccess(_) => false,
@@ -358,6 +360,7 @@ impl ReturnAnalysis for Expression {
       Expression::Comment(comment) => comment.expression(ast).ends_with_return(ast),
       Expression::Group(group) => group.expression(ast).ends_with_return(ast),
       Expression::If(if_) => if_.ends_with_return(ast),
+      Expression::List(list) => list.ends_with_return(ast),
       Expression::Match(match_) => match_.ends_with_return(ast),
       Expression::Unary(unary) => unary.expression(ast).ends_with_return(ast),
 
@@ -423,6 +426,11 @@ impl ReturnAnalysis for If {
     };
 
     None
+  }
+}
+impl ReturnAnalysis for List {
+  fn always_returns(&self, ast: &AST) -> bool {
+    (self.items(ast)).any(|expression| expression.always_returns(ast))
   }
 }
 impl ReturnAnalysis for Match {
