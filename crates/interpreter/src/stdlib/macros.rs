@@ -101,7 +101,7 @@ pub(crate) fn get_number(value: Value, vm: &VM) -> Result<f64, ErrorKind> {
 #[inline(always)]
 pub(crate) fn get_string<'a>(value: Value, vm: &'a VM) -> Result<&'a str, ErrorKind> {
   if value.is_string() {
-    Ok(value.as_string(vm))
+    Ok(value.as_string(&vm.heap))
   } else {
     Err(ErrorKind::TypeError {
       expected: "string",
@@ -199,7 +199,7 @@ macro_rules! native_function {
     NativeFunction::new(stringify!($name), |vm, arg| {
       fn func(vm: &mut VM, a: Value, b: Value) -> Result<Value, ErrorKind> {
         if b.is_string() {
-          Ok($native_function(a.as_string(vm), b.as_string(vm)).into())
+          Ok($native_function(a.as_string(&vm.heap), b.as_string(&vm.heap)).into())
         } else {
           Err(ErrorKind::TypeError {
             expected: "string",
@@ -236,7 +236,11 @@ macro_rules! native_function {
       }
       fn func_two(vm: &mut VM, a: Value, b: Value, c: Value) -> Result<Value, ErrorKind> {
         if c.is_string() {
-          let output = $native_function(a.as_string(vm), b.as_string(vm), c.as_string(vm));
+          let output = $native_function(
+            a.as_string(&vm.heap),
+            b.as_string(&vm.heap),
+            c.as_string(&vm.heap),
+          );
           Ok(vm.allocate_string(&output).into())
         } else {
           Err(ErrorKind::TypeError {

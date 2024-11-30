@@ -3,7 +3,7 @@ use super::{
   object::{BangString, STRING_SLICE_TYPE_ID, STRING_TYPE_ID, StringSlice},
   vm::VM,
 };
-use bang_gc::Gc;
+use bang_gc::{Gc, Heap};
 use std::{fmt, mem, ptr};
 
 /// A value on the stack of the interpreter.
@@ -123,11 +123,11 @@ impl Value {
   /// SAFETY: Undefined behaviour if [Value] is not a string
   /// Use [`Value::is_string`] to check if it is a string
   #[must_use]
-  pub(crate) fn as_string<'a>(self, vm: &'a VM) -> &'a str {
+  pub(crate) fn as_string(self, heap: &Heap) -> &str {
     if self.is_object_type(STRING_TYPE_ID) {
-      BangString::from(self.as_object::<usize>()).as_str(vm)
+      BangString::from(self.as_object::<usize>()).as_str(heap)
     } else {
-      vm.heap[self.as_object::<StringSlice>()].as_str(vm)
+      heap[self.as_object::<StringSlice>()].as_str(heap)
     }
   }
 
@@ -136,11 +136,11 @@ impl Value {
   ///
   /// SAFETY: Undefined behaviour if [Value] is not a function
   /// Use [`Value::is_function`] to check if it is a function
-  pub(crate) fn as_function<'a>(&'a self, vm: &'a VM) -> &'a Chunk {
+  pub(crate) fn as_function<'a>(&'a self, heap: &'a Heap) -> &'a Chunk {
     if self.is_constant_function() {
       self.as_constant_function()
     } else {
-      &vm.heap[self.as_object::<Chunk>()]
+      &heap[self.as_object::<Chunk>()]
     }
   }
 }
@@ -168,7 +168,7 @@ impl Value {
       Self(TRUE) => false,
       Self(FALSE | NULL) => true,
       x if x.is_number() => (x.as_number() - 0.0).abs() < f64::EPSILON,
-      x if x.is_string() => x.as_string(vm).is_empty(),
+      x if x.is_string() => x.as_string(&vm.heap).is_empty(),
       x if x.is_constant_function() => false,
       x => (vm.get_type_descriptor(*x).is_falsy)(vm, x.as_object()),
     }
@@ -194,8 +194,8 @@ impl Value {
       Self(FALSE) => "false".to_owned(),
       Self(NULL) => "null".to_owned(),
       x if x.is_number() => x.as_number().to_string(),
-      x if x.is_string() => x.as_string(vm).to_owned(),
-      x if x.is_constant_function() => x.as_function(vm).display(),
+      x if x.is_string() => x.as_string(&vm.heap).to_owned(),
+      x if x.is_constant_function() => x.as_function(&vm.heap).display(),
       x => (vm.get_type_descriptor(*x).display)(vm, x.as_object()),
     }
   }
@@ -210,8 +210,8 @@ impl Value {
       Self(FALSE) => "false".to_owned(),
       Self(NULL) => "null".to_owned(),
       x if x.is_number() => x.as_number().to_string(),
-      x if x.is_string() => format!("'{}'", x.as_string(vm)),
-      x if x.is_constant_function() => x.as_function(vm).display(),
+      x if x.is_string() => format!("'{}'", x.as_string(&vm.heap)),
+      x if x.is_constant_function() => x.as_function(&vm.heap).display(),
       x => (vm.get_type_descriptor(*x).debug)(vm, x.as_object()),
     }
   }

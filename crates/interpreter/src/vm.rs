@@ -91,7 +91,7 @@ impl<'context> VM<'context> {
     }
 
     if a.is_string() && b.is_string() {
-      return a.as_string(self) == b.as_string(self);
+      return a.as_string(&self.heap) == b.as_string(&self.heap);
     }
 
     if a.is_object() && b.is_object() && a.object_type() == b.object_type() {
@@ -301,13 +301,6 @@ impl<'context> VM<'context> {
           let left = self.pop();
 
           if left.is_string() && right.is_string() {
-            let (left, right) = {
-              let left = left.as_string(self);
-              let right = right.as_string(self);
-
-              ((left.as_ptr(), left.len()), (right.as_ptr(), right.len()))
-            };
-
             let new_string = BangString::concatenate(&mut self.heap, left, right);
             self.push(new_string);
           } else {
@@ -395,7 +388,7 @@ impl<'context> VM<'context> {
 
             ip = 0;
             offset = self.stack.len() - 1;
-            chunk = unsafe { &*callee.as_function(self).as_ptr() };
+            chunk = unsafe { &*callee.as_function(&self.heap).as_ptr() };
 
             continue; // skip the ip increment, as we're jumping to a new chunk
           } else if callee.is_object_type(object::CLOSURE_TYPE_ID) {
@@ -453,7 +446,7 @@ impl<'context> VM<'context> {
           let value = self.pop(); // assume is function, as bytecode is valid
           let closure = self
             .heap
-            .allocate(Closure::new(value.as_function(self), upvalue_list));
+            .allocate(Closure::new(value.as_function(&self.heap), upvalue_list));
           self.push(Value::from_object(closure, object::CLOSURE_TYPE_ID));
         }
         OpCode::GetUpvalue => {
@@ -565,7 +558,7 @@ macro_rules! comparison_operation {
     if left.is_number() && right.is_number() {
       $vm.push(Value::from(left.as_number() $operator right.as_number()));
     } else if left.is_string() && right.is_string() {
-      $vm.push(Value::from(left.as_string($vm) $operator right.as_string($vm)));
+      $vm.push(Value::from(left.as_string(&$vm.heap) $operator right.as_string(&$vm.heap)));
     } else {
       break Some(ErrorKind::TypeErrorBinary {
         expected: "two numbers or two strings",

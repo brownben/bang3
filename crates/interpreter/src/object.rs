@@ -46,21 +46,34 @@ pub const DEFAULT_TYPE_DESCRIPTORS: &[TypeDescriptor] = &[
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct BangString(GcList<u8>);
 impl BangString {
-  pub fn as_str<'a>(self, vm: &'a VM) -> &'a str {
-    unsafe { str::from_utf8_unchecked(vm.heap.get_list_buffer(self.0)) }
+  pub fn as_str(self, heap: &Heap) -> &str {
+    unsafe { str::from_utf8_unchecked(heap.get_list_buffer(self.0)) }
+  }
+
+  pub fn is_empty(self, vm: &VM) -> bool {
+    vm.heap[*self.0] == 0
   }
 
   /// Concatenate two strings together
   ///
   /// As the parts may also be borrowed from the heap, we pass the strings as pointers
-  pub fn concatenate(
-    heap: &mut Heap,
-    (left_ptr, left_len): (*const u8, usize),
-    (right_ptr, right_len): (*const u8, usize),
-  ) -> Value {
-    let length = left_len + right_len;
-    let new_string = heap.allocate_list_header(length);
+  pub fn concatenate(heap: &mut Heap, left: Value, right: Value) -> Value {
+    let left_string = left.as_string(heap);
+    let right_string = right.as_string(heap);
+
+    if left_string.is_empty() {
+      return right;
+    }
+    if right_string.is_empty() {
+      return left;
+    }
+
+    let (left_ptr, left_len) = (left_string.as_ptr(), left_string.len());
+    let (right_ptr, right_len) = (right_string.as_ptr(), right_string.len());
+
+    let new_string = heap.allocate_list_header(left_len + right_len);
     let new_string_buffer = heap.get_list_buffer_mut(new_string);
+
     unsafe {
       new_string_buffer[..left_len].copy_from_slice(slice::from_raw_parts(left_ptr, left_len));
       new_string_buffer[left_len..].copy_from_slice(slice::from_raw_parts(right_ptr, right_len));
@@ -77,9 +90,9 @@ impl<T> From<Gc<T>> for BangString {
 const STRING: TypeDescriptor = TypeDescriptor {
   type_name: "string",
   trace: |_, _, _| {},
-  display: |vm, value| BangString::from(value).as_str(vm).to_owned(),
-  debug: |vm, value| format!("'{}'", BangString::from(value).as_str(vm)),
-  is_falsy: |vm, value| BangString::from(value).as_str(vm).is_empty(),
+  display: |vm, value| BangString::from(value).as_str(&vm.heap).to_owned(),
+  debug: |vm, value| format!("'{}'", BangString::from(value).as_str(&vm.heap)),
+  is_falsy: |vm, value| BangString::from(value).is_empty(vm),
   equals: |_, _, _| unreachable!("Strings handled separately"),
   call: None,
 };
@@ -95,13 +108,19 @@ pub struct StringSlice {
 impl StringSlice {
   pub fn new(string: Value, start: usize, end: usize) -> Self {
     debug_assert!(string.is_string());
+    debug_assert!(start <= end);
+
     Self { string, start, end }
   }
 
-  pub fn as_str<'a>(&'a self, vm: &'a VM) -> &'a str {
+  pub fn from_ptr<T>(ptr: Gc<T>, heap: &Heap) -> &str {
+    heap[ptr.cast::<StringSlice>()].as_str(heap)
+  }
+
+  pub fn as_str<'a>(&'a self, heap: &'a Heap) -> &'a str {
     debug_assert!(self.string.is_string());
 
-    &self.string.as_string(vm)[self.start..self.end]
+    &self.string.as_string(heap)[self.start..self.end]
   }
 }
 const STRING_SLICE: TypeDescriptor = TypeDescriptor {
@@ -110,9 +129,9 @@ const STRING_SLICE: TypeDescriptor = TypeDescriptor {
     let slice = &vm.heap[value.cast::<StringSlice>()];
     trace_value(vm, slice.string);
   },
-  display: |vm, value| vm.heap[value.cast::<StringSlice>()].as_str(vm).to_owned(),
-  debug: |vm, value| format!("'{}'", vm.heap[value.cast::<StringSlice>()].as_str(vm)),
-  is_falsy: |vm, value| vm.heap[value.cast::<StringSlice>()].as_str(vm).is_empty(),
+  display: |vm, value| StringSlice::from_ptr(value, &vm.heap).to_owned(),
+  debug: |vm, value| format!("'{}'", StringSlice::from_ptr(value, &vm.heap)),
+  is_falsy: |vm, value| StringSlice::from_ptr(value, &vm.heap).is_empty(),
   equals: |_vm, _a, _b| unreachable!("Strings handled separately"),
   call: None,
 };
