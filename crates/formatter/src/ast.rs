@@ -38,6 +38,7 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for Expression {
       Expression::Function(function) => function.format(f, ast),
       Expression::Group(group) => group.format(f, ast),
       Expression::If(if_) => if_.format(f, ast),
+      Expression::List(list) => list.format(f, ast),
       Expression::Literal(literal) => literal.format(f, ast),
       Expression::Match(match_) => match_.format(f, ast),
       Expression::ModuleAccess(module_access) => module_access.format(f, ast),
@@ -239,6 +240,32 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for If {
     ])
   }
 }
+impl<'a, 'b> Formattable<'a, 'b, AST> for List {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
+    if self.length() == 0 {
+      return IR::Text("[]");
+    }
+
+    let items = Vec::from_iter_in(self.items(ast), f.allocator);
+    let (last, items) = items.split_last().unwrap();
+
+    f.group([
+      IR::Text("["),
+      f.indent([
+        IR::Line,
+        f.concat_iterator(
+          items.iter().map(|expression| {
+            f.concat([expression.format(f, ast), IR::Text(","), IR::LineOrSpace])
+          }),
+        ),
+      ]),
+      last.format(f, ast),
+      IR::Option("", ","),
+      IR::Line,
+      IR::Text("]"),
+    ])
+  }
+}
 impl<'a, 'b> Formattable<'a, 'b, AST> for Literal {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     match self.value(ast) {
@@ -371,39 +398,35 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for Import {
       items.sort_by_key(|item| item.name);
     };
 
-    let items_in_line = if items.is_empty() {
-      IR::Text(" ")
-    } else {
-      let (last, items) = items.split_last().unwrap();
+    if items.is_empty() {
+      return f.concat([
+        IR::Text("from "),
+        IR::Text(self.module(ast)),
+        IR::Text(" import {  }"),
+      ]);
+    }
 
-      f.concat([
-        IR::Text(" "),
-        f.concat_iterator(
-          items
-            .iter()
-            .map(|item| f.concat([item.format(f, ast), IR::Text(", ")])),
-        ),
-        last.format(f, ast),
-      ])
-    };
+    let (last, items) = items.split_last().unwrap();
 
-    let items_on_new_lines = f.indent([f.concat_iterator(
-      items
-        .iter()
-        .map(|item| f.concat([IR::LineOrSpace, item.format(f, ast), IR::Text(",")])),
-    )]);
+    let items = f.indent([
+      IR::LineOrSpace,
+      f.concat_iterator(
+        items
+          .iter()
+          .map(|item| f.concat([item.format(f, ast), IR::Text(","), IR::LineOrSpace])),
+      ),
+      last.format(f, ast),
+      IR::Option("", ","),
+    ]);
 
-    f.concat([
+    f.concat([f.group([
       IR::Text("from "),
       IR::Text(self.module(ast)),
-      IR::Text(" import "),
-      f.group([
-        IR::Text("{"),
-        f.option(items_in_line, items_on_new_lines),
-        IR::LineOrSpace,
-        IR::Text("}"),
-      ]),
-    ])
+      IR::Text(" import {"),
+      items,
+      IR::LineOrSpace,
+      IR::Text("}"),
+    ])])
   }
 }
 impl<'a, 'b> Formattable<'a, 'b, AST> for ImportItem<'a> {

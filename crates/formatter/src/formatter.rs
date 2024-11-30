@@ -70,18 +70,6 @@ impl<'ast: 'allocator, 'allocator> Formatter<'ast, 'allocator> {
     IR::Group(Box::new_in(ir, self.allocator))
   }
 
-  /// Create a new group, an option for the formatter to break the source on
-  pub(crate) fn option(
-    &self,
-    a: IR<'ast, 'allocator>,
-    b: IR<'ast, 'allocator>,
-  ) -> IR<'ast, 'allocator> {
-    IR::Option(
-      Box::new_in(a, self.allocator),
-      Box::new_in(b, self.allocator),
-    )
-  }
-
   /// Merge multiple IRs into a single IR
   pub(crate) fn concat<const N: usize>(
     &self,
@@ -116,17 +104,14 @@ pub enum IR<'source, 'allocator> {
   AlwaysLine,
   /// A possible line break, or a space
   LineOrSpace,
+  /// Give two options, use the first if the group is broken, else the second
+  Option(&'source str, &'source str),
   /// A combination of multiple IRs
   Concat(Vec<'allocator, IR<'source, 'allocator>>),
   /// Indent the given IR, if a line break present
   Indent(Box<'allocator, IR<'source, 'allocator>>),
   /// Mark a section where there are different options to break source code
   Group(Box<'allocator, IR<'source, 'allocator>>),
-  /// Give two options for different ways to format the code, the first is more condensed
-  Option(
-    Box<'allocator, IR<'source, 'allocator>>,
-    Box<'allocator, IR<'source, 'allocator>>,
-  ),
 }
 impl<'a, 'b> IR<'a, 'b> {
   /// Check if the option has any always lines
@@ -134,11 +119,10 @@ impl<'a, 'b> IR<'a, 'b> {
   fn has_always_line(&self) -> bool {
     match self {
       IR::AlwaysLine => true,
-      IR::Empty | IR::Text(_) | IR::LineOrSpace | IR::Line => false,
+      IR::Empty | IR::Text(_) | IR::LineOrSpace | IR::Line | IR::Option(_, _) => false,
       IR::Concat(x) => x.iter().any(IR::has_always_line),
       IR::Indent(ir) => ir.has_always_line(),
       IR::Group(group) => group.has_always_line(),
-      IR::Option(a, b) => a.has_always_line() && b.has_always_line(),
     }
   }
 
@@ -162,6 +146,9 @@ impl<'a, 'b> IR<'a, 'b> {
         indentation: config.indentation,
         line_ending: config.line_ending,
       },
+
+      IR::Option(a, _) if flatten => DisplayIR::Text(a),
+      IR::Option(_, b) => DisplayIR::Text(b),
 
       IR::Indent(ir) => ir.display(line_length, indentation + 1, flatten, config, allocator),
       IR::Concat(items) => DisplayIR::Collection({
@@ -189,15 +176,6 @@ impl<'a, 'b> IR<'a, 'b> {
           option_a
         } else {
           ir.display(line_length, indentation, false, config, allocator)
-        }
-      }
-      IR::Option(a, b) => {
-        let option_a = a.display(line_length, indentation, true, config, allocator);
-
-        if option_a.fits(config.print_width, line_length) {
-          option_a
-        } else {
-          b.display(line_length, indentation, false, config, allocator)
         }
       }
     }

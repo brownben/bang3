@@ -627,6 +627,23 @@ fn module_access() {
   assert_format!("maths  :: sin ", "maths::sin", 80);
 }
 
+#[test]
+fn lists() {
+  // Leaves basic correct lists alone
+  assert_format!("[1, 2, 3]", "[1, 2, 3]", 80);
+  assert_format!("[]", "[]", 80);
+
+  // Corrects spacing
+  assert_format!("[  ]", "[]", 80);
+  assert_format!("[   1  , 2  , 3 ]", "[1, 2, 3]", 80);
+
+  // Removes trailing comma
+  assert_format!("[1, 2, 3,]", "[1, 2, 3]", 80);
+
+  // Splits if too long for line
+  assert_format!("[1, 2, 3]", "[\n  1,\n  2,\n  3,\n]", 5);
+}
+
 mod types {
   use super::*;
 
