@@ -45,16 +45,16 @@ impl TypeChecker {
     ast: &'a AST,
     variables: &mut BTreeMap<&'a str, TypeRef>,
   ) -> TypeRef {
-    use bang_syntax::ast::types::{PrimitiveType, Type as Annotation};
+    use bang_syntax::ast::types::Type as Annotation;
     const TYPE_NAMES: [&str; 4] = ["number", "string", "boolean", "_"];
 
     match ty {
-      Annotation::Primitive(primitive) => match primitive.type_(ast) {
-        PrimitiveType::Number => TypeArena::NUMBER,
-        PrimitiveType::String => TypeArena::STRING,
-        PrimitiveType::Boolean => TypeArena::BOOLEAN,
-        PrimitiveType::Never => TypeArena::NEVER,
-        PrimitiveType::Unknown => {
+      Annotation::Primitive(primitive) => match primitive.name(ast) {
+        "number" => TypeArena::NUMBER,
+        "string" => TypeArena::STRING,
+        "boolean" => TypeArena::BOOLEAN,
+        "_" => TypeArena::NEVER,
+        _ => {
           self.problems.push(TypeError::UnknownTypeAnnotation {
             span: primitive.span(ast),
             did_you_mean: similarly_named(primitive.name(ast), TYPE_NAMES),

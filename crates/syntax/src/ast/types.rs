@@ -44,17 +44,6 @@ impl TypePrimitive {
     ast.get_token_text(self.token)
   }
 
-  /// The type of the primitive
-  pub fn type_(&self, ast: &AST) -> PrimitiveType {
-    match ast.get_token_text(self.token) {
-      "boolean" => PrimitiveType::Boolean,
-      "number" => PrimitiveType::Number,
-      "string" => PrimitiveType::String,
-      "_" => PrimitiveType::Never,
-      _ => PrimitiveType::Unknown,
-    }
-  }
-
   /// The location of the type
   pub fn span(&self, ast: &AST) -> Span {
     Span::from(ast[self.token])
@@ -170,19 +159,4 @@ impl From<TypeInvalid> for Type {
   fn from(invalid: TypeInvalid) -> Self {
     Self::Invalid(invalid)
   }
-}
-
-/// A primitive type, e.g. `string`, `number`, `boolean`, `never`
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum PrimitiveType {
-  /// A number, e.g. `1`, `2.4`, `-3.14`
-  Number,
-  /// A string, e.g. `"hello"`
-  String,
-  /// A boolean, e.g. `true`, `false`
-  Boolean,
-  /// An unknown type
-  Unknown,
-  /// A type that never exists
-  Never,
 }
