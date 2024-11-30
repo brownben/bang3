@@ -609,6 +609,32 @@ fn annotations() {
   assert!(has_type_error("let _x: unknown = 5"));
 }
 
+#[test]
+fn list() {
+  assert_eq!(synthesize("[]"), "list<^a>");
+  assert_eq!(synthesize("[1]"), "list<number>");
+  assert_eq!(synthesize("[1, 2, 4]"), "list<number>");
+
+  assert!(has_type_error("[] + 5"));
+  assert!(has_type_error("[5, '']"));
+
+  let early_returns_dont_match = indoc! {"
+    a => [
+      if (a) { return '' } else '',
+      'above would return string, but function returns a list',
+    ]
+  "};
+  assert!(has_type_error(early_returns_dont_match));
+
+  let early_returns_match = indoc! {"
+    a => [
+      if (a) { return [] } else '',
+      if (a) { return ['b'] } else '',
+    ]
+  "};
+  assert_eq!(synthesize(early_returns_match), "^a => list<string>");
+}
+
 mod exhaustive {
   use super::*;
 

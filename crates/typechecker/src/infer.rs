@@ -2,7 +2,7 @@ use crate::{
   TypeChecker, TypeError, VariableKind, exhaustive,
   similarity::similarly_named,
   stdlib::{self, ImportResult, StdlibModule},
-  types::{PrimitiveType, Type, TypeArena, TypeRef, TypeScheme},
+  types::{PrimitiveType, Structure, Type, TypeArena, TypeRef, TypeScheme},
 };
 use bang_syntax::{
   AST, Span,
@@ -282,6 +282,7 @@ impl InferType for Expression {
       Expression::Function(function) => function.infer(t, ast),
       Expression::Group(group) => group.infer(t, ast),
       Expression::If(if_) => if_.infer(t, ast),
+      Expression::List(list) => list.infer(t, ast),
       Expression::Literal(literal) => literal.infer(t, ast),
       Expression::Match(match_) => match_.infer(t, ast),
       Expression::ModuleAccess(module_access) => module_access.infer(t, ast),
@@ -517,6 +518,28 @@ impl InferType for If {
     }
   }
 }
+impl InferType for List {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
+    let element_type = t.new_type_var();
+    let mut return_type = None;
+
+    for item in self.items(ast) {
+      let item_type = item.infer(t, ast);
+
+      t.assert_type(item_type.expression(), element_type, item.span(ast));
+
+      if let Some(item_return_type) = item_type.get_return() {
+        match return_type {
+          Some(return_type) => t.assert_type(item_return_type, return_type, item.span(ast)),
+          None => return_type = Some(item_return_type),
+        }
+      }
+    }
+
+    let list_type = (t.types).new_type(Type::Structure(Structure::List, element_type));
+    ExpressionType::from(list_type, return_type)
+  }
+}
 impl InferType for Literal {
   fn infer(&self, _: &mut TypeChecker, ast: &AST) -> ExpressionType {
     match self.value(ast) {
@@ -710,6 +733,14 @@ impl ExpressionType {
       Self::Expression(_) => None,
       Self::Return(ty) => Some(*ty),
       Self::Both(_, return_) => Some(*return_),
+    }
+  }
+
+  fn from(ty: TypeRef, possible_return: Option<TypeRef>) -> Self {
+    if let Some(return_) = possible_return {
+      Self::Both(ty, return_)
+    } else {
+      Self::Expression(ty)
     }
   }
 }

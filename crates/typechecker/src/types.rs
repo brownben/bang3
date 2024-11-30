@@ -1,6 +1,6 @@
 use std::{
   collections::{BTreeMap, btree_map},
-  iter, ops,
+  fmt, iter, ops,
 };
 
 #[derive(Debug)]
@@ -72,6 +72,13 @@ impl TypeArena {
         self.unify_inner(a_return, b_return, strict)?;
       }
 
+      (Type::Structure(structure_a, a_param), Type::Structure(structure_b, b_param)) => {
+        if structure_a != structure_b {
+          return Err(());
+        }
+        self.unify_inner(a_param, b_param, strict)?;
+      }
+
       (Type::Variable(var1), Type::Variable(var2)) => {
         if var1 == var2 {
           return Ok(());
@@ -114,6 +121,7 @@ impl TypeArena {
       Type::Function(parameter, return_type) => {
         self.has_quantified_vars(parameter) || self.has_quantified_vars(return_type)
       }
+      Type::Structure(_, parameter) => self.has_quantified_vars(parameter),
       Type::Quantified(_) => true,
     }
   }
@@ -143,6 +151,10 @@ impl TypeArena {
         let parameter = self.replace_quantified_vars(parameter, subs);
         let return_type = self.replace_quantified_vars(return_type, subs);
         self.new_type(Type::Function(parameter, return_type))
+      }
+      Type::Structure(kind, parameter) => {
+        let parameter = self.replace_quantified_vars(parameter, subs);
+        self.new_type(Type::Structure(kind, parameter))
       }
       Type::Quantified(idx) => subs[usize::try_from(idx).unwrap()],
       Type::Primitive(_) | Type::Variable(_) => {
@@ -178,6 +190,7 @@ impl TypeArena {
           .type_vars_in(parameter)
           .chain(self.type_vars_in(return_type)),
       ),
+      Type::Structure(_, parameter) => Box::new(self.type_vars_in(parameter)),
       Type::Quantified(_) => unreachable!("type in inference has no quantified vars"),
     }
   }
@@ -198,6 +211,11 @@ impl TypeArena {
         Some(idx) => self.new_type(Type::Quantified((*idx).try_into().unwrap())),
         None => ty,
       },
+
+      Type::Structure(kind, parameter) => {
+        let parameter = self.replace_type_vars(parameter, subs);
+        self.new_type(Type::Structure(kind, parameter))
+      }
 
       Type::Quantified(_) => unreachable!("type in inference has no quantified vars"),
     }
@@ -229,6 +247,7 @@ impl TypeArena {
         }
       }
       Type::Quantified(idx) => format!("^{}", integer_to_identifier(idx)),
+      Type::Structure(kind, parameter) => format!("{kind}<{}>", self.type_to_string(parameter)),
       Type::Variable(type_var_ref) => {
         let type_var = self.get_type_var(type_var_ref);
         match type_var.link {
@@ -283,6 +302,8 @@ pub enum Type {
   Function(TypeRef, TypeRef),
   /// A type variable, e.g. `'a`
   Variable(TypeVarRef),
+  /// A structures type e.g. `list<number>`
+  Structure(Structure, TypeRef),
   /// A quantified type variable
   /// This is only used by types stored in the enviroment. It is replaced with new
   /// type variables when the type is used.
@@ -307,6 +328,18 @@ pub struct TypeVar {
 pub enum TypeVarLink {
   Link(TypeRef),
   NoLink,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Structure {
+  List,
+}
+impl fmt::Display for Structure {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Structure::List => write!(f, "list"),
+    }
+  }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
