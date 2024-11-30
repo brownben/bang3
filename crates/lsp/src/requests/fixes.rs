@@ -143,6 +143,9 @@ mod type_errors {
     if bang_interpreter::stdlib::STRING_ITEMS.contains(&identifier) {
       return Some("string");
     }
+    if bang_interpreter::stdlib::LIST_ITEMS.contains(&identifier) {
+      return Some("list");
+    }
 
     None
   }

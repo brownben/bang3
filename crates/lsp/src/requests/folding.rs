@@ -48,6 +48,7 @@ fn expression_folding_range(expression: &Expression, ast: &AST) -> Option<Span> 
     Expression::Block(block) => Some(block.span(ast)),
     Expression::Call(call) => Some(call.argument_span(ast)),
     Expression::Group(group) => Some(group.span(ast)),
+    Expression::List(list) => Some(list.span(ast)),
     Expression::Literal(literal) => Some(literal.span(ast)),
     Expression::Match(match_) => Some(match_.arms_span(ast)),
     _ => None,

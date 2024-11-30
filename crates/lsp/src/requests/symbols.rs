@@ -95,6 +95,11 @@ fn expression_symbols(
         expression_symbols(otherwise, file, ast, symbols);
       }
     }
+    Expression::List(list) => {
+      for expression in list.items(ast) {
+        expression_symbols(expression, file, ast, symbols);
+      }
+    }
     Expression::Match(match_) => {
       expression_symbols(match_.value(ast), file, ast, symbols);
       for case in match_.arms() {

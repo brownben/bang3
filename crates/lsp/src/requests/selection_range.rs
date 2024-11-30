@@ -123,6 +123,7 @@ impl SelectionRange for Expression {
       Expression::Function(function) => function.selection_range(file, span, parent),
       Expression::Group(group) => group.selection_range(file, span, parent),
       Expression::If(if_) => if_.selection_range(file, span, parent),
+      Expression::List(list) => list.selection_range(file, span, parent),
       Expression::Match(match_) => match_.selection_range(file, span, parent),
       Expression::Unary(unary) => unary.selection_range(file, span, parent),
 
@@ -226,6 +227,18 @@ impl SelectionRange for expression::If {
     let otherwise = (self.otherwise(&file.ast)).selection_range(file, span, parent);
 
     condition.or(then).or(otherwise).or(parent.take())
+  }
+}
+impl SelectionRange for expression::List {
+  fn selection_range(
+    &self,
+    file: &Document,
+    span: Span,
+    parent: &mut Option<lsp::SelectionRange>,
+  ) -> Option<lsp_types::SelectionRange> {
+    (self.items(&file.ast))
+      .find_map(|item| item.selection_range(file, span, parent))
+      .or(parent.take())
   }
 }
 impl SelectionRange for expression::Match {
