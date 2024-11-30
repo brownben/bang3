@@ -515,3 +515,50 @@ mod string {
     assert!(contains_wrong_type.is_err());
   }
 }
+
+mod list {
+  use super::{Value, assert_variable, indoc, run};
+
+  #[test]
+  fn length() {
+    let length = run(indoc! {"
+      from list import { length }
+
+      let a = length([])
+      let b = length(['hello'])
+      let c = length([1,2,3,])
+    "});
+    assert_variable!(length; a, 0.0);
+    assert_variable!(length; b, 1.0);
+    assert_variable!(length; c, 3.0);
+
+    let is_empty = run(indoc! {"
+      from list import { isEmpty }
+
+      let a = isEmpty([])
+      let b = isEmpty(['hello'])
+      let c = isEmpty([1,2,3,])
+    "});
+    assert_variable!(is_empty; a, true);
+    assert_variable!(is_empty; b, false);
+    assert_variable!(is_empty; c, false);
+  }
+
+  #[test]
+  fn contains() {
+    let contains = run(indoc! {"
+      from list import { contains }
+
+      let a = [] >> contains([])
+      let b = [[]] >> contains([])
+      let c = [1, 3, 5, 7] >> contains(3)
+      let d = [1, 3, 5, 7] >> contains(2)
+      let e = [1, 1, 1] >> contains(1)
+    "});
+    assert_variable!(contains; a, false);
+    assert_variable!(contains; b, true);
+    assert_variable!(contains; c, true);
+    assert_variable!(contains; d, false);
+    assert_variable!(contains; e, true);
+  }
+}

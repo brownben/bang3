@@ -1,6 +1,6 @@
 use crate::{
   enviroment::{StaticTypeInfo, VariableType},
-  types::{Type, TypeArena, TypeRef, TypeScheme},
+  types::{Structure, Type, TypeArena, TypeRef, TypeScheme},
 };
 pub use bang_interpreter::stdlib::MODULES;
 
@@ -28,6 +28,8 @@ pub enum StdlibModule {
   Maths,
   /// The `string` module
   String,
+  /// The `list` module
+  List,
   /// The module is unknown
   Unknown,
 }
@@ -37,6 +39,7 @@ impl StdlibModule {
     match module {
       "maths" => Self::Maths,
       "string" => Self::String,
+      "list" => Self::List,
       _ => Self::Unknown,
     }
   }
@@ -47,6 +50,7 @@ impl StdlibModule {
     match self {
       Self::Maths => "maths",
       Self::String => "string",
+      Self::List => "list",
       Self::Unknown => "",
     }
   }
@@ -56,6 +60,7 @@ impl StdlibModule {
     match self {
       Self::Maths => maths_module(types, item),
       Self::String => string_module(types, item),
+      Self::List => list_module(types, item),
       Self::Unknown => ImportResult::ModuleNotFound,
     }
   }
@@ -86,6 +91,7 @@ impl StdlibModule {
     match self {
       Self::Maths => bang_interpreter::stdlib::maths_docs(item),
       Self::String => bang_interpreter::stdlib::string_docs(item),
+      Self::List => bang_interpreter::stdlib::list_docs(item),
       Self::Unknown => None,
     }
   }
@@ -96,6 +102,7 @@ impl StdlibModule {
     match self {
       Self::Maths => &bang_interpreter::stdlib::MATHS_ITEMS,
       Self::String => &bang_interpreter::stdlib::STRING_ITEMS,
+      Self::List => &bang_interpreter::stdlib::LIST_ITEMS,
       Self::Unknown => &[],
     }
   }
@@ -143,10 +150,29 @@ fn string_module(types: &mut TypeArena, item: &str) -> ImportResult {
   }
 }
 
+fn list_module(types: &mut TypeArena, item: &str) -> ImportResult {
+  let generic = types.new_type(Type::Quantified(0));
+  let generic_list = types.new_type(Type::Structure(Structure::List, generic));
+
+  let list_to_number = types.new_type(Type::Function(generic_list, TypeArena::NUMBER));
+  let list_to_bool = types.new_type(Type::Function(generic_list, TypeArena::BOOLEAN));
+  let x_to_list_to_bool = types.new_type(Type::Function(generic, list_to_bool));
+
+  let generic_into_import_result = |item| ImportResult::Value(TypeScheme::new(item, 1));
+
+  match item {
+    "length" => generic_into_import_result(list_to_number),
+    "isEmpty" => generic_into_import_result(list_to_bool),
+    "contains" => generic_into_import_result(x_to_list_to_bool),
+
+    _ => ImportResult::ItemNotFound,
+  }
+}
+
 #[cfg(test)]
 mod test {
-  use super::{ImportResult, MODULES, TypeArena, maths_module, string_module};
-  use bang_interpreter::stdlib::{MATHS_ITEMS, STRING_ITEMS};
+  use super::{ImportResult, MODULES, TypeArena, list_module, maths_module, string_module};
+  use bang_interpreter::stdlib::{LIST_ITEMS, MATHS_ITEMS, STRING_ITEMS};
 
   #[test]
   fn all_items_present() {
@@ -164,6 +190,11 @@ mod test {
 
     for item in MATHS_ITEMS {
       let ty = maths_module(&mut types, item);
+      assert!(matches!(ty, ImportResult::Value { .. }));
+    }
+
+    for item in LIST_ITEMS {
+      let ty = list_module(&mut types, item);
       assert!(matches!(ty, ImportResult::Value { .. }));
     }
   }

@@ -800,4 +800,22 @@ mod stdlib {
     "};
     assert_eq!(synthesize(source), "string");
   }
+
+  #[test]
+  fn list() {
+    let source = indoc! {"
+      from list import { length }
+      [] >> length >> x => x * 2
+    "};
+    assert_eq!(synthesize(source), "number");
+
+    let source = indoc! {"
+      from list import { isEmpty }
+      [1, 2, 4] >> isEmpty
+    "};
+    assert_eq!(synthesize(source), "boolean");
+
+    assert_eq!(synthesize("list::contains(4)([1, 2, 4])"), "boolean");
+    assert!(has_type_error("list::contains('')([1, 2, 4])"));
+  }
 }

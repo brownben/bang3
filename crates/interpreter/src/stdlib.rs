@@ -76,6 +76,7 @@ impl Context for StandardContext {
     match module {
       "maths" => maths(vm, item),
       "string" => string(vm, item),
+      "list" => list(vm, item),
       _ => ImportResult::ModuleNotFound,
     }
   }
@@ -84,10 +85,13 @@ impl Context for StandardContext {
 mod macros;
 
 /// The names of all the modules in the standard library
-pub const MODULES: [&str; 2] = ["maths", "string"];
+pub const MODULES: [&str; 3] = ["maths", "string", "list"];
 
 mod maths;
 pub use maths::{MATHS_ITEMS, maths, maths_docs};
 
 mod string;
 pub use string::{STRING_ITEMS, string, string_docs};
+
+mod list;
+pub use list::{LIST_ITEMS, list, list_docs};

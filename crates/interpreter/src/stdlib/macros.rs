@@ -1,4 +1,5 @@
 use crate::{
+  object::{LIST_TYPE_ID, List},
   value::Value,
   vm::{ErrorKind, VM},
 };
@@ -6,7 +7,7 @@ use crate::{
 /// A prelude for the macros, all the items that are required to be in scope for the macros to work.
 pub(crate) mod prelude {
   pub(crate) use super::super::ImportResult;
-  pub(crate) use super::{count, get_number, get_string, native_function, wrap_value};
+  pub(crate) use super::{count, get_list, get_number, get_string, native_function, wrap_value};
   pub(crate) use crate::{
     object::NativeFunction,
     object::{NATIVE_CLOSURE_TWO_TYPE_ID, NativeClosureTwo},
@@ -104,6 +105,19 @@ pub(crate) fn get_string<'a>(value: Value, vm: &'a VM) -> Result<&'a str, ErrorK
   } else {
     Err(ErrorKind::TypeError {
       expected: "string",
+      got: value.get_type(vm),
+    })
+  }
+}
+
+#[allow(clippy::inline_always, reason = "function exists to simplify macros")]
+#[inline(always)]
+pub(crate) fn get_list<'a>(value: Value, vm: &'a VM) -> Result<&'a [Value], ErrorKind> {
+  if value.is_object_type(LIST_TYPE_ID) {
+    Ok(List::from(value.as_object::<usize>()).items(vm))
+  } else {
+    Err(ErrorKind::TypeError {
+      expected: "list",
       got: value.get_type(vm),
     })
   }
@@ -252,6 +266,29 @@ macro_rules! native_function {
 
       let result = $native_function(vm, arg);
       Ok(vm.allocate_string(&result).into())
+    })
+  };
+
+  ($name:ident, List, usize, $native_function:expr) => {
+    NativeFunction::new(stringify!($name), |vm, arg| {
+      let result = $native_function(get_list(arg, vm)?);
+      #[allow(clippy::cast_precision_loss, reason = "value < 2^52")]
+      Ok((result as f64).into())
+    })
+  };
+  ($name:ident, List, bool, $native_function:expr) => {
+    NativeFunction::new(stringify!($name), |vm, arg| {
+      Ok($native_function(get_list(arg, vm)?).into())
+    })
+  };
+  ($name:ident, Any List, bool, $native_function:expr) => {
+    NativeFunction::new(stringify!($name), |vm, arg| {
+      fn func(vm: &mut VM, a: Value, b: Value) -> Result<Value, ErrorKind> {
+        Ok($native_function(vm, a, get_list(b, vm)?).into())
+      }
+
+      let closure = (vm.heap).allocate(NativeClosure::new(stringify!($name), func, arg));
+      Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
     })
   };
 }
