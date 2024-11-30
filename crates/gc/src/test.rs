@@ -1,4 +1,5 @@
 use super::{Heap, HeapSize, PAGE_SIZE};
+use crate::Gc;
 
 #[test]
 fn allocate_small_size() {
@@ -241,4 +242,13 @@ fn allocate_ream_then_reuse_too_small() {
 
   assert_eq!(allocator.full_list.iter().count(), 1);
   assert_eq!(allocator.free_ream_list.iter().count(), 2);
+}
+
+#[test]
+fn mark_null() {
+  let mut allocator = Heap::new(HeapSize::Small).unwrap();
+
+  allocator.start_gc();
+  allocator.mark(Gc::NULL);
+  allocator.finish_gc();
 }

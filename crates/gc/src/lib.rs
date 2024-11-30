@@ -343,6 +343,10 @@ impl Heap {
   pub fn mark<T>(&self, ptr: Gc<T>) {
     debug_assert!(self.is_collecting);
 
+    if ptr.is_null() {
+      return;
+    }
+
     self.get_page(ptr.page_index()).mark(ptr.block_index());
   }
 
@@ -391,6 +395,8 @@ impl<T> ops::Index<Gc<T>> for Heap {
   type Output = T;
 
   fn index(&self, index: Gc<T>) -> &Self::Output {
+    debug_assert!(!index.is_null());
+
     let page = self.get_page(index.page_index());
     let is_block_allocated = page.is_block_allocated(index.block_index());
     debug_assert!(self.is_collecting || is_block_allocated, "use after free");
@@ -400,6 +406,8 @@ impl<T> ops::Index<Gc<T>> for Heap {
 }
 impl<T> ops::IndexMut<Gc<T>> for Heap {
   fn index_mut(&mut self, index: Gc<T>) -> &mut Self::Output {
+    debug_assert!(!index.is_null());
+
     let page = self.get_page(index.page_index());
     let is_block_allocated = page.is_block_allocated(index.block_index());
     debug_assert!(self.is_collecting || is_block_allocated, "use after free");
@@ -460,10 +468,18 @@ impl Drop for RawMemory {
 
 /// A virtual pointer to a memory allocation on the garbage collected heap.
 #[must_use]
-#[derive(PartialEq, Eq)]
 pub struct Gc<T> {
   value: NonZero<u32>,
   _type: PhantomData<T>,
+}
+impl Gc<u8> {
+  /// A null pointer, to pointing to no value.
+  ///
+  /// Is ignored by the Garbage Collector
+  pub const NULL: Gc<u8> = Self {
+    value: NonZero::new(u32::MAX).unwrap(),
+    _type: PhantomData,
+  };
 }
 impl<T> Gc<T> {
   /// Creates a new pointer to a value
@@ -495,6 +511,12 @@ impl<T> Gc<T> {
     }
   }
 
+  /// Does the pointer point to [`Self::NULL`]?
+  #[must_use]
+  pub fn is_null(&self) -> bool {
+    self == &Gc::NULL
+  }
+
   fn get_pointer(self, heap_base: *mut u8) -> *mut u8 {
     unsafe { heap_base.add(self.addr()).cast() }
   }
@@ -522,9 +544,19 @@ impl<T> Clone for Gc<T> {
   }
 }
 impl<T> Copy for Gc<T> {}
+impl<T, U> PartialEq<Gc<U>> for Gc<T> {
+  fn eq(&self, other: &Gc<U>) -> bool {
+    self.value == other.value
+  }
+}
+impl<T> Eq for Gc<T> {}
 impl<T> fmt::Debug for Gc<T> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "Gc({:x?})", self.value.get())
+    if self.is_null() {
+      write!(f, "Gc(NULL)")
+    } else {
+      write!(f, "Gc({:x?})", self.value.get())
+    }
   }
 }
 
