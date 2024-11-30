@@ -66,17 +66,17 @@ impl BangString {
     Value::from_object(*new_string, STRING_TYPE_ID)
   }
 }
-impl From<Gc<usize>> for BangString {
-  fn from(value: Gc<usize>) -> Self {
-    Self(value.into())
+impl<T> From<Gc<T>> for BangString {
+  fn from(value: Gc<T>) -> Self {
+    Self(value.cast().into())
   }
 }
 const STRING: TypeDescriptor = TypeDescriptor {
   type_name: "string",
-  trace: |vm, value, _trace| vm.heap.mark(value),
-  display: |vm, value| vm.heap[value.cast::<BangString>()].as_str(vm).to_owned(),
-  is_falsy: |vm, value| vm.heap[value.cast::<BangString>()].as_str(vm).is_empty(),
-  equals: |_vm, _a, _b| unreachable!("Strings handled separately"),
+  trace: |_, _, _| {},
+  display: |vm, value| BangString::from(value).as_str(vm).to_owned(),
+  is_falsy: |vm, value| BangString::from(value).as_str(vm).is_empty(),
+  equals: |_, _, _| unreachable!("Strings handled separately"),
   call: None,
 };
 pub const STRING_TYPE_ID: TypeId = TypeId(0);

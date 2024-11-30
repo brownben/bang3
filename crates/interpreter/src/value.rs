@@ -125,7 +125,7 @@ impl Value {
   #[must_use]
   pub(crate) fn as_string<'a>(self, vm: &'a VM) -> &'a str {
     if self.is_object_type(STRING_TYPE_ID) {
-      BangString::from(self.as_object()).as_str(vm)
+      BangString::from(self.as_object::<usize>()).as_str(vm)
     } else {
       vm.heap[self.as_object::<StringSlice>()].as_str(vm)
     }
