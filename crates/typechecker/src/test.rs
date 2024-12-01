@@ -607,6 +607,10 @@ fn annotations() {
 
   // Unknown Type Annotation
   assert!(has_type_error("let _x: unknown = 5"));
+  assert!(has_type_error("let _x: unknown<number> = 5"));
+
+  // Type doesn't have parameter
+  assert!(has_type_error("let _x: number<number> = 5"));
 }
 
 #[test]
@@ -633,6 +637,14 @@ fn list() {
     ]
   "};
   assert_eq!(synthesize(early_returns_match), "^a => list<string>");
+
+  // Annotations
+  assert!(!has_type_error("let _x: list<number> = []"));
+  assert!(!has_type_error("let _x: list<number> = [1,]"));
+  assert!(!has_type_error("let _x: list<number> = [1,]"));
+  assert!(has_type_error("let _x: list<number> = ['']"));
+  assert!(has_type_error("let _x: list = [1]"));
+  assert!(!has_type_error("let _x: list = []"));
 }
 
 mod exhaustive {

@@ -712,4 +712,14 @@ mod types {
       80
     );
   }
+
+  #[test]
+  fn structures() {
+    assert_format!("let a: list<string> = []", "let a: list<string> = []", 80);
+    assert_format!(
+      "let a: list  <   string  > = []",
+      "let a: list<string> = []",
+      80
+    );
+  }
 }

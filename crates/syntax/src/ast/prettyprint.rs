@@ -378,6 +378,7 @@ impl PrettyPrint for Type {
       Type::Variable(type_variable) => type_variable.pretty(f, ast, prefix, last),
       Type::Function(type_function) => type_function.pretty(f, ast, prefix, last),
       Type::Group(type_group) => type_group.pretty(f, ast, prefix, last),
+      Type::Structure(structure) => structure.pretty(f, ast, prefix, last),
       Type::Invalid(_) => write!(f, "Invalid"),
     }
   }
@@ -404,5 +405,12 @@ impl PrettyPrint for TypeGroup {
     write!(f, "(")?;
     self.type_(ast).pretty(f, ast, prefix, last)?;
     write!(f, ")")
+  }
+}
+impl PrettyPrint for TypeStructure {
+  fn pretty(&self, f: &mut fmt::Formatter, ast: &AST, prefix: &str, last: bool) -> fmt::Result {
+    write!(f, "{}<", self.structure(ast))?;
+    self.parameter(ast).pretty(f, ast, prefix, last)?;
+    write!(f, ">")
   }
 }

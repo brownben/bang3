@@ -17,6 +17,8 @@ pub enum Type {
   Function(TypeFunction),
   /// An type in parentheses, e.g. `(number)`
   Group(TypeGroup),
+  /// A type with a parameter for what it contains, e.g. `list<number>`
+  Structure(TypeStructure),
   /// An invalid type
   Invalid(TypeInvalid),
 }
@@ -28,6 +30,7 @@ impl Type {
       Type::Variable(variable) => variable.span(ast),
       Type::Function(function) => function.span(ast),
       Type::Group(group) => group.span(ast),
+      Type::Structure(structure) => structure.span(ast),
       Type::Invalid(invalid) => invalid.span(ast),
     }
   }
@@ -123,6 +126,46 @@ impl TypeGroup {
   }
 }
 
+/// A type with a parameter for what it contains, e.g. `list<number>`
+#[derive(Debug)]
+pub struct TypeStructure {
+  pub(crate) structure: TokenIdx,
+  pub(crate) opening: TokenIdx,
+  pub(crate) parameter: TypeIdx,
+  pub(crate) closing: Option<TokenIdx>,
+}
+impl TypeStructure {
+  /// The type of the structure
+  pub fn structure<'a>(&self, ast: &'a AST) -> &'a str {
+    ast.get_token_text(self.structure)
+  }
+  /// The parameter of the structure
+  pub fn parameter<'a>(&self, ast: &'a AST) -> &'a Type {
+    &ast[self.parameter]
+  }
+
+  /// The location of the type
+  pub fn span(&self, ast: &AST) -> Span {
+    let start = Span::from(ast[self.structure]);
+
+    if let Some(end) = self.closing {
+      start.merge(ast[end].into())
+    } else {
+      start.merge(self.parameter(ast).span(ast))
+    }
+  }
+  /// The location of the parameter including brackets
+  pub fn parameter_span(&self, ast: &AST) -> Span {
+    let start = Span::from(ast[self.opening]);
+
+    if let Some(end) = self.closing {
+      start.merge(ast[end].into())
+    } else {
+      start.merge(self.parameter(ast).span(ast))
+    }
+  }
+}
+
 /// An invalid type
 #[derive(Debug)]
 pub struct TypeInvalid {
@@ -153,6 +196,11 @@ impl From<TypeFunction> for Type {
 impl From<TypeGroup> for Type {
   fn from(group: TypeGroup) -> Self {
     Self::Group(group)
+  }
+}
+impl From<TypeStructure> for Type {
+  fn from(parameter: TypeStructure) -> Self {
+    Self::Structure(parameter)
   }
 }
 impl From<TypeInvalid> for Type {

@@ -192,3 +192,20 @@ fn unknown_type_annotation_without_suggestion() {
     ────╯
   "});
 }
+
+#[test]
+fn type_doesnt_accept_parameter() {
+  let source = indoc! {"
+    let _x: string<string> = ''
+  "};
+  let output = run_typecheck(source);
+
+  assert_eq!(output, indoc! {"
+    ✕ Error: Unexpected Parameter
+    type `string` does not accept a parameter
+
+        ╭─[STDIN:1]
+      1 │ let _x: string<string> = ''
+    ────╯
+  "});
+}

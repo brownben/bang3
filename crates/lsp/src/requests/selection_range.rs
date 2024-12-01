@@ -326,6 +326,7 @@ impl SelectionRange for Type {
       Type::Variable(_) => range,
       Type::Function(function) => function.selection_range(file, span, parent),
       Type::Group(group) => group.selection_range(file, span, parent),
+      Type::Structure(structure) => structure.selection_range(file, span, parent),
       Type::Invalid(_) => range,
     }
   }
@@ -351,6 +352,18 @@ impl SelectionRange for types::TypeGroup {
     parent: &mut Option<lsp_types::SelectionRange>,
   ) -> Option<lsp_types::SelectionRange> {
     (self.type_(&file.ast).selection_range(file, span, parent)).or(parent.take())
+  }
+}
+impl SelectionRange for types::TypeStructure {
+  fn selection_range(
+    &self,
+    file: &Document,
+    span: Span,
+    parent: &mut Option<lsp_types::SelectionRange>,
+  ) -> Option<lsp_types::SelectionRange> {
+    let parameter = (self.parameter(&file.ast)).selection_range(file, span, parent);
+
+    parameter.or(parent.take())
   }
 }
 

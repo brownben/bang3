@@ -128,6 +128,13 @@ pub enum Problem {
     /// Suggestion for which type could be meant instead
     did_you_mean: Option<String>,
   },
+  /// Type doesn't accept a parameter
+  UnexpectedParameter {
+    /// The type that was recieved
+    type_: String,
+    /// The location of the error
+    span: Span,
+  },
 }
 impl Problem {
   /// The title of the error message
@@ -150,6 +157,7 @@ impl Problem {
       Self::ModuleNotFound { .. } => "Module Not Found",
       Self::ItemNotFound { .. } => "Item Not Found",
       Self::UnknownTypeAnnotation { .. } => "Unknown Type Annotation",
+      Self::UnexpectedParameter { .. } => "Unexpected Parameter",
     }
   }
 
@@ -206,6 +214,9 @@ impl Problem {
         format!("could not find `{item}` in `{module}`")
       }
       Self::UnknownTypeAnnotation { .. } => "type annotation is not a valid type".to_string(),
+      Self::UnexpectedParameter { type_, .. } => {
+        format!("type `{type_}` does not accept a parameter")
+      }
     }
   }
 
@@ -288,7 +299,8 @@ impl Problem {
       | Self::FunctionReturnsNever { span }
       | Self::ModuleNotFound { span, .. }
       | Self::ItemNotFound { span, .. }
-      | Self::UnknownTypeAnnotation { span, .. } => *span,
+      | Self::UnknownTypeAnnotation { span, .. }
+      | Self::UnexpectedParameter { span, .. } => *span,
     }
   }
 }

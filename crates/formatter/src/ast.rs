@@ -476,6 +476,7 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for Type {
       Type::Variable(type_variable) => type_variable.format(f, ast),
       Type::Function(type_function) => type_function.format(f, ast),
       Type::Group(type_group) => type_group.format(f, ast),
+      Type::Structure(structure) => structure.format(f, ast),
       Type::Invalid(_) => IR::Empty,
     }
   }
@@ -514,6 +515,16 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for TypeGroup {
       f.indent([IR::Line, inner.format(f, ast)]),
       IR::Line,
       IR::Text(")"),
+    ])
+  }
+}
+impl<'a, 'b> Formattable<'a, 'b, AST> for TypeStructure {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
+    f.concat([
+      IR::Text(self.structure(ast)),
+      IR::Text("<"),
+      self.parameter(ast).format(f, ast),
+      IR::Text(">"),
     ])
   }
 }

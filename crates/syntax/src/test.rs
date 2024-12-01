@@ -1481,6 +1481,35 @@ mod types {
   }
 
   #[test]
+  fn structure() {
+    let ast = parse("let x: number<number> = _ => 4");
+    let expected = indoc! {"
+      ├─ Let 'x' =
+      │  ├─ Type: number<number>
+      │  ╰─ Function (x): _ =>
+      │     ╰─ Number (4)
+    "};
+    assert!(ast.is_ok());
+    assert_eq!(ast.to_string(), expected);
+
+    let ast = parse("let x: list<list<(string)>> => number => list<string> = ''");
+    let expected = indoc! {"
+      ├─ Let 'x' =
+      │  ├─ Type: list<list<(string)>> => number => list<string>
+      │  ╰─ String ''
+    "};
+    assert!(ast.is_ok());
+    assert_eq!(ast.to_string(), expected);
+
+    let ast = parse("let x: list<(list<list<list<number>>>)> = [[1]]");
+    assert!(ast.is_ok());
+    let ast = parse("let x: list<list<list<list<number>>>> = [[1]]");
+    assert!(ast.is_ok());
+    let ast = parse("let x: list<list<list<number>>> = [[1]]");
+    assert!(ast.is_ok());
+  }
+
+  #[test]
   fn invalid() {
     let ast = parse("let x: >= = true");
     let expected = indoc! {"

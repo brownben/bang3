@@ -21,6 +21,8 @@ pub struct Parser<'ast> {
   function_depth: usize,
   /// Have we encountered an error, and want to resync at the next chance?
   should_resync: bool,
+  /// Has the first part of a `>>` token been used by a type?
+  type_parameter_close: bool,
 }
 impl<'ast> Parser<'ast> {
   pub fn new(ast: &'ast mut AST) -> Self {
@@ -30,6 +32,7 @@ impl<'ast> Parser<'ast> {
       skipped_newline: false,
       function_depth: 0,
       should_resync: false,
+      type_parameter_close: false,
     }
   }
 
@@ -706,7 +709,7 @@ impl Parser<'_> {
 impl Parser<'_> {
   fn parse_type(&mut self) -> TypeIdx {
     let type_ = match self.current_kind() {
-      TokenKind::Identifier => self.primitive_type(),
+      TokenKind::Identifier => self.type_primitive(),
       TokenKind::LeftParen => self.type_group(),
       TokenKind::Caret => self.type_variable(),
       _ => {
@@ -718,15 +721,21 @@ impl Parser<'_> {
     };
 
     if self.matches(TokenKind::FatRightArrow) {
-      self.function_type(type_)
+      self.type_function(type_)
     } else {
       type_
     }
   }
 
-  fn primitive_type(&mut self) -> TypeIdx {
+  fn type_primitive(&mut self) -> TypeIdx {
     let (_, identifier) = self.advance();
-    self.ast.add_type(TypePrimitive::from(identifier))
+
+    if self.current_kind() == TokenKind::Less {
+      let (_, opening) = self.advance();
+      self.type_structure(identifier, opening)
+    } else {
+      self.ast.add_type(TypePrimitive::from(identifier))
+    }
   }
 
   fn type_variable(&mut self) -> TypeIdx {
@@ -737,7 +746,7 @@ impl Parser<'_> {
     }
   }
 
-  fn function_type(&mut self, parameter: TypeIdx) -> TypeIdx {
+  fn type_function(&mut self, parameter: TypeIdx) -> TypeIdx {
     let return_ = self.parse_type();
     self.ast.add_type(TypeFunction { parameter, return_ })
   }
@@ -756,6 +765,31 @@ impl Parser<'_> {
     let end = self.expect(TokenKind::RightParen);
 
     self.ast.add_type(TypeGroup { start, type_, end })
+  }
+
+  fn type_structure(&mut self, structure: TokenIdx, opening: TokenIdx) -> TypeIdx {
+    let parameter = self.parse_type();
+    self.skip_newline();
+    let closing = match self.current_kind() {
+      TokenKind::RightRight if !self.type_parameter_close => {
+        self.type_parameter_close = true;
+        Some(self.current_token_id())
+      }
+      TokenKind::RightRight if self.type_parameter_close => {
+        self.type_parameter_close = false;
+        let (_, closing) = self.advance();
+        Some(closing)
+      }
+      _ => self.expect(TokenKind::Greater),
+    };
+    self.skip_newline();
+
+    self.ast.add_type(TypeStructure {
+      structure,
+      opening,
+      parameter,
+      closing,
+    })
   }
 
   fn empty_type_group(&mut self, start: TokenIdx) -> TypeIdx {
