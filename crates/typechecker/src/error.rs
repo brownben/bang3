@@ -140,6 +140,17 @@ pub enum Problem {
     /// The location of the error
     span: Span,
   },
+  /// Module Access to access imported item
+  ModuleAccessAlreadyImported {
+    /// The path which is being imported e.g. `module::item`
+    path: String,
+    /// What it is imported as
+    defined_as: String,
+    /// The location of the existing import
+    definition_location: Span,
+    /// The location of the error
+    span: Span,
+  },
 }
 impl Problem {
   /// The title of the error message
@@ -164,6 +175,7 @@ impl Problem {
       Self::UnknownTypeAnnotation { .. } => "Unknown Type Annotation",
       Self::UnexpectedParameter { .. } => "Unexpected Parameter",
       Self::NoReturnFromMatchGuard { .. } => "No Return from Match Guard",
+      Self::ModuleAccessAlreadyImported { .. } => "Module Access Item Already Imported",
     }
   }
 
@@ -226,6 +238,11 @@ impl Problem {
       Self::NoReturnFromMatchGuard { .. } => {
         "early returns from match guards can cause unexpected execution behaviour".to_owned()
       }
+      Self::ModuleAccessAlreadyImported {
+        path, defined_as, ..
+      } => {
+        format!("`{path}` has been imported as `{defined_as}`")
+      }
     }
   }
 
@@ -286,8 +303,24 @@ impl Problem {
   pub fn is_warning(&self) -> bool {
     matches!(
       self,
-      Self::UnusedVariable { .. } | Self::UnusedImport { .. } | Self::UnreachableCase { .. }
+      Self::UnusedVariable { .. }
+        | Self::UnusedImport { .. }
+        | Self::UnreachableCase { .. }
+        | Self::ModuleAccessAlreadyImported { .. }
     )
+  }
+
+  /// Related information which can be displayed for the error
+  #[must_use]
+  pub fn related_info(&self) -> Option<(Span, String)> {
+    match self {
+      Self::ModuleAccessAlreadyImported {
+        defined_as,
+        definition_location: span,
+        ..
+      } => Some((*span, format!("`{defined_as}` is imported here"))),
+      _ => None,
+    }
   }
 
   /// The location of the error in the source code
@@ -310,7 +343,8 @@ impl Problem {
       | Self::ItemNotFound { span, .. }
       | Self::UnknownTypeAnnotation { span, .. }
       | Self::UnexpectedParameter { span, .. }
-      | Self::NoReturnFromMatchGuard { span, .. } => *span,
+      | Self::NoReturnFromMatchGuard { span, .. }
+      | Self::ModuleAccessAlreadyImported { span, .. } => *span,
     }
   }
 }

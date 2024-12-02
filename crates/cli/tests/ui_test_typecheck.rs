@@ -230,3 +230,23 @@ fn no_return_from_match_guard() {
     ────╯
   "});
 }
+
+#[test]
+fn module_access_item_already_imported() {
+  let source = indoc! {"
+    from string import { length }
+
+    let _x = length('hello')
+    'hello' >> string::length >> print
+  "};
+  let output = run_typecheck(source);
+
+  assert_eq!(output, indoc! {"
+    ⚠ Warning: Module Access Item Already Imported
+    `string::length` has been imported as `length`
+
+        ╭─[STDIN:4]
+      4 │ 'hello' >> string::length >> print
+    ────╯
+  "});
+}

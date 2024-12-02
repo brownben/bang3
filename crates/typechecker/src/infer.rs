@@ -784,6 +784,31 @@ impl InferExpression for ModuleAccess {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> TypeRef {
     let module = StdlibModule::get(self.module(ast));
 
+    let existing_import = t.env.variables().find_map(|var| match &var.kind {
+      VariableKind::Declaration { .. } | VariableKind::Builtin { .. } => None,
+      VariableKind::Import {
+        module,
+        item,
+        alias,
+        defined,
+        ..
+      } => {
+        if *module == self.module(ast) && item == self.item(ast) {
+          Some((alias, *defined))
+        } else {
+          None
+        }
+      }
+    });
+    if let Some((alias, definition_location)) = existing_import {
+      t.problems.push(TypeError::ModuleAccessAlreadyImported {
+        path: format!("{}::{}", self.module(ast), self.item(ast)),
+        defined_as: alias.clone().unwrap_or(self.item(ast).to_owned()),
+        definition_location,
+        span: self.span(ast),
+      });
+    }
+
     match module.import_value(&mut t.types, self.item(ast)) {
       ImportResult::Value(type_) => t.types.instantiate(type_),
       ImportResult::ModuleNotFound => {

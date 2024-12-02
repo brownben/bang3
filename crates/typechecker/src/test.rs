@@ -803,6 +803,34 @@ fn list() {
   assert!(!has_type_error("let _x: list = []"));
 }
 
+#[test]
+fn module_item_already_imported() {
+  let source = indoc! {"
+    from string import { length }
+
+    let _x = length('hello')
+    'hello' >> string::length >> print
+  "};
+  assert!(has_type_error(source));
+
+  let imported_not_in_scope = indoc! {"
+    {
+      from string import { length }
+
+      length('hello')
+    }
+    'hello' >> string::length >> print
+  "};
+  assert!(!has_type_error(imported_not_in_scope));
+
+  let with_alias = indoc! {"
+    from string import { length as len }
+
+    let _x = len('hello')
+    'hello' >> string::length >> print
+  "};
+  assert!(has_type_error(with_alias));
+}
 mod exhaustive {
   use super::*;
 

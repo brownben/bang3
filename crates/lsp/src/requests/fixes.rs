@@ -101,6 +101,10 @@ mod type_errors {
           actions.push(unknown_item(file, error, suggestion, *span));
         }
 
+        TypeError::ModuleAccessAlreadyImported { .. } => {
+          actions.push(already_imported_item(file, error));
+        }
+
         _ => {}
       });
   }
@@ -171,6 +175,26 @@ mod type_errors {
       kind: Some(lsp::CodeActionKind::QUICKFIX),
       diagnostics: Some(vec![error.diagnostic(file)]),
       edit: Some(replace_edit(file, span, suggestion)),
+      ..Default::default()
+    }
+  }
+
+  fn already_imported_item(file: &Document, error: &TypeError) -> lsp::CodeAction {
+    let TypeError::ModuleAccessAlreadyImported {
+      path,
+      defined_as,
+      span,
+      ..
+    } = error
+    else {
+      unreachable!()
+    };
+
+    lsp::CodeAction {
+      title: format!("Replace `{path}` with `{defined_as}`"),
+      kind: Some(lsp::CodeActionKind::QUICKFIX),
+      diagnostics: Some(vec![error.diagnostic(file)]),
+      edit: Some(replace_edit(file, *span, defined_as)),
       ..Default::default()
     }
   }

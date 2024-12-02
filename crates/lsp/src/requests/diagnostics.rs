@@ -80,6 +80,15 @@ impl IntoDiagnostic for TypeError {
           None
         }
       },
+      related_information: self.related_info().map(|(span, message)| {
+        vec![lsp::DiagnosticRelatedInformation {
+          location: lsp::Location {
+            uri: file.id.clone(),
+            range: lsp_range_from_span(span, file),
+          },
+          message,
+        }]
+      }),
       ..Default::default()
     }
   }
