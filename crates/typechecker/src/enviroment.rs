@@ -23,13 +23,13 @@ impl Enviroment {
   }
 
   pub(crate) fn define_builtin_variables(&mut self, types: &mut TypeArena) {
-    let generic = types.new_type(Type::Quantified(0));
+    let generic_a = types.new_type(Type::Quantified(0));
+    let generic_b = types.new_type(Type::Quantified(1));
+    let string = TypeArena::STRING;
 
-    let print_function = TypeScheme::new(types.new_type(Type::Function(generic, generic)), 1);
-    let x_string_function = TypeScheme::new(
-      types.new_type(Type::Function(generic, TypeArena::STRING)),
-      1,
-    );
+    let print_function = TypeScheme::new(types.new_type(Type::Function(generic_a, generic_a)), 1);
+    let type_function = TypeScheme::new(types.new_type(Type::Function(generic_a, string)), 1);
+    let panic_function = TypeScheme::new(types.new_type(Type::Function(generic_a, generic_b)), 2);
 
     self.variables.push(Variable {
       kind: VariableKind::Builtin {
@@ -75,9 +75,31 @@ impl Enviroment {
       active: None,
 
       depth: self.depth,
-      type_: x_string_function,
+      type_: type_function,
 
       type_info: OnceCell::from(StaticTypeInfo::new_function("^a => string")),
+    });
+    self.variables.push(Variable {
+      kind: VariableKind::Builtin {
+        name: "panic",
+        documentation: Some(indoc! {"
+          Stops all execution and displays an error with the given value as the message.
+
+          ## Example
+          ```
+          panic('This is an error')
+          // The interpreter has stopped executing
+          ```
+        "}),
+      },
+
+      used: Vec::new(),
+      active: None,
+
+      depth: self.depth,
+      type_: panic_function,
+
+      type_info: OnceCell::from(StaticTypeInfo::new_function("^a => ^b")),
     });
   }
 

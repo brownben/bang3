@@ -55,7 +55,11 @@ impl Context for StandardContext {
     vec![
       #[allow(clippy::print_stdout)]
       NativeFunction::new("print", |vm, arg| {
-        println!("{}", arg.display(vm));
+        if arg == Value::NULL {
+          println!();
+        } else {
+          println!("{}", arg.display(vm));
+        }
         Ok(arg)
       }),
       NativeFunction::new("type", |vm, arg| {
@@ -63,7 +67,11 @@ impl Context for StandardContext {
         Ok(vm.allocate_string(type_string))
       }),
       NativeFunction::new("panic", |vm, arg| {
-        let message = arg.display(vm);
+        let message = if arg == Value::NULL {
+          String::new()
+        } else {
+          arg.display(vm)
+        };
         Err(ErrorKind::Custom {
           title: "Panic",
           message,
