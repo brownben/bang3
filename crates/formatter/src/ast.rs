@@ -325,10 +325,10 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for Pattern {
     match self {
       Pattern::Identifier(variable) => variable.format(f, ast),
       Pattern::Literal(literal) => literal.format(f, ast),
-      Pattern::Range(start, end) => f.concat([
-        (*start).format(f, ast),
+      Pattern::Range(range) => f.concat([
+        (range.start).format(f, ast),
         IR::Text(".."),
-        (*end).format(f, ast),
+        (range.end).format(f, ast),
       ]),
       Pattern::Invalid => IR::Empty,
     }

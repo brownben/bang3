@@ -695,8 +695,8 @@ impl InferType for Match {
             });
           }
         }
-        Pattern::Range(start, end) => {
-          if let Some(start) = start {
+        Pattern::Range(range) => {
+          if let Some(start) = &range.start {
             let start_type = start.infer(t, ast);
             if t.types.unify(start_type, value_type).is_err() {
               t.problems.push(TypeError::PatternNeverMatches {
@@ -706,7 +706,7 @@ impl InferType for Match {
               });
             }
           }
-          if let Some(end) = end {
+          if let Some(end) = &range.end {
             let end_type = end.infer(t, ast);
             if t.types.unify(end_type, value_type).is_err() {
               t.problems.push(TypeError::PatternNeverMatches {

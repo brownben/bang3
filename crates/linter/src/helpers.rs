@@ -238,9 +238,14 @@ impl ASTEquality for Pattern {
     match (self, other) {
       (Self::Identifier(_), Self::Identifier(_)) => true,
       (Self::Literal(x), Self::Literal(y)) => x.equals(y, ast),
-      (Self::Range(a, b), Self::Range(c, d)) => a.equals(c, ast) && b.equals(d, ast),
+      (Self::Range(a), Self::Range(b)) => a.equals(b, ast),
       _ => false,
     }
+  }
+}
+impl ASTEquality for PatternRange {
+  fn equals(&self, other: &Self, ast: &AST) -> bool {
+    self.start.equals(&other.start, ast) && self.end.equals(&other.end, ast)
   }
 }
 impl ASTEquality for Unary {

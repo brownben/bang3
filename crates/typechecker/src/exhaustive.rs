@@ -114,8 +114,10 @@ fn number<'a>(cases: impl Iterator<Item = &'a MatchArm>, ast: &AST) -> Result {
         LiteralValue::Number(number) => number_ranges.push(NumberRange::from(number)),
         LiteralValue::Boolean(_) | LiteralValue::String(_) => {}
       },
-      Pattern::Range(start, end) => {
-        if let Ok(range) = NumberRange::from_range_pattern(start.as_ref(), end.as_ref(), ast) {
+      Pattern::Range(range) => {
+        if let Ok(range) =
+          NumberRange::from_range_pattern(range.start.as_ref(), range.end.as_ref(), ast)
+        {
           number_ranges.push(range);
         }
       }

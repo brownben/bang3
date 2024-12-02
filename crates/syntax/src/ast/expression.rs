@@ -513,7 +513,7 @@ pub enum Pattern {
   /// A range, e.g. `1..2`, `..'b'` - is a comparison against the start and end
   /// The start or end missing indicates an open range. It is inclusive of both values.
   /// The only literals which can be used as part of a range are numbers and strings (ordered).
-  Range(Option<Literal>, Option<Literal>),
+  Range(PatternRange),
   /// An invalid pattern
   Invalid,
 }
@@ -523,11 +523,36 @@ impl Pattern {
     match self {
       Pattern::Identifier(identifier) => identifier.span(ast),
       Pattern::Literal(literal) => literal.span(ast),
-      Pattern::Range(Some(start), Some(end)) => start.span(ast).merge(end.span(ast)),
-      Pattern::Range(Some(start), None) => start.span(ast),
-      Pattern::Range(None, Some(end)) => end.span(ast),
-      Pattern::Range(None, None) => unreachable!(),
+      Pattern::Range(range) => range.span(ast),
       Pattern::Invalid => Span::default(),
+    }
+  }
+}
+/// A range, e.g. `1..2`, `..'b'` - is a comparison against the start and end
+/// The start or end missing indicates an open range. It is inclusive of both values.
+/// The only literals which can be used as part of a range are numbers and strings (ordered).
+#[derive(Debug)]
+pub struct PatternRange {
+  /// The start of the range, if any
+  pub start: Option<Literal>,
+  pub(crate) dots: TokenIdx,
+  /// The end of the range, if any
+  pub end: Option<Literal>,
+}
+impl PatternRange {
+  pub(crate) fn new(start: Option<Literal>, dots: TokenIdx, end: Option<Literal>) -> Self {
+    Self { start, dots, end }
+  }
+
+  /// The location of the pattern
+  pub fn span(&self, ast: &AST) -> Span {
+    let dots = Span::from(ast[self.dots]);
+
+    match (&self.start, &self.end) {
+      (Some(start), Some(end)) => start.span(ast).merge(end.span(ast)),
+      (Some(start), None) => start.span(ast).merge(dots),
+      (None, Some(end)) => dots.merge(end.span(ast)),
+      (None, None) => unreachable!(),
     }
   }
 }

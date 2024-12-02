@@ -536,29 +536,31 @@ impl Parser<'_> {
       TokenKind::String | TokenKind::Number => Some(Literal { token }),
       TokenKind::True | TokenKind::False => return Pattern::Literal(Literal { token }),
       TokenKind::Identifier => return Pattern::Identifier(Variable { token }),
-      TokenKind::DotDot => return self.pattern_range(None),
+      TokenKind::DotDot => return self.pattern_range(None, token),
       _ => {
         self.add_error(ParseError::ExpectedPattern(self.ast[token]));
         return Pattern::Invalid;
       }
     };
 
-    if !self.matches(TokenKind::DotDot) {
-      return Pattern::Literal(start.unwrap());
-    }
+    if self.current_kind() == TokenKind::DotDot {
+      let (_, dots) = self.advance();
 
-    if self.current_kind() == TokenKind::RightArrow || self.current_kind() == TokenKind::If {
-      Pattern::Range(start, None)
+      if self.current_kind() == TokenKind::RightArrow || self.current_kind() == TokenKind::If {
+        Pattern::Range(PatternRange::new(start, dots, None))
+      } else {
+        self.pattern_range(start, dots)
+      }
     } else {
-      self.pattern_range(start)
+      Pattern::Literal(start.unwrap())
     }
   }
 
-  fn pattern_range(&mut self, start: Option<Literal>) -> Pattern {
+  fn pattern_range(&mut self, start: Option<Literal>, dots: TokenIdx) -> Pattern {
     match self.current_kind() {
       TokenKind::String | TokenKind::Number => {
         let (_, token) = self.advance();
-        Pattern::Range(start, Some(Literal { token }))
+        Pattern::Range(PatternRange::new(start, dots, Some(Literal { token })))
       }
       TokenKind::RightArrow => {
         self.add_error(ParseError::ExpectedPatternRangeEnd(self.current_token()));

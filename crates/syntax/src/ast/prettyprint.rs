@@ -249,13 +249,13 @@ impl PrettyPrint for Pattern {
     match self {
       Self::Identifier(identifier) => write!(f, "{}", identifier.name(ast))?,
       Self::Literal(literal) => display_literal(f, literal, ast)?,
-      Self::Range(start, end) => {
-        if let Some(start) = start {
+      Self::Range(range) => {
+        if let Some(start) = &range.start {
           display_literal(f, start, ast)?;
           write!(f, " ")?;
         }
         write!(f, "..")?;
-        if let Some(end) = end {
+        if let Some(end) = &range.end {
           write!(f, " ")?;
           display_literal(f, end, ast)?;
         };

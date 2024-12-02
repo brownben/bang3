@@ -455,31 +455,34 @@ impl<'s> Compile<'s> for Match {
           literal.compile(compiler, ast)?;
           compiler.chunk.add_opcode(OpCode::Equals, span);
         }
-        Pattern::Range(None, Some(pattern)) => {
-          compiler.chunk.add_opcode(OpCode::Peek, span);
-          pattern.compile(compiler, ast)?;
-          compiler.chunk.add_opcode(OpCode::LessEqual, span);
-        }
-        Pattern::Range(Some(pattern), None) => {
-          compiler.chunk.add_opcode(OpCode::Peek, span);
-          pattern.compile(compiler, ast)?;
-          compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
-        }
-        Pattern::Range(Some(greater_than), Some(less_than)) => {
-          compiler.chunk.add_opcode(OpCode::Peek, span);
-          greater_than.compile(compiler, ast)?;
-          compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
+        Pattern::Range(range) => match (&range.start, &range.end) {
+          (Some(pattern), None) => {
+            compiler.chunk.add_opcode(OpCode::Peek, span);
+            pattern.compile(compiler, ast)?;
+            compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
+          }
+          (None, Some(pattern)) => {
+            compiler.chunk.add_opcode(OpCode::Peek, span);
+            pattern.compile(compiler, ast)?;
+            compiler.chunk.add_opcode(OpCode::LessEqual, span);
+          }
+          (Some(greater_than), Some(less_than)) => {
+            compiler.chunk.add_opcode(OpCode::Peek, span);
+            greater_than.compile(compiler, ast)?;
+            compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
 
-          let jump = compiler.add_jump(OpCode::JumpIfFalse, span);
-          compiler.chunk.add_opcode(OpCode::Pop, span);
+            let jump = compiler.add_jump(OpCode::JumpIfFalse, span);
+            compiler.chunk.add_opcode(OpCode::Pop, span);
 
-          compiler.chunk.add_opcode(OpCode::Peek, span);
-          less_than.compile(compiler, ast)?;
-          compiler.chunk.add_opcode(OpCode::LessEqual, span);
+            compiler.chunk.add_opcode(OpCode::Peek, span);
+            less_than.compile(compiler, ast)?;
+            compiler.chunk.add_opcode(OpCode::LessEqual, span);
 
-          compiler.patch_jump(jump)?;
-        }
-        Pattern::Range(None, None) | Pattern::Invalid => return Err(CompileError::InvalidAST),
+            compiler.patch_jump(jump)?;
+          }
+          (None, None) => return Err(CompileError::InvalidAST),
+        },
+        Pattern::Invalid => return Err(CompileError::InvalidAST),
       }
 
       if let Some(guard) = &case.guard(ast) {
