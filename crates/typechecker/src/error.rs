@@ -135,6 +135,11 @@ pub enum Problem {
     /// The location of the error
     span: Span,
   },
+  /// No return from match guard
+  NoReturnFromMatchGuard {
+    /// The location of the error
+    span: Span,
+  },
 }
 impl Problem {
   /// The title of the error message
@@ -158,6 +163,7 @@ impl Problem {
       Self::ItemNotFound { .. } => "Item Not Found",
       Self::UnknownTypeAnnotation { .. } => "Unknown Type Annotation",
       Self::UnexpectedParameter { .. } => "Unexpected Parameter",
+      Self::NoReturnFromMatchGuard { .. } => "No Return from Match Guard",
     }
   }
 
@@ -216,6 +222,9 @@ impl Problem {
       Self::UnknownTypeAnnotation { .. } => "type annotation is not a valid type".to_string(),
       Self::UnexpectedParameter { type_, .. } => {
         format!("type `{type_}` does not accept a parameter")
+      }
+      Self::NoReturnFromMatchGuard { .. } => {
+        "early returns from match guards can cause unexpected execution behaviour".to_owned()
       }
     }
   }
@@ -300,7 +309,8 @@ impl Problem {
       | Self::ModuleNotFound { span, .. }
       | Self::ItemNotFound { span, .. }
       | Self::UnknownTypeAnnotation { span, .. }
-      | Self::UnexpectedParameter { span, .. } => *span,
+      | Self::UnexpectedParameter { span, .. }
+      | Self::NoReturnFromMatchGuard { span, .. } => *span,
     }
   }
 }

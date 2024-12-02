@@ -209,3 +209,24 @@ fn type_doesnt_accept_parameter() {
     ────╯
   "});
 }
+
+#[test]
+fn no_return_from_match_guard() {
+  let source = indoc! {"
+    let a = 5
+    _ => match a
+      | ..1 -> false
+      | _ if { return a > 5 } -> true
+      | _ -> false
+  "};
+  let output = run_typecheck(source);
+
+  assert_eq!(output, indoc! {"
+    ✕ Error: No Return from Match Guard
+    early returns from match guards can cause unexpected execution behaviour
+
+        ╭─[STDIN:4]
+      4 │   | _ if { return a > 5 } -> true
+    ────╯
+  "});
+}

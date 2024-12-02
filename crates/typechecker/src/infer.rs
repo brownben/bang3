@@ -644,7 +644,11 @@ impl InferType for Match {
 
       // check the guard is valid, needs the value to be defined
       if let Some(guard) = case.guard(ast) {
-        guard.infer(t, ast);
+        if let Some(_return_ty) = guard.infer(t, ast).get_return() {
+          t.problems.push(TypeError::NoReturnFromMatchGuard {
+            span: guard.span(ast),
+          });
+        }
       }
 
       let case_type = case.expression(ast).infer(t, ast);
