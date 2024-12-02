@@ -318,7 +318,7 @@ impl ReturnAnalysis for Statement {
       Statement::Comment(_) => false,
       Statement::Expression(expression) => expression.expression(ast).always_returns(ast),
       Statement::Import(_) => false,
-      Statement::Let(_) => false,
+      Statement::Let(let_) => let_.value(ast).always_returns(ast),
       Statement::Return(_) => true,
     }
   }
