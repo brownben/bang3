@@ -23,7 +23,7 @@ pub struct TypeDescriptor {
   /// Whether the value is falsy
   pub is_falsy: fn(vm: &VM, object_pointer: Gc<u8>) -> bool,
   /// Check if the value is equal to another value (of the same type)
-  pub equals: fn(vm: &VM, a: Gc<u8>, b: Gc<u8>) -> bool,
+  pub equals: fn(vm: &VM, a: Value, b: Value) -> bool,
   /// Call the object as a function
   pub call: Option<NativeFunctionCall>,
 }
@@ -93,7 +93,7 @@ const STRING: TypeDescriptor = TypeDescriptor {
   display: |vm, value| BangString::from(value).as_str(&vm.heap).to_owned(),
   debug: |vm, value| format!("'{}'", BangString::from(value).as_str(&vm.heap)),
   is_falsy: |vm, value| BangString::from(value).is_empty(vm),
-  equals: |_, _, _| unreachable!("Strings handled separately"),
+  equals: string_equality,
   call: None,
 };
 pub const STRING_TYPE_ID: TypeId = TypeId(0);
@@ -132,10 +132,19 @@ const STRING_VIEW: TypeDescriptor = TypeDescriptor {
   display: |vm, value| StringView::from_ptr(value, &vm.heap).to_owned(),
   debug: |vm, value| format!("'{}'", StringView::from_ptr(value, &vm.heap)),
   is_falsy: |vm, value| StringView::from_ptr(value, &vm.heap).is_empty(),
-  equals: |_vm, _a, _b| unreachable!("Strings handled separately"),
+  equals: string_equality,
   call: None,
 };
 pub const STRING_VIEW_TYPE_ID: TypeId = TypeId(1);
+
+fn string_equality(vm: &VM, a: Value, b: Value) -> bool {
+  // `a` must be a string to be dispatched to this function
+  if !b.is_string() {
+    return false;
+  }
+
+  a.as_string(&vm.heap) == b.as_string(&vm.heap)
+}
 
 /// A closure - a function which has captured variables from the surrounding scope.
 #[derive(Clone, Debug)]
@@ -339,19 +348,27 @@ const LIST: TypeDescriptor = TypeDescriptor {
   display: |vm, value| List::from(value).to_string(vm).unwrap(),
   debug: |vm, value| List::from(value).to_string(vm).unwrap(),
   is_falsy: |vm, value| List::from(value).items(vm).is_empty(),
-  equals: |vm, a, b| {
-    let a = List::from(a).items(vm);
-    let b = List::from(b).items(vm);
-
-    if a.len() != b.len() {
-      return false;
-    }
-
-    a.iter().zip(b.iter()).all(|(a, b)| vm.equals(*a, *b))
-  },
+  equals: list_equality,
   call: None,
 };
 pub const LIST_TYPE_ID: TypeId = TypeId(6);
+
+fn list_equality(vm: &VM, a: Value, b: Value) -> bool {
+  // `a` must be a list to be dispatched to this function
+  debug_assert!(a.is_object_type(LIST_TYPE_ID));
+  if !b.is_object_type(LIST_TYPE_ID) {
+    return false;
+  }
+
+  let a = List::from(a.as_object::<usize>()).items(vm);
+  let b = List::from(b.as_object::<usize>()).items(vm);
+
+  if a.len() != b.len() {
+    return false;
+  }
+
+  a.iter().zip(b.iter()).all(|(a, b)| vm.equals(*a, *b))
+}
 
 /// A value which has been moved from the stack to the heap, as it has been captured by a closure
 const ALLOCATED: TypeDescriptor = TypeDescriptor {

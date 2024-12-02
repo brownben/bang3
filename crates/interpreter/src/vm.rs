@@ -90,13 +90,9 @@ impl<'context> VM<'context> {
       return (a.as_number() - b.as_number()).abs() < f64::EPSILON;
     }
 
-    if a.is_string() && b.is_string() {
-      return a.as_string(&self.heap) == b.as_string(&self.heap);
-    }
-
-    if a.is_object() && b.is_object() && a.object_type() == b.object_type() {
+    if a.is_object() && b.is_object() {
       let type_descriptor = &self.get_type_descriptor(a);
-      return (type_descriptor.equals)(self, a.as_object(), b.as_object());
+      return (type_descriptor.equals)(self, a, b);
     }
 
     false
