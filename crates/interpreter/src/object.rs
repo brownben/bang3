@@ -38,6 +38,7 @@ pub const DEFAULT_TYPE_DESCRIPTORS: &[TypeDescriptor] = &[
   NATIVE_CLOSURE,
   NATIVE_CLOSURE_TWO,
   LIST,
+  LIST_VIEW,
   ALLOCATED,
 ];
 
@@ -106,11 +107,25 @@ pub struct StringView {
   pub(crate) end: usize,
 }
 impl StringView {
-  pub fn new(string: Value, start: usize, end: usize) -> Self {
+  pub fn new(vm: &VM, string: Value, start: usize, end: usize) -> Self {
     debug_assert!(string.is_string());
     debug_assert!(start <= end);
 
-    Self { string, start, end }
+    if string.is_object_type(STRING_TYPE_ID) {
+      return Self { string, start, end };
+    }
+
+    let Self {
+      string,
+      start: old_start,
+      ..
+    } = vm.heap[string.as_object()];
+
+    Self {
+      string,
+      start: old_start + start,
+      end: old_start + end,
+    }
   }
 
   pub fn from_ptr<T>(ptr: Gc<T>, heap: &Heap) -> &str {
@@ -137,8 +152,29 @@ const STRING_VIEW: TypeDescriptor = TypeDescriptor {
 };
 pub const STRING_VIEW_TYPE_ID: TypeId = TypeId(1);
 
+impl Value {
+  /// Is the [Value] a string?
+  #[must_use]
+  pub fn is_string(&self) -> bool {
+    self.is_object_type(STRING_TYPE_ID) || self.is_object_type(STRING_VIEW_TYPE_ID)
+  }
+  /// View the [Value] as a string.
+  /// It can be a constant string or a string on the heap.
+  ///
+  /// SAFETY: Undefined behaviour if [Value] is not a string
+  /// Use [`Value::is_string`] to check if it is a string
+  #[must_use]
+  pub(crate) fn as_string(self, heap: &Heap) -> &str {
+    if self.is_object_type(STRING_TYPE_ID) {
+      BangString::from(self.as_object::<usize>()).as_str(heap)
+    } else {
+      heap[self.as_object::<StringView>()].as_str(heap)
+    }
+  }
+}
 fn string_equality(vm: &VM, a: Value, b: Value) -> bool {
   // `a` must be a string to be dispatched to this function
+  debug_assert!(a.is_string());
   if !b.is_string() {
     return false;
   }
@@ -311,25 +347,12 @@ pub const NATIVE_CLOSURE_TWO_TYPE_ID: TypeId = TypeId(5);
 #[derive(Clone, Debug)]
 pub struct List(GcList<Value>);
 impl List {
-  pub fn items<'a>(&self, vm: &'a VM) -> &'a [Value] {
-    vm.heap.get_list_buffer(self.0)
+  pub fn is_empty(&self, vm: &VM) -> bool {
+    vm.heap[*self.0] == 0
   }
 
-  pub fn to_string(&self, vm: &VM) -> Result<String, fmt::Error> {
-    use std::fmt::Write;
-
-    let mut string = String::new();
-
-    write!(string, "[")?;
-    for (i, item) in self.items(vm).iter().enumerate() {
-      if i > 0 {
-        write!(string, ", ")?;
-      }
-      write!(string, "{}", item.debug(vm))?;
-    }
-    write!(string, "]")?;
-
-    Ok(string)
+  pub fn items<'a>(&self, heap: &'a Heap) -> &'a [Value] {
+    heap.get_list_buffer(self.0)
   }
 }
 impl<T> From<Gc<T>> for List {
@@ -345,29 +368,126 @@ const LIST: TypeDescriptor = TypeDescriptor {
       trace_value(vm, *item);
     }
   },
-  display: |vm, value| List::from(value).to_string(vm).unwrap(),
-  debug: |vm, value| List::from(value).to_string(vm).unwrap(),
-  is_falsy: |vm, value| List::from(value).items(vm).is_empty(),
+  display: |vm, value| list_display(vm, List::from(value).items(&vm.heap)),
+  debug: |vm, value| list_display(vm, List::from(value).items(&vm.heap)),
+  is_falsy: |vm, value| List::from(value).is_empty(vm),
   equals: list_equality,
   call: None,
 };
 pub const LIST_TYPE_ID: TypeId = TypeId(6);
 
+/// A list view - a reference to part of a list
+#[derive(Clone)]
+pub struct ListView {
+  pub(crate) list: Value,
+  pub(crate) start: usize,
+  pub(crate) end: usize,
+}
+impl ListView {
+  pub fn new(vm: &VM, list: Value, start: usize, end: usize) -> Self {
+    debug_assert!(list.is_object_type(LIST_TYPE_ID) || list.is_object_type(LIST_VIEW_TYPE_ID));
+    debug_assert!(start <= end);
+
+    if list.is_object_type(LIST_TYPE_ID) {
+      return Self { list, start, end };
+    }
+
+    let Self {
+      list,
+      start: old_start,
+      ..
+    } = vm.heap[list.as_object()];
+
+    Self {
+      list,
+      start: old_start + start,
+      end: old_start + end,
+    }
+  }
+
+  pub fn from_ptr<T>(ptr: Gc<T>, heap: &Heap) -> &ListView {
+    &heap[ptr.cast::<ListView>()]
+  }
+
+  pub fn is_empty(&self, vm: &VM) -> bool {
+    self.items(&vm.heap).is_empty()
+  }
+
+  pub fn items<'a>(&'a self, heap: &'a Heap) -> &'a [Value] {
+    &self.list.as_list(heap)[self.start..self.end]
+  }
+}
+const LIST_VIEW: TypeDescriptor = TypeDescriptor {
+  type_name: "list",
+  trace: |vm, value, trace_value| {
+    let view = &vm.heap[value.cast::<ListView>()];
+    trace_value(vm, view.list);
+  },
+  display: |vm, value| list_display(vm, ListView::from_ptr(value, &vm.heap).items(&vm.heap)),
+  debug: |vm, value| list_display(vm, ListView::from_ptr(value, &vm.heap).items(&vm.heap)),
+  is_falsy: |vm, value| ListView::from_ptr(value, &vm.heap).is_empty(vm),
+  equals: list_equality,
+  call: None,
+};
+pub const LIST_VIEW_TYPE_ID: TypeId = TypeId(7);
+
+impl Value {
+  /// Is the [Value] a list?
+  #[must_use]
+  pub fn is_list(&self) -> bool {
+    self.is_object_type(LIST_TYPE_ID) || self.is_object_type(LIST_VIEW_TYPE_ID)
+  }
+  /// View the [Value] as a list.
+  /// It can be a list, or a list view
+  ///
+  /// SAFETY: Undefined behaviour if [Value] is not a string
+  /// Use [`Value::is_list`] to check if it is a string
+  #[must_use]
+  pub(crate) fn as_list(self, heap: &Heap) -> &[Value] {
+    debug_assert!(self.is_list());
+
+    if self.is_object_type(LIST_TYPE_ID) {
+      List::from(self.as_object::<usize>()).items(heap)
+    } else {
+      heap[self.as_object::<ListView>()].items(heap)
+    }
+  }
+}
 fn list_equality(vm: &VM, a: Value, b: Value) -> bool {
   // `a` must be a list to be dispatched to this function
-  debug_assert!(a.is_object_type(LIST_TYPE_ID));
-  if !b.is_object_type(LIST_TYPE_ID) {
+  debug_assert!(a.is_list());
+  if !b.is_list() {
     return false;
   }
 
-  let a = List::from(a.as_object::<usize>()).items(vm);
-  let b = List::from(b.as_object::<usize>()).items(vm);
+  let a = a.as_list(&vm.heap);
+  let b = b.as_list(&vm.heap);
 
   if a.len() != b.len() {
     return false;
   }
 
   a.iter().zip(b.iter()).all(|(a, b)| vm.equals(*a, *b))
+}
+fn list_display(vm: &VM, list: &[Value]) -> String {
+  fn inner(vm: &VM, list: &[Value]) -> Result<String, fmt::Error> {
+    use std::fmt::Write;
+
+    let mut string = String::new();
+
+    write!(string, "[")?;
+    for (i, item) in list.iter().enumerate() {
+      if i > 0 {
+        write!(string, ", ")?;
+      }
+      write!(string, "{}", item.debug(vm))?;
+    }
+    write!(string, "]")?;
+
+    Ok(string)
+  }
+
+  inner(vm, list).unwrap()
 }
 
 /// A value which has been moved from the stack to the heap, as it has been captured by a closure
@@ -383,7 +503,7 @@ const ALLOCATED: TypeDescriptor = TypeDescriptor {
   equals: |_, _, _| unreachable!("Not accessed as a value"),
   call: None,
 };
-pub const ALLOCATED_TYPE_ID: TypeId = TypeId(7);
+pub const ALLOCATED_TYPE_ID: TypeId = TypeId(8);
 
 #[cfg(test)]
 mod test {
@@ -402,6 +522,7 @@ mod test {
     assert_eq!(objects[NATIVE_CLOSURE_TYPE_ID.0].type_name, "function");
     assert_eq!(objects[NATIVE_CLOSURE_TWO_TYPE_ID.0].type_name, "function");
     assert_eq!(objects[LIST_TYPE_ID.0].type_name, "list");
+    assert_eq!(objects[LIST_VIEW_TYPE_ID.0].type_name, "list");
     assert_eq!(objects[ALLOCATED_TYPE_ID.0].type_name, "allocated");
   }
 
@@ -430,6 +551,8 @@ mod test {
 
     let list = Value::from_object(empty_allocation, LIST_TYPE_ID);
     assert_eq!(vm.get_type_descriptor(list).type_name, "list");
+    let list_view = Value::from_object(empty_allocation, LIST_VIEW_TYPE_ID);
+    assert_eq!(vm.get_type_descriptor(list_view).type_name, "list");
 
     let allocated = Value::from_object(empty_allocation, ALLOCATED_TYPE_ID);
     assert_eq!(vm.get_type_descriptor(allocated).type_name, "allocated");

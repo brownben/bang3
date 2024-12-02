@@ -1,8 +1,4 @@
-use super::{
-  bytecode::Chunk,
-  object::{BangString, STRING_TYPE_ID, STRING_VIEW_TYPE_ID, StringView},
-  vm::VM,
-};
+use super::{bytecode::Chunk, vm::VM};
 use bang_gc::{Gc, Heap};
 use std::{fmt, mem, ptr};
 
@@ -14,7 +10,6 @@ use std::{fmt, mem, ptr};
 /// - Null (only created when an error has occurred)
 /// - Number (f64)
 /// - A heap pointer [`Gc`], and the type of the object
-/// - A static string
 /// - A static function
 ///
 /// It uses NaN boxing and tagged pointers,
@@ -112,25 +107,6 @@ impl Value {
     Gc::new((raw as u32).try_into().unwrap())
   }
 
-  /// Is the [Value] a string?
-  #[must_use]
-  pub fn is_string(&self) -> bool {
-    self.is_object_type(STRING_TYPE_ID) || self.is_object_type(STRING_VIEW_TYPE_ID)
-  }
-  /// View the [Value] as a string.
-  /// It can be a constant string or a string on the heap.
-  ///
-  /// SAFETY: Undefined behaviour if [Value] is not a string
-  /// Use [`Value::is_string`] to check if it is a string
-  #[must_use]
-  pub(crate) fn as_string(self, heap: &Heap) -> &str {
-    if self.is_object_type(STRING_TYPE_ID) {
-      BangString::from(self.as_object::<usize>()).as_str(heap)
-    } else {
-      heap[self.as_object::<StringView>()].as_str(heap)
-    }
-  }
-
   /// View the [Value] as a function.
   /// It can be a constant function or a function on the heap.
   ///
@@ -168,7 +144,6 @@ impl Value {
       Self(TRUE) => false,
       Self(FALSE | NULL) => true,
       x if x.is_number() => (x.as_number() - 0.0).abs() < f64::EPSILON,
-      x if x.is_string() => x.as_string(&vm.heap).is_empty(),
       x if x.is_constant_function() => false,
       x => (vm.get_type_descriptor(*x).is_falsy)(vm, x.as_object()),
     }
@@ -194,7 +169,6 @@ impl Value {
       Self(FALSE) => "false".to_owned(),
       Self(NULL) => "null".to_owned(),
       x if x.is_number() => x.as_number().to_string(),
-      x if x.is_string() => x.as_string(&vm.heap).to_owned(),
       x if x.is_constant_function() => x.as_function(&vm.heap).display(),
       x => (vm.get_type_descriptor(*x).display)(vm, x.as_object()),
     }
@@ -210,7 +184,6 @@ impl Value {
       Self(FALSE) => "false".to_owned(),
       Self(NULL) => "null".to_owned(),
       x if x.is_number() => x.as_number().to_string(),
-      x if x.is_string() => format!("'{}'", x.as_string(&vm.heap)),
       x if x.is_constant_function() => x.as_function(&vm.heap).display(),
       x => (vm.get_type_descriptor(*x).debug)(vm, x.as_object()),
     }

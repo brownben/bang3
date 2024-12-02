@@ -1,5 +1,4 @@
 use super::macros::{module, prelude::*};
-use crate::object::{LIST_TYPE_ID, List};
 
 module!(list, LIST_ITEMS, list_docs, {
   /// The number of elements in a list
@@ -50,8 +49,8 @@ module!(list, LIST_ITEMS, list_docs, {
 #[allow(clippy::inline_always, reason = "function exists to simplify macros")]
 #[inline(always)]
 pub(crate) fn get_list<'a>(value: Value, vm: &'a VM) -> Result<&'a [Value], ErrorKind> {
-  if value.is_object_type(LIST_TYPE_ID) {
-    Ok(List::from(value.as_object::<usize>()).items(vm))
+  if value.is_list() {
+    Ok(value.as_list(&vm.heap))
   } else {
     Err(ErrorKind::TypeError {
       expected: "list",

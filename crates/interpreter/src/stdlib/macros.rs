@@ -175,7 +175,7 @@ macro_rules! native_function {
       if start == 0 && end == arg_string.len() {
         Ok(arg)
       } else {
-        let closure = vm.heap.allocate(StringView::new(arg, start, end));
+        let closure = vm.heap.allocate(StringView::new(vm, arg, start, end));
         Ok(Value::from_object(closure, STRING_VIEW_TYPE_ID))
       }
     })
