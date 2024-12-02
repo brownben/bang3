@@ -118,7 +118,7 @@ module!(string, STRING_ITEMS, string_docs, {
   /// ```bang
   /// string::trim('  hello  ') // 'hello'
   /// ```
-  fn trim(String) -> StringSlice = str::trim;
+  fn trim(String) -> StringView = str::trim;
   /// Returns a string with leading whitespace removed
   ///
   /// (`Whitespace` is defined according to the terms of the Unicode Derived Core Property White_Space, which includes newlines)
@@ -127,7 +127,7 @@ module!(string, STRING_ITEMS, string_docs, {
   /// ```bang
   /// string::trimStart('  hello') // 'hello'
   /// ```
-  fn trimStart(String) -> StringSlice = str::trim_start;
+  fn trimStart(String) -> StringView = str::trim_start;
   /// Returns a string with trailing whitespace removed
   ///
   /// (`Whitespace` is defined according to the terms of the Unicode Derived Core Property White_Space, which includes newlines)
@@ -136,7 +136,7 @@ module!(string, STRING_ITEMS, string_docs, {
   /// ```bang
   /// string::trimEnd('hello   ') // 'hello'
   /// ```
-  fn trimEnd(String) -> StringSlice = str::trim_end;
+  fn trimEnd(String) -> StringView = str::trim_end;
 
 
   /// Replace all occurrences of a pattern in a string with a replacement.

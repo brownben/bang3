@@ -11,7 +11,7 @@ pub(crate) mod prelude {
     object::NativeFunction,
     object::{NATIVE_CLOSURE_TWO_TYPE_ID, NativeClosureTwo},
     object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
-    object::{STRING_SLICE_TYPE_ID, StringSlice},
+    object::{STRING_VIEW_TYPE_ID, StringView},
     value::Value,
     vm::{ErrorKind, VM},
   };
@@ -164,7 +164,7 @@ macro_rules! native_function {
     })
   };
 
-  ($name:ident, String, StringSlice, $native_function:expr) => {
+  ($name:ident, String, StringView, $native_function:expr) => {
     NativeFunction::new(stringify!($name), |vm, arg| {
       let arg_string = get_string(arg, vm)?;
       let result = $native_function(arg_string);
@@ -175,8 +175,8 @@ macro_rules! native_function {
       if start == 0 && end == arg_string.len() {
         Ok(arg)
       } else {
-        let closure = vm.heap.allocate(StringSlice::new(arg, start, end));
-        Ok(Value::from_object(closure, STRING_SLICE_TYPE_ID))
+        let closure = vm.heap.allocate(StringView::new(arg, start, end));
+        Ok(Value::from_object(closure, STRING_VIEW_TYPE_ID))
       }
     })
   };

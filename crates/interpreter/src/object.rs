@@ -32,7 +32,7 @@ type TraceValueFunction = fn(vm: &VM, Value) -> ();
 
 pub const DEFAULT_TYPE_DESCRIPTORS: &[TypeDescriptor] = &[
   STRING,
-  STRING_SLICE,
+  STRING_VIEW,
   CLOSURE,
   NATIVE_FUNCTION,
   NATIVE_CLOSURE,
@@ -98,14 +98,14 @@ const STRING: TypeDescriptor = TypeDescriptor {
 };
 pub const STRING_TYPE_ID: TypeId = TypeId(0);
 
-/// A string slice - a reference to part of a string
+/// A string view - a reference to part of a string
 #[derive(Clone)]
-pub struct StringSlice {
+pub struct StringView {
   pub(crate) string: Value,
   pub(crate) start: usize,
   pub(crate) end: usize,
 }
-impl StringSlice {
+impl StringView {
   pub fn new(string: Value, start: usize, end: usize) -> Self {
     debug_assert!(string.is_string());
     debug_assert!(start <= end);
@@ -114,7 +114,7 @@ impl StringSlice {
   }
 
   pub fn from_ptr<T>(ptr: Gc<T>, heap: &Heap) -> &str {
-    heap[ptr.cast::<StringSlice>()].as_str(heap)
+    heap[ptr.cast::<StringView>()].as_str(heap)
   }
 
   pub fn as_str<'a>(&'a self, heap: &'a Heap) -> &'a str {
@@ -123,19 +123,19 @@ impl StringSlice {
     &self.string.as_string(heap)[self.start..self.end]
   }
 }
-const STRING_SLICE: TypeDescriptor = TypeDescriptor {
+const STRING_VIEW: TypeDescriptor = TypeDescriptor {
   type_name: "string",
   trace: |vm, value, trace_value| {
-    let slice = &vm.heap[value.cast::<StringSlice>()];
-    trace_value(vm, slice.string);
+    let view = &vm.heap[value.cast::<StringView>()];
+    trace_value(vm, view.string);
   },
-  display: |vm, value| StringSlice::from_ptr(value, &vm.heap).to_owned(),
-  debug: |vm, value| format!("'{}'", StringSlice::from_ptr(value, &vm.heap)),
-  is_falsy: |vm, value| StringSlice::from_ptr(value, &vm.heap).is_empty(),
+  display: |vm, value| StringView::from_ptr(value, &vm.heap).to_owned(),
+  debug: |vm, value| format!("'{}'", StringView::from_ptr(value, &vm.heap)),
+  is_falsy: |vm, value| StringView::from_ptr(value, &vm.heap).is_empty(),
   equals: |_vm, _a, _b| unreachable!("Strings handled separately"),
   call: None,
 };
-pub const STRING_SLICE_TYPE_ID: TypeId = TypeId(1);
+pub const STRING_VIEW_TYPE_ID: TypeId = TypeId(1);
 
 /// A closure - a function which has captured variables from the surrounding scope.
 #[derive(Clone, Debug)]
@@ -379,7 +379,7 @@ mod test {
     let objects = &DEFAULT_TYPE_DESCRIPTORS;
 
     assert_eq!(objects[STRING_TYPE_ID.0].type_name, "string");
-    assert_eq!(objects[STRING_SLICE_TYPE_ID.0].type_name, "string");
+    assert_eq!(objects[STRING_VIEW_TYPE_ID.0].type_name, "string");
     assert_eq!(objects[CLOSURE_TYPE_ID.0].type_name, "function");
     assert_eq!(objects[NATIVE_FUNCTION_TYPE_ID.0].type_name, "function");
     assert_eq!(objects[NATIVE_CLOSURE_TYPE_ID.0].type_name, "function");
@@ -396,8 +396,8 @@ mod test {
 
     let string = Value::from_object(empty_allocation, STRING_TYPE_ID);
     assert_eq!(vm.get_type_descriptor(string).type_name, "string");
-    let string_slice = Value::from_object(empty_allocation, STRING_SLICE_TYPE_ID);
-    assert_eq!(vm.get_type_descriptor(string_slice).type_name, "string");
+    let string_view = Value::from_object(empty_allocation, STRING_VIEW_TYPE_ID);
+    assert_eq!(vm.get_type_descriptor(string_view).type_name, "string");
 
     let closure = Value::from_object(empty_allocation, CLOSURE_TYPE_ID);
     assert_eq!(vm.get_type_descriptor(closure).type_name, "function");
