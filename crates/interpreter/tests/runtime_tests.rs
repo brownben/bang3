@@ -40,81 +40,63 @@ macro_rules! assert_variable {
 use assert_variable;
 
 #[test]
-fn add_numbers() {
-  let vm = run(indoc! {"
+fn numeric_operators() {
+  let add = run(indoc! {"
     let a = 1 + 2
     let b = 3.3 + 4.2
     let c = 1000.2 - 35.7
   "});
-  assert_variable!(vm; a, 3.0);
-  assert_variable!(vm; b, 7.5);
-  assert_variable!(vm; c, 964.5);
-}
+  assert_variable!(add; a, 3.0);
+  assert_variable!(add; b, 7.5);
+  assert_variable!(add; c, 964.5);
 
-#[test]
-fn subtract_numbers() {
-  let vm = run(indoc! {"
+  let subtract = run(indoc! {"
     let a = 5 - 2
     let b = 10.1 - 2.6
     let c = 964.99 - .49
   "});
-  assert_variable!(vm; a, 3.0);
-  assert_variable!(vm; b, 7.5);
-  assert_variable!(vm; c, 964.5);
-}
+  assert_variable!(subtract; a, 3.0);
+  assert_variable!(subtract; b, 7.5);
+  assert_variable!(subtract; c, 964.5);
 
-#[test]
-fn multiply_numbers() {
-  let vm = run(indoc! {"
+  let multiply = run(indoc! {"
     let a = 5 * 2
     let b = 5.0 * 2.0
     let c = 3.2 * 2
     let d = 0.5 * 16.4
   "});
-  assert_variable!(vm; a, 10.0);
-  assert_variable!(vm; b, 10.0);
-  assert_variable!(vm; c, 6.4);
-  assert_variable!(vm; d, 8.2);
-}
+  assert_variable!(multiply; a, 10.0);
+  assert_variable!(multiply; b, 10.0);
+  assert_variable!(multiply; c, 6.4);
+  assert_variable!(multiply; d, 8.2);
 
-#[test]
-fn divide_numbers() {
-  let vm = run(indoc! {"
+  let divide = run(indoc! {"
     let a = 5 / 2
     let b = 5.0 / 2.0
     let c = 22 / 11
   "});
-  assert_variable!(vm; a, 2.5);
-  assert_variable!(vm; b, 2.5);
-  assert_variable!(vm; c, 2.0);
-}
+  assert_variable!(divide; a, 2.5);
+  assert_variable!(divide; b, 2.5);
+  assert_variable!(divide; c, 2.0);
 
-#[test]
-fn remainder_numbers() {
-  let vm = run(indoc! {"
+  let remainder = run(indoc! {"
     let a = 5 % 3
     let b = -5 % 3
     let c = 5 % -3
     let d = -5 % -3
   "});
-  assert_variable!(vm; a, 2.0);
-  assert_variable!(vm; b, -2.0);
-  assert_variable!(vm; c, 2.0);
-  assert_variable!(vm; d, -2.0);
-}
+  assert_variable!(remainder; a, 2.0);
+  assert_variable!(remainder; b, -2.0);
+  assert_variable!(remainder; c, 2.0);
+  assert_variable!(remainder; d, -2.0);
 
-#[test]
-fn bidmas() {
-  let vm = run(indoc! {"
+  let bidmas = run(indoc! {"
     let a = (5 - (3 - 1)) + -1
     let b = 5 + 3 * 2
   "});
-  assert_variable!(vm; a, 2.0);
-  assert_variable!(vm; b, 11.0);
-}
+  assert_variable!(bidmas; a, 2.0);
+  assert_variable!(bidmas; b, 11.0);
 
-#[test]
-fn numeric_operators_non_numbers() {
   let cant_add_boolean_and_number = run("let a = true + 4");
   assert!(cant_add_boolean_and_number.is_err());
 
@@ -133,14 +115,14 @@ fn numeric_operators_non_numbers() {
 
 #[test]
 fn negate() {
-  let vm = run(indoc! {"
+  let numbers = run(indoc! {"
     let a = - 2
     let b = - 2.6
     let c = -4525
   "});
-  assert_variable!(vm; a, -2.0);
-  assert_variable!(vm; b, -2.6);
-  assert_variable!(vm; c, -4525.0);
+  assert_variable!(numbers; a, -2.0);
+  assert_variable!(numbers; b, -2.6);
+  assert_variable!(numbers; c, -4525.0);
 
   let cant_negate_strings = run("let a = -'hello'");
   assert!(cant_negate_strings.is_err());
@@ -151,31 +133,6 @@ fn negate() {
   "});
   assert_variable!(lots_of_minuses; a, 0.0);
   assert_variable!(lots_of_minuses; b, 8.0);
-}
-
-#[test]
-fn concatenate_strings() {
-  let mut vm = run(indoc! {"
-    let a = \"Hello \" ++ \"World\"
-    let b = 'Whats Up' ++ `?`
-    let c = \"Merged\" ++ 'together'
-
-    // Keep original strings
-    let d = a ++ b
-  "});
-  assert_variable!(vm; a, string "Hello World");
-  assert_variable!(vm; b, string "Whats Up?");
-  assert_variable!(vm; c, string "Mergedtogether");
-  assert_variable!(vm; d, string "Hello WorldWhats Up?");
-
-  let numeric_add_for_strings = run(indoc! {"'a' + 'b'"});
-  assert!(numeric_add_for_strings.is_err());
-
-  let non_string_concat = run(indoc! {"'a' ++ 3"});
-  assert!(non_string_concat.is_err());
-
-  let non_string_concat = run(indoc! {"3 ++ 'a'"});
-  assert!(non_string_concat.is_err());
 }
 
 #[test]
@@ -203,6 +160,31 @@ fn not() {
   assert_variable!(vm; h, false);
   assert_variable!(vm; i, true);
   assert_variable!(vm; j, false);
+}
+
+#[test]
+fn concatenate_strings() {
+  let mut vm = run(indoc! {"
+    let a = \"Hello \" ++ \"World\"
+    let b = 'Whats Up' ++ `?`
+    let c = \"Merged\" ++ 'together'
+
+    // Keep original strings
+    let d = a ++ b
+  "});
+  assert_variable!(vm; a, string "Hello World");
+  assert_variable!(vm; b, string "Whats Up?");
+  assert_variable!(vm; c, string "Mergedtogether");
+  assert_variable!(vm; d, string "Hello WorldWhats Up?");
+
+  let numeric_add_for_strings = run(indoc! {"'a' + 'b'"});
+  assert!(numeric_add_for_strings.is_err());
+
+  let non_string_concat = run(indoc! {"'a' ++ 3"});
+  assert!(non_string_concat.is_err());
+
+  let non_string_concat = run(indoc! {"3 ++ 'a'"});
+  assert!(non_string_concat.is_err());
 }
 
 #[test]
@@ -416,39 +398,36 @@ fn greater_than() {
 }
 
 #[test]
-fn and() {
-  let mut vm = run(indoc! {"
+fn logical_operators() {
+  let mut and = run(indoc! {"
     let a = false and true
     let b = false and false
     let c = true and true
     let d = true and false
     let e = true and 'Hello'
   "});
-  assert_variable!(vm; a, false);
-  assert_variable!(vm; b, false);
-  assert_variable!(vm; c, true);
-  assert_variable!(vm; d, false);
-  assert_variable!(vm; e, string "Hello");
-}
+  assert_variable!(and; a, false);
+  assert_variable!(and; b, false);
+  assert_variable!(and; c, true);
+  assert_variable!(and; d, false);
+  assert_variable!(and; e, string "Hello");
 
-#[test]
-fn or() {
-  let vm = run(indoc! {"
+  let or = run(indoc! {"
     let a = false or true
     let b = false or false
     let c = true or true
     let d = true or false
     let e = true or \"Hello\"
   "});
-  assert_variable!(vm; a, true);
-  assert_variable!(vm; b, false);
-  assert_variable!(vm; c, true);
-  assert_variable!(vm; d, true);
-  assert_variable!(vm; e, true);
+  assert_variable!(or; a, true);
+  assert_variable!(or; b, false);
+  assert_variable!(or; c, true);
+  assert_variable!(or; d, true);
+  assert_variable!(or; e, true);
 }
 
 #[test]
-fn block() {
+fn blocks() {
   let single_expression = run(indoc! {"
     let a = { false }
     let b = {
@@ -481,6 +460,27 @@ fn block() {
   assert_variable!(multiple_statements; b, 7.0);
   assert_variable!(multiple_statements; c, 33.0);
   assert_variable!(multiple_statements; d, 2.0);
+
+  let access_higher_scopes = run(indoc! {"
+    let a = 5
+    let b = {
+      let c = 3
+      a + c
+    }
+  "});
+  assert_variable!(access_higher_scopes; a, 5.0);
+  assert_variable!(access_higher_scopes; b, 8.0);
+
+  let shadow_higher_scopes = run(indoc! {"
+    let a = 5
+    let b = {
+      let a = 4
+      let c = 3
+      a + c
+    }
+  "});
+  assert_variable!(shadow_higher_scopes; a, 5.0);
+  assert_variable!(shadow_higher_scopes; b, 7.0);
 }
 
 #[test]
@@ -515,10 +515,7 @@ fn call() {
 
   let call_boolean = run(indoc! {"false(0)"});
   assert!(call_boolean.is_err());
-}
 
-#[test]
-fn pipeline() {
   let pipeline = run(indoc! {"
     let addOne = x => x + 1
     let multiplyByThree = x => x * 3
@@ -536,17 +533,16 @@ fn pipeline() {
 
 #[test]
 fn if_() {
-  let vm = run(indoc! {"
+  let basic_conditions = run(indoc! {"
     let a = if (true) 1 else 2
     let b = if (false) 3 else 4
     let c = if (3 < 4) 5 else 6
     let d = if (_ => _ => 7) 7 else 8
   "});
-
-  assert_variable!(vm; a, 1.0);
-  assert_variable!(vm; b, 4.0);
-  assert_variable!(vm; c, 5.0);
-  assert_variable!(vm; d, 7.0);
+  assert_variable!(basic_conditions; a, 1.0);
+  assert_variable!(basic_conditions; b, 4.0);
+  assert_variable!(basic_conditions; c, 5.0);
+  assert_variable!(basic_conditions; d, 7.0);
 
   let no_else = run(indoc! {"
     let a = if (false) 4
@@ -554,20 +550,6 @@ fn if_() {
   "});
   assert_variable!(no_else; a, ());
   assert_variable!(no_else; b, 1.1);
-}
-
-#[test]
-fn access_variables_in_higher_scopes() {
-  let vm = run(indoc! {"
-    let a = 5
-    let b = {
-      let c = 3
-      a + c
-    }
-  "});
-
-  assert_variable!(vm; a, 5.0);
-  assert_variable!(vm; b, 8.0);
 }
 
 #[test]
@@ -630,10 +612,7 @@ fn closures() {
     }
   "});
   assert_variable!(nested_closure; value, 5.0);
-}
 
-#[test]
-fn closure_twice() {
   let two_parameters = run(indoc! {"
     let add = a => b => a + b
     let x = add(2)(3)
@@ -642,19 +621,19 @@ fn closure_twice() {
   assert_variable!(two_parameters; x, 5.0);
   assert_variable!(two_parameters; y, 3.75);
 
-  let two_parameters = run(indoc! {"
+  let two_parameters_curried = run(indoc! {"
     let add = a => b => a + b
     let a = add(2)
     let x = a(3)
     let b = 3.5 >> add
     let y = 0.25 >> b
   "});
-  assert_variable!(two_parameters; x, 5.0);
-  assert_variable!(two_parameters; y, 3.75);
+  assert_variable!(two_parameters_curried; x, 5.0);
+  assert_variable!(two_parameters_curried; y, 3.75);
 }
 
 #[test]
-fn match_() {
+fn match_expression() {
   let single_catch_all = run("let a = match 5 | x -> x + 1");
   assert_variable!(single_catch_all; a, 6.0);
 
@@ -720,11 +699,8 @@ fn match_() {
     }
   "});
   assert_variable!(literals_cleanedup; b, 7.0);
-}
 
-#[test]
-fn match_guards() {
-  let vm = run(indoc! {"
+  let guards = run(indoc! {"
     let a = match true | true if false -> 1 | false -> 2 | _ -> 3
     let b = match true | true if true -> 1 | false -> 2 | _ -> 3
     let c = match 5 | ..6 if false -> 1 | 2..8 if true -> 2 | _ -> 3
@@ -734,48 +710,42 @@ fn match_guards() {
     let g = match 12 | c if c > 10 -> c | _ -> 3
     let h = match 12 | c if false -> c | _ -> 3
   "});
-  assert_variable!(vm; a, 3.0);
-  assert_variable!(vm; b, 1.0);
-  assert_variable!(vm; c, 2.0);
-  assert_variable!(vm; d, 1.0);
-  assert_variable!(vm; e, 1.0);
-  assert_variable!(vm; f, 2.0);
-  assert_variable!(vm; g, 12.0);
-  assert_variable!(vm; h, 3.0);
-}
+  assert_variable!(guards; a, 3.0);
+  assert_variable!(guards; b, 1.0);
+  assert_variable!(guards; c, 2.0);
+  assert_variable!(guards; d, 1.0);
+  assert_variable!(guards; e, 1.0);
+  assert_variable!(guards; f, 2.0);
+  assert_variable!(guards; g, 12.0);
+  assert_variable!(guards; h, 3.0);
 
-#[test]
-fn fibonacci_match() {
-  let fibonnacci_match = run(indoc! {"
+  let fibonnacci = run(indoc! {"
     let fibonnacciMatch = n => match n
       | ..2 -> 1
       | n -> fibonnacciMatch(n - 1) + fibonnacciMatch(n - 2)
     let a = fibonnacciMatch(0)
     let b = fibonnacciMatch(6)
   "});
-  assert_variable!(fibonnacci_match; a, 1.0);
-  assert_variable!(fibonnacci_match; b, 8.0);
+  assert_variable!(fibonnacci; a, 1.0);
+  assert_variable!(fibonnacci; b, 8.0);
 }
 
 #[test]
 fn format_string() {
-  let mut vm = run(indoc! {"
+  let mut basic = run(indoc! {"
     let a = `hello {55}`
     let b = `there were {33 + 25} people`
     let c = `i can quote {true} or {false}`
     let d = `nested stuff: {{55} + 1 }`
     let e = `{`{55}`}`
   "});
-  assert_variable!(vm; a, string "hello 55");
-  assert_variable!(vm; b, string "there were 58 people");
-  assert_variable!(vm; c, string "i can quote true or false");
-  assert_variable!(vm; d, string "nested stuff: 56");
-  assert_variable!(vm; e, string "55");
-}
+  assert_variable!(basic; a, string "hello 55");
+  assert_variable!(basic; b, string "there were 58 people");
+  assert_variable!(basic; c, string "i can quote true or false");
+  assert_variable!(basic; d, string "nested stuff: 56");
+  assert_variable!(basic; e, string "55");
 
-#[test]
-fn format_string_to_string() {
-  let mut vm = run(indoc! {"
+  let mut objects_display = run(indoc! {"
     let a = `{'hello'}`
     let b = `{55.2}`
     let c = `{false}`
@@ -790,15 +760,15 @@ fn format_string_to_string() {
     from maths import { pow }
     let i = `{pow(2)}`
   "});
-  assert_variable!(vm; a, string "hello");
-  assert_variable!(vm; b, string "55.2");
-  assert_variable!(vm; c, string "false");
-  assert_variable!(vm; d, string "true");
-  assert_variable!(vm; e, string "<function print>");
-  assert_variable!(vm; f, string "<function identity>");
-  assert_variable!(vm; g, string "<function>");
-  assert_variable!(vm; h, string "<closure <function>>");
-  assert_variable!(vm; i, string "<closure <function pow>>");
+  assert_variable!(objects_display; a, string "hello");
+  assert_variable!(objects_display; b, string "55.2");
+  assert_variable!(objects_display; c, string "false");
+  assert_variable!(objects_display; d, string "true");
+  assert_variable!(objects_display; e, string "<function print>");
+  assert_variable!(objects_display; f, string "<function identity>");
+  assert_variable!(objects_display; g, string "<function>");
+  assert_variable!(objects_display; h, string "<closure <function>>");
+  assert_variable!(objects_display; i, string "<closure <function pow>>");
 }
 
 #[test]
@@ -841,17 +811,6 @@ fn return_statement() {
     let c = (_ => { return 5 + 5 })()
   "});
   assert_variable!(code_after; a, 5.0);
-}
-
-#[test]
-fn native_function() {
-  let mut vm = run(indoc! {"
-    let a = {
-      let x = type(55)
-      x
-    }
-  "});
-  assert_variable!(vm; a, string "number");
 }
 
 #[test]

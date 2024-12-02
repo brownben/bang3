@@ -39,7 +39,6 @@ fn expected() {
       3 │ from maths { sin }
     ────╯
   "};
-
   assert_eq!(output, expected);
 }
 
@@ -64,7 +63,6 @@ fn expected_expression() {
       2 │ + 5
     ────╯
   "};
-
   assert_eq!(output, expected);
 }
 
@@ -90,7 +88,6 @@ fn expected_pattern() {
       3 │   | , -> 2
     ────╯
   "};
-
   assert_eq!(output, expected);
 }
 
@@ -116,7 +113,6 @@ fn expected_pattern_range_end() {
       3 │   | ..false -> 6
     ────╯
   "};
-
   assert_eq!(output, expected);
 }
 
@@ -134,7 +130,6 @@ fn expected_import_item() {
       1 │ from maths import { 5 }
     ────╯
   "};
-
   assert_eq!(output, expected);
 }
 
@@ -150,7 +145,6 @@ fn expected_type() {
       1 │ let a: () = 4
     ────╯
   "};
-
   assert_eq!(output, expected);
 }
 
@@ -175,7 +169,6 @@ fn unknown_character() {
       2 │ 2 £ 3
     ────╯
   "};
-
   assert_eq!(output, expected);
 }
 
@@ -193,7 +186,6 @@ fn missing_identifier() {
       1 │ let = 5
     ────╯
   "};
-
   assert_eq!(output, expected);
 }
 
@@ -218,7 +210,6 @@ fn missing_module_name() {
       2 │ from 3 import { sin }
     ────╯
   "};
-
   assert_eq!(output, expected);
 }
 
@@ -271,7 +262,6 @@ fn block_end_with_expression() {
       3 │ }
     ────╯
   "};
-
   assert_eq!(output, expected);
 }
 
@@ -289,7 +279,6 @@ fn return_outside_function() {
       1 │ return 5
     ────╯
   "};
-
   assert_eq!(output, expected);
 }
 
@@ -314,7 +303,6 @@ fn no_single_equal_operator() {
       2 │ 4 = 5
     ────╯
   "};
-
   assert_eq!(output, expected);
 }
 
@@ -330,6 +318,5 @@ fn keyword_as_import_item() {
       1 │ from string import { from }
     ────╯
   "};
-
   assert_eq!(output, expected);
 }

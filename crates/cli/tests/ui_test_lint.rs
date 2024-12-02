@@ -44,25 +44,25 @@ fn constant_conditions() {
   let output = run_lint(source);
 
   assert_eq!(output, indoc! {"
-      ⚠ Warning: Constant Condition
-      the control flow could be removed, as the condition is always the same
+    ⚠ Warning: Constant Condition
+    the control flow could be removed, as the condition is always the same
 
-          ╭─[STDIN:1]
-        1 │ if (true) 4 else 5
-      ────╯
-      ⚠ Warning: Constant Condition
-      the control flow could be removed, as the condition is always the same
+        ╭─[STDIN:1]
+      1 │ if (true) 4 else 5
+    ────╯
+    ⚠ Warning: Constant Condition
+    the control flow could be removed, as the condition is always the same
 
-          ╭─[STDIN:2]
-        2 │ match 5
-      ────╯
-      ⚠ Warning: Constant Condition
-      the control flow could be removed, as the condition is always the same
+        ╭─[STDIN:2]
+      2 │ match 5
+    ────╯
+    ⚠ Warning: Constant Condition
+    the control flow could be removed, as the condition is always the same
 
-          ╭─[STDIN:7]
-        7 │   | _ if true -> 4
-      ────╯
-    "});
+        ╭─[STDIN:7]
+      7 │   | _ if true -> 4
+    ────╯
+  "});
 }
 
 #[test]
@@ -71,13 +71,13 @@ fn negative_zero() {
   let output = run_lint(source);
 
   assert_eq!(output, indoc! {"
-      ⚠ Warning: Negative Zero
-      negative zero is unnecessary, as 0 == -0
+    ⚠ Warning: Negative Zero
+    negative zero is unnecessary, as 0 == -0
 
-          ╭─[STDIN:1]
-        1 │ -0
-      ────╯
-    "});
+        ╭─[STDIN:1]
+      1 │ -0
+    ────╯
+  "});
 }
 
 #[test]
@@ -89,13 +89,13 @@ fn self_assignment() {
   let output = run_lint(source);
 
   assert_eq!(output, indoc! {"
-      ⚠ Warning: Self Assignment
-      assigning a variable to itself is unnecessary
+    ⚠ Warning: Self Assignment
+    assigning a variable to itself is unnecessary
 
-          ╭─[STDIN:2]
-        2 │ let a = a
-      ────╯
-    "});
+        ╭─[STDIN:2]
+      2 │ let a = a
+    ────╯
+  "});
 }
 
 #[test]
@@ -104,13 +104,13 @@ fn self_comparison() {
   let output = run_lint(source);
 
   assert_eq!(output, indoc! {"
-      ⚠ Warning: Self Comparison
-      comparing a value to itself is unnecessary
+    ⚠ Warning: Self Comparison
+    comparing a value to itself is unnecessary
 
-          ╭─[STDIN:1]
-        1 │ 5 == 5
-      ────╯
-    "});
+        ╭─[STDIN:1]
+      1 │ 5 == 5
+    ────╯
+  "});
 }
 
 #[test]
@@ -122,13 +122,13 @@ fn underscore_variable_use() {
   let output = run_lint(source);
 
   assert_eq!(output, indoc! {"
-      ⚠ Warning: Underscore Variable Use
-      a `_` prefix indicates the variable/ parameter is unused, but it has been used
+    ⚠ Warning: Underscore Variable Use
+    a `_` prefix indicates the variable/ parameter is unused, but it has been used
 
-          ╭─[STDIN:2]
-        2 │ _
-      ────╯
-    "});
+        ╭─[STDIN:2]
+      2 │ _
+    ────╯
+  "});
 }
 
 #[test]
@@ -140,14 +140,14 @@ fn useless_match() {
   let output = run_lint(source);
 
   assert_eq!(output, indoc! {"
-      ⚠ Warning: Useless Match
-      the first case matches everything, therefore the match is useless
+    ⚠ Warning: Useless Match
+    the first case matches everything, therefore the match is useless
 
-          ╭─[STDIN:1]
-        1 │ match x
-        2 │   | _ -> 5
-      ────╯
-    "});
+        ╭─[STDIN:1]
+      1 │ match x
+      2 │   | _ -> 5
+    ────╯
+  "});
 }
 
 #[test]
@@ -159,13 +159,13 @@ fn yoda_equality() {
   let output = run_lint(source);
 
   assert_eq!(output, indoc! {"
-      ⚠ Warning: Yoda Equality
-      it is clearer to have the variable first then the value to compare to
+    ⚠ Warning: Yoda Equality
+    it is clearer to have the variable first then the value to compare to
 
-          ╭─[STDIN:2]
-        2 │ 5 == x
-      ────╯
-    "});
+        ╭─[STDIN:2]
+      2 │ 5 == x
+    ────╯
+  "});
 }
 
 #[test]
@@ -174,13 +174,13 @@ fn unnecessary_closure() {
   let output = run_lint(source);
 
   assert_eq!(output, indoc! {"
-      ⚠ Warning: Unnecessary Closure
-      the inner function could be used directly, without being wrapped in another function
+    ⚠ Warning: Unnecessary Closure
+    the inner function could be used directly, without being wrapped in another function
 
-          ╭─[STDIN:1]
-        1 │ x => print(x)
-      ────╯
-    "});
+        ╭─[STDIN:1]
+      1 │ x => print(x)
+    ────╯
+  "});
 }
 
 #[test]
@@ -195,22 +195,22 @@ fn identical_branches() {
   let output = run_lint(source);
 
   assert_eq!(output, indoc! {"
-      ⚠ Warning: Identical Branches
-      both branches of the if-else are the same, consider removing the if
+    ⚠ Warning: Identical Branches
+    both branches of the if-else are the same, consider removing the if
 
-          ╭─[STDIN:1]
-        1 │ if (a) 4 else 4
-      ────╯
-      ⚠ Warning: Identical Branches
-      both branches of the if-else are the same, consider removing the if
+        ╭─[STDIN:1]
+      1 │ if (a) 4 else 4
+    ────╯
+    ⚠ Warning: Identical Branches
+    both branches of the if-else are the same, consider removing the if
 
-          ╭─[STDIN:2]
-        2 │ if (a) 4 else {
-        3 │   // comment
-        4 │   4
-        5 │ }
-      ────╯
-    "});
+        ╭─[STDIN:2]
+      2 │ if (a) 4 else {
+      3 │   // comment
+      4 │   4
+      5 │ }
+    ────╯
+  "});
 }
 
 #[test]
@@ -222,19 +222,19 @@ fn erasing_operation() {
   let output = run_lint(source);
 
   assert_eq!(output, indoc! {"
-      ⚠ Warning: Erasing Operation
-      this operation always returns 0
+    ⚠ Warning: Erasing Operation
+    this operation always returns 0
 
-          ╭─[STDIN:1]
-        1 │ 0 * 4
-      ────╯
-      ⚠ Warning: Erasing Operation
-      this operation always returns 0
+        ╭─[STDIN:1]
+      1 │ 0 * 4
+    ────╯
+    ⚠ Warning: Erasing Operation
+    this operation always returns 0
 
-          ╭─[STDIN:2]
-        2 │ 0 / 8
-      ────╯
-    "});
+        ╭─[STDIN:2]
+      2 │ 0 / 8
+    ────╯
+  "});
 }
 
 #[test]
@@ -243,13 +243,13 @@ fn constant_string_in_format_string() {
   let output = run_lint(source);
 
   assert_eq!(output, indoc! {"
-      ⚠ Warning: Constant String in Format String
-      the constant can be combined with the rest of the string
+    ⚠ Warning: Constant String in Format String
+    the constant can be combined with the rest of the string
 
-          ╭─[STDIN:1]
-        1 │ `hello {'john'}`
-      ────╯
-    "});
+        ╭─[STDIN:1]
+      1 │ `hello {'john'}`
+    ────╯
+  "});
 }
 
 #[test]
@@ -258,13 +258,13 @@ fn unnecessary_return() {
   let output = run_lint(source);
 
   assert_eq!(output, indoc! {"
-      ⚠ Warning: Unnecessary Return
-      the return statement is unnecessary, as a block will return the last expression
+    ⚠ Warning: Unnecessary Return
+    the return statement is unnecessary, as a block will return the last expression
 
-          ╭─[STDIN:1]
-        1 │ x => { return x }
-      ────╯
-    "});
+        ╭─[STDIN:1]
+      1 │ x => { return x }
+    ────╯
+  "});
 }
 
 #[test]
@@ -279,14 +279,14 @@ fn unreachable_code() {
   let output = run_lint(source);
 
   assert_eq!(output, indoc! {"
-      ⚠ Warning: Unreachable Code
-      code after a return will never be run
+    ⚠ Warning: Unreachable Code
+    code after a return will never be run
 
-          ╭─[STDIN:4]
-        4 │   a + 4
-        5 │ }
-      ────╯
-    "});
+        ╭─[STDIN:4]
+      4 │   a + 4
+      5 │ }
+    ────╯
+  "});
 }
 
 #[test]
@@ -299,14 +299,14 @@ fn double_comparison_chain() {
   let output = run_lint(source);
 
   assert_eq!(output, indoc! {"
-      ⚠ Warning: Double Comparison Chain
-      the expression can be simplified into a single condition
-      `a == b or a > b` can be simplified to `a >= b`
+    ⚠ Warning: Double Comparison Chain
+    the expression can be simplified into a single condition
+    `a == b or a > b` can be simplified to `a >= b`
 
-          ╭─[STDIN:3]
-        3 │ a == b or (a > b)
-      ────╯
-    "});
+        ╭─[STDIN:3]
+      3 │ a == b or (a > b)
+    ────╯
+  "});
 }
 
 #[test]
@@ -315,13 +315,13 @@ fn empty_imports() {
   let output = run_lint(source);
 
   assert_eq!(output, indoc! {"
-      ⚠ Warning: Empty Imports
-      the import statement imports nothing, it can be removed
+    ⚠ Warning: Empty Imports
+    the import statement imports nothing, it can be removed
 
-          ╭─[STDIN:1]
-        1 │ from maths import {  }
-      ────╯
-    "});
+        ╭─[STDIN:1]
+      1 │ from maths import {  }
+    ────╯
+  "});
 }
 
 #[test]
@@ -330,12 +330,12 @@ fn loss_of_precision() {
   let output = run_lint(source);
 
   assert_eq!(output, indoc! {"
-      ⚠ Warning: Loss of Precision
-      numbers are stored as double-precision floating-point numbers according to the IEEE 754 standard
-      when the literal is converted to a number, precision will be lost and the value may not be what was intended
+    ⚠ Warning: Loss of Precision
+    numbers are stored as double-precision floating-point numbers according to the IEEE 754 standard
+    when the literal is converted to a number, precision will be lost and the value may not be what was intended
 
-          ╭─[STDIN:2]
-        2 │   1234567890123456789
-      ────╯
-    "});
+        ╭─[STDIN:2]
+      2 │   1234567890123456789
+    ────╯
+  "});
 }
