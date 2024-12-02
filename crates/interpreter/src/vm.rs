@@ -478,6 +478,35 @@ impl<'context> VM<'context> {
           let list = self.heap.allocate_list(items, length.into());
           self.push(Value::from_object(*list, object::LIST_TYPE_ID));
         }
+        OpCode::ListLength => {
+          let value = self.peek();
+
+          #[allow(clippy::cast_precision_loss, reason = "value < 2^52")]
+          let length = if value.is_list() {
+            value.as_list(&self.heap).len() as f64
+          } else {
+            f64::NAN
+          };
+
+          self.push(length.into());
+        }
+        OpCode::ListHeadTail => {
+          let list = self.peek();
+
+          if !list.is_list() {
+            break Some(ErrorKind::TypeError {
+              expected: "list",
+              got: list.get_type(self),
+            });
+          }
+
+          let list_items = list.as_list(&self.heap);
+          let head = *list_items.first().unwrap_or(&Value::NULL);
+          let tail = (self.heap).allocate(object::ListView::new(self, list, 1, list_items.len()));
+
+          self.push(head);
+          self.push(Value::from_object(tail, object::LIST_VIEW_TYPE_ID));
+        }
 
         // VM Operations
         OpCode::Pop => {

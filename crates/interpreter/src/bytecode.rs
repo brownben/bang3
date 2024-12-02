@@ -264,6 +264,10 @@ pub enum OpCode {
   // Lists
   /// Creates a list. Arg(u8) - number of elements
   List,
+  /// List length. Gets the length of the list on the top of the stack. NaN if not a list
+  ListLength,
+  /// Pushes the head, and the tail of the list which is on the top of the stack
+  ListHeadTail,
 
   // VM Operations
   /// Removes the top element of the stack
