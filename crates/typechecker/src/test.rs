@@ -1,4 +1,8 @@
-use crate::{TypeChecker, infer::InferType};
+use crate::{
+  TypeChecker,
+  infer::{ExpressionType, InferType},
+  types::TypeArena,
+};
 
 use bang_syntax::parse;
 use indoc::indoc;
@@ -8,7 +12,11 @@ fn synthesize(source: &str) -> String {
   assert!(ast.errors.is_empty());
 
   let mut checker = TypeChecker::new();
-  let result = ast.infer(&mut checker, &ast).expression();
+  let result = match ast.infer(&mut checker, &ast) {
+    ExpressionType::Expression(ty) => ty,
+    ExpressionType::Return(_) => TypeArena::UNKNOWN,
+    ExpressionType::Both(ty, _) => ty,
+  };
   assert!(checker.problems.is_empty());
 
   let generalized_type = checker.types.generalize(result).raw_type();
@@ -20,7 +28,11 @@ fn synthesize_has_error(source: &str) -> String {
   assert!(ast.errors.is_empty());
 
   let mut checker = TypeChecker::new();
-  let result = ast.infer(&mut checker, &ast).expression();
+  let result = match ast.infer(&mut checker, &ast) {
+    ExpressionType::Expression(ty) => ty,
+    ExpressionType::Return(_) => TypeArena::UNKNOWN,
+    ExpressionType::Both(ty, _) => ty,
+  };
   assert!(!checker.problems.is_empty());
 
   let generalized_type = checker.types.generalize(result).raw_type();
@@ -104,6 +116,38 @@ fn binary_pipeline() {
 }
 
 #[test]
+fn binary_early_return() {
+  let left_always = "a => { return a ++ 'y' } ++ 'x'";
+  assert_eq!(synthesize(left_always), "string => string");
+  let left_sometimes = "a => (if (a) 5 else { return true }) == 6";
+  assert_eq!(synthesize(left_sometimes), "^a => boolean");
+  let left_sometimes_mismatch = "a => (if (a) 5 else { return true }) + 6";
+  assert!(has_type_error(left_sometimes_mismatch));
+
+  let right_always = "a => 'x' ++ { return a ++ 'y' }";
+  assert_eq!(synthesize(right_always), "string => string");
+  let right_sometimes = "a => 6 == (if (a) 5 else { return true })";
+  assert_eq!(synthesize(right_sometimes), "^a => boolean");
+  let right_sometimes_mismatch = "a => 6 + (if (a) 5 else { return true })";
+  assert!(has_type_error(right_sometimes_mismatch));
+
+  let both_sometimes_return =
+    "a => (if (a) { return false } else 5) == (if (a) { return true } else 5)";
+  assert_eq!(synthesize(both_sometimes_return), "^a => boolean");
+  let both_sometimes_return_error =
+    "a => (if (a) { return false } else 5) == (if (a) { return true } else '')";
+  assert!(has_type_error(both_sometimes_return_error));
+
+  let left_sometimes_right_always = "a => (if (a) { return false } else 5) == ({ return true })";
+  assert_eq!(synthesize(left_sometimes_right_always), "^a => boolean");
+
+  let both_always_return = "_ => { return 5 } + { return 6 }";
+  assert_eq!(synthesize(both_always_return), "_ => number");
+  let both_always_return_mismatch = "_ => { return 5 } + { return '' }";
+  assert_eq!(synthesize(both_always_return_mismatch), "_ => number");
+}
+
+#[test]
 fn block() {
   assert_eq!(synthesize("{\n1\ntrue\n}"), "boolean");
   assert_eq!(synthesize("{\n1\ntrue\n//hello\n}"), "boolean");
@@ -148,6 +192,36 @@ fn call() {
 }
 
 #[test]
+fn call_early_return() {
+  let callee_always = "a => { return a ++ 'y' }()";
+  assert_eq!(synthesize(callee_always), "string => string");
+  let callee_sometimes = "a => (if (a) x => x else { return true })(false)";
+  assert_eq!(synthesize(callee_sometimes), "^a => boolean");
+  let callee_sometimes_mismatch = "a => (if (a) x => x else { return true })(4)";
+  assert!(has_type_error(callee_sometimes_mismatch));
+
+  let arg_always = "a => (x => x)({ return a ++ 'y' })";
+  assert_eq!(synthesize(arg_always), "string => string");
+  let arg_sometimes = "a => (x => x)(if (a) false else { return true })";
+  assert_eq!(synthesize(arg_sometimes), "^a => boolean");
+  let arg_sometimes_mismatch = "a => (x => x)(if (a) 5 else { return true })";
+  assert!(has_type_error(arg_sometimes_mismatch));
+
+  let callee_sometimes_arg_always = "a => (if (a) { return false } else x => x)({ return true })";
+  assert_eq!(synthesize(callee_sometimes_arg_always), "^a => boolean");
+
+  let both_sometimes_return =
+    "a => (if (a) { return false } else x => x)(if (a) { return true } else false)";
+  assert_eq!(synthesize(both_sometimes_return), "^a => boolean");
+  let both_sometimes_return_error =
+    "a => (if (a) { return false } else x => x)(if (a) { return true } else 5)";
+  assert!(has_type_error(both_sometimes_return_error));
+
+  let both_always_return = "_ => { return 5 }({ return 6 })";
+  assert_eq!(synthesize(both_always_return), "_ => number");
+}
+
+#[test]
 fn functions() {
   let source = indoc! {"
     let a = x => x + 1
@@ -184,6 +258,16 @@ fn if_() {
   assert!(has_type_error("if (false) false else -true"));
   assert!(has_type_error("if (true) { 5 } else { false }"));
   assert!(has_type_error("a => if (a) { 5 } else { false }"));
+
+  let early_return_condition = "_ => if ({ return 55 }) false else true";
+  assert_eq!(synthesize(early_return_condition), "_ => number");
+  let sometimes_return_condition = "x => if (if (x) { return false } else 5) false else true";
+  assert_eq!(synthesize(sometimes_return_condition), "^a => boolean");
+  let sometimes_condition_or_arm =
+    "x => if (if (x) { return false } else 5) false else if (x) true else { return false }";
+  assert_eq!(synthesize(sometimes_condition_or_arm), "^a => boolean");
+  let sometimes_condition_mismatch = "x => if (if (x) { return 4 } else 5) false else true";
+  assert!(has_type_error(sometimes_condition_mismatch));
 }
 
 #[test]
@@ -238,6 +322,18 @@ fn match_() {
 
   let source = "match 5 | ..0 -> false | 0.. -> 5";
   assert!(has_type_error(source));
+
+  // Early Return
+  let early_return_condition = "_ => match ({ return 55 }) | x -> 5";
+  assert_eq!(synthesize(early_return_condition), "_ => number");
+  let sometimes_return_condition =
+    "x => match (if (x) { return false } else 5) | ..4 -> false | x -> !x";
+  assert_eq!(synthesize(sometimes_return_condition), "^a => boolean");
+  let sometimes_condition_or_arm = "x => match (if (x) { return false } else 5) | ..4 -> false | x -> if (x) true else { return false }";
+  assert_eq!(synthesize(sometimes_condition_or_arm), "^a => boolean");
+  let sometimes_condition_mismatch =
+    "x => match (if (x) { return 6 } else 5) | ..4 -> false | x -> !x";
+  assert!(has_type_error(sometimes_condition_mismatch));
 }
 
 #[test]
@@ -252,6 +348,13 @@ fn unary() {
   assert!(has_type_error("-true"));
   assert!(has_type_error("-'hello'"));
   assert!(has_type_error("!-'hello'"));
+
+  let always_early_return = "a => -{ return a ++ '' }";
+  assert_eq!(synthesize(always_early_return), "string => string");
+  let sometimes_returns = "a => !(if (a) true else { return false })";
+  assert_eq!(synthesize(sometimes_returns), "^a => boolean");
+  let sometimes_returns_mismatch = "a => !(if (a) true else { return 5 })";
+  assert!(has_type_error(sometimes_returns_mismatch));
 }
 
 #[test]
@@ -424,6 +527,19 @@ fn format_string() {
   assert_eq!(synthesize(different_fields), "string");
 
   assert!(has_type_error("`{5 + false}`"));
+
+  let always_early_return = "a => `{{ return a }}`";
+  assert_eq!(synthesize(always_early_return), "string => string");
+  let sometimes_returns = "a => `{if (a) true else { return '' }}`";
+  assert_eq!(synthesize(sometimes_returns), "^a => string");
+  let sometimes_returns_multiple = indoc! {"
+    a => `
+      {if (a) true else { return '' }}
+      {if (a) true else { return '' }}
+  `"};
+  assert_eq!(synthesize(sometimes_returns_multiple), "^a => string");
+  let sometimes_returns_mismatch = "a => `{if (a) true else { return 5 }}`";
+  assert!(has_type_error(sometimes_returns_mismatch));
 }
 
 #[test]
@@ -454,7 +570,7 @@ fn return_statement() {
 
 #[test]
 fn early_returns() {
-  let source = indoc! {"
+  let if_branch_different_to_expression = indoc! {"
     let function = a => {
       let _a = if (a == true) {
         return 5
@@ -465,9 +581,12 @@ fn early_returns() {
     }
     function
   "};
-  assert_eq!(synthesize(source), "boolean => number");
+  assert_eq!(
+    synthesize(if_branch_different_to_expression),
+    "boolean => number"
+  );
 
-  let source = indoc! {"
+  let else_branch_different_to_expression = indoc! {"
     let function = a => {
       let _a = if (a == true) {
         true
@@ -478,9 +597,12 @@ fn early_returns() {
     }
     function
   "};
-  assert_eq!(synthesize(source), "boolean => number");
+  assert_eq!(
+    synthesize(else_branch_different_to_expression),
+    "boolean => number"
+  );
 
-  let source = indoc! {"
+  let both_branches_early_return_expression_differs = indoc! {"
     let function = a => {
       let _a = if (a == true) {
         return 5
@@ -490,12 +612,16 @@ fn early_returns() {
 
       false
     }
+    function
   "};
-  assert!(has_type_error(source));
+  assert_eq!(
+    synthesize(both_branches_early_return_expression_differs),
+    "boolean => number"
+  );
 
-  let source = indoc! {"
+  let both_branches_early_return_expression_same = indoc! {"
     let function = a => {
-      let _a = if (a == true) {
+      let _a = if (a == 3) {
         return 5
       } else {
         return 4
@@ -503,10 +629,14 @@ fn early_returns() {
 
       a
     }
+    function
   "};
-  assert!(has_type_error(source));
+  assert_eq!(
+    synthesize(both_branches_early_return_expression_same),
+    "number => number"
+  );
 
-  let source = indoc! {"
+  let from_match = indoc! {"
     let function = a => {
       let x = match a
         | true -> { return false }
@@ -515,7 +645,31 @@ fn early_returns() {
     }
     function
   "};
-  assert_eq!(synthesize(source), "boolean => boolean");
+  assert_eq!(synthesize(from_match), "boolean => boolean");
+
+  let nested_return = indoc! {"
+    let function = a => {
+      return if (a) 5 else { return 6 }
+    }
+    function
+  "};
+  assert_eq!(synthesize(nested_return), "^a => number");
+
+  let if_last_statement = indoc! {"
+    let function = a => {
+      if (a) 5 else { return 6 }
+    }
+    function
+  "};
+  assert_eq!(synthesize(if_last_statement), "^a => number");
+  let multiple_if_early_returns = indoc! {"
+    let function = a => {
+      if (a) 5 else { return 6 }
+      if (a) 5 else { return 6 }
+    }
+    function
+  "};
+  assert_eq!(synthesize(multiple_if_early_returns), "^a => number");
 }
 
 #[test]
@@ -637,6 +791,8 @@ fn list() {
     ]
   "};
   assert_eq!(synthesize(early_returns_match), "^a => list<string>");
+  let always_returns = "_ => [{ return 5 }]";
+  assert_eq!(synthesize(always_returns), "_ => number");
 
   // Annotations
   assert!(!has_type_error("let _x: list<number> = []"));

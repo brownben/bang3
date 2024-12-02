@@ -2,7 +2,7 @@ use crate::{
   TypeChecker, TypeError, VariableKind, exhaustive,
   similarity::similarly_named,
   stdlib::{self, ImportResult, StdlibModule},
-  types::{PrimitiveType, Structure, Type, TypeArena, TypeRef, TypeScheme},
+  types::{Structure, Type, TypeArena, TypeRef, TypeScheme},
 };
 use bang_syntax::{
   AST, Span,
@@ -201,7 +201,7 @@ impl InferType for AST {
 
     let (last_statement, statements) = self.root_statements.split_last().unwrap();
     for statement in statements {
-      statement.infer(t, self);
+      _ = statement.infer(t, self);
     }
     let result = last_statement.infer(t, self);
     let end_span = self.root_statements.last().unwrap().span(self);
@@ -255,53 +255,77 @@ impl InferExpression for Import {
 }
 impl InferType for Let {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
-    if let Expression::Function(_) = self.value(ast) {
-      let function_type = t.new_type_var();
-      t.env.define_variable(
-        self.identifier(ast),
-        self.identifier_span(ast),
-        TypeScheme::monomorphic(function_type),
-        self.doc_comment(ast).map(|comment| comment.full_text(ast)),
-      );
-
-      // Infer the function type
-      let mut expression_type = self.value(ast).infer(t, ast).expression();
-      if let Some(annotation) = self.annotation(ast) {
-        let annotation_type = t.type_from_annotation(annotation, ast);
-
-        if annotation_type != TypeArena::UNKNOWN {
-          t.assert_type_strict(annotation_type, expression_type, self.value(ast).span(ast));
-          expression_type = annotation_type;
-        }
-      }
-
-      // Update the variable type to be the inferred type
-      t.env
-        .update_variable(self.identifier(ast), t.types.generalize(expression_type));
-      return TypeArena::NEVER.into();
+    if let Expression::Function(function) = self.value(ast) {
+      return let_statement_function(self, function, t, ast);
     }
 
-    let mut type_ = self.value(ast).infer(t, ast).expression();
+    let (mut ty, return_type) = match self.value(ast).infer(t, ast) {
+      ExpressionType::Expression(ty) => (ty, None),
+      ExpressionType::Return(ty) => return ExpressionType::Return(ty),
+      ExpressionType::Both(ty, return_ty) => (ty, Some(return_ty)),
+    };
     if let Some(annotation) = self.annotation(ast) {
       let annotation_type = t.type_from_annotation(annotation, ast);
 
       if annotation_type != TypeArena::UNKNOWN {
-        t.assert_type_strict(annotation_type, type_, self.value(ast).span(ast));
-        type_ = annotation_type;
+        t.assert_type_strict(annotation_type, ty, self.value(ast).span(ast));
+        ty = annotation_type;
       }
     }
+
+    let (identifier, identifier_span) = (self.identifier(ast), self.identifier_span(ast));
+    let doc_comment = self.doc_comment(ast).map(|comment| comment.full_text(ast));
+
     t.env.define_variable(
-      self.identifier(ast),
-      self.identifier_span(ast),
-      TypeScheme::monomorphic(type_),
-      self.doc_comment(ast).map(|comment| comment.full_text(ast)),
+      identifier,
+      identifier_span,
+      TypeScheme::monomorphic(ty),
+      doc_comment,
     );
-    TypeArena::NEVER.into()
+    ExpressionType::from(TypeArena::NEVER, return_type)
   }
+}
+fn let_statement_function(
+  let_: &Let,
+  function: &Function,
+  t: &mut TypeChecker,
+  ast: &AST,
+) -> ExpressionType {
+  let (identifier, identifier_span) = (let_.identifier(ast), let_.identifier_span(ast));
+  let doc_comment = let_.doc_comment(ast).map(|comment| comment.full_text(ast));
+
+  let function_type = t.new_type_var();
+  t.env.define_variable(
+    identifier,
+    identifier_span,
+    TypeScheme::monomorphic(function_type),
+    doc_comment,
+  );
+
+  // Infer the function type
+  let mut ty = function.infer(t, ast);
+  if let Some(annotation) = let_.annotation(ast) {
+    let annotation_type = t.type_from_annotation(annotation, ast);
+
+    if annotation_type != TypeArena::UNKNOWN {
+      t.assert_type_strict(annotation_type, ty, let_.value(ast).span(ast));
+      ty = annotation_type;
+    }
+  }
+
+  // Update the variable type to be the inferred type
+  t.env.update_variable(identifier, t.types.generalize(ty));
+  ExpressionType::NEVER
 }
 impl InferType for Return {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
-    ExpressionType::return_(self.expression(ast).infer(t, ast).expression())
+    match self.expression(ast).infer(t, ast) {
+      ExpressionType::Expression(ty) | ExpressionType::Return(ty) => ExpressionType::Return(ty),
+      ExpressionType::Both(a, b) => {
+        t.assert_type(a, b, self.span(ast));
+        ExpressionType::Return(b)
+      }
+    }
   }
 }
 
@@ -330,10 +354,28 @@ impl InferType for Expression {
 }
 impl InferType for Binary {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
-    let left = self.left(ast).infer(t, ast).expression();
-    let right = self.right(ast).infer(t, ast).expression();
+    let (left, return_ty) = match self.left(ast).infer(t, ast) {
+      ExpressionType::Expression(ty) => (ty, None),
+      ExpressionType::Return(ty) => return ExpressionType::Return(ty),
+      ExpressionType::Both(ty, return_ty) => (ty, Some(return_ty)),
+    };
+    let (right, return_ty) = match self.right(ast).infer(t, ast) {
+      ExpressionType::Expression(ty) => (ty, return_ty),
+      ExpressionType::Return(ty) => {
+        if let Some(return_ty) = return_ty {
+          t.assert_type(ty, return_ty, self.right(ast).span(ast));
+        }
+        return ExpressionType::Return(ty);
+      }
+      ExpressionType::Both(ty, return_) => {
+        if let Some(return_ty) = return_ty {
+          t.assert_type(return_, return_ty, self.right(ast).span(ast));
+        }
+        (ty, Some(return_))
+      }
+    };
 
-    match self.operator(ast) {
+    let expression_ty = match self.operator(ast) {
       BinaryOperator::Add
       | BinaryOperator::Subtract
       | BinaryOperator::Multiply
@@ -342,27 +384,27 @@ impl InferType for Binary {
         t.assert_type(left, TypeArena::NUMBER, self.left(ast).span(ast));
         t.assert_type(right, TypeArena::NUMBER, self.right(ast).span(ast));
 
-        TypeArena::NUMBER.into()
+        TypeArena::NUMBER
       }
       BinaryOperator::AddString => {
         t.assert_type(left, TypeArena::STRING, self.left(ast).span(ast));
         t.assert_type(right, TypeArena::STRING, self.right(ast).span(ast));
-        TypeArena::STRING.into()
+        TypeArena::STRING
       }
       BinaryOperator::NotEqual | BinaryOperator::Equal => {
         t.assert_type(right, left, self.right(ast).span(ast));
-        TypeArena::BOOLEAN.into()
+        TypeArena::BOOLEAN
       }
       BinaryOperator::Greater
       | BinaryOperator::GreaterEqual
       | BinaryOperator::Less
       | BinaryOperator::LessEqual => {
         t.assert_type(right, left, self.right(ast).span(ast));
-        TypeArena::BOOLEAN.into()
+        TypeArena::BOOLEAN
       }
       BinaryOperator::And | BinaryOperator::Or => {
         t.assert_type(right, left, self.right(ast).span(ast));
-        right.into()
+        right
       }
       BinaryOperator::Pipeline => {
         let callee_type = right;
@@ -393,53 +435,73 @@ impl InferType for Binary {
           }
         }
 
-        return_type.into()
+        return_type
       }
-      BinaryOperator::InvalidSingleEqual => TypeArena::UNKNOWN.into(),
-    }
+      BinaryOperator::InvalidSingleEqual => TypeArena::UNKNOWN,
+    };
+
+    ExpressionType::from(expression_ty, return_ty)
   }
 }
 impl InferType for Block {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     t.env.enter_scope();
 
-    let final_statement = self
-      .statements(ast)
-      .position(|statment| matches!(statment, Statement::Return(_)))
-      .or(
-        self
-          .statements(ast)
-          .enumerate()
-          .rev()
-          .find_map(|(id, statment)| matches!(statment, Statement::Expression(_)).then_some(id)),
-      )
+    let final_statement = (self.statements(ast).enumerate().rev())
+      .find_map(|(id, statment)| matches!(statment, Statement::Expression(_)).then_some(id))
       .unwrap_or(self.len() - 1);
 
-    let block_return_type = t.new_type_var();
+    let mut block_ty = None;
+    let mut return_ty = None;
+
     for (id, statement) in self.statements(ast).enumerate() {
-      let statement_type = statement.infer(t, ast);
+      match statement.infer(t, ast) {
+        ExpressionType::Expression(ty) if id == final_statement => block_ty = Some(ty),
+        ExpressionType::Expression(_) => {}
+        ExpressionType::Return(ty) => {
+          t.env.exit_scope(self.span(ast));
+          return ExpressionType::Return(ty);
+        }
+        ExpressionType::Both(ty, return_) => {
+          if let Some(return_ty) = return_ty {
+            t.assert_type(return_, return_ty, self.span(ast));
+          } else {
+            return_ty = Some(return_);
+          }
 
-      if let Some(return_type) = statement_type.get_return() {
-        t.assert_type(return_type, block_return_type, statement.span(ast));
-      }
-
-      if id == final_statement {
-        t.env.exit_scope(self.span(ast));
-        return statement_type;
+          if id == final_statement {
+            block_ty = Some(ty);
+          }
+        }
       }
     }
 
     t.env.exit_scope(self.span(ast));
-    block_return_type.into()
+    ExpressionType::from(block_ty.unwrap(), return_ty)
   }
 }
 impl InferType for Call {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
-    let callee_type = self.callee(ast).infer(t, ast).expression();
-    let argument_type = if let Some(argument) = self.argument(ast) {
-      argument.infer(t, ast).expression()
-    } else {
-      TypeArena::NEVER
+    let (callee_type, return_ty) = match self.callee(ast).infer(t, ast) {
+      ExpressionType::Expression(ty) => (ty, None),
+      ExpressionType::Return(ty) => return ExpressionType::Return(ty),
+      ExpressionType::Both(ty, return_ty) => (ty, Some(return_ty)),
+    };
+    let (argument_type, return_ty) = match self.argument(ast).map(|arg| arg.infer(t, ast)) {
+      Some(ExpressionType::Expression(ty)) => (ty, return_ty),
+      Some(ExpressionType::Return(ty)) => {
+        if let Some(return_ty) = return_ty {
+          t.assert_type(ty, return_ty, self.argument_span(ast));
+        }
+        return ExpressionType::Return(ty);
+      }
+      Some(ExpressionType::Both(ty, return_)) => {
+        if let Some(return_ty) = return_ty {
+          t.assert_type(return_, return_ty, self.argument_span(ast));
+        }
+        (ty, Some(return_))
+      }
+      None => (TypeArena::NEVER, None),
     };
 
     let return_type = t.new_type_var();
@@ -472,11 +534,12 @@ impl InferType for Call {
     }
 
     // If the unification fails, `return_type` may not be unified with the callee return type
-    if let Some(function_return_type) = t.types.function_return(callee_type) {
-      function_return_type.into()
+    let expression_ty = if let Some(function_return_type) = t.types.function_return(callee_type) {
+      function_return_type
     } else {
-      return_type.into()
-    }
+      return_type
+    };
+    ExpressionType::from(expression_ty, return_ty)
   }
 }
 impl InferType for Comment {
@@ -486,11 +549,17 @@ impl InferType for Comment {
 }
 impl InferType for FormatString {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
+    let mut return_type = None;
+
     for expression in self.expressions(ast) {
-      expression.infer(t, ast);
+      match expression.infer(t, ast).get_return() {
+        Some(ty) if return_type.is_none() => return_type = Some(ty),
+        Some(ty) => t.assert_type(ty, return_type.unwrap(), expression.span(ast)),
+        None => {}
+      }
     }
 
-    TypeArena::STRING.into()
+    ExpressionType::from(TypeArena::STRING, return_type)
   }
 }
 impl InferExpression for Function {
@@ -510,13 +579,13 @@ impl InferExpression for Function {
     let return_type = match self.body(ast).infer(t, ast) {
       ExpressionType::Expression(ty) | ExpressionType::Return(ty) => ty,
       ExpressionType::Both(expression_type, return_type) => {
-        t.assert_type(expression_type, return_type, self.span(ast));
+        t.assert_type(return_type, expression_type, self.span(ast));
         expression_type
       }
     };
     t.types.unify(return_type, expected_return).unwrap();
 
-    if t.types[return_type] == Type::Primitive(PrimitiveType::Never) {
+    if t.types.is_never(return_type) {
       t.problems.push(TypeError::FunctionReturnsNever {
         span: self.span(ast),
       });
@@ -542,15 +611,32 @@ impl InferType for Group {
 }
 impl InferType for If {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
-    self.condition(ast).infer(t, ast);
+    let condition_return_ty = match self.condition(ast).infer(t, ast) {
+      ExpressionType::Expression(_) => None,
+      ExpressionType::Return(ty) => return ExpressionType::Return(ty),
+      ExpressionType::Both(_, ty) => Some(ty),
+    };
 
     let then_type = self.then(ast).infer(t, ast);
 
-    if let Some(otherwise) = self.otherwise(ast) {
+    let branch_ty = if let Some(otherwise) = self.otherwise(ast) {
       let else_type = otherwise.infer(t, ast);
       t.merge_branches(&then_type, &else_type, self.span(ast))
     } else {
       ExpressionType::UNKNOWN
+    };
+
+    if let Some(condition_return) = condition_return_ty {
+      match branch_ty {
+        ExpressionType::Expression(ty) => ExpressionType::Both(ty, condition_return),
+        ExpressionType::Return(_) => unreachable!(),
+        ExpressionType::Both(ty, branch_ty) => {
+          t.assert_type(condition_return, branch_ty, self.condition(ast).span(ast));
+          ExpressionType::Both(ty, condition_return)
+        }
+      }
+    } else {
+      branch_ty
     }
   }
 }
@@ -560,14 +646,16 @@ impl InferType for List {
     let mut return_type = None;
 
     for item in self.items(ast) {
-      let item_type = item.infer(t, ast);
+      match item.infer(t, ast) {
+        ExpressionType::Expression(ty) => t.assert_type(ty, element_type, item.span(ast)),
+        ExpressionType::Return(ty) => return ExpressionType::Return(ty),
+        ExpressionType::Both(expression, return_) => {
+          t.assert_type(expression, element_type, item.span(ast));
 
-      t.assert_type(item_type.expression(), element_type, item.span(ast));
-
-      if let Some(item_return_type) = item_type.get_return() {
-        match return_type {
-          Some(return_type) => t.assert_type(item_return_type, return_type, item.span(ast)),
-          None => return_type = Some(item_return_type),
+          match return_type {
+            Some(return_type) => t.assert_type(return_, return_type, item.span(ast)),
+            None => return_type = Some(return_),
+          }
         }
       }
     }
@@ -587,7 +675,11 @@ impl InferExpression for Literal {
 }
 impl InferType for Match {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
-    let value_type = self.value(ast).infer(t, ast).expression();
+    let (value_type, value_return_ty) = match self.value(ast).infer(t, ast) {
+      ExpressionType::Expression(ty) => (ty, None),
+      ExpressionType::Return(ty) => return ExpressionType::Return(ty),
+      ExpressionType::Both(expression, return_) => (expression, Some(return_)),
+    };
 
     // check patterns match the value passes
     for case in self.arms() {
@@ -629,7 +721,7 @@ impl InferType for Match {
     }
 
     // check all cases return the same type
-    let mut return_type = t.new_type_var().into();
+    let mut expression_ty = ExpressionType::Both(t.new_type_var(), t.new_type_var());
     for case in self.arms() {
       t.env.enter_scope();
 
@@ -652,7 +744,7 @@ impl InferType for Match {
       }
 
       let case_type = case.expression(ast).infer(t, ast);
-      return_type = t.merge_branches(&return_type, &case_type, self.span(ast));
+      expression_ty = t.merge_branches(&expression_ty, &case_type, self.span(ast));
 
       t.env.exit_scope(self.span(ast));
     }
@@ -674,7 +766,18 @@ impl InferType for Match {
       ),
     };
 
-    return_type
+    if let Some(value_return_ty) = value_return_ty {
+      match expression_ty {
+        ExpressionType::Expression(ty) => ExpressionType::Both(ty, value_return_ty),
+        ExpressionType::Return(_) => unreachable!(),
+        ExpressionType::Both(ty, expression_ty) => {
+          t.assert_type(value_return_ty, expression_ty, self.value(ast).span(ast));
+          ExpressionType::Both(ty, expression_ty)
+        }
+      }
+    } else {
+      expression_ty
+    }
   }
 }
 impl InferExpression for ModuleAccess {
@@ -705,16 +808,22 @@ impl InferExpression for ModuleAccess {
 }
 impl InferType for Unary {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
-    let left = self.expression(ast).infer(t, ast).expression();
-    let span = self.expression(ast).span(ast);
+    let (left, return_) = match self.expression(ast).infer(t, ast) {
+      ExpressionType::Expression(ty) => (ty, None),
+      ExpressionType::Return(ty) => return ExpressionType::Return(ty),
+      ExpressionType::Both(expression, return_) => (expression, Some(return_)),
+    };
 
-    match self.operator(ast) {
-      UnaryOperator::Not => TypeArena::BOOLEAN.into(),
+    let span = self.expression(ast).span(ast);
+    let expression_type = match self.operator(ast) {
+      UnaryOperator::Not => TypeArena::BOOLEAN,
       UnaryOperator::Minus => {
         t.assert_type(left, TypeArena::NUMBER, span);
-        TypeArena::NUMBER.into()
+        TypeArena::NUMBER
       }
-    }
+    };
+
+    ExpressionType::from(expression_type, return_)
   }
 }
 impl InferExpression for Variable {
@@ -739,6 +848,7 @@ impl InferExpression for Variable {
 ///
 /// An expression can have a regular expression type,
 /// or it can return a from a function which may have a different type
+#[must_use]
 pub(crate) enum ExpressionType {
   Expression(TypeRef),
   Return(TypeRef),
@@ -747,21 +857,6 @@ pub(crate) enum ExpressionType {
 impl ExpressionType {
   const NEVER: Self = Self::Expression(TypeArena::NEVER);
   const UNKNOWN: Self = Self::Expression(TypeArena::UNKNOWN);
-
-  /// Create a type which returns a value
-  fn return_(ty: TypeRef) -> Self {
-    Self::Return(ty)
-  }
-
-  /// Get the expression type
-  /// If it doesn't have an expression type, put unknown
-  pub(crate) fn expression(&self) -> TypeRef {
-    match self {
-      Self::Expression(ty) => *ty,
-      Self::Return(_) => TypeArena::UNKNOWN,
-      Self::Both(expression, _) => *expression,
-    }
-  }
 
   fn get_expression(&self) -> Option<TypeRef> {
     match self {
@@ -784,10 +879,5 @@ impl ExpressionType {
     } else {
       Self::Expression(ty)
     }
-  }
-}
-impl From<TypeRef> for ExpressionType {
-  fn from(ty: TypeRef) -> Self {
-    Self::Expression(ty)
   }
 }

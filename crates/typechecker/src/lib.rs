@@ -54,7 +54,7 @@ impl TypeChecker {
   /// ```
   pub fn check(ast: &AST) -> Self {
     let mut typechecker = Self::new();
-    ast.infer(&mut typechecker, ast);
+    _ = ast.infer(&mut typechecker, ast);
     typechecker
   }
 
