@@ -186,11 +186,14 @@ impl TypeChecker {
 pub(crate) trait InferType {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType;
 }
+pub(crate) trait InferExpression {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> TypeRef;
+}
 
 impl InferType for AST {
   fn infer(&self, t: &mut TypeChecker, _ast: &AST) -> ExpressionType {
     if self.root_statements.is_empty() {
-      return TypeArena::NEVER.into();
+      return ExpressionType::NEVER;
     }
 
     t.env.enter_scope();
@@ -214,16 +217,16 @@ impl InferType for AST {
 impl InferType for Statement {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     match self {
-      Statement::Comment(_) => TypeArena::NEVER.into(),
+      Statement::Comment(_) => ExpressionType::NEVER,
       Statement::Expression(expression) => expression.expression(ast).infer(t, ast),
-      Statement::Import(import) => import.infer(t, ast),
+      Statement::Import(import) => ExpressionType::Expression(import.infer(t, ast)),
       Statement::Let(let_) => let_.infer(t, ast),
       Statement::Return(return_) => return_.infer(t, ast),
     }
   }
 }
-impl InferType for Import {
-  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
+impl InferExpression for Import {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> TypeRef {
     let module = StdlibModule::get(self.module(ast));
 
     for item in self.items(ast) {
@@ -247,7 +250,7 @@ impl InferType for Import {
       };
     }
 
-    TypeArena::NEVER.into()
+    TypeArena::NEVER
   }
 }
 impl InferType for Let {
@@ -310,16 +313,18 @@ impl InferType for Expression {
       Expression::Call(call) => call.infer(t, ast),
       Expression::Comment(comment) => comment.infer(t, ast),
       Expression::FormatString(format_string) => format_string.infer(t, ast),
-      Expression::Function(function) => function.infer(t, ast),
       Expression::Group(group) => group.infer(t, ast),
       Expression::If(if_) => if_.infer(t, ast),
       Expression::List(list) => list.infer(t, ast),
-      Expression::Literal(literal) => literal.infer(t, ast),
       Expression::Match(match_) => match_.infer(t, ast),
-      Expression::ModuleAccess(module_access) => module_access.infer(t, ast),
       Expression::Unary(unary) => unary.infer(t, ast),
-      Expression::Variable(variable) => variable.infer(t, ast),
-      Expression::Invalid(_) => TypeArena::UNKNOWN.into(),
+
+      // Expressions which only have an expression, and can never return
+      Expression::Function(function) => ExpressionType::Expression(function.infer(t, ast)),
+      Expression::Literal(literal) => ExpressionType::Expression(literal.infer(t, ast)),
+      Expression::ModuleAccess(module) => ExpressionType::Expression(module.infer(t, ast)),
+      Expression::Variable(variable) => ExpressionType::Expression(variable.infer(t, ast)),
+      Expression::Invalid(_) => ExpressionType::Expression(TypeArena::UNKNOWN),
     }
   }
 }
@@ -488,8 +493,8 @@ impl InferType for FormatString {
     TypeArena::STRING.into()
   }
 }
-impl InferType for Function {
-  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
+impl InferExpression for Function {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> TypeRef {
     t.env.enter_scope();
 
     let parameter = t.new_type_var();
@@ -527,7 +532,7 @@ impl InferType for Function {
       t.types.link(type_var, TypeArena::NEVER);
     }
 
-    function_type.into()
+    function_type
   }
 }
 impl InferType for Group {
@@ -545,7 +550,7 @@ impl InferType for If {
       let else_type = otherwise.infer(t, ast);
       t.merge_branches(&then_type, &else_type, self.span(ast))
     } else {
-      TypeArena::NEVER.into()
+      ExpressionType::UNKNOWN
     }
   }
 }
@@ -571,14 +576,13 @@ impl InferType for List {
     ExpressionType::from(list_type, return_type)
   }
 }
-impl InferType for Literal {
-  fn infer(&self, _: &mut TypeChecker, ast: &AST) -> ExpressionType {
+impl InferExpression for Literal {
+  fn infer(&self, _: &mut TypeChecker, ast: &AST) -> TypeRef {
     match self.value(ast) {
       LiteralValue::Boolean(_) => TypeArena::BOOLEAN,
       LiteralValue::Number { .. } => TypeArena::NUMBER,
       LiteralValue::String(_) => TypeArena::STRING,
     }
-    .into()
   }
 }
 impl InferType for Match {
@@ -590,7 +594,7 @@ impl InferType for Match {
       match &case.pattern {
         Pattern::Identifier(_) | Pattern::Invalid => {}
         Pattern::Literal(literal) => {
-          let literal = literal.infer(t, ast).expression();
+          let literal = literal.infer(t, ast);
           if t.types.unify(literal, value_type).is_err() {
             t.problems.push(TypeError::PatternNeverMatches {
               pattern: t.types.type_to_string(literal),
@@ -601,7 +605,7 @@ impl InferType for Match {
         }
         Pattern::Range(start, end) => {
           if let Some(start) = start {
-            let start_type = start.infer(t, ast).expression();
+            let start_type = start.infer(t, ast);
             if t.types.unify(start_type, value_type).is_err() {
               t.problems.push(TypeError::PatternNeverMatches {
                 pattern: t.types.type_to_string(start_type),
@@ -611,7 +615,7 @@ impl InferType for Match {
             }
           }
           if let Some(end) = end {
-            let end_type = end.infer(t, ast).expression();
+            let end_type = end.infer(t, ast);
             if t.types.unify(end_type, value_type).is_err() {
               t.problems.push(TypeError::PatternNeverMatches {
                 pattern: t.types.type_to_string(end_type),
@@ -669,19 +673,19 @@ impl InferType for Match {
     return_type
   }
 }
-impl InferType for ModuleAccess {
-  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
+impl InferExpression for ModuleAccess {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> TypeRef {
     let module = StdlibModule::get(self.module(ast));
 
     match module.import_value(&mut t.types, self.item(ast)) {
-      ImportResult::Value(type_) => t.types.instantiate(type_).into(),
+      ImportResult::Value(type_) => t.types.instantiate(type_),
       ImportResult::ModuleNotFound => {
         t.problems.push(TypeError::ModuleNotFound {
           module: self.module(ast).to_owned(),
           span: self.span(ast),
           did_you_mean: similarly_named(self.module(ast), stdlib::MODULES),
         });
-        TypeArena::UNKNOWN.into()
+        TypeArena::UNKNOWN
       }
       ImportResult::ItemNotFound => {
         t.problems.push(TypeError::ItemNotFound {
@@ -690,7 +694,7 @@ impl InferType for ModuleAccess {
           span: self.span(ast),
           did_you_mean: similarly_named(self.item(ast), module.items().iter().copied()),
         });
-        TypeArena::UNKNOWN.into()
+        TypeArena::UNKNOWN
       }
     }
   }
@@ -709,11 +713,11 @@ impl InferType for Unary {
     }
   }
 }
-impl InferType for Variable {
-  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
+impl InferExpression for Variable {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> TypeRef {
     if let Some(type_) = t.env.get_variable(self.name(ast)) {
       t.env.mark_variable_use(self.name(ast), self.span(ast));
-      t.types.instantiate(type_).into()
+      t.types.instantiate(type_)
     } else {
       use super::enviroment::Variable;
 
@@ -722,7 +726,7 @@ impl InferType for Variable {
         span: self.span(ast),
         did_you_mean: similarly_named(self.name(ast), t.env.variables().map(Variable::name)),
       });
-      TypeArena::UNKNOWN.into()
+      TypeArena::UNKNOWN
     }
   }
 }
@@ -737,6 +741,9 @@ pub(crate) enum ExpressionType {
   Both(TypeRef, TypeRef),
 }
 impl ExpressionType {
+  const NEVER: Self = Self::Expression(TypeArena::NEVER);
+  const UNKNOWN: Self = Self::Expression(TypeArena::UNKNOWN);
+
   /// Create a type which returns a value
   fn return_(ty: TypeRef) -> Self {
     Self::Return(ty)
