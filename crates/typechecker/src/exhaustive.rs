@@ -1,41 +1,30 @@
-use crate::types::{PrimitiveType, Type};
+use crate::{
+  TypeError,
+  types::{PrimitiveType, Type},
+};
 use bang_syntax::{
   AST, Span,
   ast::expression::{Literal, LiteralValue, MatchArm, Pattern},
 };
 use std::{cmp, fmt};
 
-/// Details what arms are unnecessary, or what arms are missing
-#[derive(Debug)]
-pub enum Result {
-  MissingCases(Vec<MissingPattern>),
-  UnreachableCases(Vec<Span>),
-  Ok,
+fn unused_arms_errors(unused_arms: impl IntoIterator<Item = Span>) -> Vec<TypeError> {
+  unused_arms
+    .into_iter()
+    .map(|span| TypeError::UnreachableCase { span })
+    .collect()
 }
-
-/// Details about that values are uncovered by match arm
-#[derive(Debug, Clone)]
-pub enum MissingPattern {
-  Boolean(bool),
-  Number(f64, f64),
-  CatchAll,
-}
-impl fmt::Display for MissingPattern {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      MissingPattern::CatchAll => write!(f, "a catch all arm is missing"),
-      MissingPattern::Boolean(x) => write!(f, "the arms don't cover `{x}`"),
-      MissingPattern::Number(f64::NEG_INFINITY, end) => {
-        write!(f, "the arms don't cover numbers less than `{end}`")
-      }
-      MissingPattern::Number(start, f64::INFINITY) => {
-        write!(f, "the arms don't cover numbers greater than `{start}`")
-      }
-      MissingPattern::Number(start, end) => {
-        write!(f, "the arms don't cover between `{start}` and `{end}`")
-      }
-    }
-  }
+fn missing_cases_errors(
+  missing_cases: impl IntoIterator<Item = impl ToString>,
+  match_span: Span,
+) -> Vec<TypeError> {
+  missing_cases
+    .into_iter()
+    .map(|case| TypeError::MissingPattern {
+      message: case.to_string(),
+      span: match_span,
+    })
+    .collect()
 }
 
 /// Checks if a match expressions arms are exhaustive
@@ -43,29 +32,46 @@ pub fn check<'a>(
   value: &Type,
   arms: impl ExactSizeIterator<Item = &'a MatchArm>,
   ast: &AST,
-) -> Result {
+  match_span: Span,
+) -> Vec<TypeError> {
   match value {
-    Type::Primitive(PrimitiveType::Boolean) => boolean(arms, ast),
-    Type::Primitive(PrimitiveType::Number) => number(arms, ast),
-    _ => has_catch_all(arms, ast),
+    Type::Primitive(PrimitiveType::Boolean) => boolean(arms, ast, match_span),
+    Type::Primitive(PrimitiveType::Number) => number(arms, ast, match_span),
+    Type::Primitive(PrimitiveType::Unknown) => Vec::new(),
+    _ => has_catch_all(arms, ast, match_span),
   }
 }
 
 /// Simple check that
-fn has_catch_all<'a>(mut arms: impl ExactSizeIterator<Item = &'a MatchArm>, ast: &AST) -> Result {
+fn has_catch_all<'a>(
+  mut arms: impl ExactSizeIterator<Item = &'a MatchArm>,
+  ast: &AST,
+  match_span: Span,
+) -> Vec<TypeError> {
   let position = arms
     .position(|case| case.guard(ast).is_none() && matches!(case.pattern, Pattern::Identifier(_)));
 
   if position.is_some() && arms.len() == 0 {
-    Result::Ok
+    Vec::new()
   } else if position.is_some() {
-    Result::UnreachableCases(arms.map(|arm| arm.span(ast)).collect())
+    unused_arms_errors(arms.map(|arm| arm.span(ast)))
   } else {
-    Result::MissingCases(vec![MissingPattern::CatchAll])
+    missing_cases_errors([MissingCatchAllPattern], match_span)
+  }
+}
+#[derive(Debug, Clone)]
+pub struct MissingCatchAllPattern;
+impl fmt::Display for MissingCatchAllPattern {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "a catch all arm is missing")
   }
 }
 
-fn boolean<'a>(cases: impl Iterator<Item = &'a MatchArm>, ast: &AST) -> Result {
+fn boolean<'a>(
+  cases: impl Iterator<Item = &'a MatchArm>,
+  ast: &AST,
+  match_span: Span,
+) -> Vec<TypeError> {
   let (mut has_true, mut has_false) = (false, false);
   let mut unused_arms = vec![];
 
@@ -89,18 +95,29 @@ fn boolean<'a>(cases: impl Iterator<Item = &'a MatchArm>, ast: &AST) -> Result {
   }
 
   match (has_true, has_false) {
-    (true, true) if unused_arms.is_empty() => Result::Ok,
-    (true, true) => Result::UnreachableCases(unused_arms),
-    (false, true) => Result::MissingCases(vec![MissingPattern::Boolean(true)]),
-    (true, false) => Result::MissingCases(vec![MissingPattern::Boolean(false)]),
-    (false, false) => Result::MissingCases(vec![
-      MissingPattern::Boolean(true),
-      MissingPattern::Boolean(false),
-    ]),
+    (true, true) if unused_arms.is_empty() => Vec::new(),
+    (true, true) => unused_arms_errors(unused_arms),
+    (false, true) => missing_cases_errors([MissingBooleanPattern(true)], match_span),
+    (true, false) => missing_cases_errors([MissingBooleanPattern(false)], match_span),
+    (false, false) => missing_cases_errors(
+      [MissingBooleanPattern(true), MissingBooleanPattern(false)],
+      match_span,
+    ),
+  }
+}
+#[derive(Debug, Clone)]
+pub struct MissingBooleanPattern(bool);
+impl fmt::Display for MissingBooleanPattern {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "the arms don't cover `{}`", self.0)
   }
 }
 
-fn number<'a>(cases: impl Iterator<Item = &'a MatchArm>, ast: &AST) -> Result {
+fn number<'a>(
+  cases: impl Iterator<Item = &'a MatchArm>,
+  ast: &AST,
+  match_span: Span,
+) -> Vec<TypeError> {
   let mut has_catch_all = false;
   let mut number_ranges = vec![];
   let mut unused_arms = vec![];
@@ -127,9 +144,9 @@ fn number<'a>(cases: impl Iterator<Item = &'a MatchArm>, ast: &AST) -> Result {
 
   if has_catch_all {
     return if unused_arms.is_empty() {
-      Result::Ok
+      Vec::new()
     } else {
-      Result::UnreachableCases(unused_arms)
+      unused_arms_errors(unused_arms)
     };
   }
 
@@ -139,7 +156,7 @@ fn number<'a>(cases: impl Iterator<Item = &'a MatchArm>, ast: &AST) -> Result {
 
   for NumberRange(start, end) in number_ranges {
     if start > current_number {
-      missing_cases.push(MissingPattern::Number(current_number, start));
+      missing_cases.push(NumberRange(current_number, start));
     }
 
     if end > current_number {
@@ -147,14 +164,13 @@ fn number<'a>(cases: impl Iterator<Item = &'a MatchArm>, ast: &AST) -> Result {
     }
   }
   if current_number < f64::INFINITY {
-    missing_cases.push(MissingPattern::Number(current_number, f64::INFINITY));
+    missing_cases.push(NumberRange(current_number, f64::INFINITY));
   }
 
-  match (missing_cases.len(), unused_arms.is_empty()) {
-    (0, true) => Result::Ok,
-    (0, false) => Result::UnreachableCases(unused_arms),
-    (missing_cases_count, _) if missing_cases_count <= 5 => Result::MissingCases(missing_cases),
-    (_, _) => Result::MissingCases(vec![MissingPattern::CatchAll]),
+  match (missing_cases.is_empty(), unused_arms.is_empty()) {
+    (true, true) => Vec::new(),
+    (true, false) => unused_arms_errors(unused_arms),
+    (false, _) => missing_cases_errors(missing_cases, match_span),
   }
 }
 
@@ -202,3 +218,19 @@ impl Ord for NumberRange {
   }
 }
 impl Eq for NumberRange {}
+impl fmt::Display for NumberRange {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self(f64::NEG_INFINITY, end) => {
+        write!(f, "the arms don't cover numbers less than `{end}`")
+      }
+      Self(start, f64::INFINITY) => {
+        write!(f, "the arms don't cover numbers greater than `{start}`")
+      }
+      Self(start, end) => {
+        write!(f, "the arms don't cover between `{start}` and `{end}`")
+      }
+    }
+  }
+}
+

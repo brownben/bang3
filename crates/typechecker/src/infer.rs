@@ -750,21 +750,12 @@ impl InferType for Match {
     }
 
     // check the match statement is exhaustive
-    match exhaustive::check(&t.types[value_type], self.arms(), ast) {
-      exhaustive::Result::Ok => {}
-      exhaustive::Result::MissingCases(missing) => {
-        t.problems
-          .extend(missing.iter().map(|pattern| TypeError::MissingPattern {
-            message: pattern.to_string(),
-            span: self.span(ast),
-          }));
-      }
-      exhaustive::Result::UnreachableCases(unreachable) => t.problems.extend(
-        unreachable
-          .into_iter()
-          .map(|span| TypeError::UnreachableCase { span }),
-      ),
-    };
+    t.problems.extend(exhaustive::check(
+      &t.types[value_type],
+      self.arms(),
+      ast,
+      self.arms_span(ast),
+    ));
 
     if let Some(value_return_ty) = value_return_ty {
       match expression_ty {
