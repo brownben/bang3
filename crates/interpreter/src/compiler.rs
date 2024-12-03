@@ -103,16 +103,16 @@ impl<'s> Compiler<'s> {
     Ok(())
   }
 
-  fn add_jump(&mut self, instruction: OpCode, span: Span) -> usize {
+  fn add_jump(&mut self, instruction: OpCode, span: Span) -> Jump {
     self.chunk.add_opcode(instruction, span);
     self.chunk.add_long_value(u16::MAX, span);
-    self.chunk.len() - 2
+    Jump(self.chunk.len() - 2)
   }
-  fn patch_jump(&mut self, offset: usize) -> Result<(), CompileError> {
-    let jump = self.chunk.len() - offset - 2;
+  fn patch_jump(&mut self, offset: Jump) -> Result<(), CompileError> {
+    let jump = self.chunk.len() - offset.0 - 2;
 
     if let Ok(jump) = u16::try_from(jump) {
-      self.chunk.replace_long_value(offset, jump);
+      self.chunk.replace_long_value(offset.0, jump);
       Ok(())
     } else {
       Err(CompileError::TooBigJump)
@@ -164,6 +164,10 @@ impl<'s> Compiler<'s> {
     Ok(())
   }
 }
+
+/// The location of a jump which has not yet been patched
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Jump(usize);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Local<'s> {
