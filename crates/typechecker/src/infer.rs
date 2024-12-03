@@ -675,63 +675,73 @@ impl InferExpression for Literal {
 }
 impl InferType for Match {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
+    fn check_pattern(t: &mut TypeChecker, pattern: TypeRef, value: TypeRef, span: Span) {
+      if t.types.unify(pattern, value).is_err() {
+        t.problems.push(TypeError::PatternNeverMatches {
+          pattern: t.types.type_to_string(pattern),
+          value: t.types.type_to_string(value),
+          span,
+        });
+      }
+    }
+
     let (value_type, value_return_ty) = match self.value(ast).infer(t, ast) {
       ExpressionType::Expression(ty) => (ty, None),
       ExpressionType::Return(ty) => return ExpressionType::Return(ty),
       ExpressionType::Both(expression, return_) => (expression, Some(return_)),
     };
 
-    // check patterns match the value passes
-    for case in self.arms() {
-      match &case.pattern {
-        Pattern::Identifier(_) | Pattern::Invalid => {}
-        Pattern::Literal(literal) => {
-          let literal = literal.infer(t, ast);
-          if t.types.unify(literal, value_type).is_err() {
-            t.problems.push(TypeError::PatternNeverMatches {
-              pattern: t.types.type_to_string(literal),
-              value: t.types.type_to_string(value_type),
-              span: case.pattern.span(ast),
-            });
-          }
-        }
-        Pattern::Range(range) => {
-          if let Some(start) = &range.start {
-            let start_type = start.infer(t, ast);
-            if t.types.unify(start_type, value_type).is_err() {
-              t.problems.push(TypeError::PatternNeverMatches {
-                pattern: t.types.type_to_string(start_type),
-                value: t.types.type_to_string(value_type),
-                span: case.pattern.span(ast),
-              });
-            }
-          }
-          if let Some(end) = &range.end {
-            let end_type = end.infer(t, ast);
-            if t.types.unify(end_type, value_type).is_err() {
-              t.problems.push(TypeError::PatternNeverMatches {
-                pattern: t.types.type_to_string(end_type),
-                value: t.types.type_to_string(value_type),
-                span: case.pattern.span(ast),
-              });
-            }
-          }
-        }
-      }
-    }
-
-    // check all cases return the same type
     let mut expression_ty = ExpressionType::Both(t.new_type_var(), t.new_type_var());
     for case in self.arms() {
       t.env.enter_scope();
 
-      if let Pattern::Identifier(identifier) = &case.pattern {
-        t.env.define_variable(
-          identifier.name(ast),
-          identifier.span(ast),
-          TypeScheme::monomorphic(value_type),
-          None,
-        );
+      match &case.pattern {
+        Pattern::Identifier(identifier) => {
+          t.env.define_variable(
+            identifier.name(ast),
+            identifier.span(ast),
+            TypeScheme::monomorphic(value_type),
+            None,
+          );
+        }
+        Pattern::Invalid => {}
+        Pattern::Literal(literal) => {
+          let literal_ty = literal.infer(t, ast);
+          check_pattern(t, literal_ty, value_type, literal.span(ast));
+        }
+        Pattern::Range(range) => {
+          if let Some(start) = &range.start {
+            let start_type = start.infer(t, ast);
+            check_pattern(t, start_type, value_type, range.span(ast));
+          }
+          if let Some(end) = &range.end {
+            let end_type = end.infer(t, ast);
+            check_pattern(t, end_type, value_type, range.span(ast));
+          }
+        }
+        Pattern::List(list) => {
+          let generic = t.new_type_var();
+          let list_type = t.types.new_type(Type::Structure(Structure::List, generic));
+
+          check_pattern(t, list_type, value_type, list.span(ast));
+
+          if let Some(first) = list.first(ast) {
+            t.env.define_variable(
+              first.name(ast),
+              first.span(ast),
+              TypeScheme::new(generic, 1),
+              None,
+            );
+          }
+          if let Some(rest) = list.rest(ast) {
+            t.env.define_variable(
+              rest.name(ast),
+              rest.span(ast),
+              TypeScheme::monomorphic(value_type),
+              None,
+            );
+          }
+        }
       }
 
       // check the guard is valid, needs the value to be defined
@@ -744,7 +754,7 @@ impl InferType for Match {
       }
 
       let case_type = case.expression(ast).infer(t, ast);
-      expression_ty = t.merge_branches(&expression_ty, &case_type, self.span(ast));
+      expression_ty = t.merge_branches(&expression_ty, &case_type, case.span(ast));
 
       t.env.exit_scope(self.span(ast));
     }

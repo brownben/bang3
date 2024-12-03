@@ -1,6 +1,6 @@
 use crate::{
   TypeError,
-  types::{PrimitiveType, Type},
+  types::{PrimitiveType, Structure, Type},
 };
 use bang_syntax::{
   AST, Span,
@@ -38,6 +38,7 @@ pub fn check<'a>(
     Type::Primitive(PrimitiveType::Boolean) => boolean(arms, ast, match_span),
     Type::Primitive(PrimitiveType::Number) => number(arms, ast, match_span),
     Type::Primitive(PrimitiveType::Unknown) => Vec::new(),
+    Type::Structure(Structure::List, _) => list(arms, ast, match_span),
     _ => has_catch_all(arms, ast, match_span),
   }
 }
@@ -236,3 +237,101 @@ impl fmt::Display for NumberRange {
   }
 }
 
+fn list<'a>(
+  cases: impl Iterator<Item = &'a MatchArm>,
+  ast: &AST,
+  match_span: Span,
+) -> Vec<TypeError> {
+  let (mut empty, mut one, mut infinite) = (false, false, false);
+  let mut unused_arms = vec![];
+
+  for arm in cases {
+    match &arm.pattern {
+      Pattern::Identifier(_) if !empty || !infinite || !one => {
+        if arm.guard(ast).is_none() {
+          empty = true;
+          one = true;
+          infinite = true;
+        }
+      }
+      Pattern::List(list) => match (list.first(ast), list.rest(ast)) {
+        (None, None) if !empty => {
+          if arm.guard(ast).is_none() {
+            empty = true;
+          }
+        }
+        (None, Some(_)) if !empty || !infinite || !one => {
+          if arm.guard(ast).is_none() {
+            empty = true;
+            one = true;
+            infinite = true;
+          }
+        }
+        (Some(_), None) if !one => {
+          if arm.guard(ast).is_none() {
+            one = true;
+          }
+        }
+        (Some(_), Some(_)) if !infinite => {
+          if arm.guard(ast).is_none() {
+            one = true;
+            infinite = true;
+          }
+        }
+        _ => unused_arms.push(arm.span(ast)),
+      },
+      _ => unused_arms.push(arm.span(ast)),
+    }
+  }
+
+  if empty && one && infinite {
+    return if unused_arms.is_empty() {
+      Vec::new()
+    } else {
+      unused_arms_errors(unused_arms)
+    };
+  }
+
+  let mut missing_cases = Vec::new();
+
+  if !empty {
+    missing_cases.push(MissingListPattern::Empty.into_error(match_span));
+  }
+  if one && !infinite {
+    missing_cases.push(MissingListPattern::LongerThanOne.into_error(match_span));
+  } else if !infinite {
+    missing_cases.push(MissingListPattern::NonEmpty.into_error(match_span));
+  }
+
+  missing_cases
+}
+
+#[derive(Debug, Clone)]
+pub enum MissingListPattern {
+  Empty,
+  LongerThanOne,
+  NonEmpty,
+}
+impl fmt::Display for MissingListPattern {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::Empty => {
+        write!(f, "the arms don't cover an empty list")
+      }
+      Self::NonEmpty => {
+        write!(f, "the arms don't cover a list with elements")
+      }
+      Self::LongerThanOne => {
+        write!(f, "the arms don't cover a list longer than one item")
+      }
+    }
+  }
+}
+impl MissingListPattern {
+  fn into_error(self, match_span: Span) -> TypeError {
+    TypeError::MissingPattern {
+      message: self.to_string(),
+      span: match_span,
+    }
+  }
+}

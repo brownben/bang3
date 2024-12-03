@@ -323,6 +323,22 @@ fn match_() {
   let source = "match 5 | ..0 -> false | 0.. -> 5";
   assert!(has_type_error(source));
 
+  let matches_list_pattern = "match [] | [] -> false | [_ , .._] -> true";
+  assert_eq!(synthesize(matches_list_pattern), "boolean");
+  let number_not_list_pattern = "match 5 | [] -> false | [_ , .._] -> true";
+  assert!(has_type_error(number_not_list_pattern));
+  let list_pattern_vars_bound = indoc! {"
+    let isListOfNumbers = x => {
+      x == [1]
+      list::length(x)
+    }
+    match [1, 2, 3]
+      | [] -> 3
+      | [x] -> x + 1
+      | [x, ..xs] -> x + isListOfNumbers(xs)
+  "};
+  assert_eq!(synthesize(list_pattern_vars_bound), "number");
+
   // Early Return
   let early_return_condition = "_ => match ({ return 55 }) | x -> 5";
   assert_eq!(synthesize(early_return_condition), "_ => number");
@@ -923,6 +939,35 @@ mod exhaustive {
 
     let needs_catch_all = "match 'stuff' | _ if 4 > 5 -> 1";
     assert!(has_type_error(needs_catch_all));
+  }
+
+  #[test]
+  fn lists() {
+    let just_empty = "match [1, 2, 3] | [] -> 1";
+    assert!(has_type_error(just_empty));
+    let just_single = "match [1, 2, 3] | [_] -> 1";
+    assert!(has_type_error(just_single));
+    let just_xxs = "match [1, 2, 3] | [_x, .._xs] -> 1";
+    assert!(has_type_error(just_xxs));
+    let just_rest = "match [1, 2, 3] | [..rest] -> list::length(rest)";
+    assert_eq!(synthesize(just_rest), "number");
+
+    let empty_and_xxs = "match [1, 2, 3] | [] -> 1 | [_x, ..xs] -> list::length(xs)";
+    assert_eq!(synthesize(empty_and_xxs), "number");
+    let single_and_xxs = "match [1, 2, 3] | [_] -> 1 | [_x, ..xs] -> list::length(xs)";
+    assert!(has_type_error(single_and_xxs));
+    let empty_and_single = "match [1, 2, 3] | [_] -> 1 | [] -> 2";
+    assert!(has_type_error(empty_and_single));
+
+    let empty_single_and_xxs =
+      "match [1, 2, 3] | [] -> 1 | [_x] -> 2 | [_x, ..xs] -> list::length(xs)";
+    assert_eq!(synthesize(empty_single_and_xxs), "number");
+
+    let extra_one = "match [1, 2, 3] | [x] -> 1 | [y] -> 2 | [.._] -> 3";
+    assert!(has_type_error(extra_one));
+
+    let arms_after_catch_all = "match 4 | _ -> 1 | [] -> 3 | [.._] -> 5";
+    assert!(has_type_error(arms_after_catch_all));
   }
 }
 
