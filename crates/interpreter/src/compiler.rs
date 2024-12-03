@@ -425,6 +425,7 @@ impl<'s> Compile<'s> for Match {
     self.value(ast).compile(compiler, ast)?;
 
     let mut case_end_jumps = Vec::new();
+    let mut match_end_jumps = Vec::new();
     for case in self.arms() {
       if let Pattern::Identifier(variable) = &case.pattern
         && case.guard(ast).is_none()
@@ -444,65 +445,65 @@ impl<'s> Compile<'s> for Match {
           compiler.chunk.add_opcode(OpCode::Peek, span);
           compiler.define_variable(variable.name(ast), variable.span(ast))?;
 
-          // This statement is only used when there is a guard
-          // Other guards already have a condition, so we and the guard, to simplify we and with if
-          compiler.chunk.add_opcode(OpCode::True, span);
-
           bound_variable = true;
         }
         Pattern::Literal(literal) => {
           compiler.chunk.add_opcode(OpCode::Peek, span);
           literal.compile(compiler, ast)?;
           compiler.chunk.add_opcode(OpCode::Equals, span);
+
+          case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, self.span(ast)));
+          compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
         }
-        Pattern::Range(range) => match (&range.start, &range.end) {
-          (Some(pattern), None) => {
-            compiler.chunk.add_opcode(OpCode::Peek, span);
-            pattern.compile(compiler, ast)?;
-            compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
-          }
-          (None, Some(pattern)) => {
-            compiler.chunk.add_opcode(OpCode::Peek, span);
-            pattern.compile(compiler, ast)?;
-            compiler.chunk.add_opcode(OpCode::LessEqual, span);
-          }
-          (Some(greater_than), Some(less_than)) => {
-            compiler.chunk.add_opcode(OpCode::Peek, span);
-            greater_than.compile(compiler, ast)?;
-            compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
+        Pattern::Range(range) => {
+          match (&range.start, &range.end) {
+            (Some(pattern), None) => {
+              compiler.chunk.add_opcode(OpCode::Peek, span);
+              pattern.compile(compiler, ast)?;
+              compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
+            }
+            (None, Some(pattern)) => {
+              compiler.chunk.add_opcode(OpCode::Peek, span);
+              pattern.compile(compiler, ast)?;
+              compiler.chunk.add_opcode(OpCode::LessEqual, span);
+            }
+            (Some(greater_than), Some(less_than)) => {
+              compiler.chunk.add_opcode(OpCode::Peek, span);
+              greater_than.compile(compiler, ast)?;
+              compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
 
-            let jump = compiler.add_jump(OpCode::JumpIfFalse, span);
-            compiler.chunk.add_opcode(OpCode::Pop, span);
+              case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, span));
+              compiler.chunk.add_opcode(OpCode::Pop, span);
 
-            compiler.chunk.add_opcode(OpCode::Peek, span);
-            less_than.compile(compiler, ast)?;
-            compiler.chunk.add_opcode(OpCode::LessEqual, span);
-
-            compiler.patch_jump(jump)?;
+              compiler.chunk.add_opcode(OpCode::Peek, span);
+              less_than.compile(compiler, ast)?;
+              compiler.chunk.add_opcode(OpCode::LessEqual, span);
+            }
+            (None, None) => return Err(CompileError::InvalidAST),
           }
-          (None, None) => return Err(CompileError::InvalidAST),
-        },
+
+          case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, self.span(ast)));
+          compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
+        }
         Pattern::Invalid => return Err(CompileError::InvalidAST),
       }
 
       if let Some(guard) = &case.guard(ast) {
-        let jump = compiler.add_jump(OpCode::JumpIfFalse, self.span(ast));
-        compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
         guard.compile(compiler, ast)?;
-        compiler.patch_jump(jump)?;
+        case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, self.span(ast)));
+        compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
       }
 
-      // If it does, do the expression
-      let non_match_jump = compiler.add_jump(OpCode::JumpIfFalse, self.span(ast));
-      compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
       case.expression(ast).compile(compiler, ast)?;
-      case_end_jumps.push(compiler.add_jump(OpCode::Jump, self.span(ast)));
+      match_end_jumps.push(compiler.add_jump(OpCode::Jump, self.span(ast)));
 
       // Otherwise skip to the next case
       if bound_variable {
         compiler.end_scope(case.span(ast))?;
       }
-      compiler.patch_jump(non_match_jump)?;
+      for jump in case_end_jumps.drain(..) {
+        compiler.patch_jump(jump)?;
+      }
       compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
     }
 
@@ -510,7 +511,7 @@ impl<'s> Compile<'s> for Match {
       compiler.chunk.add_opcode(OpCode::Null, self.span(ast));
     }
 
-    for jump in case_end_jumps {
+    for jump in match_end_jumps {
       compiler.patch_jump(jump)?;
     }
 
