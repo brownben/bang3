@@ -652,10 +652,12 @@ fn match_expression() {
     let a = match true | false -> 1 | true -> 2 | _ -> 3
     let b = match false | false -> 1 | true -> 2 | _ -> 3
     let c = match 4 | false -> 1 | true -> 2 | _ -> 3
+    let d = match 4 | 4 -> 1 | 4 -> 2 | _ -> 3
   "});
   assert_variable!(literal_multi_case; a, 2.0);
   assert_variable!(literal_multi_case; b, 1.0);
   assert_variable!(literal_multi_case; c, 3.0);
+  assert_variable!(literal_multi_case; d, 1.0);
 
   let max_range = run(indoc! {"
     let a = match 5 | ..10 -> 1 | _ -> 2
@@ -688,17 +690,46 @@ fn match_expression() {
   assert_variable!(both_range; d, 1.0);
   assert_variable!(both_range; e, 2.0);
 
-  let literals_cleanedup = run(indoc! {"
+  let temporaries_cleaned_up = run(indoc! {"
     let a = match false
       | true -> 1
       | false -> 2
 
     let b = {
-      let c = 7
-      c
+      let x = 7
+      x
     }
+
+    let c = match 55
+      | ..44 -> 1
+      | 44.. -> 2
+
+    let d = {
+      let x = c
+      x
+    }
+
+    let matchFunction = listy => {
+      let a = 1
+      let b = match listy
+        | 44 -> 5
+        | 900 if false -> 11
+        | x if x -> 3
+        | _ -> 9
+      let c = 2
+      a + b + c
+    }
+    let e = matchFunction(44)
+    let f = matchFunction(1)
+    let g = matchFunction(0)
+    let h = matchFunction(900)
   "});
-  assert_variable!(literals_cleanedup; b, 7.0);
+  assert_variable!(temporaries_cleaned_up; b, 7.0);
+  assert_variable!(temporaries_cleaned_up; d, 2.0);
+  assert_variable!(temporaries_cleaned_up; e, 8.0);
+  assert_variable!(temporaries_cleaned_up; f, 6.0);
+  assert_variable!(temporaries_cleaned_up; g, 12.0);
+  assert_variable!(temporaries_cleaned_up; h, 6.0);
 
   let guards = run(indoc! {"
     let a = match true | true if false -> 1 | false -> 2 | _ -> 3
@@ -719,6 +750,104 @@ fn match_expression() {
   assert_variable!(guards; g, 12.0);
   assert_variable!(guards; h, 3.0);
 
+  let mut list_patterns = run(indoc! {"
+    // checks that basic lists match properly, non-lists are regected,
+    // and that the stack is maintained properly
+    let matchFunction = listy => {
+      let a = 1
+      let b = match listy
+        | [] -> 3
+        | [x] -> 5
+        | [x, ..y] -> 7
+        | _ -> 9
+
+      let c = 2
+      a + b + c
+    }
+    let a = matchFunction([])
+    let b = matchFunction([1])
+    let c = matchFunction([1, 2])
+    let d = matchFunction([1, 2, 3, 4, 5, 6, 7, 8])
+    let e = matchFunction(false)
+    let f = matchFunction(-55)
+    let g = matchFunction('a string')
+
+    // rest pattern can match single item list
+    let minimal = listy => match listy
+      | [] -> 'empty'
+      | [item, ..rest] -> `{item} {rest}`
+    let h = minimal([])
+    let i = minimal([1])
+    let j = minimal([1, 2])
+
+    // catch all rest pattern - conflicts with standard rest pattern
+    let rest = listy => match listy
+      | [..rest] -> string::from(rest)
+    let k = rest([])
+    let l = rest([1])
+    let m = rest([1, 2])
+    let n = rest(false)
+  "});
+  assert_variable!(list_patterns; a, 6.0);
+  assert_variable!(list_patterns; b, 8.0);
+  assert_variable!(list_patterns; c, 10.0);
+  assert_variable!(list_patterns; d, 10.0);
+  assert_variable!(list_patterns; e, 12.0);
+  assert_variable!(list_patterns; f, 12.0);
+  assert_variable!(list_patterns; g, 12.0);
+  assert_variable!(list_patterns; h, string "empty");
+  assert_variable!(list_patterns; i, string "1 []");
+  assert_variable!(list_patterns; j, string "1 [2]");
+  assert_variable!(list_patterns; k, string "[]");
+  assert_variable!(list_patterns; l, string "[1]");
+  assert_variable!(list_patterns; m, string "[1, 2]");
+  assert_variable!(list_patterns; n, ());
+
+  let list_pattern_guards = run(indoc! {"
+    let func = x => y => {
+      let a = 1
+      let b = match x
+        | [] if y -> 3
+        | [x] if y -> 5
+        | [x, ..xs] if y -> 7
+        | [.._rest] if y -> 13
+        | _ -> 9
+      let c = 2
+      a + b + c
+    }
+    let a = func([])(true)
+    let b = func([])(false)
+    let c = func([1])(true)
+    let d = func([1])(false)
+    let e = func([1, 2])(true)
+    let f = func([1, 2, 3])(false)
+    let g = func(1)(true)
+    let h = func(1)(false)
+
+    let func = x => {
+      let a = 1
+      let b = match x
+        | [x, ..y] if false -> 2
+        | _ -> 3
+      let c = 5
+      a + b + c
+    }
+    let i = func([])
+    let j = func([1])
+    let k = func(1)
+  "});
+  assert_variable!(list_pattern_guards; a, 6.0);
+  assert_variable!(list_pattern_guards; b, 12.0);
+  assert_variable!(list_pattern_guards; c, 8.0);
+  assert_variable!(list_pattern_guards; d, 12.0);
+  assert_variable!(list_pattern_guards; e, 10.0);
+  assert_variable!(list_pattern_guards; f, 12.0);
+  assert_variable!(list_pattern_guards; g, 12.0);
+  assert_variable!(list_pattern_guards; h, 12.0);
+  assert_variable!(list_pattern_guards; i, 9.0);
+  assert_variable!(list_pattern_guards; j, 9.0);
+  assert_variable!(list_pattern_guards; k, 9.0);
+
   let fibonnacci = run(indoc! {"
     let fibonnacciMatch = n => match n
       | ..2 -> 1
@@ -728,6 +857,34 @@ fn match_expression() {
   "});
   assert_variable!(fibonnacci; a, 1.0);
   assert_variable!(fibonnacci; b, 8.0);
+
+  let sum = run(indoc! {"
+    let sum = list => match list
+      | [] -> 0
+      | [x, ..y] -> x + sum(y)
+    let a = [] >> sum
+    let b = [1] >> sum
+    let c = [1, 2, 3] >> sum
+    let d = [256, 128, 128, 1] >> sum
+  "});
+  assert_variable!(sum; a, 0.0);
+  assert_variable!(sum; b, 1.0);
+  assert_variable!(sum; c, 6.0);
+  assert_variable!(sum; d, 513.0);
+
+  let length = run(indoc! {"
+    let length = list => match list
+      | [] -> 0
+      | [_, ..xs] -> 1 + length(xs)
+    let a = [] >> length
+    let b = [1] >> length
+    let c = [1, 2, 3] >> length
+    let d = [256, false, 128, 1, '', 4] >> length
+  "});
+  assert_variable!(length; a, 0.0);
+  assert_variable!(length; b, 1.0);
+  assert_variable!(length; c, 3.0);
+  assert_variable!(length; d, 6.0);
 }
 
 #[test]

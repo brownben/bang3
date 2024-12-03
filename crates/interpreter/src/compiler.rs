@@ -421,12 +421,10 @@ impl<'s> Compile<'s> for Literal {
 }
 impl<'s> Compile<'s> for Match {
   fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
-    let is_exhaustive = self
-      .arms()
-      .any(|case| case.guard(ast).is_none() && matches!(case.pattern, Pattern::Identifier(_)));
-
-    let span = self.span(ast);
+    // Calculate the value being matched upon, and store it as a temporary variable
+    compiler.begin_scope();
     self.value(ast).compile(compiler, ast)?;
+    compiler.define_variable("$MATCH_VALUE$", self.span(ast))?;
 
     let mut case_end_jumps = Vec::new();
     let mut match_end_jumps = Vec::new();
@@ -434,94 +432,58 @@ impl<'s> Compile<'s> for Match {
       if let Pattern::Identifier(variable) = &case.pattern
         && case.guard(ast).is_none()
       {
-        compiler.chunk.add_opcode(OpCode::Peek, span);
+        compiler.chunk.add_opcode(OpCode::Peek, self.span(ast));
         compiler.begin_scope();
         compiler.define_variable(variable.name(ast), variable.span(ast))?;
         case.expression(ast).compile(compiler, ast)?;
-        compiler.end_scope(case.span(ast))?; // clears up the value being matched upon
+        compiler.end_scope(case.span(ast))?;
         break; // optimisation: nothing can match after this
       }
 
-      let mut bound_variable = false;
-      match &case.pattern {
-        Pattern::Identifier(variable) => {
-          compiler.begin_scope();
-          compiler.chunk.add_opcode(OpCode::Peek, span);
-          compiler.define_variable(variable.name(ast), variable.span(ast))?;
+      compiler.begin_scope(); // for any varibles bound in the pattern
 
-          bound_variable = true;
-        }
-        Pattern::Literal(literal) => {
-          compiler.chunk.add_opcode(OpCode::Peek, span);
-          literal.compile(compiler, ast)?;
-          compiler.chunk.add_opcode(OpCode::Equals, span);
-
-          case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, self.span(ast)));
-          compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
-        }
-        Pattern::Range(range) => {
-          match (&range.start, &range.end) {
-            (Some(pattern), None) => {
-              compiler.chunk.add_opcode(OpCode::Peek, span);
-              pattern.compile(compiler, ast)?;
-              compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
-            }
-            (None, Some(pattern)) => {
-              compiler.chunk.add_opcode(OpCode::Peek, span);
-              pattern.compile(compiler, ast)?;
-              compiler.chunk.add_opcode(OpCode::LessEqual, span);
-            }
-            (Some(greater_than), Some(less_than)) => {
-              compiler.chunk.add_opcode(OpCode::Peek, span);
-              greater_than.compile(compiler, ast)?;
-              compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
-
-              case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, span));
-              compiler.chunk.add_opcode(OpCode::Pop, span);
-
-              compiler.chunk.add_opcode(OpCode::Peek, span);
-              less_than.compile(compiler, ast)?;
-              compiler.chunk.add_opcode(OpCode::LessEqual, span);
-            }
-            (None, None) => return Err(CompileError::InvalidAST),
-          }
-
-          case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, self.span(ast)));
-          compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
-        }
-        Pattern::Invalid => return Err(CompileError::InvalidAST),
-      }
-
+      // Compile the pattern and guard if it exists
+      // If it doesn't match either, jump to the end of the case
+      (case.pattern).compile_pattern(compiler, ast, &mut case_end_jumps)?;
       if let Some(guard) = &case.guard(ast) {
         guard.compile(compiler, ast)?;
         case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, self.span(ast)));
         compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
       }
 
+      // Compile the arm, then remove bound variables, and jump to the end of the match
       case.expression(ast).compile(compiler, ast)?;
+      compiler.end_scope(case.span(ast))?;
       match_end_jumps.push(compiler.add_jump(OpCode::Jump, self.span(ast)));
 
-      // Otherwise skip to the next case
-      if bound_variable {
-        compiler.end_scope(case.span(ast))?;
+      // Clean-up after any failed patterns
+      if case.guard(ast).is_some() {
+        let guard_jump = case_end_jumps.pop().unwrap(); // as there is a guard, there must be a jump
+        compiler.patch_jump(guard_jump)?;
+        // there may be variables defined by the pattern which need to be cleared up
+        let bound_vars = case.pattern.bound_vars_count(ast);
+        (0..bound_vars).for_each(|_| compiler.chunk.add_opcode(OpCode::Pop, self.span(ast)));
       }
       for jump in case_end_jumps.drain(..) {
         compiler.patch_jump(jump)?;
       }
-      compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
+      compiler.chunk.add_opcode(OpCode::Pop, self.span(ast)); // remove the failed condition value
     }
 
+    // If an arm isn't guaranteed to match, make sure that a value is always returned
+    let is_exhaustive = (self.arms())
+      .any(|case| case.guard(ast).is_none() && matches!(case.pattern, Pattern::Identifier(_)));
     if !is_exhaustive {
       compiler.chunk.add_opcode(OpCode::Null, self.span(ast));
     }
 
+    // Link the ends of all the cases to the end of the match
     for jump in match_end_jumps {
       compiler.patch_jump(jump)?;
     }
 
     // Remove the value being matched upon
-    compiler.chunk.add_opcode(OpCode::PopBelow, self.span(ast));
-    compiler.chunk.add_value(1, self.span(ast));
+    compiler.end_scope(self.span(ast))?;
 
     Ok(())
   }
@@ -533,7 +495,6 @@ impl<'s> Compile<'s> for ModuleAccess {
     compiler.add_symbol(self.item(ast), self.span(ast))
   }
 }
-
 impl<'s> Compile<'s> for Unary {
   fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
     self.expression(ast).compile(compiler, ast)?;
@@ -661,6 +622,198 @@ impl<'s> Compile<'s> for Return {
     self.expression(ast).compile(compiler, ast)?;
     compiler.chunk.add_opcode(OpCode::Return, self.span(ast));
     Ok(())
+  }
+}
+
+trait CompilePattern<'s> {
+  fn compile_pattern(
+    &self,
+    compiler: &mut Compiler<'s>,
+    ast: &'s AST,
+    case_end_jumps: &mut Vec<Jump>,
+  ) -> Result<(), CompileError>;
+
+  /// How many variables will be bound if this pattern is fully matched?
+  fn bound_vars_count(&self, ast: &AST) -> u8;
+}
+
+impl<'s> CompilePattern<'s> for Pattern {
+  fn compile_pattern(
+    &self,
+    compiler: &mut Compiler<'s>,
+    ast: &'s AST,
+    case_end_jumps: &mut Vec<Jump>,
+  ) -> Result<(), CompileError> {
+    match self {
+      Self::Identifier(variable) => variable.compile_pattern(compiler, ast, case_end_jumps),
+      Self::Literal(literal) => literal.compile_pattern(compiler, ast, case_end_jumps),
+      Self::Range(range) => range.compile_pattern(compiler, ast, case_end_jumps),
+      Self::List(list) => list.compile_pattern(compiler, ast, case_end_jumps),
+      Self::Invalid => Err(CompileError::InvalidAST),
+    }
+  }
+
+  fn bound_vars_count(&self, ast: &AST) -> u8 {
+    match self {
+      Self::Identifier(variable) => variable.bound_vars_count(ast),
+      Self::Literal(literal) => literal.bound_vars_count(ast),
+      Self::Range(range) => range.bound_vars_count(ast),
+      Self::List(list) => list.bound_vars_count(ast),
+      Self::Invalid => unreachable!(),
+    }
+  }
+}
+impl<'s> CompilePattern<'s> for Variable {
+  fn compile_pattern(
+    &self,
+    compiler: &mut Compiler<'s>,
+    ast: &'s AST,
+    _: &mut Vec<Jump>,
+  ) -> Result<(), CompileError> {
+    compiler.chunk.add_opcode(OpCode::Peek, self.span(ast));
+    compiler.define_variable(self.name(ast), self.span(ast))?;
+
+    Ok(())
+  }
+
+  fn bound_vars_count(&self, _: &AST) -> u8 {
+    1
+  }
+}
+impl<'s> CompilePattern<'s> for Literal {
+  fn compile_pattern(
+    &self,
+    compiler: &mut Compiler<'s>,
+    ast: &'s AST,
+    case_end_jumps: &mut Vec<Jump>,
+  ) -> Result<(), CompileError> {
+    compiler.chunk.add_opcode(OpCode::Peek, self.span(ast));
+    self.compile(compiler, ast)?;
+    compiler.chunk.add_opcode(OpCode::Equals, self.span(ast));
+
+    case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, self.span(ast)));
+    compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
+
+    Ok(())
+  }
+
+  fn bound_vars_count(&self, _: &AST) -> u8 {
+    0
+  }
+}
+impl<'s> CompilePattern<'s> for PatternList {
+  fn compile_pattern(
+    &self,
+    compiler: &mut Compiler<'s>,
+    ast: &'s AST,
+    case_end_jumps: &mut Vec<Jump>,
+  ) -> Result<(), CompileError> {
+    let span = self.span(ast);
+
+    match (self.first(ast), self.rest(ast)) {
+      // Empty List
+      (None, None) => {
+        compiler.chunk.add_opcode(OpCode::ListLength, span);
+        compiler.chunk.add_opcode(OpCode::Not, span);
+
+        case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, span));
+        compiler.chunk.add_opcode(OpCode::Pop, span);
+      }
+      // Full List
+      (None, Some(rest)) => {
+        compiler.chunk.add_opcode(OpCode::ListLength, span);
+        compiler.chunk.add_number(0.0, span);
+        compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
+
+        case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, span));
+        compiler.chunk.add_opcode(OpCode::Pop, span);
+
+        (compiler.chunk).add_opcode(OpCode::Peek, span);
+        compiler.define_variable(rest.name(ast), span)?;
+      }
+      // List with a single item
+      (Some(first), None) => {
+        compiler.chunk.add_opcode(OpCode::ListLength, span);
+        compiler.chunk.add_number(1.0, span);
+        compiler.chunk.add_opcode(OpCode::Equals, span);
+
+        case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, span));
+        compiler.chunk.add_opcode(OpCode::Pop, span);
+
+        (compiler.chunk).add_opcode(OpCode::ListHeadTail, span);
+        compiler.chunk.add_opcode(OpCode::Pop, span);
+        compiler.define_variable(first.name(ast), span)?;
+      }
+      // A list with at least one item
+      (Some(first), Some(rest)) => {
+        compiler.chunk.add_opcode(OpCode::ListLength, span);
+        compiler.chunk.add_number(1.0, span);
+        compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
+
+        case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, span));
+        compiler.chunk.add_opcode(OpCode::Pop, span);
+
+        (compiler.chunk).add_opcode(OpCode::ListHeadTail, span);
+        compiler.define_variable(first.name(ast), span)?;
+        compiler.define_variable(rest.name(ast), span)?;
+      }
+    }
+
+    Ok(())
+  }
+
+  fn bound_vars_count(&self, ast: &AST) -> u8 {
+    match (self.first(ast), self.rest(ast)) {
+      (None, None) => 0,
+      (None, Some(_)) => 1,
+      (Some(_), None) => 1,
+      (Some(_), Some(_)) => 2,
+    }
+  }
+}
+impl<'s> CompilePattern<'s> for PatternRange {
+  fn compile_pattern(
+    &self,
+    compiler: &mut Compiler<'s>,
+    ast: &'s AST,
+    case_end_jumps: &mut Vec<Jump>,
+  ) -> Result<(), CompileError> {
+    let span = self.span(ast);
+
+    match (&self.start, &self.end) {
+      (Some(pattern), None) => {
+        compiler.chunk.add_opcode(OpCode::Peek, span);
+        pattern.compile(compiler, ast)?;
+        compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
+      }
+      (None, Some(pattern)) => {
+        compiler.chunk.add_opcode(OpCode::Peek, span);
+        pattern.compile(compiler, ast)?;
+        compiler.chunk.add_opcode(OpCode::LessEqual, span);
+      }
+      (Some(greater_than), Some(less_than)) => {
+        compiler.chunk.add_opcode(OpCode::Peek, span);
+        greater_than.compile(compiler, ast)?;
+        compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
+
+        case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, span));
+        compiler.chunk.add_opcode(OpCode::Pop, span);
+
+        compiler.chunk.add_opcode(OpCode::Peek, span);
+        less_than.compile(compiler, ast)?;
+        compiler.chunk.add_opcode(OpCode::LessEqual, span);
+      }
+      (None, None) => return Err(CompileError::InvalidAST),
+    }
+
+    case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, span));
+    compiler.chunk.add_opcode(OpCode::Pop, span);
+
+    Ok(())
+  }
+
+  fn bound_vars_count(&self, _: &AST) -> u8 {
+    0
   }
 }
 
