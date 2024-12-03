@@ -514,6 +514,8 @@ pub enum Pattern {
   /// The start or end missing indicates an open range. It is inclusive of both values.
   /// The only literals which can be used as part of a range are numbers and strings (ordered).
   Range(PatternRange),
+  /// A list pattern, e.g. `[]`, `[x, ..y]`, `[x, y, z]`
+  List(PatternList),
   /// An invalid pattern
   Invalid,
 }
@@ -524,6 +526,7 @@ impl Pattern {
       Pattern::Identifier(identifier) => identifier.span(ast),
       Pattern::Literal(literal) => literal.span(ast),
       Pattern::Range(range) => range.span(ast),
+      Pattern::List(list) => list.span(ast),
       Pattern::Invalid => Span::default(),
     }
   }
@@ -553,6 +556,39 @@ impl PatternRange {
       (Some(start), None) => start.span(ast).merge(dots),
       (None, Some(end)) => dots.merge(end.span(ast)),
       (None, None) => unreachable!(),
+    }
+  }
+}
+/// A list pattern, e.g. `[]`, `[x, ..y]`, `[x, y, z]`
+#[derive(Debug)]
+pub struct PatternList {
+  pub(crate) opening: TokenIdx,
+  pub(crate) first: Option<Variable>,
+  pub(crate) rest: Option<Variable>,
+  pub(crate) closing: Option<TokenIdx>,
+}
+impl PatternList {
+  /// Match the first item of the list to this variable
+  pub fn first<'a>(&'a self, _ast: &'a AST) -> Option<&'a Variable> {
+    self.first.as_ref()
+  }
+  /// The rest of the list is matched to this variable
+  pub fn rest<'a>(&'a self, _ast: &'a AST) -> Option<&'a Variable> {
+    self.rest.as_ref()
+  }
+
+  /// The location of the pattern
+  pub fn span(&self, ast: &AST) -> Span {
+    let opening = Span::from(ast[self.opening]);
+
+    if let Some(end) = self.closing {
+      opening.merge(ast[end].into())
+    } else if let Some(rest) = &self.rest {
+      opening.merge(rest.span(ast))
+    } else if let Some(first) = &self.first {
+      opening.merge(first.span(ast))
+    } else {
+      opening
     }
   }
 }

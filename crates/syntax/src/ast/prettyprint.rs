@@ -260,6 +260,16 @@ impl PrettyPrint for Pattern {
           display_literal(f, end, ast)?;
         };
       }
+      Self::List(list_pattern) => {
+        write!(f, "[")?;
+        match (list_pattern.first(ast), list_pattern.rest(ast)) {
+          (Some(first), Some(rest)) => write!(f, "{}, ..{}", first.name(ast), rest.name(ast))?,
+          (Some(first), None) => write!(f, "{}", first.name(ast))?,
+          (None, Some(rest)) => write!(f, "..{}", rest.name(ast))?,
+          (None, None) => {}
+        };
+        write!(f, "]")?;
+      }
       Self::Invalid => write!(f, "invalid")?,
     };
 

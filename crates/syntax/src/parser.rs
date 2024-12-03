@@ -537,6 +537,7 @@ impl Parser<'_> {
       TokenKind::True | TokenKind::False => return Pattern::Literal(Literal { token }),
       TokenKind::Identifier => return Pattern::Identifier(Variable { token }),
       TokenKind::DotDot => return self.pattern_range(None, token),
+      TokenKind::LeftSquare => return self.pattern_list(token),
       _ => {
         self.add_error(ParseError::ExpectedPattern(self.ast[token]));
         return Pattern::Invalid;
@@ -554,6 +555,38 @@ impl Parser<'_> {
     } else {
       Pattern::Literal(start.unwrap())
     }
+  }
+
+  fn pattern_list(&mut self, opening: TokenIdx) -> Pattern {
+    let (first, rest) = match self.current_kind() {
+      TokenKind::RightSquare => (None, None),
+      TokenKind::DotDot => {
+        let (_, _dots) = self.advance();
+        let rest = self.expect(TokenKind::Identifier);
+        _ = self.matches(TokenKind::Comma);
+
+        (None, rest)
+      }
+      _ => {
+        let first = self.expect(TokenKind::Identifier);
+        let rest = if self.matches(TokenKind::Comma) && self.matches(TokenKind::DotDot) {
+          self.expect(TokenKind::Identifier)
+        } else {
+          None
+        };
+        _ = self.matches(TokenKind::Comma);
+
+        (first, rest)
+      }
+    };
+
+    let closing = self.expect(TokenKind::RightSquare);
+    Pattern::List(PatternList {
+      opening,
+      first: first.map(|token| Variable { token }),
+      rest: rest.map(|token| Variable { token }),
+      closing,
+    })
   }
 
   fn pattern_range(&mut self, start: Option<Literal>, dots: TokenIdx) -> Pattern {

@@ -563,6 +563,49 @@ fn pattern_negative_numbers() {
 }
 
 #[test]
+fn pattern_lists() {
+  let ast = parse(indoc! {"
+    match value
+    | [] -> 0
+    | [x] -> 1
+    | [x, ..y] -> 2
+    | [..x] -> 3
+    | [x, ..y,] -> 4
+    | [x,] -> 5
+  "});
+  let expected = indoc! {"
+    ├─ Match
+    │  ├─ Variable (value)
+    │  ╰─ Cases:
+    │     ├─ Pattern ─ []
+    │     │  ╰─ Number (0)
+    │     ├─ Pattern ─ [x]
+    │     │  ╰─ Number (1)
+    │     ├─ Pattern ─ [x, ..y]
+    │     │  ╰─ Number (2)
+    │     ├─ Pattern ─ [..x]
+    │     │  ╰─ Number (3)
+    │     ├─ Pattern ─ [x, ..y]
+    │     │  ╰─ Number (4)
+    │     ╰─ Pattern ─ [x]
+    │        ╰─ Number (5)
+  "};
+  assert!(ast.is_ok());
+  assert_eq!(ast.to_string(), expected);
+
+  let empty_no_closing_bracket = "match x | [ -> 3";
+  assert!(parse(empty_no_closing_bracket).is_err());
+  let identifier_no_closing = "match x | [x -> 3";
+  assert!(parse(identifier_no_closing).is_err());
+  let more_than_one_identifier = "match x | [x, y, z] -> 3";
+  assert!(parse(more_than_one_identifier).is_err());
+  let nested_literal = "match x | [3] -> 3";
+  assert!(parse(nested_literal).is_err());
+  let two_vars_no_rest = "match x | [x, y] -> 3";
+  assert!(parse(two_vars_no_rest).is_err());
+}
+
+#[test]
 fn match_missing_parts() {
   assert!(parse("match | 1 -> 2").is_err());
   assert!(parse("match 3 | -5").is_err());

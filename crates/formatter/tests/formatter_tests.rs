@@ -423,6 +423,31 @@ fn match_() {
     "match n\n  | 1 -> a\n  | 2.25 -> b\n  | 'hello' -> c",
     100
   );
+
+  let match_lists = indoc! {"
+    match x
+      | [] -> 0
+      | [x] -> 1
+      | [variable] -> 1
+      | [x, ..xs] -> {
+        let hello = 3 + x
+        length(xs) * hello
+      }
+      | [..whole] -> maths::NAN
+  "};
+  let match_lists_misformatted = indoc! {"
+    match x
+      | [ ] -> 0
+    | [  x] -> 1
+      | [variable,] -> 1
+          |    [x  ,..  xs ]   -> {
+        let hello = 3  + x
+        length(xs ) * hello
+      }
+      |  [..whole   ]          -> maths::NAN
+  "};
+  assert_format!(match_lists, match_lists, 80);
+  assert_format!(match_lists_misformatted, match_lists, 20);
 }
 
 #[test]

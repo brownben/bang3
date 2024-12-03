@@ -330,8 +330,27 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for Pattern {
         IR::Text(".."),
         (range.end).format(f, ast),
       ]),
+      Pattern::List(list) => list.format(f, ast),
       Pattern::Invalid => IR::Empty,
     }
+  }
+}
+impl<'a, 'b> Formattable<'a, 'b, AST> for PatternList {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
+    f.concat([
+      IR::Text("["),
+      match (self.first(ast), self.rest(ast)) {
+        (Some(first), Some(rest)) => f.concat([
+          IR::Text(first.name(ast)),
+          IR::Text(", .."),
+          IR::Text(rest.name(ast)),
+        ]),
+        (Some(first), None) => IR::Text(first.name(ast)),
+        (None, Some(rest)) => f.concat([IR::Text(".."), IR::Text(rest.name(ast))]),
+        (None, None) => IR::Empty,
+      },
+      IR::Text("]"),
+    ])
   }
 }
 impl<'a, 'b> Formattable<'a, 'b, AST> for Unary {
