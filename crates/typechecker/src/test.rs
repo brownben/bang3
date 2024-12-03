@@ -904,6 +904,10 @@ mod exhaustive {
 
     let arms_after_catch_all = "match 4 | _ -> 1 | 1 -> 3 | 2 -> 5";
     assert!(has_type_error(arms_after_catch_all));
+
+    let covered_except_guard =
+      "match 5 | 0 -> 'zero' | ..0 if false -> 'negative' | 0.. -> 'positive'";
+    assert!(has_type_error(covered_except_guard));
   }
 
   #[test]

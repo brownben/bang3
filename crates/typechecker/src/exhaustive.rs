@@ -128,10 +128,12 @@ fn number<'a>(
       Pattern::Identifier(_) if arm.guard(ast).is_none() => has_catch_all = true,
 
       Pattern::Literal(literal) => match literal.value(ast) {
-        LiteralValue::Number(number) => number_ranges.push(NumberRange::from(number)),
-        LiteralValue::Boolean(_) | LiteralValue::String(_) => {}
+        LiteralValue::Number(number) if arm.guard(ast).is_none() => {
+          number_ranges.push(NumberRange::from(number));
+        }
+        LiteralValue::Number(_) | LiteralValue::Boolean(_) | LiteralValue::String(_) => {}
       },
-      Pattern::Range(range) => {
+      Pattern::Range(range) if arm.guard(ast).is_none() => {
         if let Ok(range) =
           NumberRange::from_range_pattern(range.start.as_ref(), range.end.as_ref(), ast)
         {
