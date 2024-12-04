@@ -477,7 +477,7 @@ impl Gc<u8> {
   ///
   /// Is ignored by the Garbage Collector
   pub const NULL: Gc<u8> = Self {
-    value: NonZero::new(u32::MAX).unwrap(),
+    value: NonZero::new(u32::MAX - 7).unwrap(),
     _type: PhantomData,
   };
 }

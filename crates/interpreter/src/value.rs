@@ -324,4 +324,13 @@ mod test {
     assert!(!function.is_object());
     assert!(!function.is_string());
   }
+
+  #[test]
+  fn gc_null() {
+    let type_id = TypeId(u16::MAX.into()); // Hopefully an untaken type id
+    let gc_null = Value::from_object(Gc::NULL, type_id);
+    assert!(!gc_null.is_number());
+    assert!(!gc_null.is_constant_function());
+    assert!(!gc_null.is_string());
+  }
 }
