@@ -39,6 +39,8 @@ pub const DEFAULT_TYPE_DESCRIPTORS: &[TypeDescriptor] = &[
   NATIVE_CLOSURE_TWO,
   LIST,
   LIST_VIEW,
+  OPTION_SOME,
+  OPTION_NONE,
   ALLOCATED,
 ];
 
@@ -490,6 +492,37 @@ fn list_display(vm: &VM, list: &[Value]) -> String {
   inner(vm, list).unwrap()
 }
 
+const OPTION_SOME: TypeDescriptor = TypeDescriptor {
+  type_name: "Option::Some",
+  trace: |vm, value, trace_value| trace_value(vm, vm.heap[value.cast::<Value>()]),
+  display: |vm, value| format!("Some({})", vm.heap[value.cast::<Value>()].debug(vm)),
+  debug: |vm, value| format!("Some({})", vm.heap[value.cast::<Value>()].debug(vm)),
+  is_falsy: |_, _| false,
+  equals: |vm, a, b| {
+    if !b.is_object_type(SOME_TYPE_ID) {
+      return false;
+    }
+
+    vm.equals(
+      vm.heap[a.as_object::<Value>()],
+      vm.heap[b.as_object::<Value>()],
+    )
+  },
+  call: None,
+};
+pub const SOME_TYPE_ID: TypeId = TypeId(8);
+
+const OPTION_NONE: TypeDescriptor = TypeDescriptor {
+  type_name: "Option::None",
+  trace: |_, _, _| {},
+  display: |_, _| "None".to_owned(),
+  debug: |_, _| "None".to_owned(),
+  is_falsy: |_, _| true,
+  equals: |_, a, b| a == b,
+  call: None,
+};
+pub const NONE_TYPE_ID: TypeId = TypeId(9);
+
 /// A value which has been moved from the stack to the heap, as it has been captured by a closure
 const ALLOCATED: TypeDescriptor = TypeDescriptor {
   type_name: "allocated",
@@ -503,7 +536,7 @@ const ALLOCATED: TypeDescriptor = TypeDescriptor {
   equals: |_, _, _| unreachable!("Not accessed as a value"),
   call: None,
 };
-pub const ALLOCATED_TYPE_ID: TypeId = TypeId(8);
+pub const ALLOCATED_TYPE_ID: TypeId = TypeId(10);
 
 #[cfg(test)]
 mod test {
@@ -523,6 +556,8 @@ mod test {
     assert_eq!(objects[NATIVE_CLOSURE_TWO_TYPE_ID.0].type_name, "function");
     assert_eq!(objects[LIST_TYPE_ID.0].type_name, "list");
     assert_eq!(objects[LIST_VIEW_TYPE_ID.0].type_name, "list");
+    assert_eq!(objects[SOME_TYPE_ID.0].type_name, "Option::Some");
+    assert_eq!(objects[NONE_TYPE_ID.0].type_name, "Option::None");
     assert_eq!(objects[ALLOCATED_TYPE_ID.0].type_name, "allocated");
   }
 
@@ -531,6 +566,7 @@ mod test {
     let mut vm = VM::new(HeapSize::Small, &EmptyContext).unwrap();
 
     let empty_allocation = vm.heap.allocate(());
+    let get_type_name = |value| vm.get_type_descriptor(value).type_name;
 
     let string = Value::from_object(empty_allocation, STRING_TYPE_ID);
     assert_eq!(vm.get_type_descriptor(string).type_name, "string");
@@ -538,23 +574,26 @@ mod test {
     assert_eq!(vm.get_type_descriptor(string_view).type_name, "string");
 
     let closure = Value::from_object(empty_allocation, CLOSURE_TYPE_ID);
-    assert_eq!(vm.get_type_descriptor(closure).type_name, "function");
+    assert_eq!(get_type_name(closure), "function");
 
     let native_function = Value::from_object(empty_allocation, NATIVE_FUNCTION_TYPE_ID);
-    let type_name = vm.get_type_descriptor(native_function).type_name;
-    assert_eq!(type_name, "function");
+    assert_eq!(get_type_name(native_function), "function");
     let native_closure = Value::from_object(empty_allocation, NATIVE_CLOSURE_TYPE_ID);
-    assert_eq!(vm.get_type_descriptor(native_closure).type_name, "function");
+    assert_eq!(get_type_name(native_closure), "function");
     let native_closure_two = Value::from_object(empty_allocation, NATIVE_CLOSURE_TWO_TYPE_ID);
-    let type_name = vm.get_type_descriptor(native_closure_two).type_name;
-    assert_eq!(type_name, "function");
+    assert_eq!(get_type_name(native_closure_two), "function");
 
     let list = Value::from_object(empty_allocation, LIST_TYPE_ID);
-    assert_eq!(vm.get_type_descriptor(list).type_name, "list");
+    assert_eq!(get_type_name(list), "list");
     let list_view = Value::from_object(empty_allocation, LIST_VIEW_TYPE_ID);
-    assert_eq!(vm.get_type_descriptor(list_view).type_name, "list");
+    assert_eq!(get_type_name(list_view), "list");
+
+    let some = Value::from_object(empty_allocation, SOME_TYPE_ID);
+    assert_eq!(get_type_name(some), "Option::Some");
+    let none = Value::from_object(empty_allocation, NONE_TYPE_ID);
+    assert_eq!(get_type_name(none), "Option::None");
 
     let allocated = Value::from_object(empty_allocation, ALLOCATED_TYPE_ID);
-    assert_eq!(vm.get_type_descriptor(allocated).type_name, "allocated");
+    assert_eq!(get_type_name(allocated), "allocated");
   }
 }

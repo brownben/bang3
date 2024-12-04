@@ -30,6 +30,8 @@ pub enum StdlibModule {
   String,
   /// The `list` module
   List,
+  /// The `option` module
+  Option,
   /// The module is unknown
   Unknown,
 }
@@ -40,6 +42,7 @@ impl StdlibModule {
       "maths" => Self::Maths,
       "string" => Self::String,
       "list" => Self::List,
+      "option" => Self::Option,
       _ => Self::Unknown,
     }
   }
@@ -51,6 +54,7 @@ impl StdlibModule {
       Self::Maths => "maths",
       Self::String => "string",
       Self::List => "list",
+      Self::Option => "option",
       Self::Unknown => "",
     }
   }
@@ -61,6 +65,7 @@ impl StdlibModule {
       Self::Maths => maths_module(types, item),
       Self::String => string_module(types, item),
       Self::List => list_module(types, item),
+      Self::Option => option_module(types, item),
       Self::Unknown => ImportResult::ModuleNotFound,
     }
   }
@@ -92,6 +97,7 @@ impl StdlibModule {
       Self::Maths => bang_interpreter::stdlib::maths_docs(item),
       Self::String => bang_interpreter::stdlib::string_docs(item),
       Self::List => bang_interpreter::stdlib::list_docs(item),
+      Self::Option => bang_interpreter::stdlib::option_docs(item),
       Self::Unknown => None,
     }
   }
@@ -103,6 +109,7 @@ impl StdlibModule {
       Self::Maths => &bang_interpreter::stdlib::MATHS_ITEMS,
       Self::String => &bang_interpreter::stdlib::STRING_ITEMS,
       Self::List => &bang_interpreter::stdlib::LIST_ITEMS,
+      Self::Option => &bang_interpreter::stdlib::OPTION_ITEMS,
       Self::Unknown => &[],
     }
   }
@@ -165,6 +172,31 @@ fn list_module(types: &mut TypeArena, item: &str) -> ImportResult {
     "isEmpty" => generic_into_import_result(list_to_bool),
     "contains" => generic_into_import_result(x_to_list_to_bool),
 
+    _ => ImportResult::ItemNotFound,
+  }
+}
+
+fn option_module(types: &mut TypeArena, item: &str) -> ImportResult {
+  let generic = types.new_type(Type::Quantified(0));
+  let generic_option = types.new_type(Type::Structure(Structure::Option, generic));
+  let generic_option_option = types.new_type(Type::Structure(Structure::Option, generic_option));
+
+  let x_to_option_x = types.new_type(Type::Function(generic, generic_option));
+  let x_option_to_bool = types.new_type(Type::Function(generic_option, TypeArena::BOOLEAN));
+  let option_x_to_x = types.new_type(Type::Function(generic_option, generic));
+  let x_to_option_x_to_x = types.new_type(Type::Function(generic, option_x_to_x));
+  let option_option_x_to_option_x =
+    types.new_type(Type::Function(generic_option_option, generic_option));
+
+  let generic_into_import_result = |item| ImportResult::Value(TypeScheme::new(item, 1));
+
+  match item {
+    "None" => generic_into_import_result(generic_option),
+    "Some" => generic_into_import_result(x_to_option_x),
+    "isNone" | "isSome" => generic_into_import_result(x_option_to_bool),
+    "unwrap" => generic_into_import_result(option_x_to_x),
+    "unwrapOr" => generic_into_import_result(x_to_option_x_to_x),
+    "flatten" => generic_into_import_result(option_option_x_to_option_x),
     _ => ImportResult::ItemNotFound,
   }
 }

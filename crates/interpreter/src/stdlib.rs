@@ -85,6 +85,7 @@ impl Context for StandardContext {
       "maths" => maths(vm, item),
       "string" => string(vm, item),
       "list" => list(vm, item),
+      "option" => option(vm, item),
       _ => ImportResult::ModuleNotFound,
     }
   }
@@ -103,3 +104,6 @@ pub use string::{STRING_ITEMS, string, string_docs};
 
 mod list;
 pub use list::{LIST_ITEMS, list, list_docs};
+
+mod option;
+pub use option::{OPTION_ITEMS, option, option_docs};

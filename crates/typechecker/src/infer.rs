@@ -40,7 +40,7 @@ impl TypeChecker {
   }
 
   const PRIMITIVE_NAMES: [&str; 4] = ["number", "string", "boolean", "_"];
-  const STRUCTURE_NAMES: [&str; 1] = ["list"];
+  const STRUCTURE_NAMES: [&str; 2] = ["list", "option"];
 
   fn type_from_annotation_inner<'a>(
     &mut self,
@@ -73,6 +73,10 @@ impl TypeChecker {
           let type_ = self.type_from_annotation_inner(parameter.parameter(ast), ast, variables);
           self.types.new_type(Type::Structure(Structure::List, type_))
         }
+        "option" => {
+          let type_ = self.type_from_annotation_inner(parameter.parameter(ast), ast, variables);
+          (self.types).new_type(Type::Structure(Structure::Option, type_))
+        }
         name if Self::PRIMITIVE_NAMES.contains(&name) => {
           self.problems.push(TypeError::UnexpectedParameter {
             type_: name.to_owned(),
@@ -101,6 +105,11 @@ impl TypeChecker {
         // If it doesn't have a parameter, make it generic
         let type_ = self.new_type_var();
         self.types.new_type(Type::Structure(Structure::List, type_))
+      }
+      "option" => {
+        // If it doesn't have a parameter, make it generic
+        let type_ = self.new_type_var();
+        (self.types).new_type(Type::Structure(Structure::Option, type_))
       }
       "_" => TypeArena::NEVER,
       _ => {

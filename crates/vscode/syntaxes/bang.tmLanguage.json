@@ -223,7 +223,7 @@
               "name": "support.type.primitive.bang"
             },
             {
-              "match": "\\b(list)\\b",
+              "match": "\\b(list|option)\\b",
               "name": "support.type.structure.bang"
             },
             {

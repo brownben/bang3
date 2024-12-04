@@ -562,3 +562,137 @@ mod list {
     assert_variable!(contains; e, true);
   }
 }
+
+mod option {
+  use super::{Value, assert_variable, indoc, run};
+
+  #[test]
+  fn basic_types() {
+    let mut to_string = run(indoc! {"
+      from option import { None, Some }
+
+      let a = Some(1) >> string::from
+      let b = Some('hello world') >> string::from
+      let c = None >> string::from
+      let d = Some(None) >> string::from
+    "});
+    assert_variable!(to_string; a, string "Some(1)");
+    assert_variable!(to_string; b, string "Some('hello world')");
+    assert_variable!(to_string; c, string "None");
+    assert_variable!(to_string; d, string "Some(None)");
+
+    let is_falsy = run(indoc! {"
+      from option import { None, Some }
+
+      let a = if (None) 5 else 10
+      let b = if (Some(0)) 5 else 10
+      let c = if (Some(1)) 5 else 10
+    "});
+    assert_variable!(is_falsy; a, 10.0);
+    assert_variable!(is_falsy; b, 5.0);
+    assert_variable!(is_falsy; c, 5.0);
+
+    let equality = run(indoc! {"
+      from option import { None, Some }
+
+      let a = None == None
+      let b = Some(1) == Some(1)
+      let c = Some(1) == Some(0)
+      let d = Some(1) == None
+      let e = Some(None) == None
+      let f = None == Some(1)
+      let g = Some([1, '', None]) == Some([1, '', None])
+    "});
+    assert_variable!(equality; a, true);
+    assert_variable!(equality; b, true);
+    assert_variable!(equality; c, false);
+    assert_variable!(equality; d, false);
+    assert_variable!(equality; e, false);
+    assert_variable!(equality; f, false);
+    assert_variable!(equality; g, true);
+  }
+
+  #[test]
+  fn is_option() {
+    let is_none = run(indoc! {"
+      from option import { None, Some, isNone }
+
+      let a = Some(1) >> isNone
+      let b = None >> isNone
+      let c = Some(None) >> isNone
+      let d = 5 >> isNone
+    "});
+    assert_variable!(is_none; a, false);
+    assert_variable!(is_none; b, true);
+    assert_variable!(is_none; c, false);
+    assert_variable!(is_none; d, false);
+
+    let is_some = run(indoc! {"
+      from option import { None, Some, isSome }
+
+      let a = Some(1) >> isSome
+      let b = None >> isSome
+      let c = Some(None) >> isSome
+      let d = 5 >> isSome
+    "});
+    assert_variable!(is_some; a, true);
+    assert_variable!(is_some; b, false);
+    assert_variable!(is_some; c, true);
+    assert_variable!(is_some; d, false);
+  }
+
+  #[test]
+  fn unwrap() {
+    let of_none = run(indoc! {"
+      from option import { None, Some, unwrap }
+
+      unwrap(None)
+    "});
+    assert!(of_none.is_err());
+
+    let of_some = run(indoc! {"
+      from option import { None, Some, unwrap }
+
+      let a = Some(1) >> unwrap
+      let b = (Some(None) >> unwrap) == None
+    "});
+    assert_variable!(of_some; a, 1.0);
+    assert_variable!(of_some; b, true);
+
+    let wrong_type = run("option::unwrap(5)");
+    assert!(wrong_type.is_err());
+
+    let unwrap_or = run(indoc! {"
+      from option import { None, Some, unwrapOr }
+
+      let a = None >> unwrapOr(5)
+      let b = Some(1) >> unwrapOr(5)
+      let c = (Some(None) >> unwrapOr(5)) == None
+    "});
+    assert_variable!(unwrap_or; a, 5.0);
+    assert_variable!(unwrap_or; b, 1.0);
+    assert_variable!(unwrap_or; c, true);
+
+    let unwrap_or_wrong_type = run("option::unwrapOr(5)(3)");
+    assert!(unwrap_or_wrong_type.is_err());
+  }
+
+  #[test]
+  fn flatten() {
+    let mut flatten = run(indoc! {"
+      from option import { None, Some, flatten }
+
+      let a = Some(1) >> flatten >> string::from
+      let b = None >> flatten >> string::from
+      let c = Some(None) >> flatten >> string::from
+      let d = Some(Some(5)) >> flatten >> string::from
+    "});
+    assert_variable!(flatten; a,string "1");
+    assert_variable!(flatten; b,string "None");
+    assert_variable!(flatten; c,string "None");
+    assert_variable!(flatten; d,string "Some(5)");
+
+    let not_option = run("option::flatten(5)");
+    assert!(not_option.is_err());
+  }
+}

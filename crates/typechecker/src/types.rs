@@ -333,11 +333,13 @@ pub enum TypeVarLink {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Structure {
   List,
+  Option,
 }
 impl fmt::Display for Structure {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       Structure::List => write!(f, "list"),
+      Structure::Option => write!(f, "option"),
     }
   }
 }

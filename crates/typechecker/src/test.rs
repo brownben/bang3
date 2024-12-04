@@ -1063,4 +1063,21 @@ mod stdlib {
     assert_eq!(synthesize("list::contains(4)([1, 2, 4])"), "boolean");
     assert!(has_type_error("list::contains('')([1, 2, 4])"));
   }
+
+  #[test]
+  fn option() {
+    let source = indoc! {"
+      from option import { None, Some }
+
+      option::isSome(Some(5)) == option::isNone(None)
+      (Some(5) >> option::unwrap) == 2
+      (Some(2) >> option::unwrapOr(4)) == 2
+      option::flatten(Some(None))
+      let _: option<option<number>> = option::flatten(Some(Some(Some(5))))
+      None >> option::unwrapOr(4)
+    "};
+    assert_eq!(synthesize(source), "number");
+
+    assert!(has_type_error("option::Some(false) >> option::unwrapOr(2)"));
+  }
 }
