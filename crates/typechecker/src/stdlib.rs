@@ -206,6 +206,8 @@ mod test {
   use super::{ImportResult, MODULES, TypeArena};
   use super::{list_module, maths_module, option_module, string_module};
   use bang_interpreter::stdlib::{LIST_ITEMS, MATHS_ITEMS, OPTION_ITEMS, STRING_ITEMS};
+  use bang_interpreter::stdlib::{list_docs, maths_docs, option_docs, string_docs};
+  use indoc::indoc;
 
   #[test]
   fn all_items_present() {
@@ -234,6 +236,81 @@ mod test {
     for item in OPTION_ITEMS {
       let ty = option_module(&mut types, item);
       assert!(matches!(ty, ImportResult::Value { .. }));
+    }
+  }
+
+  #[test]
+  fn check_example_in_docs_typecheck() {
+    for item in STRING_ITEMS {
+      typecheck_docs("string", item, string_docs(item));
+    }
+
+    for item in MATHS_ITEMS {
+      typecheck_docs("maths", item, maths_docs(item));
+    }
+
+    for item in LIST_ITEMS {
+      typecheck_docs("list", item, list_docs(item));
+    }
+
+    for item in OPTION_ITEMS {
+      typecheck_docs("option", item, option_docs(item));
+    }
+  }
+
+  /// Gets an example from a docstring if it exists
+  fn get_doc_example(docs: &str) -> String {
+    docs
+      .lines()
+      .skip_while(|line| !line.trim_end().ends_with("```bang"))
+      .skip(1)
+      .take_while(|line| !line.trim_end().ends_with("```"))
+      .fold(String::new(), |a, b| a + b + "\n")
+      .trim_end()
+      .to_string()
+  }
+
+  /// Typechecks a docstring example
+  fn typecheck_docs(module: &str, item: &str, docs: Option<&'static str>) {
+    let doc_example = get_doc_example(docs.unwrap());
+
+    let ast = bang_syntax::parse(doc_example);
+    if !ast.is_valid() {
+      panic!(
+        indoc! {"
+          `{}::{}`'s documentation example could not be parsed
+
+          ```bang
+          {}
+          ```
+        "},
+        module, item, ast.source
+      );
+    }
+
+    let type_checker = crate::TypeChecker::check(&ast);
+    if !type_checker.problems().is_empty() {
+      let errors = (type_checker.problems.iter())
+        .map(|error| error.full_message())
+        .fold(String::new(), |a, b| a + b.as_str() + "\n\n");
+
+      panic!(
+        indoc! {"
+          `{}::{}`'s documentation example has a type error
+
+          ```bang
+          {}
+          ```
+
+          Errors:
+
+          {}
+        "},
+        module,
+        item,
+        ast.source,
+        errors.trim_end()
+      );
     }
   }
 }

@@ -167,7 +167,7 @@ module!(maths, MATHS_ITEMS, maths_docs, {
   /// ## Example
   /// ```bang
   /// maths::ln(1) // 0
-  /// maths::ln(E) // 1
+  /// maths::ln(maths::E) // 1
   /// ```
   fn ln() = f64_function!(f64::ln);
   /// Raises a number to the power of a number
