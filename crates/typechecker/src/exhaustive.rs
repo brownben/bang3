@@ -39,6 +39,7 @@ pub fn check<'a>(
     Type::Primitive(PrimitiveType::Number) => number(arms, ast, match_span),
     Type::Primitive(PrimitiveType::Unknown) => Vec::new(),
     Type::Structure(Structure::List, _) => list(arms, ast, match_span),
+    Type::Structure(Structure::Option, _) => option(arms, ast, match_span),
     _ => has_catch_all(arms, ast, match_span),
   }
 }
@@ -176,7 +177,6 @@ fn number<'a>(
     (false, _) => missing_cases_errors(missing_cases, match_span),
   }
 }
-
 #[derive(Debug, PartialEq)]
 struct NumberRange(f64, f64);
 impl NumberRange {
@@ -305,7 +305,6 @@ fn list<'a>(
 
   missing_cases
 }
-
 #[derive(Debug, Clone)]
 pub enum MissingListPattern {
   Empty,
@@ -332,6 +331,55 @@ impl MissingListPattern {
     TypeError::MissingPattern {
       message: self.to_string(),
       span: match_span,
+    }
+  }
+}
+
+fn option<'a>(
+  cases: impl Iterator<Item = &'a MatchArm>,
+  ast: &AST,
+  match_span: Span,
+) -> Vec<TypeError> {
+  let (mut has_some, mut has_none) = (false, false);
+  let mut unused_arms = vec![];
+
+  for arm in cases {
+    match &arm.pattern {
+      Pattern::Identifier(_) if !has_some || !has_none => {
+        if arm.guard(ast).is_none() {
+          has_some = true;
+          has_none = true;
+        }
+      }
+      Pattern::Option(option) => match option.kind {
+        None if !has_none && arm.guard(ast).is_none() => has_none = true,
+        None if !has_none => {}
+        Some(()) if !has_some && arm.guard(ast).is_none() => has_some = true,
+        Some(()) if !has_some => {}
+        _ => unused_arms.push(arm.span(ast)),
+      },
+      _ => unused_arms.push(arm.span(ast)),
+    }
+  }
+
+  match (has_some, has_none) {
+    (true, true) if unused_arms.is_empty() => Vec::new(),
+    (true, true) => unused_arms_errors(unused_arms),
+    (false, true) => missing_cases_errors([MissingOptionPattern(Some(()))], match_span),
+    (true, false) => missing_cases_errors([MissingOptionPattern(None)], match_span),
+    (false, false) => missing_cases_errors(
+      [MissingOptionPattern(Some(())), MissingOptionPattern(None)],
+      match_span,
+    ),
+  }
+}
+#[derive(Debug, Clone)]
+pub struct MissingOptionPattern(Option<()>);
+impl fmt::Display for MissingOptionPattern {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self.0 {
+      Some(()) => write!(f, "the arms don't cover `Some`"),
+      None => write!(f, "the arms don't cover `None`"),
     }
   }
 }

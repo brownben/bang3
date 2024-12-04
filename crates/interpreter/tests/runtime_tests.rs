@@ -848,6 +848,69 @@ fn match_expression() {
   assert_variable!(list_pattern_guards; j, 9.0);
   assert_variable!(list_pattern_guards; k, 9.0);
 
+  let option_patterns = run(indoc! {"
+    from option import { None, Some }
+
+    /// matches options properly and clears up properly
+    let matchFunction = x => {
+      let a = 1
+      let b = match x
+        | Some(_) -> 5
+        | None -> 10
+        | _ -> 100
+      let c = 2
+      a + b + c
+    }
+    let a = matchFunction(None)
+    let b = matchFunction(Some(5))
+    let c = matchFunction(false)
+    let d = matchFunction(-55)
+    let e = matchFunction('a string')
+
+    /// some variable is matched properly
+    let matchFunction = x => {
+      let a = 1
+      let b = match x
+        | Some(x) -> x
+        | _ -> 100
+      let c = 2
+      a + b + c
+    }
+    let f = matchFunction(Some(0))
+    let g = matchFunction(Some(1))
+    let h = matchFunction(Some(7))
+  "});
+  assert_variable!(option_patterns; a, 13.0);
+  assert_variable!(option_patterns; b, 8.0);
+  assert_variable!(option_patterns; c, 103.0);
+  assert_variable!(option_patterns; d, 103.0);
+  assert_variable!(option_patterns; e, 103.0);
+  assert_variable!(option_patterns; f, 3.0);
+  assert_variable!(option_patterns; g, 4.0);
+  assert_variable!(option_patterns; h, 10.0);
+
+  let option_pattern_guard = run(indoc! {"
+    from option import { None, Some }
+
+    let matchFunction = x => {
+      let a = 1
+      let b = match x
+        | Some(_) if false -> 5
+        | None if false -> 10
+        | _ -> 100
+      let c = 2
+      a + b + c
+    }
+    let a = matchFunction(None)
+    let b = matchFunction(Some(5))
+    let c = matchFunction(false)
+    let d = matchFunction(-55)
+  "});
+  assert_variable!(option_pattern_guard; a, 103.0);
+  assert_variable!(option_pattern_guard; b, 103.0);
+  assert_variable!(option_pattern_guard; c, 103.0);
+  assert_variable!(option_pattern_guard; d, 103.0);
+
   let fibonnacci = run(indoc! {"
     let fibonnacciMatch = n => match n
       | ..2 -> 1

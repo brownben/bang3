@@ -725,6 +725,15 @@ impl InferType for Match {
           if let Some(rest) = list.rest(ast) {
             (t.env).define_variable(rest.name(ast), rest.span(ast), value_type, None);
           }
+        }
+        Pattern::Option(option) => {
+          let generic = t.new_type_var();
+          let option_type = (t.types).new_type(Type::Structure(Structure::Option, generic));
+
+          check_pattern(t, option_type, value_type, option.span(ast));
+
+          if let Some(variable) = option.variable() {
+            (t.env).define_variable(variable.name(ast), variable.span(ast), generic, None);
           }
         }
       }

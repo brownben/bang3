@@ -508,6 +508,16 @@ impl<'context> VM<'context> {
           self.push(Value::from_object(tail, object::LIST_VIEW_TYPE_ID));
         }
 
+        // Options
+        OpCode::OptionIsSome => {
+          let is_some = self.peek().is_object_type(object::SOME_TYPE_ID);
+          self.push(is_some.into());
+        }
+        OpCode::OptionIsNone => {
+          let is_none = self.peek().is_object_type(object::NONE_TYPE_ID);
+          self.push(is_none.into());
+        }
+
         // VM Operations
         OpCode::Pop => {
           self.pop();

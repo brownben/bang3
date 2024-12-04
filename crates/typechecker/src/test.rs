@@ -847,6 +847,7 @@ fn module_item_already_imported() {
   "};
   assert!(has_type_error(with_alias));
 }
+
 mod exhaustive {
   use super::*;
 
@@ -967,6 +968,27 @@ mod exhaustive {
     assert!(has_type_error(extra_one));
 
     let arms_after_catch_all = "match 4 | _ -> 1 | [] -> 3 | [.._] -> 5";
+    assert!(has_type_error(arms_after_catch_all));
+  }
+
+  #[test]
+  fn option() {
+    let source = "match option::None | Some(_) -> 1 | None -> 3";
+    assert_eq!(synthesize(source), "number");
+
+    let source = "match option::Some(4) | Some(x) -> x + 1 | _ -> 3";
+    assert_eq!(synthesize(source), "number");
+
+    let no_some = "match option::Some(4) | None -> 1";
+    assert!(has_type_error(no_some));
+    let no_none = "match option::None | Some(_) -> 1";
+    assert!(has_type_error(no_none));
+    let no_some_or_none = "match option::Some(2) | 1 -> 2 | 4 -> 7";
+    assert!(has_type_error(no_some_or_none));
+
+    let extra_catch_all = "match option::Some(2) | Some(_) -> 1 | None -> 3 | _ -> 5";
+    assert!(has_type_error(extra_catch_all));
+    let arms_after_catch_all = "match option::None | _ -> 1 | Some(_) -> 3 | None -> 5";
     assert!(has_type_error(arms_after_catch_all));
   }
 }

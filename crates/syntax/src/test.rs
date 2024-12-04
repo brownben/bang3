@@ -606,6 +606,35 @@ fn pattern_lists() {
 }
 
 #[test]
+fn pattern_options() {
+  let ast = parse(indoc! {"
+    match value
+    | Some(var) -> 0
+    | None -> 1
+  "});
+  let expected = indoc! {"
+    ├─ Match
+    │  ├─ Variable (value)
+    │  ╰─ Cases:
+    │     ├─ Pattern ─ Some(var)
+    │     │  ╰─ Number (0)
+    │     ╰─ Pattern ─ None
+    │        ╰─ Number (1)
+  "};
+  assert!(ast.is_ok());
+  assert_eq!(ast.to_string(), expected);
+
+  let some_no_closing_bracket = "match x | Some(x -> 3";
+  assert!(parse(some_no_closing_bracket).is_err());
+  let some_no_var = "match x | Some() -> 3";
+  assert!(parse(some_no_var).is_err());
+  let some_no_opening_bracket = "match x | Some x) -> 3";
+  assert!(parse(some_no_opening_bracket).is_err());
+  let none_with_variable = "match x | None(x) -> 3";
+  assert!(parse(none_with_variable).is_err());
+}
+
+#[test]
 fn match_missing_parts() {
   assert!(parse("match | 1 -> 2").is_err());
   assert!(parse("match 3 | -5").is_err());

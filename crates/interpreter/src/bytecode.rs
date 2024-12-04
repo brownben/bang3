@@ -269,6 +269,12 @@ pub enum OpCode {
   /// Pushes the head, and the tail of the list which is on the top of the stack
   ListHeadTail,
 
+  // Options
+  /// Is the top element of the stack a `Some`?
+  OptionIsSome,
+  /// Is the top element of the stack a `None`?
+  OptionIsNone,
+
   // VM Operations
   /// Removes the top element of the stack
   Pop,

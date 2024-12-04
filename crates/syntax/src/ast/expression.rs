@@ -516,6 +516,8 @@ pub enum Pattern {
   Range(PatternRange),
   /// A list pattern, e.g. `[]`, `[x, ..y]`, `[x, y, z]`
   List(PatternList),
+  /// An option pattern, e.g. `Some(x)`, `None`
+  Option(PatternOption),
   /// An invalid pattern
   Invalid,
 }
@@ -527,6 +529,7 @@ impl Pattern {
       Pattern::Literal(literal) => literal.span(ast),
       Pattern::Range(range) => range.span(ast),
       Pattern::List(list) => list.span(ast),
+      Pattern::Option(option) => option.span(ast),
       Pattern::Invalid => Span::default(),
     }
   }
@@ -589,6 +592,44 @@ impl PatternList {
       opening.merge(first.span(ast))
     } else {
       opening
+    }
+  }
+}
+/// An option pattern, e.g. `Some(x)`, `None`
+#[derive(Debug)]
+pub struct PatternOption {
+  /// The kind of option (Some/ None)
+  pub kind: Option<()>,
+  pub(crate) start: TokenIdx,
+  pub(crate) variable: Option<Variable>,
+  pub(crate) end: Option<TokenIdx>,
+}
+impl PatternOption {
+  pub(crate) fn none(token: TokenIdx) -> Self {
+    Self {
+      kind: None,
+      start: token,
+      variable: None,
+      end: None,
+    }
+  }
+
+  /// The variable matched inside a `Some` pattern
+  #[must_use]
+  pub fn variable(&self) -> Option<&Variable> {
+    self.variable.as_ref()
+  }
+
+  /// The location of the pattern
+  pub fn span(&self, ast: &AST) -> Span {
+    let start = Span::from(ast[self.start]);
+
+    if let Some(end) = self.end {
+      start.merge(ast[end].into())
+    } else if let Some(variable) = &self.variable {
+      start.merge(variable.span(ast))
+    } else {
+      start
     }
   }
 }

@@ -649,6 +649,7 @@ impl<'s> CompilePattern<'s> for Pattern {
       Self::Literal(literal) => literal.compile_pattern(compiler, ast, case_end_jumps),
       Self::Range(range) => range.compile_pattern(compiler, ast, case_end_jumps),
       Self::List(list) => list.compile_pattern(compiler, ast, case_end_jumps),
+      Self::Option(option) => option.compile_pattern(compiler, ast, case_end_jumps),
       Self::Invalid => Err(CompileError::InvalidAST),
     }
   }
@@ -659,6 +660,7 @@ impl<'s> CompilePattern<'s> for Pattern {
       Self::Literal(literal) => literal.bound_vars_count(ast),
       Self::Range(range) => range.bound_vars_count(ast),
       Self::List(list) => list.bound_vars_count(ast),
+      Self::Option(option) => option.bound_vars_count(ast),
       Self::Invalid => unreachable!(),
     }
   }
@@ -816,7 +818,44 @@ impl<'s> CompilePattern<'s> for PatternRange {
     0
   }
 }
+impl<'s> CompilePattern<'s> for PatternOption {
+  fn compile_pattern(
+    &self,
+    compiler: &mut Compiler<'s>,
+    ast: &'s AST,
+    case_end_jumps: &mut Vec<Jump>,
+  ) -> Result<(), CompileError> {
+    if self.kind.is_some() {
+      (compiler.chunk).add_opcode(OpCode::OptionIsSome, self.span(ast));
+      case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, self.span(ast)));
+      compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
 
+      (compiler.chunk).add_opcode(OpCode::GetAllocatedValue, self.span(ast));
+      if let Ok(match_value_location) = u8::try_from(compiler.function_locals().len() - 1) {
+        (compiler.chunk).add_value(match_value_location, self.span(ast));
+      } else {
+        return Err(CompileError::TooManyLocalVariables);
+      }
+      let variable = self.variable().ok_or(CompileError::InvalidAST)?;
+      compiler.define_variable(variable.name(ast), self.span(ast))?;
+    }
+
+    if self.kind.is_none() {
+      (compiler.chunk).add_opcode(OpCode::OptionIsNone, self.span(ast));
+      case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, self.span(ast)));
+      compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
+    }
+
+    Ok(())
+  }
+
+  fn bound_vars_count(&self, _: &AST) -> u8 {
+    match self.kind {
+      Some(()) => 1,
+      None => 0,
+    }
+  }
+}
 /// An error from compiling an AST into bytecode
 #[derive(Debug, Clone, Copy)]
 pub enum CompileError {

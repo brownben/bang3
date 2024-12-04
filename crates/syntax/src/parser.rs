@@ -535,7 +535,7 @@ impl Parser<'_> {
     let start = match kind {
       TokenKind::String | TokenKind::Number => Some(Literal { token }),
       TokenKind::True | TokenKind::False => return Pattern::Literal(Literal { token }),
-      TokenKind::Identifier => return Pattern::Identifier(Variable { token }),
+      TokenKind::Identifier => return self.pattern_identifier(token),
       TokenKind::DotDot => return self.pattern_range(None, token),
       TokenKind::LeftSquare => return self.pattern_list(token),
       _ => {
@@ -554,6 +554,30 @@ impl Parser<'_> {
       }
     } else {
       Pattern::Literal(start.unwrap())
+    }
+  }
+
+  fn pattern_identifier(&mut self, token: TokenIdx) -> Pattern {
+    match self.ast.get_token_text(token) {
+      "None" => Pattern::Option(PatternOption::none(token)),
+      "Some" => {
+        let _opening_paren = self.expect(TokenKind::LeftParen);
+        let variable = if self.current_kind() == TokenKind::RightParen {
+          self.add_error(ParseError::MissingIdentifier(self.current_token()));
+          None
+        } else {
+          self.expect(TokenKind::Identifier)
+        };
+        let end = self.expect(TokenKind::RightParen);
+
+        Pattern::Option(PatternOption {
+          kind: Some(()),
+          start: token,
+          variable: variable.map(|token| Variable { token }),
+          end,
+        })
+      }
+      _ => Pattern::Identifier(Variable { token }),
     }
   }
 

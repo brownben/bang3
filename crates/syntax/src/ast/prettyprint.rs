@@ -270,6 +270,13 @@ impl PrettyPrint for Pattern {
         };
         write!(f, "]")?;
       }
+      Self::Option(option) => {
+        if let Some(variable) = option.variable() {
+          write!(f, "Some({})", variable.name(ast))?;
+        } else {
+          write!(f, "None")?;
+        }
+      }
       Self::Invalid => write!(f, "invalid")?,
     };
 

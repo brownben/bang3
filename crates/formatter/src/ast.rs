@@ -326,11 +326,19 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for Pattern {
       Pattern::Identifier(variable) => variable.format(f, ast),
       Pattern::Literal(literal) => literal.format(f, ast),
       Pattern::Range(range) => f.concat([
-        (range.start).format(f, ast),
+        (range.start).as_ref().format(f, ast),
         IR::Text(".."),
-        (range.end).format(f, ast),
+        (range.end).as_ref().format(f, ast),
       ]),
       Pattern::List(list) => list.format(f, ast),
+      Pattern::Option(option) => match option.kind {
+        Some(()) => f.concat([
+          IR::Text("Some("),
+          option.variable().format(f, ast),
+          IR::Text(")"),
+        ]),
+        None => IR::Text("None"),
+      },
       Pattern::Invalid => IR::Empty,
     }
   }

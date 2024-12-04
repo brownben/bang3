@@ -11,7 +11,7 @@ pub trait Formattable<'source, 'allocator, AST> {
     ast: &'source AST,
   ) -> IR<'source, 'allocator>;
 }
-impl<'a, 'b, T: Formattable<'a, 'b, AST>, AST> Formattable<'a, 'b, AST> for Option<T> {
+impl<'a, 'b, T: Formattable<'a, 'b, AST>, AST> Formattable<'a, 'b, AST> for Option<&T> {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     self.as_ref().map(|x| x.format(f, ast)).unwrap_or_default()
   }

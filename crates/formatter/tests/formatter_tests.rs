@@ -447,7 +447,20 @@ fn match_() {
       |  [..whole   ]          -> maths::NAN
   "};
   assert_format!(match_lists, match_lists, 80);
-  assert_format!(match_lists_misformatted, match_lists, 20);
+  assert_format!(match_lists_misformatted, match_lists, 80);
+
+  let match_options = indoc! {"
+    match x
+      | None -> 0
+      | Some(x) -> 1
+  "};
+  let match_options_misformatted = indoc! {"
+    match x
+      |   None -> 0
+      | Some(  x ) -> 1
+  "};
+  assert_format!(match_options, match_options, 80);
+  assert_format!(match_options_misformatted, match_options, 80);
 }
 
 #[test]
