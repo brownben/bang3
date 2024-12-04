@@ -93,6 +93,7 @@ mod type_errors {
       .for_each(|error| match error {
         TypeError::UndefinedVariable { .. } => undefined_variable(file, error, actions),
         TypeError::UnreachableCase { span } => actions.push(unreachable_case(file, error, *span)),
+        TypeError::UnusedVariable { span, .. } => actions.push(unused_variable(file, error, *span)),
 
         #[rustfmt::skip]
         TypeError::ItemNotFound { span, did_you_mean: Some(suggestion), .. }
@@ -175,6 +176,18 @@ mod type_errors {
       kind: Some(lsp::CodeActionKind::QUICKFIX),
       diagnostics: Some(vec![error.diagnostic(file)]),
       edit: Some(replace_edit(file, span, suggestion)),
+      ..Default::default()
+    }
+  }
+
+  fn unused_variable(file: &Document, error: &TypeError, span: Span) -> lsp::CodeAction {
+    // TODO: Suggestion to delete the declaration, but not the expression
+
+    lsp::CodeAction {
+      title: "Prefix with `_`".to_owned(),
+      kind: Some(lsp::CodeActionKind::QUICKFIX),
+      diagnostics: Some(vec![error.diagnostic(file)]),
+      edit: Some(insert_edit(file, span.start, "_")),
       ..Default::default()
     }
   }
