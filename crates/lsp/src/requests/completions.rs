@@ -179,7 +179,7 @@ fn variable_completion(
 
     // If it is a function, we want to use the function snippet
     insert_text: match type_info.kind {
-      VariableType::Function if !skip_function_brackets => Some(format!("{name}($0)")),
+      VariableType::Function if !skip_function_brackets => Some(format!("{name}($1)$0")),
       VariableType::FunctionNoArgs if !skip_function_brackets => Some(format!("{name}()")),
       _ => Some(name.to_owned()),
     },
