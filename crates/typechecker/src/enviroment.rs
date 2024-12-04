@@ -122,7 +122,7 @@ impl Enviroment {
     &mut self,
     variable_name: &str,
     variable_span: Span,
-    type_: TypeScheme,
+    type_: TypeRef,
     documentation: Option<String>,
   ) {
     self.variables.push(Variable {
@@ -136,7 +136,7 @@ impl Enviroment {
       active: Some(variable_span),
 
       depth: self.depth,
-      type_,
+      type_: TypeScheme::monomorphic(type_),
 
       type_info: OnceCell::new(),
     });

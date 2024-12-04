@@ -2,7 +2,7 @@ use crate::{
   TypeChecker, TypeError, VariableKind, exhaustive,
   similarity::similarly_named,
   stdlib::{self, ImportResult, StdlibModule},
-  types::{Structure, Type, TypeArena, TypeRef, TypeScheme},
+  types::{Structure, Type, TypeArena, TypeRef},
 };
 use bang_syntax::{
   AST, Span,
@@ -285,12 +285,7 @@ impl InferType for Let {
     let (identifier, identifier_span) = (self.identifier(ast), self.identifier_span(ast));
     let doc_comment = self.doc_comment(ast).map(|comment| comment.full_text(ast));
 
-    t.env.define_variable(
-      identifier,
-      identifier_span,
-      TypeScheme::monomorphic(ty),
-      doc_comment,
-    );
+    (t.env).define_variable(identifier, identifier_span, ty, doc_comment);
     ExpressionType::from(TypeArena::NEVER, return_type)
   }
 }
@@ -304,12 +299,7 @@ fn let_statement_function(
   let doc_comment = let_.doc_comment(ast).map(|comment| comment.full_text(ast));
 
   let function_type = t.new_type_var();
-  t.env.define_variable(
-    identifier,
-    identifier_span,
-    TypeScheme::monomorphic(function_type),
-    doc_comment,
-  );
+  (t.env).define_variable(identifier, identifier_span, function_type, doc_comment);
 
   // Infer the function type
   let mut ty = function.infer(t, ast);
@@ -582,7 +572,7 @@ impl InferExpression for Function {
     t.env.define_variable(
       self.parameter.name(ast),
       self.parameter.span(ast),
-      TypeScheme::monomorphic(parameter),
+      parameter,
       None,
     );
     let return_type = match self.body(ast).infer(t, ast) {
@@ -706,12 +696,7 @@ impl InferType for Match {
 
       match &case.pattern {
         Pattern::Identifier(identifier) => {
-          t.env.define_variable(
-            identifier.name(ast),
-            identifier.span(ast),
-            TypeScheme::monomorphic(value_type),
-            None,
-          );
+          (t.env).define_variable(identifier.name(ast), identifier.span(ast), value_type, None);
         }
         Pattern::Invalid => {}
         Pattern::Literal(literal) => {
@@ -735,20 +720,11 @@ impl InferType for Match {
           check_pattern(t, list_type, value_type, list.span(ast));
 
           if let Some(first) = list.first(ast) {
-            t.env.define_variable(
-              first.name(ast),
-              first.span(ast),
-              TypeScheme::new(generic, 1),
-              None,
-            );
+            (t.env).define_variable(first.name(ast), first.span(ast), generic, None);
           }
           if let Some(rest) = list.rest(ast) {
-            t.env.define_variable(
-              rest.name(ast),
-              rest.span(ast),
-              TypeScheme::monomorphic(value_type),
-              None,
-            );
+            (t.env).define_variable(rest.name(ast), rest.span(ast), value_type, None);
+          }
           }
         }
       }
