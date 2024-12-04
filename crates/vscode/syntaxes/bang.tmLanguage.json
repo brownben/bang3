@@ -19,6 +19,9 @@
           "include": "#types"
         },
         {
+          "include": "#options"
+        },
+        {
           "include": "#module-access"
         },
         {
@@ -150,6 +153,24 @@
           "name": "punctuation.separator.dot.decimal.bang"
         }
       }
+    },
+
+    "options": {
+      "patterns": [
+        {
+          "match": "\\b(Some)\\(",
+          "captures": {
+            "1": { "name": "entity.name.type.bang" }
+          }
+        },
+        {
+          "match": "\\b(None|Some)\\b",
+          "captures": {
+            "1": { "name": "entity.name.type.bang" },
+            "2": { "name": "variable.other.bang" }
+          }
+        }
+      ]
     },
 
     "module-access": {

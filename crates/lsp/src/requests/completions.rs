@@ -253,7 +253,7 @@ fn module_item_completions(module: &str, skip_function_brackets: bool) -> lsp::C
   }
 }
 
-fn type_annotation_snippets() -> [lsp::CompletionItem; 4] {
+fn type_annotation_snippets() -> [lsp::CompletionItem; 6] {
   [
     lsp::CompletionItem {
       label: "string".to_owned(),
@@ -274,6 +274,20 @@ fn type_annotation_snippets() -> [lsp::CompletionItem; 4] {
       label: "function".to_owned(),
       kind: Some(lsp::CompletionItemKind::SNIPPET),
       insert_text: Some("$0 => $1".to_owned()),
+      insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+      ..Default::default()
+    },
+    lsp::CompletionItem {
+      label: "list".to_owned(),
+      kind: Some(lsp::CompletionItemKind::SNIPPET),
+      insert_text: Some("list<$1>$0".to_owned()),
+      insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+      ..Default::default()
+    },
+    lsp::CompletionItem {
+      label: "option".to_owned(),
+      kind: Some(lsp::CompletionItemKind::SNIPPET),
+      insert_text: Some("option<$1>$0".to_owned()),
       insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
       ..Default::default()
     },

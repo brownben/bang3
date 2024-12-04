@@ -74,7 +74,7 @@ impl IntoDiagnostic for TypeError {
       message: self.full_message(),
       range: lsp_range_from_span(self.span(), file),
       tags: {
-        if self.is_warning() {
+        if self.is_unused() {
           Some(vec![lsp::DiagnosticTag::UNNECESSARY])
         } else {
           None

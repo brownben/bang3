@@ -94,7 +94,7 @@ impl Context for StandardContext {
 mod macros;
 
 /// The names of all the modules in the standard library
-pub const MODULES: [&str; 3] = ["maths", "string", "list"];
+pub const MODULES: [&str; 4] = ["maths", "string", "list", "option"];
 
 mod maths;
 pub use maths::{MATHS_ITEMS, maths, maths_docs};

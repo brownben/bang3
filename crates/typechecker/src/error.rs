@@ -310,6 +310,15 @@ impl Problem {
     )
   }
 
+  /// Does this error indicate unused code?
+  #[must_use]
+  pub fn is_unused(&self) -> bool {
+    matches!(
+      self,
+      Self::UnusedVariable { .. } | Self::UnusedImport { .. } | Self::UnreachableCase { .. }
+    )
+  }
+
   /// Related information which can be displayed for the error
   #[must_use]
   pub fn related_info(&self) -> Option<(Span, String)> {

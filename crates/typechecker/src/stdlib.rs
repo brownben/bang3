@@ -203,8 +203,9 @@ fn option_module(types: &mut TypeArena, item: &str) -> ImportResult {
 
 #[cfg(test)]
 mod test {
-  use super::{ImportResult, MODULES, TypeArena, list_module, maths_module, string_module};
-  use bang_interpreter::stdlib::{LIST_ITEMS, MATHS_ITEMS, STRING_ITEMS};
+  use super::{ImportResult, MODULES, TypeArena};
+  use super::{list_module, maths_module, option_module, string_module};
+  use bang_interpreter::stdlib::{LIST_ITEMS, MATHS_ITEMS, OPTION_ITEMS, STRING_ITEMS};
 
   #[test]
   fn all_items_present() {
@@ -227,6 +228,11 @@ mod test {
 
     for item in LIST_ITEMS {
       let ty = list_module(&mut types, item);
+      assert!(matches!(ty, ImportResult::Value { .. }));
+    }
+
+    for item in OPTION_ITEMS {
+      let ty = option_module(&mut types, item);
       assert!(matches!(ty, ImportResult::Value { .. }));
     }
   }
