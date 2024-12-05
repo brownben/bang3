@@ -545,6 +545,9 @@ impl<'context> VM<'context> {
         OpCode::Halt => break None,
       };
 
+      #[cfg(feature = "debug-stack")]
+      self.debug_stack(instruction);
+
       ip += instruction.length();
 
       if self.should_garbage_collect() {
@@ -566,6 +569,20 @@ impl<'context> VM<'context> {
     } else {
       Ok(())
     }
+  }
+
+  #[cfg(feature = "debug-stack")]
+  fn debug_stack(&self, instruction: OpCode) {
+    print!("{instruction:?} [");
+
+    for (index, value) in self.stack.iter().enumerate() {
+      if index > 0 {
+        print!(", ");
+      }
+
+      print!("{}", value.debug(self));
+    }
+    println!("]");
   }
 }
 

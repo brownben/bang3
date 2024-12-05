@@ -15,6 +15,7 @@ indoc.workspace = true
 
 [features]
 gc-stress-test = []
+debug-stack = []
 
 [lints]
 workspace = true
