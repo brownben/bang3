@@ -178,7 +178,9 @@ fn list_module(types: &mut TypeArena, item: &str) -> ImportResult {
 
 fn option_module(types: &mut TypeArena, item: &str) -> ImportResult {
   let generic = types.new_type(Type::Quantified(0));
+  let generic_b = types.new_type(Type::Quantified(1));
   let generic_option = types.new_type(Type::Structure(Structure::Option, generic));
+  let generic_option_b = types.new_type(Type::Structure(Structure::Option, generic_b));
   let generic_option_option = types.new_type(Type::Structure(Structure::Option, generic_option));
 
   let x_to_option_x = types.new_type(Type::Function(generic, generic_option));
@@ -187,6 +189,10 @@ fn option_module(types: &mut TypeArena, item: &str) -> ImportResult {
   let x_to_option_x_to_x = types.new_type(Type::Function(generic, option_x_to_x));
   let option_option_x_to_option_x =
     types.new_type(Type::Function(generic_option_option, generic_option));
+
+  let a_to_b = types.new_type(Type::Function(generic, generic_b));
+  let option_a_to_option_b = types.new_type(Type::Function(generic_option, generic_option_b));
+  let a_to_b_to_option_a_to_option_b = types.new_type(Type::Function(a_to_b, option_a_to_option_b));
 
   let generic_into_import_result = |item| ImportResult::Value(TypeScheme::new(item, 1));
 
@@ -197,6 +203,7 @@ fn option_module(types: &mut TypeArena, item: &str) -> ImportResult {
     "unwrap" => generic_into_import_result(option_x_to_x),
     "unwrapOr" => generic_into_import_result(x_to_option_x_to_x),
     "flatten" => generic_into_import_result(option_option_x_to_option_x),
+    "map" => ImportResult::Value(TypeScheme::new(a_to_b_to_option_a_to_option_b, 2)),
     _ => ImportResult::ItemNotFound,
   }
 }

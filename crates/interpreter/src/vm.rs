@@ -17,6 +17,7 @@ struct CallFrame {
   offset: usize,
   chunk: *const Chunk,
   upvalues: Option<GcList<Value>>,
+  native_return: bool,
 }
 
 /// A virtual machine to execute compiled bytecode
@@ -152,6 +153,27 @@ impl<'context> VM<'context> {
       offset,
       chunk,
       upvalues,
+      native_return: false,
+    });
+  }
+  #[inline]
+  fn push_frame_from_native(&mut self, chunk: *const Chunk, upvalues: Option<GcList<Value>>) {
+    self.frames.push(CallFrame {
+      ip: 0,
+      offset: self.stack.len(),
+      chunk,
+      upvalues,
+      native_return: true,
+    });
+  }
+  #[inline]
+  fn push_native_frame(&mut self, upvalues: Option<GcList<Value>>, native_return: bool) {
+    self.frames.push(CallFrame {
+      ip: 0,
+      offset: self.stack.len(),
+      chunk: ptr::null(),
+      upvalues,
+      native_return,
     });
   }
   #[inline]
@@ -227,10 +249,89 @@ impl<'context> VM<'context> {
   ///
   /// # Errors
   /// Returns an error if a runtime error is encountered in the bytecode being executed
-  #[allow(clippy::too_many_lines)]
   pub fn run(&mut self, chunk: &Chunk) -> Result<(), RuntimeError> {
+    let result = self.main_loop::<true>(chunk);
+
+    if let Err(MainLoopError {
+      ip,
+      offset,
+      chunk,
+      kind,
+    }) = result
+    {
+      let mut traceback = Vec::with_capacity(self.stack.len() + 1);
+      let chunk = unsafe { &*chunk };
+
+      if offset != 0 {
+        traceback.push(StackTraceLocation::from_chunk_ip(chunk, ip, offset));
+      }
+      traceback.extend(
+        (self.frames.iter())
+          .rev()
+          .map(|frame| StackTraceLocation::from_frame(self, frame)),
+      );
+      if offset == 0 {
+        traceback.push(StackTraceLocation::from_chunk_ip(chunk, ip, offset));
+      }
+
+      Err(RuntimeError { kind, traceback })
+    } else {
+      Ok(())
+    }
+  }
+
+  /// Call a [`Value`] with the given argument
+  ///
+  /// Returns an optional value. Which is `None` if the function stops execution instead of
+  /// returning a value.
+  ///
+  /// # Errors
+  /// Returns an error if the given value is not callable, or if a runtime error is
+  /// encountered during the bytecode execution
+  pub(crate) fn call(&mut self, func: Value, argument: Value) -> Result<Option<Value>, ErrorKind> {
+    if func.is_constant_function() {
+      self.push(func);
+      self.push_frame_from_native(func.as_function(&self.heap), None);
+      self.push(argument);
+
+      let chunk = unsafe { &*func.as_function(&self.heap).as_ptr() };
+      return self.main_loop::<false>(chunk).map_err(|error| error.kind);
+    }
+
+    if func.is_object() {
+      if func.is_object_type(object::CLOSURE_TYPE_ID) {
+        self.push(func);
+        let closure = &self.heap[func.as_object::<Closure>()];
+        self.push_frame_from_native(closure.function(), Some(closure.upvalues));
+        self.push(argument);
+
+        let chunk = unsafe { &*self.heap[func.as_object::<Closure>()].function().as_ptr() };
+        return self.main_loop::<false>(chunk).map_err(|error| error.kind);
+      }
+
+      if let Some(native_function) = self.get_type_descriptor(func).call {
+        self.push(func);
+        self.push_native_frame(None, true);
+        let result = native_function(self, func.as_object(), argument)?;
+        _ = self.pop_frame();
+        self.pop();
+
+        return Ok(Some(result));
+      }
+    }
+
+    Err(ErrorKind::NotCallable {
+      type_: func.get_type(self),
+    })
+  }
+
+  #[allow(clippy::too_many_lines)]
+  fn main_loop<const MAIN_SCRIPT: bool>(
+    &mut self,
+    chunk: &Chunk,
+  ) -> Result<Option<Value>, MainLoopError> {
     let mut ip = 0;
-    let mut offset = 0;
+    let mut offset = if MAIN_SCRIPT { 0 } else { self.stack.len() - 1 };
     let mut chunk = chunk;
 
     let error = loop {
@@ -400,10 +501,14 @@ impl<'context> VM<'context> {
             && let Some(native_function) = self.get_type_descriptor(callee).call
           {
             let argument = self.pop();
-            let callee = self.pop();
+            self.push_native_frame(None, false);
 
             match native_function(self, callee.as_object(), argument) {
-              Ok(value) => self.push(value),
+              Ok(value) => {
+                _ = self.pop_frame();
+                let _callee = self.pop();
+                self.push(value);
+              }
               Err(err) => break Some(err),
             }
           } else {
@@ -415,9 +520,15 @@ impl<'context> VM<'context> {
         OpCode::Return => {
           let result = self.pop();
           self.stack.drain(offset - 1..);
+          let frame = self.pop_frame();
+
+          // If the frame is marked as native, we can return the value directly
+          if !MAIN_SCRIPT && frame.native_return {
+            return Ok(Some(result));
+          }
+
           self.push(result);
 
-          let frame = self.pop_frame();
           ip = frame.ip;
           offset = frame.offset;
           // SAFETY: callee stays on stack, so call stack reference will always exist
@@ -555,19 +666,15 @@ impl<'context> VM<'context> {
       }
     };
 
-    // TODO: store constant chunks on the heap, to ensure if they are stored they can be accessed later
-
-    if let Some(error) = error {
-      let traceback = std::iter::once(StackTraceLocation::from_chunk_ip(chunk, ip, offset))
-        .chain(self.frames.iter().rev().map(StackTraceLocation::from_frame))
-        .collect();
-
-      Err(RuntimeError {
-        kind: error,
-        traceback,
+    if let Some(kind) = error {
+      Err(MainLoopError {
+        ip,
+        offset,
+        kind,
+        chunk: chunk.as_ptr(),
       })
     } else {
-      Ok(())
+      Ok(None)
     }
   }
 
@@ -621,6 +728,14 @@ macro_rules! comparison_operation {
 }
 use comparison_operation;
 
+#[derive(Debug)]
+struct MainLoopError {
+  ip: usize,
+  offset: usize,
+  chunk: *const Chunk,
+  kind: ErrorKind,
+}
+
 /// An error whilst executing bytecode
 #[derive(Debug, Clone)]
 pub struct RuntimeError {
@@ -652,18 +767,28 @@ impl RuntimeError {
     let mut string = String::new();
 
     for location in &self.traceback {
-      let line = line_index.line(location.span);
-      match &location.kind {
-        StackTraceLocationKind::Root => {
-          writeln!(&mut string, "at line {line}").unwrap();
-        }
-        StackTraceLocationKind::Function(name) if name.is_empty() => {
-          writeln!(string, "in anonymous function at line {line}").unwrap();
-        }
-        StackTraceLocationKind::Function(name) => {
-          writeln!(string, "in function '{name}' at line {line}").unwrap();
-        }
-      };
+      if let Some(span) = location.span {
+        let line = line_index.line(span);
+
+        match &location.kind {
+          StackTraceLocationKind::Root => {
+            writeln!(&mut string, "at line {line}").unwrap();
+          }
+          StackTraceLocationKind::Function(name) if name.is_empty() => {
+            writeln!(string, "in anonymous function at line {line}").unwrap();
+          }
+          StackTraceLocationKind::Function(name) => {
+            writeln!(string, "in function '{name}' at line {line}").unwrap();
+          }
+        };
+      } else {
+        match &location.kind {
+          StackTraceLocationKind::Function(name) => {
+            writeln!(string, "in native function '{name}'").unwrap();
+          }
+          StackTraceLocationKind::Root => unreachable!(),
+        };
+      }
     }
 
     Some(string)
@@ -671,7 +796,9 @@ impl RuntimeError {
 
   /// The location of the error in the source code
   pub fn span(&self) -> Span {
-    self.traceback.first().map(|x| x.span).unwrap_or_default()
+    (self.traceback.iter())
+      .find_map(|x| x.span)
+      .unwrap_or_default()
   }
 }
 impl fmt::Display for RuntimeError {
@@ -744,7 +871,7 @@ impl ErrorKind {
 #[derive(Clone, Debug)]
 struct StackTraceLocation {
   kind: StackTraceLocationKind,
-  span: Span,
+  span: Option<Span>,
 }
 impl StackTraceLocation {
   fn from_chunk_ip(chunk: &Chunk, ip: usize, offset: usize) -> Self {
@@ -756,16 +883,52 @@ impl StackTraceLocation {
       StackTraceLocationKind::Function(chunk.name.clone())
     };
 
-    StackTraceLocation { kind, span }
+    StackTraceLocation {
+      kind,
+      span: Some(span),
+    }
   }
-  fn from_frame(frame: &CallFrame) -> Self {
-    let chunk = unsafe { &*frame.chunk };
+  fn from_frame(vm: &VM, frame: &CallFrame) -> Self {
+    if frame.offset == 0 {
+      // If the offset is 0, we are not in a native function, so the chunk exists
+      let chunk = unsafe { &*frame.chunk };
+      let span = Some(chunk.get_span(frame.ip));
 
-    Self::from_chunk_ip(chunk, frame.ip, frame.offset)
+      return Self {
+        kind: StackTraceLocationKind::Root,
+        span,
+      };
+    }
+
+    let function = vm.stack[frame.offset - 1];
+    let span = (!frame.chunk.is_null()).then(|| unsafe { &*frame.chunk }.get_span(frame.ip));
+
+    Self {
+      kind: StackTraceLocationKind::Function(get_function_name(vm, function)),
+      span,
+    }
   }
 }
 #[derive(Clone, Debug)]
 enum StackTraceLocationKind {
   Function(SmartString),
   Root,
+}
+
+fn get_function_name(vm: &VM, func: Value) -> SmartString {
+  use object::{NativeClosure, NativeClosureTwo, NativeFunction};
+
+  if func.is_constant_function() {
+    return func.as_function(&vm.heap).name.clone();
+  }
+
+  match func.object_type() {
+    object::CLOSURE_TYPE_ID => vm.heap[func.as_object::<Closure>()].function().name.clone(),
+
+    object::NATIVE_FUNCTION_TYPE_ID => vm.heap[func.as_object::<NativeFunction>()].name.into(),
+    object::NATIVE_CLOSURE_TYPE_ID => vm.heap[func.as_object::<NativeClosure>()].name.into(),
+    object::NATIVE_CLOSURE_TWO_TYPE_ID => vm.heap[func.as_object::<NativeClosureTwo>()].name.into(),
+
+    _ => "".into(),
+  }
 }

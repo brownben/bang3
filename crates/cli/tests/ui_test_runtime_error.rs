@@ -202,6 +202,93 @@ fn traceback() {
 }
 
 #[test]
+fn traceback_native_functions() {
+  let source = indoc! {"
+    from option import { Some, None, map }
+
+    Some(5) >> map(x => x ++ '')
+  "};
+  let output = run(source);
+  assert_eq!(output, indoc! {"
+    ✕ Error: Type Error
+    expected two strings, got a number and a string
+
+        ╭─[STDIN:3]
+      3 │ Some(5) >> map(x => x ++ '')
+    ────╯
+
+    in anonymous function at line 3
+    in native function 'map'
+    at line 3
+
+  "});
+
+  let source = indoc! {"
+    from option import { None, Some, map }
+
+    let inner = x => x ++ ''
+    Some(5) >> map(inner)
+  "};
+  let output = run(source);
+  assert_eq!(output, indoc! {"
+    ✕ Error: Type Error
+    expected two strings, got a number and a string
+
+        ╭─[STDIN:3]
+      3 │ let inner = x => x ++ ''
+    ────╯
+
+    in function 'inner' at line 3
+    in native function 'map'
+    at line 4
+
+  "});
+
+  let source = indoc! {"
+    from option import { None, Some, map }
+
+    let inner = x => x ++ ''
+    let mapX = map(inner)
+
+    mapX(Some(5))
+  "};
+  let output = run(source);
+  assert_eq!(output, indoc! {"
+    ✕ Error: Type Error
+    expected two strings, got a number and a string
+
+        ╭─[STDIN:3]
+      3 │ let inner = x => x ++ ''
+    ────╯
+
+    in function 'inner' at line 3
+    in native function 'map'
+    at line 6
+
+  "});
+
+  let source = indoc! {"
+    from option import { None, Some, map }
+
+    map(string::length)(Some(5))
+  "};
+  let output = run(source);
+  assert_eq!(output, indoc! {"
+    ✕ Error: Type Error
+    expected `string`, got `number`
+
+        ╭─[STDIN:3]
+      3 │ map(string::length)(Some(5))
+    ────╯
+
+    in native function 'length'
+    in native function 'map'
+    at line 3
+
+  "});
+}
+
+#[test]
 fn panics() {
   let output = run("panic('did something wrong')");
   assert_eq!(output, indoc! {"
@@ -212,6 +299,7 @@ fn panics() {
       1 │ panic('did something wrong')
     ────╯
 
+    in native function 'panic'
     at line 1
 
   "});

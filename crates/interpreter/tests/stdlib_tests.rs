@@ -302,6 +302,7 @@ mod string {
 
       from maths import { pow }
       let i = toString(pow(2))
+      let j = string::from('world')
     "});
     assert_variable!(vm; a, string "hello");
     assert_variable!(vm; b, string "55.2");
@@ -312,6 +313,7 @@ mod string {
     assert_variable!(vm; g, string "<function>");
     assert_variable!(vm; h, string "<closure <function>>");
     assert_variable!(vm; i, string "<closure <function pow>>");
+    assert_variable!(vm; j, string "world");
   }
 
   #[test]
@@ -542,6 +544,9 @@ mod list {
     assert_variable!(is_empty; a, true);
     assert_variable!(is_empty; b, false);
     assert_variable!(is_empty; c, false);
+
+    let not_list = run("list::length(x => x + 1)");
+    assert!(not_list.is_err());
   }
 
   #[test]
@@ -693,6 +698,64 @@ mod option {
     assert_variable!(flatten; d,string "Some(5)");
 
     let not_option = run("option::flatten(5)");
+    assert!(not_option.is_err());
+  }
+
+  #[test]
+  fn map() {
+    let mut simple = run(indoc! {"
+      from option import { None, Some, map }
+
+      let a = Some(8) >> map(x => x + 1) >> string::from
+      let b = None >> map(x => x + 1) >> string::from
+    "});
+    assert_variable!(simple; a, string "Some(9)");
+    assert_variable!(simple; b, string "None");
+
+    let mut closure = run(indoc! {"
+      from option import { None, Some, map }
+
+      let timesBy = x => y => x * y
+
+      let a = Some(8) >> map(timesBy(2)) >> string::from
+      let b = None >> map(timesBy(2)) >> string::from
+    "});
+    assert_variable!(closure; a, string "Some(16)");
+    assert_variable!(closure; b, string "None");
+
+    let mut native_functions = run(indoc! {"
+      from option import { None, Some, map }
+
+      let a = Some('example') >> map(string::length) >> string::from
+      let b = None >> map(string::length) >> string::from
+
+      let c = Some(5) >> map(maths::abs) >> string::from
+      let d = Some(-5) >> map(maths::abs) >> string::from
+      let e = None >> map(maths::abs) >> string::from
+    "});
+    assert_variable!(native_functions; a, string "Some(7)");
+    assert_variable!(native_functions; b, string "None");
+    assert_variable!(native_functions; c, string "Some(5)");
+    assert_variable!(native_functions; d, string "Some(5)");
+    assert_variable!(native_functions; e, string "None");
+
+    let mut native_closures = run(indoc! {"
+      from option import { None, Some, map }
+
+      let a = Some(8) >> map(maths::log(2)) >> string::from
+      let b = None >> map(maths::log(2)) >> string::from
+
+      let c = Some('hello') >> map(string::replaceOne('l')('L')) >> string::from
+      let d = None >> map(maths::abs) >> string::from
+    "});
+    assert_variable!(native_closures; a, string "Some(3)");
+    assert_variable!(native_closures; b, string "None");
+    assert_variable!(native_closures; c, string "Some('heLlo')");
+    assert_variable!(native_closures; d, string "None");
+
+    let not_callable = run("option::map(5)");
+    assert!(not_callable.is_err());
+    let not_option = run("option::map(x => x + 1)(5)");
     assert!(not_option.is_err());
   }
 }
