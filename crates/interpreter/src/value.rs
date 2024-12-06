@@ -159,6 +159,20 @@ impl Value {
     }
   }
 
+  /// Check if the current value can be called
+  #[inline]
+  #[must_use]
+  pub fn is_callable(&self, vm: &VM) -> bool {
+    if self.is_constant_function() {
+      true
+    } else if self.is_object() {
+      self.object_type() == crate::object::CLOSURE_TYPE_ID
+        || vm.get_type_descriptor(*self).call.is_some()
+    } else {
+      false
+    }
+  }
+
   /// Get the type of the value as a string
   #[must_use]
   pub fn get_type(&self, vm: &VM) -> &'static str {

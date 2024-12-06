@@ -1,7 +1,7 @@
 use super::macros::module;
 use crate::{
   VM, Value,
-  object::{CLOSURE_TYPE_ID, NATIVE_CLOSURE_TYPE_ID, NativeClosure},
+  object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
   object::{NONE_TYPE_ID, SOME_TYPE_ID},
   vm::ErrorKind,
 };
@@ -124,21 +124,11 @@ module!(option, OPTION_ITEMS, option_types, option_docs, {
     }
 
 
-    if !is_callable(vm, arg) {
-      return Err(ErrorKind::TypeError { expected: "list", got: arg.get_type(vm) })
+    if !arg.is_callable(vm) {
+      return Err(ErrorKind::TypeError { expected: "function", got: arg.get_type(vm) })
     }
 
     let closure = (vm.heap).allocate(NativeClosure::new("map", func, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
 });
-
-fn is_callable(vm: &VM, value: Value) -> bool {
-  if value.is_constant_function() {
-    true
-  } else if value.is_object() {
-    value.object_type() == CLOSURE_TYPE_ID || vm.get_type_descriptor(value).call.is_some()
-  } else {
-    false
-  }
-}
