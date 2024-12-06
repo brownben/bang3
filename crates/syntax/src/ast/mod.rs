@@ -104,6 +104,21 @@ impl AST {
     self.root_statements.iter().chain(self.statements.iter())
   }
 
+  /// Gets the [`Type`] that has been parsed
+  ///
+  /// # Panics
+  /// This will panic if the AST was not parsed using [`crate::parse_type`]
+  pub fn get_type(&self) -> &Type {
+    assert!(!self.types.is_empty());
+
+    // Make sure that it is not used on a "normal" AST
+    assert!(self.root_statements.is_empty());
+    assert!(self.statements.is_empty());
+    assert!(self.expressions.is_empty());
+
+    self.types.last().unwrap()
+  }
+
   pub(crate) fn add_expression(&mut self, expression: impl Into<Expression>) -> ExpressionIdx {
     let id = self.expressions.len() + 1;
     self.expressions.push(expression.into());

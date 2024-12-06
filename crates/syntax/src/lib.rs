@@ -38,6 +38,21 @@ pub fn parse(source: String) -> AST {
   ast
 }
 
+/// Parses a type annotation string into an AST.
+///
+/// # Examples
+/// ```
+/// use bang_syntax::parse_type;
+/// let ast = parse_type("number".to_owned());
+///
+/// assert!(ast.is_valid());
+/// ```
+pub fn parse_type(source: String) -> AST {
+  let mut ast = AST::new(source);
+  parser::Parser::new(&mut ast).parse_type();
+  ast
+}
+
 /// Parses a source code string into an AST, reusing the allocation of a previous AST.
 ///
 /// # Examples

@@ -97,13 +97,13 @@ mod macros;
 pub const MODULES: [&str; 4] = ["maths", "string", "list", "option"];
 
 mod maths;
-pub use maths::{MATHS_ITEMS, maths, maths_docs};
+pub use maths::{MATHS_ITEMS, maths, maths_docs, maths_types};
 
 mod string;
-pub use string::{STRING_ITEMS, string, string_docs};
+pub use string::{STRING_ITEMS, string, string_docs, string_types};
 
 mod list;
-pub use list::{LIST_ITEMS, list, list_docs};
+pub use list::{LIST_ITEMS, list, list_docs, list_types};
 
 mod option;
-pub use option::{OPTION_ITEMS, option, option_docs};
+pub use option::{OPTION_ITEMS, option, option_docs, option_types};

@@ -8,7 +8,7 @@ use crate::{
   vm::ErrorKind,
 };
 
-module!(string, STRING_ITEMS, string_docs, {
+module!(string, STRING_ITEMS, string_types, string_docs, {
   const /// A newline character
         NEW_LINE: String = "\n";
   const // A tab character
@@ -25,6 +25,7 @@ module!(string, STRING_ITEMS, string_docs, {
   /// toString('hello') // 'hello'
   /// toString(x => x + 1) // '<function>'
   /// ```
+  #[type(^a => string)]
   fn toString() = |vm, arg| {
     if arg.is_string() {
           return Ok(arg);
@@ -43,6 +44,7 @@ module!(string, STRING_ITEMS, string_docs, {
   /// string::from('hello') // 'hello'
   /// string::from(x => x + 1) // '<function>'
   /// ```
+  #[type(^a => string)]
   fn from() = |vm, arg| {
     if arg.is_string() {
       return Ok(arg);
@@ -59,6 +61,7 @@ module!(string, STRING_ITEMS, string_docs, {
   /// 'hello' >> string::length // 5
   /// '🏃' >> string::length // 1
   /// ```
+  #[type(string => number)]
   fn length() = |vm, arg| {
     let string = get_string(arg, vm)?;
     let result = string.chars().count();
@@ -72,6 +75,7 @@ module!(string, STRING_ITEMS, string_docs, {
   /// 'hello' >> string::byteLength // 5
   /// '🏃' >> string::byteLength // 4
   /// ```
+  #[type(string => number)]
   fn byteLength() = |vm, arg| {
     let result = get_string(arg, vm)?.len();
 
@@ -85,6 +89,7 @@ module!(string, STRING_ITEMS, string_docs, {
   /// '' >> string::isEmpty // true
   /// 'a' >> string::isEmpty // false
   /// ```
+  #[type(string => boolean)]
   fn isEmpty() = |vm, arg| {
     let result = get_string(arg, vm)?.is_empty();
 
@@ -97,6 +102,7 @@ module!(string, STRING_ITEMS, string_docs, {
   /// 'hello!' >> string::isAscii // true
   /// 'hiya 👋' >> string::isAscii // false
   /// ```
+  #[type(string => boolean)]
   fn isAscii() = |vm, arg| {
     let result = get_string(arg, vm)?.is_ascii();
 
@@ -112,6 +118,7 @@ module!(string, STRING_ITEMS, string_docs, {
   /// 'hello' >> string::toLowercase // 'hello'
   /// 'HELLO' >> string::toLowercase // 'hello'
   /// ```
+  #[type(string => string)]
   fn toLowercase() = |vm, arg| {
     let result = get_string(arg, vm)?.to_lowercase();
 
@@ -126,6 +133,7 @@ module!(string, STRING_ITEMS, string_docs, {
   /// 'hello' >> string::toUppercase // 'HELLO'
   /// 'HELLO' >> string::toUppercase // 'HELLO'
   /// ```
+  #[type(string => string)]
   fn toUppercase() = |vm, arg| {
     let result = get_string(arg, vm)?.to_uppercase();
 
@@ -139,6 +147,7 @@ module!(string, STRING_ITEMS, string_docs, {
   /// 'welcome to earth' >> string::contains('come') // true
   /// 'welcome to earth' >> string::contains('hello') // false
   /// ```
+  #[type(string => string => boolean)]
   fn contains() = |vm, arg| {
     fn func(vm: &mut VM, pat: Value, string: Value) -> Result<Value, ErrorKind> {
       let string = get_string(string, vm)?;
@@ -158,6 +167,7 @@ module!(string, STRING_ITEMS, string_docs, {
   /// 'hello' >> string::startsWith('he') // true
   /// 'hello' >> string::startsWith('lo') // false
   /// ```
+  #[type(string => string => boolean)]
   fn startsWith() = |vm, arg| {
     fn func(vm: &mut VM, pat: Value, string: Value) -> Result<Value, ErrorKind> {
       let string = get_string(string, vm)?;
@@ -177,6 +187,7 @@ module!(string, STRING_ITEMS, string_docs, {
   /// 'hello' >> string::endsWith('lo') // true
   /// string::endsWith('he')('hello') // false
   /// ```
+  #[type(string => string => boolean)]
   fn endsWith() = |vm, arg| {
     fn func(vm: &mut VM, pat: Value, string: Value) -> Result<Value, ErrorKind> {
       let string = get_string(string, vm)?;
@@ -198,6 +209,7 @@ module!(string, STRING_ITEMS, string_docs, {
   /// ```bang
   /// string::trim('  hello  ') // 'hello'
   /// ```
+  #[type(string => string)]
   fn trim() = |vm, arg| {
     let string = get_string(arg, vm)?;
     let result = string.trim();
@@ -220,6 +232,7 @@ module!(string, STRING_ITEMS, string_docs, {
   /// ```bang
   /// string::trimStart('  hello') // 'hello'
   /// ```
+  #[type(string => string)]
   fn trimStart() = |vm, arg| {
     let string = get_string(arg, vm)?;
     let result = string.trim_start();
@@ -241,6 +254,7 @@ module!(string, STRING_ITEMS, string_docs, {
   /// ```bang
   /// string::trimEnd('hello   ') // 'hello'
   /// ```
+  #[type(string => string)]
   fn trimEnd() = |vm, arg| {
     let string = get_string(arg, vm)?;
     let result = string.trim_end();
@@ -264,6 +278,7 @@ module!(string, STRING_ITEMS, string_docs, {
   /// 'this is old' >> string::replaceAll('old')('new') // 'this is new'
   /// 'this is old' >> string::replaceAll('i')('I') // 'thIs Is new'
   /// ```
+  #[type(string => string => string => string)]
   fn replaceAll() = |vm, arg| {
     fn func_one(vm: &mut VM, a: Value, b: Value) -> Result<Value, ErrorKind> {
       () = is_string(b, vm)?;
@@ -295,6 +310,7 @@ module!(string, STRING_ITEMS, string_docs, {
   /// 'this is old' >> string::replaceOne('old')('new') // 'this is new'
   /// 'this is old' >> string::replaceOne('i')('I') // 'thIs is new'
   /// ```
+  #[type(string => string => string => string)]
   fn replaceOne() = |vm, arg| {
     fn func_one(vm: &mut VM, a: Value, b: Value) -> Result<Value, ErrorKind> {
       () = is_string(b, vm)?;

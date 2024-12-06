@@ -7,11 +7,12 @@ use crate::{
 };
 use bang_gc::Gc;
 
-module!(option, OPTION_ITEMS, option_docs, {
+module!(option, OPTION_ITEMS, option_types, option_docs, {
   const /// No value
-        None: Value = Value::from_object(Gc::NULL, NONE_TYPE_ID);
+        None: option = Value::from_object(Gc::NULL, NONE_TYPE_ID);
 
   /// Some value
+  #[type(^a => option<^a>)]
   fn Some() = |vm, arg| Ok(Value::from_object(vm.heap.allocate(arg), SOME_TYPE_ID));
 
   /// Is the value `None`?
@@ -21,6 +22,7 @@ module!(option, OPTION_ITEMS, option_docs, {
   /// option::isNone(option::None) // true
   /// option::isNone(option::Some(1)) // false
   /// ```
+  #[type(option => boolean)]
   fn isNone() = |_, arg| Ok(arg.is_object_type(NONE_TYPE_ID).into());
   /// Is the value `Some`?
   ///
@@ -29,6 +31,7 @@ module!(option, OPTION_ITEMS, option_docs, {
   /// option::isSome(option::Some(1)) // true
   /// option::isSome(option::None) // false
   /// ```
+  #[type(option => boolean)]
   fn isSome() = |_, arg| Ok(arg.is_object_type(SOME_TYPE_ID).into());
 
   /// Returns the contained `Some` value, panics if the value is a `None`.
@@ -38,6 +41,7 @@ module!(option, OPTION_ITEMS, option_docs, {
   /// option::Some(5) >> option::unwrap // 5
   /// option::None >> option::unwrap // panic, execution stopped
   /// ```
+  #[type(option<^a> => ^a)]
   fn unwrap() = |vm, arg| {
     if arg.is_object_type(SOME_TYPE_ID) {
       Ok(vm.heap[arg.as_object::<Value>()])
@@ -57,6 +61,7 @@ module!(option, OPTION_ITEMS, option_docs, {
   /// option::Some(5) >> option::unwrapOr(0) // 5
   /// option::None >> option::unwrapOr(0) // 0
   /// ```
+  #[type(^a => option<^a> => ^a)]
   fn unwrapOr() = |vm, arg| {
     fn func(vm: &mut VM, alternative: Value, option: Value) -> Result<Value, ErrorKind> {
       if option.is_object_type(NONE_TYPE_ID) {
@@ -81,6 +86,7 @@ module!(option, OPTION_ITEMS, option_docs, {
   /// option::flatten(option::Some(option::None)) // None
   /// option::flatten(option::Some(option::Some(5))) // Some(5)
   /// ```
+  #[type(option<option<^a>> => option<^a>)]
   fn flatten() = |vm, arg| {
     if arg.is_object_type(NONE_TYPE_ID) {
       Ok(arg)
@@ -102,6 +108,7 @@ module!(option, OPTION_ITEMS, option_docs, {
   /// option::Some('example') >> option::map(string::length) // Some(7)
   /// option::None >> option::map(string::length) // None
   /// ```
+  #[type((^a => ^b) => option<^a> => option<^b>)]
   fn map() = |vm, arg| {
     fn func(vm: &mut VM, function: Value, option: Value) -> Result<Value, ErrorKind> {
       if option.is_object_type(NONE_TYPE_ID) {

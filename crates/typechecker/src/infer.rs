@@ -6,9 +6,8 @@ use crate::{
 };
 use bang_syntax::{
   AST, Span,
-  ast::{self as ast, expression::*, statement::*, types::Type as Annotation},
+  ast::{expression::*, statement::*},
 };
-use std::collections::BTreeMap;
 
 impl TypeChecker {
   fn check_unused_variables(&mut self) {
@@ -32,94 +31,6 @@ impl TypeChecker {
 
   fn new_type_var(&mut self) -> TypeRef {
     self.types.new_type_var()
-  }
-
-  pub(crate) fn type_from_annotation(&mut self, ty: &ast::Type, ast: &AST) -> TypeRef {
-    let mut variables = BTreeMap::new();
-    self.type_from_annotation_inner(ty, ast, &mut variables)
-  }
-
-  const PRIMITIVE_NAMES: [&str; 4] = ["number", "string", "boolean", "_"];
-  const STRUCTURE_NAMES: [&str; 2] = ["list", "option"];
-
-  fn type_from_annotation_inner<'a>(
-    &mut self,
-    ty: &ast::Type,
-    ast: &'a AST,
-    variables: &mut BTreeMap<&'a str, TypeRef>,
-  ) -> TypeRef {
-    match ty {
-      Annotation::Primitive(primitive) => {
-        self.primitive_type_from_annotation(primitive.name(ast), primitive.span(ast))
-      }
-      Annotation::Variable(variable) => {
-        let type_ = variables.get(variable.name(ast));
-        if let Some(type_) = type_ {
-          *type_
-        } else {
-          let type_var = self.new_type_var();
-          variables.insert(variable.name(ast), type_var);
-          type_var
-        }
-      }
-      Annotation::Function(function) => {
-        let parameter = self.type_from_annotation_inner(function.parameter(ast), ast, variables);
-        let return_ = self.type_from_annotation_inner(function.return_(ast), ast, variables);
-        self.types.new_type(Type::Function(parameter, return_))
-      }
-      Annotation::Group(group) => self.type_from_annotation_inner(group.type_(ast), ast, variables),
-      Annotation::Structure(parameter) => match parameter.structure(ast) {
-        "list" => {
-          let type_ = self.type_from_annotation_inner(parameter.parameter(ast), ast, variables);
-          self.types.new_type(Type::Structure(Structure::List, type_))
-        }
-        "option" => {
-          let type_ = self.type_from_annotation_inner(parameter.parameter(ast), ast, variables);
-          (self.types).new_type(Type::Structure(Structure::Option, type_))
-        }
-        name if Self::PRIMITIVE_NAMES.contains(&name) => {
-          self.problems.push(TypeError::UnexpectedParameter {
-            type_: name.to_owned(),
-            span: parameter.span(ast),
-          });
-          self.primitive_type_from_annotation(name, parameter.span(ast))
-        }
-        name => {
-          self.problems.push(TypeError::UnknownTypeAnnotation {
-            span: parameter.span(ast),
-            did_you_mean: similarly_named(name, Self::STRUCTURE_NAMES),
-          });
-          TypeArena::UNKNOWN
-        }
-      },
-      Annotation::Invalid(_) => TypeArena::UNKNOWN,
-    }
-  }
-
-  fn primitive_type_from_annotation(&mut self, primitive: &str, span: Span) -> TypeRef {
-    match primitive {
-      "number" => TypeArena::NUMBER,
-      "string" => TypeArena::STRING,
-      "boolean" => TypeArena::BOOLEAN,
-      "list" => {
-        // If it doesn't have a parameter, make it generic
-        let type_ = self.new_type_var();
-        self.types.new_type(Type::Structure(Structure::List, type_))
-      }
-      "option" => {
-        // If it doesn't have a parameter, make it generic
-        let type_ = self.new_type_var();
-        (self.types).new_type(Type::Structure(Structure::Option, type_))
-      }
-      "_" => TypeArena::NEVER,
-      _ => {
-        self.problems.push(TypeError::UnknownTypeAnnotation {
-          span,
-          did_you_mean: similarly_named(primitive, Self::PRIMITIVE_NAMES),
-        });
-        TypeArena::UNKNOWN
-      }
-    }
   }
 
   /// Asserts that type `a` is applicable to type `b`
@@ -274,11 +185,15 @@ impl InferType for Let {
       ExpressionType::Both(ty, return_ty) => (ty, Some(return_ty)),
     };
     if let Some(annotation) = self.annotation(ast) {
-      let annotation_type = t.type_from_annotation(annotation, ast);
+      let annotation_type = t.types.type_from_annotation(annotation, ast);
 
-      if annotation_type != TypeArena::UNKNOWN {
-        t.assert_type_strict(annotation_type, ty, self.value(ast).span(ast));
-        ty = annotation_type;
+      match annotation_type {
+        Ok(TypeArena::UNKNOWN) => {} // if it is invalid don't typecheck it
+        Ok(annotation_type) => {
+          t.assert_type_strict(annotation_type, ty, self.value(ast).span(ast));
+          ty = annotation_type;
+        }
+        Err(error) => t.problems.push(error),
       }
     }
 
@@ -304,11 +219,15 @@ fn let_statement_function(
   // Infer the function type
   let mut ty = function.infer(t, ast);
   if let Some(annotation) = let_.annotation(ast) {
-    let annotation_type = t.type_from_annotation(annotation, ast);
+    let annotation_type = t.types.type_from_annotation(annotation, ast);
 
-    if annotation_type != TypeArena::UNKNOWN {
-      t.assert_type_strict(annotation_type, ty, let_.value(ast).span(ast));
-      ty = annotation_type;
+    match annotation_type {
+      Ok(TypeArena::UNKNOWN) => {} // if it is invalid don't typecheck it
+      Ok(annotation_type) => {
+        t.assert_type_strict(annotation_type, ty, let_.value(ast).span(ast));
+        ty = annotation_type;
+      }
+      Err(error) => t.problems.push(error),
     }
   }
 

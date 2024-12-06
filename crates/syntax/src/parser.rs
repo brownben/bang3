@@ -766,7 +766,7 @@ impl Parser<'_> {
 }
 // Types
 impl Parser<'_> {
-  fn parse_type(&mut self) -> TypeIdx {
+  pub(crate) fn parse_type(&mut self) -> TypeIdx {
     let type_ = match self.current_kind() {
       TokenKind::Identifier => self.type_primitive(),
       TokenKind::LeftParen => self.type_group(),

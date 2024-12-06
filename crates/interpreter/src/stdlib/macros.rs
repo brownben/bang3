@@ -1,11 +1,17 @@
 macro_rules! module {
-  ($module_name:ident, $module_items_name:ident, $module_docs_name:ident, {
+  (
+    $module_name:ident,
+    $module_items_name:ident,
+    $module_types_name:ident,
+    $module_docs_name:ident,
+  {
     $(
       const $(#[doc = $constant_doc_comment:literal])*
       $constant_name:ident : $constant_type:ident = $constant:expr;
     )*
     $(
       $(#[doc = $doc_comment:literal])*
+      #[type$function_type:tt]
       fn $function_name:ident() = $function:expr;
     )*
   }) => {
@@ -34,6 +40,19 @@ macro_rules! module {
       $(stringify!($function_name),)*
     ];
 
+    #[doc = concat!("Get the type annotations for the items in the `", stringify!($module_name), "` module")]
+    #[must_use] pub fn $module_types_name(item: &str) -> Option<&'static str> {
+      match item {
+        $(
+          stringify!($constant_name) => Some(module!(const type $constant_type)),
+        )*
+        $(
+          stringify!($function_name) => Some(stringify!($function_type)),
+        )*
+        _ => None,
+      }
+    }
+
     #[doc = concat!("Get doc comments for the items in the `", stringify!($module_name), "` module")]
     #[must_use] pub fn $module_docs_name(item: &str) -> Option<&'static str> {
       match item {
@@ -49,6 +68,12 @@ macro_rules! module {
   };
 
   // Wrap Constants
+  (const type String) => {
+    "string"
+  };
+  (const type $type:ident) => {
+    stringify!($type)
+  };
   (const String, $vm:expr, $value:expr) => {
     $vm.allocate_string($value).into()
   };

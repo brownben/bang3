@@ -1,3 +1,5 @@
+use crate::{TypeError, similarity::similarly_named};
+use bang_syntax::{AST, Span, ast::Type as Annotation};
 use std::{
   collections::{BTreeMap, btree_map},
   fmt, iter, ops,
@@ -278,6 +280,93 @@ impl TypeArena {
   /// Is the type ref point to the never type?
   pub fn is_never(&self, type_ref: TypeRef) -> bool {
     self[type_ref] == Type::Primitive(PrimitiveType::Never)
+  }
+
+  pub(crate) fn type_from_annotation(
+    &mut self,
+    ty: &Annotation,
+    ast: &AST,
+  ) -> Result<TypeRef, TypeError> {
+    let mut variables = BTreeMap::new();
+    self.type_from_annotation_inner(ty, ast, &mut variables)
+  }
+
+  const PRIMITIVE_NAMES: [&str; 4] = ["number", "string", "boolean", "_"];
+  const STRUCTURE_NAMES: [&str; 2] = ["list", "option"];
+
+  fn type_from_annotation_inner<'a>(
+    &mut self,
+    ty: &Annotation,
+    ast: &'a AST,
+    variables: &mut BTreeMap<&'a str, TypeRef>,
+  ) -> Result<TypeRef, TypeError> {
+    match ty {
+      Annotation::Primitive(primitive) => {
+        self.primitive_type_from_annotation(primitive.name(ast), primitive.span(ast))
+      }
+      Annotation::Variable(variable) => {
+        let type_ = variables.get(variable.name(ast));
+        if let Some(type_) = type_ {
+          Ok(*type_)
+        } else {
+          let type_var = self.new_type_var();
+          variables.insert(variable.name(ast), type_var);
+          Ok(type_var)
+        }
+      }
+      Annotation::Function(function) => {
+        let parameter = self.type_from_annotation_inner(function.parameter(ast), ast, variables)?;
+        let return_ = self.type_from_annotation_inner(function.return_(ast), ast, variables)?;
+        Ok(self.new_type(Type::Function(parameter, return_)))
+      }
+      Annotation::Group(group) => self.type_from_annotation_inner(group.type_(ast), ast, variables),
+      Annotation::Structure(parameter) => match parameter.structure(ast) {
+        "list" => {
+          let param = self.type_from_annotation_inner(parameter.parameter(ast), ast, variables)?;
+          Ok(self.new_type(Type::Structure(Structure::List, param)))
+        }
+        "option" => {
+          let param = self.type_from_annotation_inner(parameter.parameter(ast), ast, variables)?;
+          Ok(self.new_type(Type::Structure(Structure::Option, param)))
+        }
+        name if Self::PRIMITIVE_NAMES.contains(&name) => Err(TypeError::UnexpectedParameter {
+          type_: name.to_owned(),
+          span: parameter.span(ast),
+        }),
+        name => Err(TypeError::UnknownTypeAnnotation {
+          span: parameter.span(ast),
+          did_you_mean: similarly_named(name, Self::STRUCTURE_NAMES),
+        }),
+      },
+      Annotation::Invalid(_) => Ok(TypeArena::UNKNOWN),
+    }
+  }
+
+  fn primitive_type_from_annotation(
+    &mut self,
+    primitive: &str,
+    span: Span,
+  ) -> Result<TypeRef, TypeError> {
+    match primitive {
+      "number" => Ok(TypeArena::NUMBER),
+      "string" => Ok(TypeArena::STRING),
+      "boolean" => Ok(TypeArena::BOOLEAN),
+      "_" => Ok(TypeArena::NEVER),
+      "list" => {
+        // If it doesn't have a parameter, make it generic
+        let type_ = self.new_type_var();
+        Ok(self.new_type(Type::Structure(Structure::List, type_)))
+      }
+      "option" => {
+        // If it doesn't have a parameter, make it generic
+        let type_ = self.new_type_var();
+        Ok(self.new_type(Type::Structure(Structure::Option, type_)))
+      }
+      _ => Err(TypeError::UnknownTypeAnnotation {
+        span,
+        did_you_mean: similarly_named(primitive, Self::PRIMITIVE_NAMES),
+      }),
+    }
   }
 }
 impl ops::Index<TypeRef> for TypeArena {
