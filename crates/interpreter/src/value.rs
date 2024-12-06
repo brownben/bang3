@@ -135,8 +135,18 @@ impl fmt::Debug for Value {
 
 /// Methods which work on a generic Value
 impl Value {
+  /// Check if the current value is truthy
+  ///
+  /// It is truthy if not `false`, `0`, or an empty collection
+  #[inline]
+  #[must_use]
+  pub fn is_truthy(&self, vm: &VM) -> bool {
+    !self.is_falsy(vm)
+  }
+
   /// Check if the current value is falsy
-  /// It is falsy if false, 0, or an empty collection
+  ///
+  /// It is falsy if `false`, `0`, or an empty collection
   #[inline]
   #[must_use]
   pub fn is_falsy(&self, vm: &VM) -> bool {
