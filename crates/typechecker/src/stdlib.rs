@@ -3,7 +3,7 @@ use crate::{
   types::{Type, TypeArena, TypeRef, TypeScheme},
 };
 pub use bang_interpreter::stdlib::MODULES;
-use bang_interpreter::stdlib::{list_types, maths_types, option_types, string_types};
+use bang_interpreter::stdlib::{iter_types, list_types, maths_types, option_types, string_types};
 
 /// The result of importing a value from a module.
 #[derive(Clone)]
@@ -33,6 +33,8 @@ pub enum StdlibModule {
   List,
   /// The `option` module
   Option,
+  /// The `iter` module
+  Iter,
   /// The module is unknown
   Unknown,
 }
@@ -44,6 +46,7 @@ impl StdlibModule {
       "string" => Self::String,
       "list" => Self::List,
       "option" => Self::Option,
+      "iter" => Self::Iter,
       _ => Self::Unknown,
     }
   }
@@ -56,6 +59,7 @@ impl StdlibModule {
       Self::String => "string",
       Self::List => "list",
       Self::Option => "option",
+      Self::Iter => "iter",
       Self::Unknown => "",
     }
   }
@@ -67,6 +71,7 @@ impl StdlibModule {
       Self::String => string_types(item),
       Self::List => list_types(item),
       Self::Option => option_types(item),
+      Self::Iter => iter_types(item),
       Self::Unknown => return ImportResult::ModuleNotFound,
     };
     let Some(type_annotation) = type_annotation else {
@@ -106,6 +111,7 @@ impl StdlibModule {
       Self::String => bang_interpreter::stdlib::string_docs(item),
       Self::List => bang_interpreter::stdlib::list_docs(item),
       Self::Option => bang_interpreter::stdlib::option_docs(item),
+      Self::Iter => bang_interpreter::stdlib::iter_docs(item),
       Self::Unknown => None,
     }
   }
@@ -118,6 +124,7 @@ impl StdlibModule {
       Self::String => &bang_interpreter::stdlib::STRING_ITEMS,
       Self::List => &bang_interpreter::stdlib::LIST_ITEMS,
       Self::Option => &bang_interpreter::stdlib::OPTION_ITEMS,
+      Self::Iter => &bang_interpreter::stdlib::ITER_ITEMS,
       Self::Unknown => &[],
     }
   }

@@ -2,6 +2,7 @@
 use super::macros::module;
 use crate::{
   VM, Value,
+  object::{ITERATOR_TYPE_ID, Iterator},
   object::{NATIVE_CLOSURE_TWO_TYPE_ID, NativeClosureTwo},
   object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
   object::{STRING_VIEW_TYPE_ID, StringView},
@@ -346,6 +347,41 @@ module!(string, STRING_ITEMS, string_types, string_docs, {
 
     let closure = vm.heap.allocate(NativeClosure::new("replaceOne", func_one, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
+  };
+
+  /// Creates an iterator over the characters in the string.
+  ///
+  /// ## Example
+  /// ```bang
+  /// 'hello' >> string::chars >> iter::toList // ['h', 'e', 'l', 'l', 'o']
+  /// 'hi 🏃' >> string::chars >> iter::toList // ['h', 'i', ' ', '🏃']
+  /// ```
+  #[type(string => iterator<string>)]
+  fn chars() = |vm, base| {
+    fn next(vm: &mut VM, state: usize, base: Value) -> Option<(Value, usize)> {
+      let string = base.as_string(&vm.heap);
+
+      if state >= string.len() {
+        return None;
+      }
+
+      let length = match string.as_bytes()[state] {
+        x if (x & 0b1111_0000) == 0b1111_0000 => 4,
+        x if (x & 0b1110_0000) == 0b1110_0000 => 3,
+        x if (x & 0b1100_0000) == 0b1100_0000 => 2,
+        _ => 1,
+      };
+
+      let view = vm.heap.allocate(StringView::new(vm, base, state, state + length));
+      Some((Value::from_object(view, STRING_VIEW_TYPE_ID), state + length))
+    }
+
+    if !base.is_string() {
+      return Err(ErrorKind::TypeError { expected: "string", got: base.get_type(vm) });
+    }
+
+    let iterator = vm.heap.allocate(Iterator { base, next, is_infinite: false });
+    Ok(Value::from_object(iterator, ITERATOR_TYPE_ID))
   };
 });
 

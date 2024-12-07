@@ -41,6 +41,8 @@ pub const DEFAULT_TYPE_DESCRIPTORS: &[TypeDescriptor] = &[
   LIST_VIEW,
   OPTION_SOME,
   OPTION_NONE,
+  ITERATOR,
+  ITERATOR_TRANSFORM,
   ALLOCATED,
 ];
 
@@ -523,6 +525,86 @@ const OPTION_NONE: TypeDescriptor = TypeDescriptor {
 };
 pub const NONE_TYPE_ID: TypeId = TypeId(9);
 
+pub struct Iterator {
+  pub base: Value,
+  pub next: fn(&mut VM, state: usize, base: Value) -> IteratorReturn,
+
+  pub is_infinite: bool,
+}
+const ITERATOR: TypeDescriptor = TypeDescriptor {
+  type_name: "iterator",
+  trace: |vm, value, trace_value| {
+    let iterator = &vm.heap[value.cast::<Iterator>()];
+    trace_value(vm, iterator.base);
+  },
+  display: |_, _| "<iterator>".to_owned(),
+  debug: |_, _| "<iterator>".to_owned(),
+  is_falsy: |_, _| false,
+  equals: |vm, a, b| {
+    if !b.is_object_type(ITERATOR_TYPE_ID) {
+      return false;
+    }
+
+    let a = &vm.heap[a.as_object::<Iterator>()];
+    let b = &vm.heap[b.as_object::<Iterator>()];
+
+    vm.equals(a.base, b.base) && ptr::fn_addr_eq(a.next, b.next) && a.is_infinite == b.is_infinite
+  },
+  call: None,
+};
+pub const ITERATOR_TYPE_ID: TypeId = TypeId(10);
+
+#[derive(Debug)]
+pub struct IteratorTransform {
+  pub iterator: Value,
+  pub arg: Value,
+  pub next: IteratorTransformNextFunction,
+
+  pub is_infinite: bool,
+}
+const ITERATOR_TRANSFORM: TypeDescriptor = TypeDescriptor {
+  type_name: "iterator",
+  trace: |vm, value, trace_value| {
+    let transform = &vm.heap[value.cast::<IteratorTransform>()];
+    trace_value(vm, transform.arg);
+    trace_value(vm, transform.iterator);
+  },
+  display: |_, _| "<iterator>".to_owned(),
+  debug: |_, _| "<iterator>".to_owned(),
+  is_falsy: |_, _| false,
+  equals: |vm, a, b| {
+    if !b.is_object_type(ITERATOR_TRANSFORM_TYPE_ID) {
+      return false;
+    }
+
+    let a = &vm.heap[a.as_object::<IteratorTransform>()];
+    let b = &vm.heap[b.as_object::<IteratorTransform>()];
+
+    vm.equals(a.arg, b.arg)
+      && vm.equals(a.iterator, b.iterator)
+      && ptr::fn_addr_eq(a.next, b.next)
+      && a.is_infinite == b.is_infinite
+  },
+  call: None,
+};
+pub const ITERATOR_TRANSFORM_TYPE_ID: TypeId = TypeId(11);
+
+type IteratorReturn = Option<(Value, usize)>;
+type IteratorTransformNextFunction = fn(
+  &mut VM,
+  iterator: Value,
+  state: usize,
+  transfom_arg: Value,
+) -> Result<IteratorReturn, ErrorKind>;
+
+impl Value {
+  /// Is the [Value] an iterator?
+  #[must_use]
+  pub fn is_iterator(&self) -> bool {
+    self.is_object_type(ITERATOR_TYPE_ID) || self.is_object_type(ITERATOR_TRANSFORM_TYPE_ID)
+  }
+}
+
 /// A value which has been moved from the stack to the heap, as it has been captured by a closure
 const ALLOCATED: TypeDescriptor = TypeDescriptor {
   type_name: "allocated",
@@ -536,7 +618,7 @@ const ALLOCATED: TypeDescriptor = TypeDescriptor {
   equals: |_, _, _| unreachable!("Not accessed as a value"),
   call: None,
 };
-pub const ALLOCATED_TYPE_ID: TypeId = TypeId(10);
+pub const ALLOCATED_TYPE_ID: TypeId = TypeId(12);
 
 #[cfg(test)]
 mod test {
@@ -558,6 +640,8 @@ mod test {
     assert_eq!(objects[LIST_VIEW_TYPE_ID.0].type_name, "list");
     assert_eq!(objects[SOME_TYPE_ID.0].type_name, "Option::Some");
     assert_eq!(objects[NONE_TYPE_ID.0].type_name, "Option::None");
+    assert_eq!(objects[ITERATOR_TYPE_ID.0].type_name, "iterator");
+    assert_eq!(objects[ITERATOR_TRANSFORM_TYPE_ID.0].type_name, "iterator");
     assert_eq!(objects[ALLOCATED_TYPE_ID.0].type_name, "allocated");
   }
 
@@ -592,6 +676,11 @@ mod test {
     assert_eq!(get_type_name(some), "Option::Some");
     let none = Value::from_object(empty_allocation, NONE_TYPE_ID);
     assert_eq!(get_type_name(none), "Option::None");
+
+    let iterator = Value::from_object(empty_allocation, ITERATOR_TYPE_ID);
+    assert_eq!(get_type_name(iterator), "iterator");
+    let iterator_transform = Value::from_object(empty_allocation, ITERATOR_TRANSFORM_TYPE_ID);
+    assert_eq!(get_type_name(iterator_transform), "iterator");
 
     let allocated = Value::from_object(empty_allocation, ALLOCATED_TYPE_ID);
     assert_eq!(get_type_name(allocated), "allocated");

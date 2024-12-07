@@ -154,6 +154,9 @@ mod type_errors {
     if bang_interpreter::stdlib::OPTION_ITEMS.contains(&identifier) {
       return Some("option");
     }
+    if bang_interpreter::stdlib::ITER_ITEMS.contains(&identifier) {
+      return Some("iter");
+    }
 
     None
   }

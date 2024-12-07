@@ -1,6 +1,7 @@
 use super::macros::module;
 use crate::{
   VM, Value,
+  object::{ITERATOR_TYPE_ID, Iterator},
   object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
   vm::ErrorKind,
 };
@@ -51,6 +52,33 @@ module!(list, LIST_ITEMS, list_types, list_docs, {
 
     let closure = (vm.heap).allocate(NativeClosure::new("contains", func, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
+  };
+
+  /// Creates an iterator over the values of the list
+  ///
+  /// ## Example
+  /// ```bang
+  /// [] >> list::iter // <iterator>
+  /// [1, 2, 3] >> list::iter // <iterator>
+  /// ```
+  #[type(list<^a> => iterator<^a>)]
+  fn iter() = |vm, base| {
+    fn next(vm: &mut VM, state: usize, base: Value) -> Option<(Value, usize)> {
+      let list = base.as_list(&vm.heap);
+
+      if state < list.len() {
+        Some((list[state], state + 1))
+      } else {
+        None
+      }
+    }
+
+    if !base.is_list() {
+      return Err(ErrorKind::TypeError { expected: "list", got: base.get_type(vm) });
+    }
+
+    let iterator = vm.heap.allocate(Iterator { base, next, is_infinite: false });
+    Ok(Value::from_object(iterator, ITERATOR_TYPE_ID))
   };
 });
 

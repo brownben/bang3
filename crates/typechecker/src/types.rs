@@ -329,6 +329,10 @@ impl TypeArena {
           let param = self.type_from_annotation_inner(parameter.parameter(ast), ast, variables)?;
           Ok(self.new_type(Type::Structure(Structure::Option, param)))
         }
+        "iterator" => {
+          let param = self.type_from_annotation_inner(parameter.parameter(ast), ast, variables)?;
+          Ok(self.new_type(Type::Structure(Structure::Iterator, param)))
+        }
         name if Self::PRIMITIVE_NAMES.contains(&name) => Err(TypeError::UnexpectedParameter {
           type_: name.to_owned(),
           span: parameter.span(ast),
@@ -361,6 +365,11 @@ impl TypeArena {
         // If it doesn't have a parameter, make it generic
         let type_ = self.new_type_var();
         Ok(self.new_type(Type::Structure(Structure::Option, type_)))
+      }
+      "iterator" => {
+        // If it doesn't have a parameter, make it generic
+        let type_ = self.new_type_var();
+        Ok(self.new_type(Type::Structure(Structure::Iterator, type_)))
       }
       _ => Err(TypeError::UnknownTypeAnnotation {
         span,
@@ -423,12 +432,14 @@ pub enum TypeVarLink {
 pub enum Structure {
   List,
   Option,
+  Iterator,
 }
 impl fmt::Display for Structure {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       Structure::List => write!(f, "list"),
       Structure::Option => write!(f, "option"),
+      Structure::Iterator => write!(f, "iterator"),
     }
   }
 }

@@ -86,6 +86,7 @@ impl Context for StandardContext {
       "string" => string(vm, item),
       "list" => list(vm, item),
       "option" => option(vm, item),
+      "iter" => iter(vm, item),
       _ => ImportResult::ModuleNotFound,
     }
   }
@@ -94,7 +95,7 @@ impl Context for StandardContext {
 mod macros;
 
 /// The names of all the modules in the standard library
-pub const MODULES: [&str; 4] = ["maths", "string", "list", "option"];
+pub const MODULES: [&str; 5] = ["maths", "string", "list", "option", "iter"];
 
 mod maths;
 pub use maths::{MATHS_ITEMS, maths, maths_docs, maths_types};
@@ -107,3 +108,6 @@ pub use list::{LIST_ITEMS, list, list_docs, list_types};
 
 mod option;
 pub use option::{OPTION_ITEMS, option, option_docs, option_types};
+
+mod iter;
+pub use iter::{ITER_ITEMS, iter, iter_docs, iter_types};

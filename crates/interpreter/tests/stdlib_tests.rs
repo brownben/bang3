@@ -256,6 +256,9 @@ mod maths {
     "});
     assert_variable!(log; a, 0.0);
     assert_variable!(log; b, 2.0);
+
+    let log_wrong_type = run("maths::log('')");
+    assert!(log_wrong_type.is_err());
   }
 
   #[test]
@@ -425,6 +428,11 @@ mod string {
     assert_variable!(contains; f, true);
     assert_variable!(contains; g, false);
     assert_variable!(contains; h, false);
+
+    let starts_with_non_string = run("string::startsWith(1)");
+    assert!(starts_with_non_string.is_err());
+    let ends_with_non_string = run("string::endsWith(1)");
+    assert!(ends_with_non_string.is_err());
   }
 
   #[test]
@@ -501,6 +509,38 @@ mod string {
     assert_variable!(replace; f, string "hello");
     assert_variable!(replace; g, string "helo");
     assert_variable!(replace; h, string "hello");
+
+    let replace_one_arg_a_non_string = run("string::replaceOne(1)");
+    assert!(replace_one_arg_a_non_string.is_err());
+    let replace_one_arg_b_non_string = run("string::replaceOne('')(5)");
+    assert!(replace_one_arg_b_non_string.is_err());
+
+    let replace_all_arg_a_non_string = run("string::replaceAll(1)");
+    assert!(replace_all_arg_a_non_string.is_err());
+    let replace_all_arg_b_non_string = run("string::replaceAll('')(5)");
+    assert!(replace_all_arg_b_non_string.is_err());
+  }
+
+  #[test]
+  fn chars() {
+    let mut chars = run(indoc! {"
+      let a = 'hello' >> string::chars >> iter::toList >> string::from
+      let b = 'hi 🏃' >> string::chars >> iter::toList >> string::from
+      let c = '' >> string::chars >> iter::count
+
+      let two_byte = 'a © b' >> string::chars >> iter::toList >> string::from
+      let three_byte = 'c ࠀ b' >> string::chars >> iter::toList >> string::from
+      let four_byte = 'd 🌈 b' >> string::chars >> iter::toList >> string::from
+    "});
+    assert_variable!(chars; a, string "['h', 'e', 'l', 'l', 'o']");
+    assert_variable!(chars; b, string "['h', 'i', ' ', '🏃']");
+    assert_variable!(chars; c, 0.0);
+    assert_variable!(chars; two_byte, string "['a', ' ', '©', ' ', 'b']");
+    assert_variable!(chars; three_byte, string "['c', ' ', 'ࠀ', ' ', 'b']");
+    assert_variable!(chars; four_byte, string "['d', ' ', '🌈', ' ', 'b']");
+
+    let not_string = run("string::chars(5)");
+    assert!(not_string.is_err());
   }
 
   #[test]
@@ -760,9 +800,315 @@ mod option {
   }
 }
 
+mod iter {
+  use core::f64;
+
+  use super::{Value, assert_variable, indoc, run};
+
+  #[test]
+  fn basic_types() {
+    let mut to_string = run(indoc! {"
+      let a = iter::empty() >> string::from
+      let b = iter::once() >> string::from
+      let c = iter::repeat(1) >> string::from
+    "});
+    assert_variable!(to_string; a, string "<iterator>");
+    assert_variable!(to_string; b, string "<iterator>");
+    assert_variable!(to_string; c, string "<iterator>");
+
+    let is_falsy = run(indoc! {"
+      let a = if (iter::empty()) 5 else 10
+      let b = if (iter::repeat(0)) 5 else 10
+      let c = if (iter::repeat(1)) 5 else 10
+    "});
+    assert_variable!(is_falsy; a, 5.0);
+    assert_variable!(is_falsy; b, 5.0);
+    assert_variable!(is_falsy; c, 5.0);
+
+    let equality = run(indoc! {"
+      let a = iter::empty() == iter::empty()
+      let b = iter::repeat(1) == iter::repeat(1)
+      let c = iter::repeat(2) == iter::repeat(1)
+      let d = iter::once(1) == iter::repeat(1)
+    "});
+    assert_variable!(equality; a, true);
+    assert_variable!(equality; b, true);
+    assert_variable!(equality; c, false);
+    assert_variable!(equality; d, false);
+  }
+
+  #[test]
+  fn to_from_list() {
+    let mut round_trip = run(indoc! {"
+      let a = list::iter([]) >> iter::toList >> string::from
+      let b = list::iter([1, 5, 10]) >> iter::toList >> string::from
+    "});
+    assert_variable!(round_trip; a, string "[]");
+    assert_variable!(round_trip; b, string "[1, 5, 10]");
+
+    let to_list_infinite = run("iter::repeat(1) >> iter::toList");
+    assert!(to_list_infinite.is_err());
+
+    let to_list_non_iter = run("6 >> iter::toList");
+    assert!(to_list_non_iter.is_err());
+
+    let list_iter_non_list = run("6 >> list::iter");
+    assert!(list_iter_non_list.is_err());
+  }
+
+  #[test]
+  fn first_last() {
+    let mut first = run(indoc! {"
+      let a = iter::empty() >> iter::first >> string::from
+      let b = iter::once(false) >> iter::first >> string::from
+      let c = iter::repeat(77) >> iter::first >> string::from
+      let d = iter::integers() >> iter::first >> string::from
+    "});
+    assert_variable!(first; a, string "None");
+    assert_variable!(first; b, string "Some(false)");
+    assert_variable!(first; c, string "Some(77)");
+    assert_variable!(first; d, string "Some(0)");
+
+    let mut last = run(indoc! {"
+      let a = iter::empty() >> iter::last >> string::from
+      let b = iter::once(false) >> iter::last >> string::from
+      let c = list::iter([1, 2, 3]) >> iter::last >> string::from
+    "});
+    assert_variable!(last; a, string "None");
+    assert_variable!(last; b, string "Some(false)");
+    assert_variable!(last; c, string "Some(3)");
+
+    let last_infinite = run("iter::repeat(1) >> iter::last");
+    assert!(last_infinite.is_err());
+    let first_not_iter = run("4 >> iter::first");
+    assert!(first_not_iter.is_err());
+    let last_not_iter = run("4 >> iter::last");
+    assert!(last_not_iter.is_err());
+  }
+
+  #[test]
+  fn count() {
+    let count = run(indoc! {"
+      let a = iter::empty() >> iter::count
+      let b = iter::once(false) >> iter::count
+      let c = iter::repeat(77) >> iter::count
+      let d = iter::integers() >> iter::count
+      let e = list::iter([1, 2, 4]) >> iter::count
+    "});
+    assert_variable!(count; a, 0.0);
+    assert_variable!(count; b, 1.0);
+    assert_variable!(count; c, f64::INFINITY);
+    assert_variable!(count; d, f64::INFINITY);
+    assert_variable!(count; e, 3.0);
+
+    let count_not_iter = run("4 >> iter::count");
+    assert!(count_not_iter.is_err());
+  }
+
+  #[test]
+  fn any_all() {
+    let any = run(indoc! {"
+      let a = iter::empty() >> iter::any
+      let b = iter::once(false) >> iter::any
+      let c = iter::once(true) >> iter::any
+      let d = iter::repeat(true) >> iter::any
+      let e = list::iter([false, false, true]) >> iter::any
+      let f = list::iter([false, false, false]) >> iter::any
+    "});
+    assert_variable!(any; a, false);
+    assert_variable!(any; b, false);
+    assert_variable!(any; c, true);
+    assert_variable!(any; d, true);
+    assert_variable!(any; e, true);
+    assert_variable!(any; f, false);
+
+    let all = run(indoc! {"
+      let a = iter::empty() >> iter::all
+      let b = iter::once(false) >> iter::all
+      let c = iter::once(true) >> iter::all
+      let d = iter::repeat(false) >> iter::all
+      let e = list::iter([true, true, true]) >> iter::all
+      let f = list::iter([true, false, true]) >> iter::all
+    "});
+    assert_variable!(all; a, true);
+    assert_variable!(all; b, false);
+    assert_variable!(all; c, true);
+    assert_variable!(all; d, false);
+    assert_variable!(all; e, true);
+    assert_variable!(all; f, false);
+
+    let any_not_iter = run("4 >> iter::any");
+    assert!(any_not_iter.is_err());
+    let all_not_iter = run("4 >> iter::all");
+    assert!(all_not_iter.is_err());
+  }
+
+  #[test]
+  fn find_position() {
+    let mut find = run(indoc! {"
+      let a = iter::empty() >> iter::find(x => x % 3 == 0) >> string::from
+      let b = iter::repeat(6) >> iter::find(x => x % 3 == 0) >> string::from
+      let c = iter::once(77) >> iter::find(x => x % 3 == 0) >> string::from
+      let d = list::iter([1, 2, 4]) >> iter::find(x => x % 3 == 0) >> string::from
+      let e = list::iter([1, 2, 3]) >> iter::find(x => x % 3 == 0) >> string::from
+
+      let f = 'hello world' >> string::chars >> iter::find(char => char > 't') >> string::from
+      let g = 'hello world' >> string::chars >> iter::find(char => char > 'z') >> string::from
+    "});
+    assert_variable!(find; a, string "None");
+    assert_variable!(find; b, string "Some(6)");
+    assert_variable!(find; c, string "None");
+    assert_variable!(find; d, string "None");
+    assert_variable!(find; e, string "Some(3)");
+    assert_variable!(find; f, string "Some('w')");
+    assert_variable!(find; g, string "None");
+
+    let find_not_iter = run("4 >> iter::find(x => x)");
+    assert!(find_not_iter.is_err());
+    let find_not_callable = run("iter::empty() >> iter::find(5)");
+    assert!(find_not_callable.is_err());
+
+    let mut position = run(indoc! {"
+      let a = iter::empty() >> iter::position(x => x % 3 == 0) >> string::from
+      let b = iter::repeat(6) >> iter::position(x => x % 3 == 0) >> string::from
+      let c = iter::once(77) >> iter::position(x => x % 3 == 0) >> string::from
+      let d = list::iter([1, 2, 4]) >> iter::position(x => x % 3 == 0) >> string::from
+      let e = list::iter([1, 2, 3]) >> iter::position(x => x % 3 == 0) >> string::from
+
+      let f = 'hello world' >> string::chars >> iter::position(char => char > 't') >> string::from
+      let g = 'hello world' >> string::chars >> iter::position(char => char > 'z') >> string::from
+    "});
+    assert_variable!(position; a, string "None");
+    assert_variable!(position; b, string "Some(0)");
+    assert_variable!(position; c, string "None");
+    assert_variable!(position; d, string "None");
+    assert_variable!(position; e, string "Some(2)");
+    assert_variable!(position; f, string "Some(6)");
+    assert_variable!(position; g, string "None");
+
+    let position_not_iter = run("4 >> iter::position(x => x)");
+    assert!(position_not_iter.is_err());
+    let position_not_callable = run("iter::empty() >> iter::position(5)");
+    assert!(position_not_callable.is_err());
+  }
+
+  #[test]
+  fn map_inspect_filter() {
+    let mut map = run(indoc! {"
+      let a = iter::empty() >> iter::map(x => x + 1) >> iter::toList >> string::from
+      let b = iter::once(false) >> iter::map(x => !x) >> iter::toList >> string::from
+
+      let c = string::chars('hello') >> iter::map(string::toUppercase) >> iter::toList >> string::from
+    "});
+    assert_variable!(map; a, string "[]");
+    assert_variable!(map; b, string "[true]");
+    assert_variable!(map; c, string "['H', 'E', 'L', 'L', 'O']");
+
+    let map_not_iter = run("4 >> iter::map(x => x)");
+    assert!(map_not_iter.is_err());
+    let map_not_callable = run("iter::empty() >> iter::map(5)");
+    assert!(map_not_callable.is_err());
+
+    let mut inspect = run(indoc! {"
+      let a = iter::empty() >> iter::inspect(x => panic('not called')) >> iter::count
+      let b = list::iter([1, 2, 3]) >> iter::inspect(x => !x) >> iter::toList >> string::from
+      let c = list::iter([1, 2]) >> iter::inspect(x => `{x}`) >> iter::toList >> string::from
+    "});
+    assert_variable!(inspect; a, 0.0);
+    assert_variable!(inspect; b, string "[1, 2, 3]");
+    assert_variable!(inspect; c, string "[1, 2]");
+
+    let inspect_not_iter = run("4 >> iter::inspect(x => x)");
+    assert!(inspect_not_iter.is_err());
+    let inspect_not_callable = run("iter::once(1) >> iter::inspect(5)");
+    assert!(inspect_not_callable.is_err());
+
+    let mut filter = run(indoc! {"
+      let a = 'Hi 👋'
+        >> string::chars
+        >> iter::filter(string::isAscii)
+        >> iter::toList
+        >> string::from
+      let b = list::iter([1, 2, 3]) >> iter::filter(_ => false) >> iter::count
+      let c = list::iter([1, 2, 3]) >> iter::filter(_ => true) >> iter::count
+    "});
+    assert_variable!(filter; a, string "['H', 'i', ' ']");
+    assert_variable!(filter; b, 0.0);
+    assert_variable!(filter; c, 3.0);
+
+    let filter_not_iter = run("4 >> iter::filter(x => x)");
+    assert!(filter_not_iter.is_err());
+    let filter_not_callable = run("iter::once(1) >> iter::filter(5)");
+    assert!(filter_not_callable.is_err());
+  }
+
+  #[test]
+  fn reduce_fold() {
+    let mut reduce = run(indoc! {"
+      let sum = iter::reduce(acc => x => acc + x)
+      let product = iter::reduce(acc => x => acc * x)
+
+      let a = iter::empty() >> sum >> string::from
+      let b = iter::once(1) >> sum >> string::from
+      let c = iter::once(1) >> product >> string::from
+      let d = list::iter([1, 2, 4]) >> sum >> string::from
+      let e = list::iter([1, 2, 4]) >> product >> string::from
+    "});
+    assert_variable!(reduce; a, string "None");
+    assert_variable!(reduce; b, string "Some(1)");
+    assert_variable!(reduce; c, string "Some(1)");
+    assert_variable!(reduce; d, string "Some(7)");
+    assert_variable!(reduce; e, string "Some(8)");
+
+    let reduce_infinite = run("iter::integers() >> iter::reduce(x => x => x)");
+    assert!(reduce_infinite.is_err());
+
+    let reduce_not_iter = run("4 >> iter::reduce(x => x => x)");
+    assert!(reduce_not_iter.is_err());
+    let reduce_not_callable = run("iter::reduce(5)");
+    assert!(reduce_not_callable.is_err());
+    let reduce_not_callable_inner = run("list::iter([1, 2]) >> iter::reduce(x => 5)");
+    assert!(reduce_not_callable_inner.is_err());
+
+    let fold = run(indoc! {"
+      let a = list::iter([1, 2, 3]) >> iter::fold(0)(acc => x => acc + x)
+      let b = list::iter([1, 2, 3]) >> iter::fold(4)(acc => x => acc + x)
+      let c = iter::empty() >> iter::fold(0)(acc => x => acc + x)
+    "});
+    assert_variable!(fold; a, 6.0);
+    assert_variable!(fold; b, 10.0);
+    assert_variable!(fold; c, 0.0);
+
+    let fold_infinite = run("iter::integers() >> iter::fold(0)(x => x => x)");
+    assert!(fold_infinite.is_err());
+
+    let fold_not_iter = run("4 >> iter::fold(0)(x => x => x)");
+    assert!(fold_not_iter.is_err());
+    let fold_not_callable = run("iter::empty() >> iter::fold(5)(5)");
+    assert!(fold_not_callable.is_err());
+    let fold_not_callable_inner = run("list::iter([1, 2]) >> iter::fold(0)(x => 5)");
+    assert!(fold_not_callable_inner.is_err());
+  }
+
+  #[test]
+  fn take_while() {
+    let mut take_while = run(indoc! {"
+      let a = (iter::empty() >> iter::takeWhile(x => x) >> iter::toList) == []
+      let b = iter::integers() >> iter::takeWhile(x => x < 4) >> iter::toList >> string::from
+    "});
+    assert_variable!(take_while; a, true);
+    assert_variable!(take_while; b, string "[0, 1, 2, 3]");
+
+    let take_while_not_iter = run("4 >> iter::takeWhile(x => x)");
+    assert!(take_while_not_iter.is_err());
+    let take_while_not_callable = run("iter::empty() >> iter::takeWhile(5)");
+    assert!(take_while_not_callable.is_err());
+  }
+}
+
 mod docs {
-  use bang_interpreter::stdlib::{LIST_ITEMS, MATHS_ITEMS, OPTION_ITEMS, STRING_ITEMS};
-  use bang_interpreter::stdlib::{list_docs, maths_docs, option_docs, string_docs};
+  use bang_interpreter::stdlib::{ITER_ITEMS, LIST_ITEMS, MATHS_ITEMS, OPTION_ITEMS, STRING_ITEMS};
+  use bang_interpreter::stdlib::{iter_docs, list_docs, maths_docs, option_docs, string_docs};
   use indoc::indoc;
 
   #[test]
@@ -781,6 +1127,10 @@ mod docs {
 
     for item in OPTION_ITEMS {
       typecheck_docs("option", item, option_docs(item));
+    }
+
+    for item in ITER_ITEMS {
+      typecheck_docs("iter", item, iter_docs(item));
     }
   }
 
@@ -801,6 +1151,10 @@ mod docs {
     for item in OPTION_ITEMS {
       lint_docs("option", item, option_docs(item));
     }
+
+    for item in ITER_ITEMS {
+      lint_docs("iter", item, iter_docs(item));
+    }
   }
 
   #[test]
@@ -820,6 +1174,10 @@ mod docs {
     for item in OPTION_ITEMS {
       format_docs("option", item, option_docs(item));
     }
+
+    for item in ITER_ITEMS {
+      format_docs("iter", item, iter_docs(item));
+    }
   }
 
   /// Gets an example from a docstring if it exists
@@ -829,7 +1187,7 @@ mod docs {
       .skip_while(|line| !line.trim_end().ends_with("```bang"))
       .skip(1)
       .take_while(|line| !line.trim_end().ends_with("```"))
-      .map(|line| line.trim())
+      .map(|line| if line.is_empty() { "" } else { &line[1..] })
       .fold(String::new(), |a, b| a + b + "\n")
       .trim_end()
       .to_string()
