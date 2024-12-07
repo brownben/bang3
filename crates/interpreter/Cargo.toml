@@ -13,6 +13,11 @@ smartstring.workspace = true
 [dev-dependencies]
 indoc.workspace = true
 
+# for checking stdlib documentation
+bang-typechecker = { path = "../typechecker" }
+bang-linter = { path = "../linter" }
+bang-formatter = { path = "../formatter" }
+
 [features]
 gc-stress-test = []
 debug-stack = []

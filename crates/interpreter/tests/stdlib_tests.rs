@@ -759,3 +759,177 @@ mod option {
     assert!(not_option.is_err());
   }
 }
+
+mod docs {
+  use bang_interpreter::stdlib::{LIST_ITEMS, MATHS_ITEMS, OPTION_ITEMS, STRING_ITEMS};
+  use bang_interpreter::stdlib::{list_docs, maths_docs, option_docs, string_docs};
+  use indoc::indoc;
+
+  #[test]
+  fn typecheck() {
+    for item in STRING_ITEMS {
+      typecheck_docs("string", item, string_docs(item));
+    }
+
+    for item in MATHS_ITEMS {
+      typecheck_docs("maths", item, maths_docs(item));
+    }
+
+    for item in LIST_ITEMS {
+      typecheck_docs("list", item, list_docs(item));
+    }
+
+    for item in OPTION_ITEMS {
+      typecheck_docs("option", item, option_docs(item));
+    }
+  }
+
+  #[test]
+  fn lint() {
+    for item in STRING_ITEMS {
+      lint_docs("string", item, string_docs(item));
+    }
+
+    for item in MATHS_ITEMS {
+      lint_docs("maths", item, maths_docs(item));
+    }
+
+    for item in LIST_ITEMS {
+      lint_docs("list", item, list_docs(item));
+    }
+
+    for item in OPTION_ITEMS {
+      lint_docs("option", item, option_docs(item));
+    }
+  }
+
+  #[test]
+  fn format() {
+    for item in STRING_ITEMS {
+      format_docs("string", item, string_docs(item));
+    }
+
+    for item in MATHS_ITEMS {
+      format_docs("maths", item, maths_docs(item));
+    }
+
+    for item in LIST_ITEMS {
+      format_docs("list", item, list_docs(item));
+    }
+
+    for item in OPTION_ITEMS {
+      format_docs("option", item, option_docs(item));
+    }
+  }
+
+  /// Gets an example from a docstring if it exists
+  fn get_doc_example(docs: &str) -> String {
+    docs
+      .lines()
+      .skip_while(|line| !line.trim_end().ends_with("```bang"))
+      .skip(1)
+      .take_while(|line| !line.trim_end().ends_with("```"))
+      .map(|line| line.trim())
+      .fold(String::new(), |a, b| a + b + "\n")
+      .trim_end()
+      .to_string()
+  }
+
+  fn generate_error_message(
+    module: &str,
+    item: &str,
+    source: &str,
+    error: &str,
+    error_kind: &str,
+  ) -> String {
+    format!(
+      indoc! {"
+      `{}::{}`'s documentation example {}
+
+      ```bang
+      {}
+      ```
+
+      Errors:
+
+      {}
+    "},
+      module,
+      item,
+      error_kind,
+      source,
+      error.trim_end()
+    )
+  }
+
+  fn parse_docs(module: &str, item: &str, docs: &str) -> bang_syntax::AST {
+    let doc_example = get_doc_example(docs);
+
+    let ast = bang_syntax::parse(doc_example);
+    if !ast.is_valid() {
+      let errors = (ast.errors.iter())
+        .map(|error| error.full_message())
+        .fold(String::new(), |a, b| a + b.as_str() + "\n\n");
+
+      panic!(
+        "{}",
+        generate_error_message(module, item, &ast.source, &errors, "could not be parsed")
+      );
+    }
+    ast
+  }
+
+  fn typecheck_docs(module: &str, item: &str, docs: Option<&'static str>) {
+    let ast = parse_docs(module, item, docs.unwrap_or(""));
+
+    let type_checker = bang_typechecker::TypeChecker::check(&ast);
+    if !type_checker.problems().is_empty() {
+      let errors = (type_checker.problems().iter())
+        .map(|error| error.full_message())
+        .fold(String::new(), |a, b| a + b.as_str() + "\n\n");
+
+      panic!(
+        "{}",
+        generate_error_message(module, item, &ast.source, &errors, "has a type error")
+      );
+    }
+  }
+
+  fn lint_docs(module: &str, item: &str, docs: Option<&'static str>) {
+    let ast = parse_docs(module, item, docs.unwrap());
+
+    let problems = bang_linter::lint(&ast);
+    if !problems.is_empty() {
+      let errors = problems
+        .iter()
+        .map(|error| error.full_message())
+        .fold(String::new(), |a, b| a + b.as_str() + "\n\n");
+
+      panic!(
+        "{}",
+        generate_error_message(module, item, &ast.source, &errors, "has a lint warning")
+      );
+    }
+  }
+
+  fn format_docs(module: &str, item: &str, docs: Option<&'static str>) {
+    use bang_formatter::{FormatterConfig, config::LineEnding};
+
+    let ast = parse_docs(module, item, docs.unwrap());
+
+    let format_config = FormatterConfig {
+      print_width: 80,
+      single_quotes: true,
+      indentation: 2.into(),
+      line_ending: LineEnding::LineFeed,
+      sort_imports: true,
+    };
+    let formatted_code = bang_formatter::format(&ast, format_config);
+
+    assert_eq!(
+      ast.source.trim(),
+      formatted_code.trim(),
+      "`{module}::{item}`'s documentation example is not formatted"
+    );
+  }
+}
