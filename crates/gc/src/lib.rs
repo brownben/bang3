@@ -350,6 +350,18 @@ impl Heap {
     self.get_page(ptr.page_index()).mark(ptr.block_index());
   }
 
+  /// Marks a pointer as freed, to free memory in the heap.
+  ///
+  /// If it is in a full page, the page will not be returned to the free list (until a
+  /// full garbage collection is performed). But it can free space in small allocation pages.
+  pub fn mark_free<T>(&self, ptr: Gc<T>) {
+    if ptr.is_null() {
+      return;
+    }
+
+    self.get_page(ptr.page_index()).mark_free(ptr.block_index());
+  }
+
   /// Finishes a garbage collection
   ///
   /// Returns all unused pages to the appropriate free lists.

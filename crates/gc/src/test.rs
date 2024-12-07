@@ -252,3 +252,25 @@ fn mark_null() {
   allocator.mark(Gc::NULL);
   allocator.finish_gc();
 }
+
+#[test]
+fn mark_as_free() {
+  let mut allocator = Heap::new(HeapSize::Standard).unwrap();
+  let a = allocator.allocate_bytes(10);
+  let b = allocator.allocate_bytes(10);
+  let c = allocator.allocate_bytes(10);
+
+  let small_object_page_list = &mut allocator.size_class_lists[0];
+  let first_page = small_object_page_list.first().unwrap();
+
+  assert_eq!(first_page.num_allocated_blocks(), 3);
+
+  allocator.mark_free(b);
+  assert_eq!(first_page.num_allocated_blocks(), 2);
+
+  allocator.mark_free(a);
+  assert_eq!(first_page.num_allocated_blocks(), 1);
+
+  allocator.mark_free(c);
+  assert_eq!(first_page.num_allocated_blocks(), 0);
+}

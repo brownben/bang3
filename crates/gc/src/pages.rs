@@ -223,6 +223,12 @@ impl PageDescriptorRef {
     let gc_bits = &mut self.as_mut().gc_bits;
     *gc_bits |= 1u64 << block_index;
   }
+  /// Mark a block in the page as used
+  pub fn mark_free(&mut self, block_index: usize) {
+    let block_index = block_index / self.as_ref().class.block_size();
+    let gc_bits = &mut self.as_mut().gc_bits;
+    *gc_bits &= !(1u64 << block_index);
+  }
   /// Get the next free block in the page
   pub fn take_next_block(&mut self) -> usize {
     let gc_bits = &mut self.as_mut().gc_bits;
