@@ -11,9 +11,9 @@ use crate::{
 module!(string, STRING_ITEMS, string_types, string_docs, {
   const /// A newline character
         NEW_LINE: String = "\n";
-  const // A tab character
+  const /// A tab character
         TAB: String = "\t";
-  const // A carriage return character
+  const /// A carriage return character
         CARRIAGE_RETURN: String = "\r";
 
   /// Converts a value to a string
@@ -28,7 +28,7 @@ module!(string, STRING_ITEMS, string_types, string_docs, {
   #[type(^a => string)]
   fn toString() = |vm, arg| {
     if arg.is_string() {
-          return Ok(arg);
+      return Ok(arg);
     }
 
     let result = (arg).display(vm);
@@ -155,9 +155,11 @@ module!(string, STRING_ITEMS, string_types, string_docs, {
       Ok(result.into())
     }
 
-    () = is_string(arg, vm)?;
+    if !arg.is_string() {
+      return Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) });
+    }
 
-    let closure = (vm.heap).allocate(NativeClosure::new("contains", func, arg));
+    let closure = vm.heap.allocate(NativeClosure::new("contains", func, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
   /// Is a string a prefix of the given string?
@@ -171,13 +173,15 @@ module!(string, STRING_ITEMS, string_types, string_docs, {
   fn startsWith() = |vm, arg| {
     fn func(vm: &mut VM, pat: Value, string: Value) -> Result<Value, ErrorKind> {
       let string = get_string(string, vm)?;
-      let result = string.starts_with(get_string(pat, vm)?);
+      let result = string.starts_with(pat.as_string(&vm.heap));
       Ok(result.into())
     }
 
-    () = is_string(arg, vm)?;
+    if !arg.is_string() {
+      return Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) });
+    }
 
-    let closure = (vm.heap).allocate(NativeClosure::new("startsWith", func, arg));
+    let closure = vm.heap.allocate(NativeClosure::new("startsWith", func, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
   /// Is a string a suffix of the given string?
@@ -191,13 +195,15 @@ module!(string, STRING_ITEMS, string_types, string_docs, {
   fn endsWith() = |vm, arg| {
     fn func(vm: &mut VM, pat: Value, string: Value) -> Result<Value, ErrorKind> {
       let string = get_string(string, vm)?;
-      let result = string.ends_with(get_string(pat, vm)?);
+      let result = string.ends_with(pat.as_string(&vm.heap));
       Ok(result.into())
     }
 
-    () = is_string(arg, vm)?;
+    if !arg.is_string() {
+      return Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) });
+    }
 
-    let closure = (vm.heap).allocate(NativeClosure::new("endsWith", func, arg));
+    let closure = vm.heap.allocate(NativeClosure::new("endsWith", func, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
 
@@ -220,8 +226,8 @@ module!(string, STRING_ITEMS, string_types, string_docs, {
     if start == 0 && end == string.len() {
       Ok(arg)
     } else {
-      let closure = (vm.heap).allocate(StringView::new(vm, arg, start, end));
-      Ok(Value::from_object(closure, STRING_VIEW_TYPE_ID))
+      let view = vm.heap.allocate(StringView::new(vm, arg, start, end));
+      Ok(Value::from_object(view, STRING_VIEW_TYPE_ID))
     }
   };
   /// Returns a string with leading whitespace removed
@@ -242,8 +248,8 @@ module!(string, STRING_ITEMS, string_types, string_docs, {
     if start == 0  {
       Ok(arg)
     } else {
-      let closure = (vm.heap).allocate(StringView::new(vm, arg, start, string.len()));
-      Ok(Value::from_object(closure, STRING_VIEW_TYPE_ID))
+      let view = vm.heap.allocate(StringView::new(vm, arg, start, string.len()));
+      Ok(Value::from_object(view, STRING_VIEW_TYPE_ID))
     }
   };
   /// Returns a string with trailing whitespace removed
@@ -264,8 +270,8 @@ module!(string, STRING_ITEMS, string_types, string_docs, {
     if end == string.len() {
       Ok(arg)
     } else {
-      let closure = (vm.heap).allocate(StringView::new(vm, arg, 0, end));
-      Ok(Value::from_object(closure, STRING_VIEW_TYPE_ID))
+      let view = vm.heap.allocate(StringView::new(vm, arg, 0, end));
+      Ok(Value::from_object(view, STRING_VIEW_TYPE_ID))
     }
   };
 
@@ -281,7 +287,9 @@ module!(string, STRING_ITEMS, string_types, string_docs, {
   #[type(string => string => string => string)]
   fn replaceAll() = |vm, arg| {
     fn func_one(vm: &mut VM, a: Value, b: Value) -> Result<Value, ErrorKind> {
-      () = is_string(b, vm)?;
+      if !b.is_string() {
+        return Err(ErrorKind::TypeError { expected: "string", got: b.get_type(vm) });
+      }
 
       let closure = (vm.heap).allocate(NativeClosureTwo::new("replaceAll", func_two, a, b));
       Ok(Value::from_object(closure, NATIVE_CLOSURE_TWO_TYPE_ID))
@@ -295,7 +303,9 @@ module!(string, STRING_ITEMS, string_types, string_docs, {
       Ok(vm.allocate_string(&output))
     }
 
-    () = is_string(arg, vm)?;
+    if !arg.is_string() {
+      return Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) });
+    }
 
     let closure = (vm.heap).allocate(NativeClosure::new("replaceAll", func_one, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
@@ -313,9 +323,11 @@ module!(string, STRING_ITEMS, string_types, string_docs, {
   #[type(string => string => string => string)]
   fn replaceOne() = |vm, arg| {
     fn func_one(vm: &mut VM, a: Value, b: Value) -> Result<Value, ErrorKind> {
-      () = is_string(b, vm)?;
+      if !b.is_string() {
+        return Err(ErrorKind::TypeError { expected: "string", got: b.get_type(vm) });
+      }
 
-      let closure = (vm.heap).allocate(NativeClosureTwo::new("replaceOne", func_two, a, b));
+      let closure = vm.heap.allocate(NativeClosureTwo::new("replaceOne", func_two, a, b));
       Ok(Value::from_object(closure, NATIVE_CLOSURE_TWO_TYPE_ID))
     }
     fn func_two(vm: &mut VM, pat: Value, rep: Value, string: Value) -> Result<Value, ErrorKind> {
@@ -328,9 +340,11 @@ module!(string, STRING_ITEMS, string_types, string_docs, {
       Ok(vm.allocate_string(&output))
     }
 
-    () = is_string(arg, vm)?;
+    if !arg.is_string() {
+      return Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) });
+    }
 
-    let closure = (vm.heap).allocate(NativeClosure::new("replaceOne", func_one, arg));
+    let closure = vm.heap.allocate(NativeClosure::new("replaceOne", func_one, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
 });
@@ -340,19 +354,6 @@ module!(string, STRING_ITEMS, string_types, string_docs, {
 fn get_string<'a>(value: Value, vm: &'a VM) -> Result<&'a str, ErrorKind> {
   if value.is_string() {
     Ok(value.as_string(&vm.heap))
-  } else {
-    Err(ErrorKind::TypeError {
-      expected: "string",
-      got: value.get_type(vm),
-    })
-  }
-}
-
-#[allow(clippy::inline_always, reason = "function exists to simplify macros")]
-#[inline(always)]
-fn is_string(value: Value, vm: &VM) -> Result<(), ErrorKind> {
-  if value.is_string() {
-    Ok(())
   } else {
     Err(ErrorKind::TypeError {
       expected: "string",

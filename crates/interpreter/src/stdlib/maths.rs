@@ -206,7 +206,9 @@ module!(maths, MATHS_ITEMS, maths_types, maths_docs, {
       Ok(result.into())
     }
 
-    () = is_number(arg, vm)?;
+    if !arg.is_number() {
+      return Err(ErrorKind::TypeError { expected: "number", got: arg.get_type(vm) })
+    }
 
     let closure = vm.heap.allocate(NativeClosure::new("pow", func, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
@@ -229,7 +231,9 @@ module!(maths, MATHS_ITEMS, maths_types, maths_docs, {
       Ok(result.into())
     }
 
-    () = is_number(arg, vm)?;
+    if !arg.is_number() {
+      return Err(ErrorKind::TypeError { expected: "number", got: arg.get_type(vm) })
+    }
 
     let closure = vm.heap.allocate(NativeClosure::new("log", func, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
@@ -267,19 +271,6 @@ use f64_function;
 fn get_number(value: Value, vm: &VM) -> Result<f64, ErrorKind> {
   if value.is_number() {
     Ok(value.as_number())
-  } else {
-    Err(ErrorKind::TypeError {
-      expected: "number",
-      got: value.get_type(vm),
-    })
-  }
-}
-
-#[allow(clippy::inline_always, reason = "function exists to simplify macros")]
-#[inline(always)]
-fn is_number(value: Value, vm: &VM) -> Result<(), ErrorKind> {
-  if value.is_number() {
-    Ok(())
   } else {
     Err(ErrorKind::TypeError {
       expected: "number",
