@@ -24,3 +24,8 @@ debug-stack = []
 
 [lints]
 workspace = true
+
+[[bin]]
+name = "stdlib-docs"
+path = "scripts/stdlib-docs.rs"
+doc = false

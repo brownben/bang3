@@ -20,6 +20,8 @@ jobs:
         run: cargo build --workspace
       - name: Lint
         run: cargo clippy --workspace -- -D warnings
+      - name: Standard Library Documentation
+        run: cargo run -p bang-interpreter --bin stdlib-docs -- --check
       - name: Test
         run: |
           cargo test --workspace --verbose
@@ -44,5 +46,5 @@ jobs:
           tool: cargo-nextest
       - name: Test
         run: |
-          cargo miri nextest run --no-fail-fast
+          cargo miri nextest run --no-fail-fast --workspace
           cargo miri nextest run -p bang-interpreter -F gc-stress-test --no-fail-fast

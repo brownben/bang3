@@ -10,6 +10,7 @@ members = [
   "crates/syntax",
   "crates/typechecker",
 ]
+default-members = ["crates/cli"]
 
 [workspace.dependencies]
 # formatter
