@@ -661,7 +661,9 @@ impl<'context> VM<'context> {
 
       ip += instruction.length();
 
-      if self.should_garbage_collect() {
+      // Only garbage collect if we are in the main script. If we are in a native function
+      // callback, we could have references to some values which wouldn't be traced by the GC
+      if MAIN_SCRIPT && self.should_garbage_collect() {
         self.garbage_collect();
       }
     };
