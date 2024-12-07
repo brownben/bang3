@@ -138,6 +138,14 @@ fn binary_pipeline() {
       >> print
   "};
   assert_format!(source, source, 20);
+
+  let source = indoc! {"
+    iter::integers()
+      >> iter::map(x => x * 2)
+      >> iter::take(5)
+      >> iter::toList // [0, 2, 4, 6, 8]
+  "};
+  assert_format!(source, source, 80);
 }
 
 #[test]

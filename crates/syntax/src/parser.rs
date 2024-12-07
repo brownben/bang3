@@ -183,6 +183,7 @@ impl<'ast> Parser<'ast> {
     {
       let (kind, token) = self.advance();
       previous = self.infix_expression(previous, kind, token);
+      self.skip_single_newline();
     }
 
     previous

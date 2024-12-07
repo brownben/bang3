@@ -807,6 +807,38 @@ fn pipeline_can_break_lines() {
   "};
   assert!(ast.is_ok());
   assert_eq!(ast.to_string(), expected);
+
+  let ast = parse(indoc! {"
+    iter::integers()
+      >> iter::map(x => x * 2)
+      >> iter::take(5)
+      >> iter::toList // [0, 2, 4, 6, 8]
+  "});
+  let expected = indoc! {"
+    ├─ Binary (>>)
+    │  ├─ Binary (>>)
+    │  │  ├─ Binary (>>)
+    │  │  │  ├─ Call
+    │  │  │  │  ├─ Callee
+    │  │  │  │  │  ╰─ Module Access (iter::integers)
+    │  │  │  ╰─ Call
+    │  │  │     ├─ Callee
+    │  │  │     │  ╰─ Module Access (iter::map)
+    │  │  │     ╰─ Argument
+    │  │  │        ╰─ Function: x =>
+    │  │  │           ╰─ Binary (*)
+    │  │  │              ├─ Variable (x)
+    │  │  │              ╰─ Number (2)
+    │  │  ╰─ Call
+    │  │     ├─ Callee
+    │  │     │  ╰─ Module Access (iter::take)
+    │  │     ╰─ Argument
+    │  │        ╰─ Number (5)
+    │  ╰─ Comment ([0, 2, 4, 6, 8])
+    │     ╰─ Module Access (iter::toList)
+  "};
+  assert!(ast.is_ok());
+  assert_eq!(ast.to_string(), expected);
 }
 
 #[test]
