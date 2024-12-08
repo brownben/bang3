@@ -6,10 +6,9 @@ use crate::{
   object::{LIST_TYPE_ID, List},
   object::{NATIVE_CLOSURE_TWO_TYPE_ID, NativeClosureTwo},
   object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
-  object::{NONE_TYPE_ID, SOME_TYPE_ID},
+  object::{NONE, SOME_TYPE_ID},
   vm::ErrorKind,
 };
-use bang_gc::Gc;
 
 module!(iter, ITER_ITEMS, iter_types, iter_docs, {
   /// Creates an iterator that yields nothing
@@ -111,7 +110,7 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
 
     match result {
       Some(value) => Ok(Value::from_object(vm.heap.allocate(value), SOME_TYPE_ID)),
-      None => Ok(Value::from_object(Gc::NULL, NONE_TYPE_ID))
+      None => Ok(NONE)
     }
   };
   /// Gets the last element from the iterator
@@ -142,7 +141,7 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
 
     match last {
       Some(value) => Ok(Value::from_object(vm.heap.allocate(value), SOME_TYPE_ID)),
-      None => Ok(Value::from_object(Gc::NULL, NONE_TYPE_ID))
+      None => Ok(NONE)
     }
   };
 
@@ -253,7 +252,7 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
 
       match result {
         Some(value) => Ok(Value::from_object(vm.heap.allocate(value), SOME_TYPE_ID)),
-        None => Ok(Value::from_object(Gc::NULL, NONE_TYPE_ID))
+        None => Ok(NONE)
       }
     }
 
@@ -297,7 +296,7 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
 
       match result {
         Some(value) => Ok(Value::from_object(vm.heap.allocate(value), SOME_TYPE_ID)),
-        None => Ok(Value::from_object(Gc::NULL, NONE_TYPE_ID))
+        None => Ok(NONE)
       }
     }
 
@@ -449,7 +448,7 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
       };
 
       let Some((mut accumulator, mut state)) = iter_next(vm, iterator, 0)? else {
-        return Ok(Value::from_object(Gc::NULL, NONE_TYPE_ID));
+        return Ok(NONE);
       };
 
       loop {

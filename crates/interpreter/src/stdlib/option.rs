@@ -2,14 +2,13 @@ use super::macros::module;
 use crate::{
   VM, Value,
   object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
-  object::{NONE_TYPE_ID, SOME_TYPE_ID},
+  object::{NONE, NONE_TYPE_ID, SOME_TYPE_ID},
   vm::ErrorKind,
 };
-use bang_gc::Gc;
 
 module!(option, OPTION_ITEMS, option_types, option_docs, {
   const /// No value
-        None: option = Value::from_object(Gc::NULL, NONE_TYPE_ID);
+        None: option = NONE;
 
   /// Some value
   #[type(^a => option<^a>)]
@@ -19,8 +18,8 @@ module!(option, OPTION_ITEMS, option_types, option_docs, {
   ///
   /// ## Example
   /// ```bang
-  /// option::isNone(option::None) // true
-  /// option::isNone(option::Some(1)) // false
+  /// option::isNone(None) // true
+  /// option::isNone(Some(1)) // false
   /// ```
   #[type(option => boolean)]
   fn isNone() = |_, arg| Ok(arg.is_object_type(NONE_TYPE_ID).into());
@@ -28,8 +27,8 @@ module!(option, OPTION_ITEMS, option_types, option_docs, {
   ///
   /// ## Example
   /// ```bang
-  /// option::isSome(option::Some(1)) // true
-  /// option::isSome(option::None) // false
+  /// option::isSome(Some(1)) // true
+  /// option::isSome(None) // false
   /// ```
   #[type(option => boolean)]
   fn isSome() = |_, arg| Ok(arg.is_object_type(SOME_TYPE_ID).into());
@@ -38,14 +37,14 @@ module!(option, OPTION_ITEMS, option_types, option_docs, {
   ///
   /// ## Example
   /// ```bang
-  /// option::Some(5) >> option::unwrap // 5
-  /// option::None >> option::unwrap // panic, execution stopped
+  /// Some(5) >> option::unwrap // 5
+  /// None >> option::unwrap // panic, execution stopped
   /// ```
   #[type(option<^a> => ^a)]
   fn unwrap() = |vm, arg| {
     if arg.is_object_type(SOME_TYPE_ID) {
       Ok(vm.heap[arg.as_object::<Value>()])
-    } else if arg.is_object_type(NONE_TYPE_ID) {
+    } else if arg == NONE {
       Err(ErrorKind::Custom {
         title: "Panic",
         message: "called `option::unwrap` on a `None` value".to_string()
@@ -58,13 +57,13 @@ module!(option, OPTION_ITEMS, option_types, option_docs, {
   ///
   /// ## Example
   /// ```bang
-  /// option::Some(5) >> option::unwrapOr(0) // 5
-  /// option::None >> option::unwrapOr(0) // 0
+  /// Some(5) >> option::unwrapOr(0) // 5
+  /// None >> option::unwrapOr(0) // 0
   /// ```
   #[type(^a => option<^a> => ^a)]
   fn unwrapOr() = |vm, arg| {
     fn func(vm: &mut VM, alternative: Value, option: Value) -> Result<Value, ErrorKind> {
-      if option.is_object_type(NONE_TYPE_ID) {
+      if option == NONE {
         Ok(alternative)
       } else if option.is_object_type(SOME_TYPE_ID) {
         Ok(vm.heap[option.as_object::<Value>()])
@@ -83,12 +82,12 @@ module!(option, OPTION_ITEMS, option_types, option_docs, {
   ///
   /// ## Example
   /// ```bang
-  /// option::flatten(option::Some(option::None)) // None
-  /// option::flatten(option::Some(option::Some(5))) // Some(5)
+  /// option::flatten(Some(None)) // None
+  /// option::flatten(Some(Some(5))) // Some(5)
   /// ```
   #[type(option<option<^a>> => option<^a>)]
   fn flatten() = |vm, arg| {
-    if arg.is_object_type(NONE_TYPE_ID) {
+    if arg == NONE {
       Ok(arg)
     } else if arg.is_object_type(SOME_TYPE_ID) {
       Ok(vm.heap[arg.as_object::<Value>()])
@@ -102,16 +101,16 @@ module!(option, OPTION_ITEMS, option_types, option_docs, {
   ///
   /// ## Example
   /// ```bang
-  /// option::Some(5) >> option::map(x => x + 1) // Some(6)
-  /// option::None >> option::map(x => x + 1) // None
+  /// Some(5) >> option::map(x => x + 1) // Some(6)
+  /// None >> option::map(x => x + 1) // None
   ///
-  /// option::Some('example') >> option::map(string::length) // Some(7)
-  /// option::None >> option::map(string::length) // None
+  /// Some('example') >> option::map(string::length) // Some(7)
+  /// None >> option::map(string::length) // None
   /// ```
   #[type((^a => ^b) => option<^a> => option<^b>)]
   fn map() = |vm, arg| {
     fn func(vm: &mut VM, function: Value, option: Value) -> Result<Value, ErrorKind> {
-      if option.is_object_type(NONE_TYPE_ID) {
+      if option == NONE {
         Ok(option)
       } else if option.is_object_type(SOME_TYPE_ID) {
         let inner_value = vm.heap[option.as_object::<Value>()];

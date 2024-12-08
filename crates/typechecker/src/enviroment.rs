@@ -1,7 +1,7 @@
 //! Tracks variables, their types, and where they are defined and used
 
 use crate::stdlib::StdlibModule;
-use crate::types::{Type, TypeArena, TypeRef, TypeScheme};
+use crate::types::{Structure, Type, TypeArena, TypeRef, TypeScheme};
 use bang_syntax::{Span, ast::statement::ImportItem};
 use indoc::indoc;
 use std::cell::OnceCell;
@@ -30,6 +30,10 @@ impl Enviroment {
     let print_function = TypeScheme::new(types.new_type(Type::Function(generic_a, generic_a)), 1);
     let type_function = TypeScheme::new(types.new_type(Type::Function(generic_a, string)), 1);
     let panic_function = TypeScheme::new(types.new_type(Type::Function(generic_a, generic_b)), 2);
+
+    let option = types.new_type(Type::Structure(Structure::Option, generic_a));
+    let none = TypeScheme::new(option, 1);
+    let some = TypeScheme::new(types.new_type(Type::Function(generic_a, option)), 1);
 
     self.variables.push(Variable {
       kind: VariableKind::Builtin {
@@ -100,6 +104,44 @@ impl Enviroment {
       type_: panic_function,
 
       type_info: OnceCell::from(StaticTypeInfo::new_function("^a => ^b")),
+    });
+    self.variables.push(Variable {
+      kind: VariableKind::Builtin {
+        name: "None",
+        documentation: Some(indoc! {"
+          option::None
+
+          No value
+          ```
+        "}),
+      },
+
+      used: Vec::new(),
+      active: None,
+
+      depth: self.depth,
+      type_: none,
+
+      type_info: OnceCell::from(StaticTypeInfo::new_variable("option<^a>")),
+    });
+    self.variables.push(Variable {
+      kind: VariableKind::Builtin {
+        name: "Some",
+        documentation: Some(indoc! {"
+          option::Some
+
+          Some value
+          ```
+        "}),
+      },
+
+      used: Vec::new(),
+      active: None,
+
+      depth: self.depth,
+      type_: some,
+
+      type_info: OnceCell::from(StaticTypeInfo::new_variable("^a => option<^a>")),
     });
   }
 
@@ -348,6 +390,12 @@ impl StaticTypeInfo {
     Self {
       string: string.to_owned(),
       kind: VariableType::Function,
+    }
+  }
+  pub(crate) fn new_variable(string: &str) -> Self {
+    Self {
+      string: string.to_owned(),
+      kind: VariableType::Variable,
     }
   }
 }

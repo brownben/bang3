@@ -530,8 +530,8 @@ Some value
 Is the value `None`?
 
 ```bang
-option::isNone(option::None) // true
-option::isNone(option::Some(1)) // false
+option::isNone(None) // true
+option::isNone(Some(1)) // false
 ```
 
 ### isSome *(option => boolean)*
@@ -539,8 +539,8 @@ option::isNone(option::Some(1)) // false
 Is the value `Some`?
 
 ```bang
-option::isSome(option::Some(1)) // true
-option::isSome(option::None) // false
+option::isSome(Some(1)) // true
+option::isSome(None) // false
 ```
 
 ### unwrap *(option<^a> => ^a)*
@@ -548,8 +548,8 @@ option::isSome(option::None) // false
 Returns the contained `Some` value, panics if the value is a `None`.
 
 ```bang
-option::Some(5) >> option::unwrap // 5
-option::None >> option::unwrap // panic, execution stopped
+Some(5) >> option::unwrap // 5
+None >> option::unwrap // panic, execution stopped
 ```
 
 ### unwrapOr *(^a => option<^a> => ^a)*
@@ -557,8 +557,8 @@ option::None >> option::unwrap // panic, execution stopped
 Returns the contained Some value or a provided default.
 
 ```bang
-option::Some(5) >> option::unwrapOr(0) // 5
-option::None >> option::unwrapOr(0) // 0
+Some(5) >> option::unwrapOr(0) // 5
+None >> option::unwrapOr(0) // 0
 ```
 
 ### flatten *(option<option<^a>> => option<^a>)*
@@ -568,8 +568,8 @@ Merges a nested Option into a single layer.
 Converts from `option<option<T>>` to `option<T>`
 
 ```bang
-option::flatten(option::Some(option::None)) // None
-option::flatten(option::Some(option::Some(5))) // Some(5)
+option::flatten(Some(None)) // None
+option::flatten(Some(Some(5))) // Some(5)
 ```
 
 ### map *((^a => ^b) => option<^a> => option<^b>)*
@@ -578,11 +578,11 @@ Maps an `Option<T>` to a `Option<U>` by applying a function to a contained value
 (if `Some`) or returns `None` (if `None`).
 
 ```bang
-option::Some(5) >> option::map(x => x + 1) // Some(6)
-option::None >> option::map(x => x + 1) // None
+Some(5) >> option::map(x => x + 1) // Some(6)
+None >> option::map(x => x + 1) // None
 
-option::Some('example') >> option::map(string::length) // Some(7)
-option::None >> option::map(string::length) // None
+Some('example') >> option::map(string::length) // Some(7)
+None >> option::map(string::length) // None
 ```
 
 ## iter

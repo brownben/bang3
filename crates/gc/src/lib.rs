@@ -518,6 +518,12 @@ impl<T> Gc<T> {
   pub fn addr(self) -> usize {
     self.value.get().try_into().unwrap()
   }
+  /// The address of the pointer
+  #[must_use]
+  pub const fn addr_const(self) -> usize {
+    self.value.get() as usize
+  }
+
   /// Casts the pointer to a different type.
   pub fn cast<U>(self) -> Gc<U> {
     Gc {

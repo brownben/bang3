@@ -1,11 +1,9 @@
-use bang_gc::Gc;
-
 use super::macros::module;
 use crate::{
   VM, Value,
   object::{ITERATOR_TYPE_ID, Iterator, IteratorLength},
   object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
-  object::{NONE_TYPE_ID, SOME_TYPE_ID},
+  object::{NONE, SOME_TYPE_ID},
   vm::ErrorKind,
 };
 
@@ -111,7 +109,7 @@ module!(list, LIST_ITEMS, list_types, list_docs, {
       let index = -number.as_number() as usize;
 
       if index > list.len() {
-        return Ok(Value::from_object(Gc::NULL, NONE_TYPE_ID));
+        return Ok(NONE);
       }
 
       let result = unsafe { *list.get_unchecked(list.len() - index) };
@@ -125,7 +123,7 @@ module!(list, LIST_ITEMS, list_types, list_docs, {
       let index = number.as_number() as usize;
 
       if index >= list.len() {
-        return Ok(Value::from_object(Gc::NULL, NONE_TYPE_ID));
+        return Ok(NONE);
       }
 
       let result = unsafe { *list.get_unchecked(index) };

@@ -537,7 +537,7 @@ fn list_display(vm: &VM, list: &[Value]) -> String {
 }
 
 const OPTION_SOME: TypeDescriptor = TypeDescriptor {
-  type_name: "Option::Some",
+  type_name: "option::Some",
   trace: |vm, value, trace_value| trace_value(vm, vm.heap[value.cast::<Value>()]),
   display: |vm, value| format!("Some({})", vm.heap[value.cast::<Value>()].debug(vm)),
   debug: |vm, value| format!("Some({})", vm.heap[value.cast::<Value>()].debug(vm)),
@@ -557,7 +557,7 @@ const OPTION_SOME: TypeDescriptor = TypeDescriptor {
 pub const SOME_TYPE_ID: TypeId = TypeId(8);
 
 const OPTION_NONE: TypeDescriptor = TypeDescriptor {
-  type_name: "Option::None",
+  type_name: "option::None",
   trace: |_, _, _| {},
   display: |_, _| "None".to_owned(),
   debug: |_, _| "None".to_owned(),
@@ -566,6 +566,8 @@ const OPTION_NONE: TypeDescriptor = TypeDescriptor {
   call: None,
 };
 pub const NONE_TYPE_ID: TypeId = TypeId(9);
+
+pub const NONE: Value = Value::from_object(Gc::NULL, NONE_TYPE_ID);
 
 pub struct Iterator {
   pub base: Value,
@@ -666,8 +668,8 @@ mod test {
     assert_eq!(objects[NATIVE_CLOSURE_TWO_TYPE_ID.0].type_name, "function");
     assert_eq!(objects[LIST_TYPE_ID.0].type_name, "list");
     assert_eq!(objects[LIST_VIEW_TYPE_ID.0].type_name, "list");
-    assert_eq!(objects[SOME_TYPE_ID.0].type_name, "Option::Some");
-    assert_eq!(objects[NONE_TYPE_ID.0].type_name, "Option::None");
+    assert_eq!(objects[SOME_TYPE_ID.0].type_name, "option::Some");
+    assert_eq!(objects[NONE_TYPE_ID.0].type_name, "option::None");
     assert_eq!(objects[ITERATOR_TYPE_ID.0].type_name, "iterator");
     assert_eq!(objects[ITERATOR_TRANSFORM_TYPE_ID.0].type_name, "iterator");
     assert_eq!(objects[ALLOCATED_TYPE_ID.0].type_name, "allocated");
@@ -701,9 +703,9 @@ mod test {
     assert_eq!(get_type_name(list_view), "list");
 
     let some = Value::from_object(empty_allocation, SOME_TYPE_ID);
-    assert_eq!(get_type_name(some), "Option::Some");
+    assert_eq!(get_type_name(some), "option::Some");
     let none = Value::from_object(empty_allocation, NONE_TYPE_ID);
-    assert_eq!(get_type_name(none), "Option::None");
+    assert_eq!(get_type_name(none), "option::None");
 
     let iterator = Value::from_object(empty_allocation, ITERATOR_TYPE_ID);
     assert_eq!(get_type_name(iterator), "iterator");

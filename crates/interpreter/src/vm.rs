@@ -64,6 +64,9 @@ impl<'context> VM<'context> {
         Value::from_object(function, object::NATIVE_FUNCTION_TYPE_ID),
       );
     }
+    for (constant_name, constant) in vm.context.global_constants() {
+      vm.define_global(constant_name, constant);
+    }
 
     Ok(vm)
   }

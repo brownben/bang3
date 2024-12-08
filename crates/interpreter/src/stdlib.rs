@@ -4,7 +4,7 @@
 
 use crate::{
   Value,
-  object::NativeFunction,
+  object::{self, NONE, NativeFunction},
   vm::{ErrorKind, VM},
 };
 use std::fmt;
@@ -14,6 +14,11 @@ use std::fmt;
 /// It is responsible for defining the global functions which can be called,
 /// and for importing values from modules.
 pub trait Context: fmt::Debug {
+  /// Defines the constants which should be registered globally for the VM
+  fn global_constants(&self) -> Vec<(&'static str, Value)> {
+    Vec::new()
+  }
+
   /// Defines the functions which should be registered globally for the VM
   fn global_functions(&self) -> Vec<NativeFunction> {
     Vec::new()
@@ -51,6 +56,9 @@ impl Context for EmptyContext {}
 #[derive(Clone, Debug)]
 pub struct StandardContext;
 impl Context for StandardContext {
+  fn global_constants(&self) -> Vec<(&'static str, Value)> {
+    vec![("None", NONE)]
+  }
   fn global_functions(&self) -> Vec<NativeFunction> {
     vec![
       #[allow(clippy::print_stdout)]
@@ -76,6 +84,12 @@ impl Context for StandardContext {
           title: "Panic",
           message,
         })
+      }),
+      NativeFunction::new("Some", |vm, arg| {
+        Ok(Value::from_object(
+          vm.heap.allocate(arg),
+          object::SOME_TYPE_ID,
+        ))
       }),
     ]
   }
