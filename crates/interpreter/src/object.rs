@@ -529,7 +529,7 @@ pub struct Iterator {
   pub base: Value,
   pub next: fn(&mut VM, state: usize, base: Value) -> IteratorReturn,
 
-  pub is_infinite: bool,
+  pub length: IteratorLength,
 }
 const ITERATOR: TypeDescriptor = TypeDescriptor {
   type_name: "iterator",
@@ -551,7 +551,7 @@ pub struct IteratorTransform {
   pub arg: Value,
   pub next: IteratorTransformNextFunction,
 
-  pub is_infinite: bool,
+  pub length: IteratorLength,
 }
 const ITERATOR_TRANSFORM: TypeDescriptor = TypeDescriptor {
   type_name: "iterator",
@@ -575,6 +575,13 @@ type IteratorTransformNextFunction = fn(
   state: usize,
   transfom_arg: Value,
 ) -> Result<IteratorReturn, ErrorKind>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IteratorLength {
+  Infinite,
+  Unknown,
+  Max(usize),
+}
 
 impl Value {
   /// Is the [Value] an iterator?

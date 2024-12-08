@@ -2,7 +2,7 @@ use super::macros::module;
 use crate::{
   VM, Value,
   object::{ITERATOR_TRANSFORM_TYPE_ID, IteratorTransform},
-  object::{ITERATOR_TYPE_ID, Iterator},
+  object::{ITERATOR_TYPE_ID, Iterator, IteratorLength},
   object::{LIST_TYPE_ID, NONE_TYPE_ID, SOME_TYPE_ID},
   object::{NATIVE_CLOSURE_TWO_TYPE_ID, NativeClosureTwo},
   object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
@@ -24,7 +24,11 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
       None
     }
 
-    let iterator = (vm.heap).allocate(Iterator { base, next, is_infinite: false });
+    let iterator = vm.heap.allocate(Iterator {
+      base,
+      next,
+      length: IteratorLength::Max(0),
+    });
     Ok(Value::from_object(iterator, ITERATOR_TYPE_ID))
   };
   /// Creates an iterator that yields an element exactly once
@@ -40,7 +44,11 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
       (state == 0).then_some((value, 1))
     }
 
-    let iterator = (vm.heap).allocate(Iterator { base, next, is_infinite: false });
+    let iterator = vm.heap.allocate(Iterator {
+      base,
+      next,
+      length: IteratorLength::Max(1),
+    });
     Ok(Value::from_object(iterator, ITERATOR_TYPE_ID))
   };
   /// Creates a new iterator that endlessly repeats a single element
@@ -58,7 +66,11 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
       Some((value, state))
     }
 
-    let iterator = (vm.heap).allocate(Iterator { base, next, is_infinite: true });
+    let iterator = (vm.heap).allocate(Iterator {
+      base,
+      next,
+      length: IteratorLength::Infinite,
+    });
     Ok(Value::from_object(iterator, ITERATOR_TYPE_ID))
   };
   /// Creates a new iterator which counts integers starting from 0
@@ -76,7 +88,11 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
       Some(((state as f64).into(), state + 1))
     }
 
-    let iterator = (vm.heap).allocate(Iterator { base, next, is_infinite: true });
+    let iterator = (vm.heap).allocate(Iterator {
+      base,
+      next,
+      length: IteratorLength::Infinite,
+    });
     Ok(Value::from_object(iterator, ITERATOR_TYPE_ID))
   };
 
@@ -112,7 +128,7 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
     if is_infinite(iterator, vm) {
       return Err(ErrorKind::Custom {
         title: "Infinite Computation",
-        message: "cannot check that all elements are truthy".to_owned()
+        message: "cannot get the last element of an infinite list".to_owned()
       });
     };
 
@@ -307,14 +323,18 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
   /// ```
   #[type(iterator<^a> => list<^a>)]
   fn toList() = |vm, iterator| {
-    if is_infinite(iterator, vm) {
-      return Err(ErrorKind::Custom {
-        title: "Infinite Computation",
-        message: "cannot collect an infinite iterator into a list".to_owned()
-      });
+    let length = match iterator_length(iterator, vm) {
+      IteratorLength::Infinite => {
+        return Err(ErrorKind::Custom {
+          title: "Infinite Computation",
+          message: "cannot collect an infinite iterator into a list".to_owned()
+        });
+      },
+      IteratorLength::Unknown => 8,
+      IteratorLength::Max(length) => length,
     };
 
-    let mut items = Vec::new();
+    let mut items = Vec::with_capacity(length);
     let mut state = 0;
     while let Some((value, new_state)) = iter_next(vm, iterator, state)? {
       items.push(value);
@@ -518,7 +538,7 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
   ///   >> iter::toList // [0, 1, 2, 3, 4]
   /// ```
   #[type((^a => boolean) => iterator<^a> => iterator<^a>)]
-  fn takeWhile() = function_transform!("takeWhile" #notInfinite, |vm, iterator, state, func| {
+  fn takeWhile() = function_transform!("takeWhile" #unknownLength, |vm, iterator, state, func| {
     let Some((result, new_state)) = iter_next(vm, iterator, state)? else { return Ok(None) };
 
     let predicate = vm.call(func, result)?;
@@ -530,18 +550,22 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
   });
 });
 
-fn is_infinite(value: Value, vm: &VM) -> bool {
+fn iterator_length(value: Value, vm: &VM) -> IteratorLength {
   if value.is_object_type(ITERATOR_TYPE_ID) {
-    let bang_iterator: &Iterator = &vm.heap[value.as_object()];
-    return bang_iterator.is_infinite;
+    let iterator: &Iterator = &vm.heap[value.as_object()];
+    return iterator.length;
   }
 
   if value.is_object_type(ITERATOR_TRANSFORM_TYPE_ID) {
     let transform: &IteratorTransform = &vm.heap[value.as_object()];
-    return transform.is_infinite;
+    return transform.length;
   }
 
-  false
+  IteratorLength::Unknown
+}
+
+fn is_infinite(value: Value, vm: &VM) -> bool {
+  iterator_length(value, vm) == IteratorLength::Infinite
 }
 
 fn iter_next(
@@ -582,7 +606,7 @@ macro_rules! function_transform {
           iterator,
           arg,
           next: $next,
-          is_infinite: function_transform!(infinite $($infinite)?, iterator, vm),
+          length: function_transform!(infinite $($infinite)?, iterator, vm),
         });
         Ok(Value::from_object(iterator, ITERATOR_TRANSFORM_TYPE_ID))
       }
@@ -600,13 +624,18 @@ macro_rules! function_transform {
   };
 
   (infinite infinite, $iterator:expr, $vm:expr) => {
-    false
+    IteratorLength::Infinite
   };
-  (infinite notInfinite, $iterator:expr, $vm:expr) => {
-    false
-  };
+  (infinite unknownLength, $iterator:expr, $vm:expr) => {{
+    let length = iterator_length($iterator, $vm);
+    if length == IteratorLength::Infinite {
+      IteratorLength::Unknown
+    } else {
+      length
+    }
+  }};
   (infinite, $iterator:expr, $vm:expr) => {
-    is_infinite($iterator, $vm)
+    iterator_length($iterator, $vm)
   };
 }
 use function_transform;

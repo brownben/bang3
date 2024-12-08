@@ -4,7 +4,7 @@ use bang_gc::Gc;
 use super::macros::module;
 use crate::{
   VM, Value,
-  object::{ITERATOR_TYPE_ID, Iterator},
+  object::{ITERATOR_TYPE_ID, Iterator, IteratorLength},
   object::{NATIVE_CLOSURE_TWO_TYPE_ID, NativeClosureTwo},
   object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
   object::{NONE_TYPE_ID, SOME_TYPE_ID},
@@ -403,8 +403,13 @@ module!(string, STRING_ITEMS, string_types, string_docs, {
     if !base.is_string() {
       return Err(ErrorKind::TypeError { expected: "string", got: base.get_type(vm) });
     }
+    let length = base.as_string(&vm.heap).chars().count();
 
-    let iterator = vm.heap.allocate(Iterator { base, next, is_infinite: false });
+    let iterator = vm.heap.allocate(Iterator {
+      base,
+      next,
+      length: IteratorLength::Max(length),
+    });
     Ok(Value::from_object(iterator, ITERATOR_TYPE_ID))
   };
   /// Creates an iterator over the lines in a string
@@ -464,8 +469,13 @@ module!(string, STRING_ITEMS, string_types, string_docs, {
     if !base.is_string() {
       return Err(ErrorKind::TypeError { expected: "string", got: base.get_type(vm) });
     }
+    let length = base.as_string(&vm.heap).lines().count();
 
-    let iterator = vm.heap.allocate(Iterator { base, next, is_infinite: false });
+    let iterator = vm.heap.allocate(Iterator {
+      base,
+      next,
+      length: IteratorLength::Max(length),
+    });
     Ok(Value::from_object(iterator, ITERATOR_TYPE_ID))
   };
 });
