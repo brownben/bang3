@@ -115,21 +115,29 @@ impl<'context> VM<'context> {
   }
 
   #[inline]
-  fn pop(&mut self) -> Value {
+  pub(crate) fn pop(&mut self) -> Value {
     // SAFETY: Assume bytecode is valid, so stack is not empty
     debug_assert!(!self.stack.is_empty());
 
     unsafe { self.stack.pop().unwrap_unchecked() }
   }
   #[inline]
-  fn peek(&self) -> Value {
+  pub(crate) fn peek(&self) -> Value {
     // SAFETY: Assume bytecode is valid, so stack is not empty
     debug_assert!(!self.stack.is_empty());
 
     unsafe { *self.stack.last().unwrap_unchecked() }
   }
+  /// Get a pointer to the last value added to the stack
   #[inline]
-  fn push(&mut self, value: Value) {
+  pub(crate) unsafe fn peek_ptr(&mut self) -> *mut Value {
+    // SAFETY: Assume bytecode is valid, so stack is not empty
+    debug_assert!(!self.stack.is_empty());
+
+    unsafe { ptr::from_mut(self.stack.last_mut().unwrap_unchecked()) }
+  }
+  #[inline]
+  pub(crate) fn push(&mut self, value: Value) {
     self.stack.push(value);
   }
   #[inline]
@@ -170,7 +178,7 @@ impl<'context> VM<'context> {
   fn push_native_frame(&mut self, upvalues: Option<GcList<Value>>, native_return: bool) {
     self.frames.push(CallFrame {
       ip: 0,
-      offset: self.stack.len(),
+      offset: self.stack.len() - 1,
       chunk: ptr::null(),
       upvalues,
       native_return,
@@ -311,10 +319,11 @@ impl<'context> VM<'context> {
 
       if let Some(native_function) = self.get_type_descriptor(func).call {
         self.push(func);
+        self.push(argument);
         self.push_native_frame(None, true);
         let result = native_function(self, func.as_object(), argument)?;
         _ = self.pop_frame();
-        self.pop();
+        let (_func, _argument) = (self.pop(), self.pop());
 
         return Ok(Some(result));
       }
@@ -500,13 +509,13 @@ impl<'context> VM<'context> {
           } else if callee.is_object()
             && let Some(native_function) = self.get_type_descriptor(callee).call
           {
-            let argument = self.pop();
+            let argument = self.peek();
             self.push_native_frame(None, false);
 
             match native_function(self, callee.as_object(), argument) {
               Ok(value) => {
                 _ = self.pop_frame();
-                let _callee = self.pop();
+                let (_argument, _callee) = (self.pop(), self.pop());
                 self.push(value);
               }
               Err(err) => break Some(err),
@@ -661,9 +670,7 @@ impl<'context> VM<'context> {
 
       ip += instruction.length();
 
-      // Only garbage collect if we are in the main script. If we are in a native function
-      // callback, we could have references to some values which wouldn't be traced by the GC
-      if MAIN_SCRIPT && self.should_garbage_collect() {
+      if self.should_garbage_collect() {
         self.garbage_collect();
       }
     };

@@ -335,14 +335,22 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
       IteratorLength::Max(length) => length,
     };
 
-    let mut list = List::with_capacity(&mut vm.heap, length);
+    // We save the list on the stack, so it can always be viewed by the GC tracer
+    // We take a pointer to it, so we can update it if it needs to be resized
+    let list = List::with_capacity(&mut vm.heap, length);
+    vm.push(Value::from_object(list.as_ptr(), LIST_TYPE_ID));
+    let list_location = unsafe { vm.peek_ptr() };
+
     let mut state = 0;
     while let Some((value, new_state)) = iter_next(vm, iterator, state)? {
-      list = list.push(&mut vm.heap, value);
+      let list = List::from(unsafe { *list_location }.as_object());
+      let updated_list = list.push(&mut vm.heap, value);
+      unsafe { *list_location = Value::from_object(updated_list.as_ptr(), LIST_TYPE_ID) };
+
       state = new_state;
     };
 
-    Ok(Value::from_object(list.as_ptr(), LIST_TYPE_ID))
+    Ok(vm.pop())
   };
 
   /// Transforms the iterator by applying a function to each element
@@ -378,12 +386,7 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
   fn inspect() = function_transform!("inspect", |vm, iterator, state, func| {
     match iter_next(vm, iterator, state)? {
       Some((value, new_state)) => {
-        let result = vm.call(func, value)?;
-        if let Some(result) = result && result.is_object() {
-          // we are just inspecting the value, so no one can have
-          // a reference to it, so it is safe to free it immediately
-          vm.heap.mark_free(result.as_object::<u8>());
-        }
+        let _result = vm.call(func, value)?;
 
         Ok(Some((value, new_state)))
       }
@@ -438,8 +441,6 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
   #[type((^a => ^a => ^a) => iterator<^a> => option<^a>)]
   fn reduce() = |vm, arg| {
     fn func(vm: &mut VM, func: Value, iterator: Value) -> Result<Value, ErrorKind> {
-      let mut state = 0;
-
       if is_infinite(iterator, vm) {
         return Err(ErrorKind::Custom {
           title: "Infinite Computation",
@@ -447,15 +448,15 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
         });
       };
 
-      let Some((mut accumulator, new_state)) = iter_next(vm, iterator, state)? else {
+      let Some((mut accumulator, mut state)) = iter_next(vm, iterator, 0)? else {
         return Ok(Value::from_object(Gc::NULL, NONE_TYPE_ID));
       };
-      state = new_state;
 
       loop {
         let Some((iterator_result, new_state)) = iter_next(vm, iterator, state)? else { break };
-
+        vm.push(iterator_result); // we save the iterator result, so it is not garbage collected
         let Some(inner_function) = vm.call(func, accumulator)? else { break };
+        let iterator_result = vm.pop();
         let Some(new_accumulator) = vm.call(inner_function, iterator_result)? else { break };
 
         accumulator = new_accumulator;
@@ -509,8 +510,9 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
 
       loop {
         let Some((iterator_result, new_state)) = iter_next(vm, iter, state)? else { break };
-
+        vm.push(iterator_result); // we save the iterator result, so it is not garbage collected
         let Some(inner_function) = vm.call(func, accumulator)? else { break };
+        let iterator_result = vm.pop();
         let Some(new_accumulator) = vm.call(inner_function, iterator_result)? else { break };
 
         accumulator = new_accumulator;

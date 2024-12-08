@@ -941,6 +941,22 @@ mod iter {
     "});
     assert_variable!(from_unknown_sized_iterator; a, string "[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]");
 
+    let mut with_local_variables = run(indoc! {"
+      let a = 'hello world'
+      let b = iter::integers()
+        >> iter::takeWhile(x => x < 10)
+        >> iter::map(x => {
+          let b = 0
+          x + 0
+        })
+        >> iter::toList
+        >> string::from
+      let c = 1
+    "});
+    assert_variable!(with_local_variables; a, string "hello world");
+    assert_variable!(with_local_variables; b, string "[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]");
+    assert_variable!(with_local_variables; c, 1.0);
+
     let to_list_infinite = run("iter::repeat(1) >> iter::toList");
     assert!(to_list_infinite.is_err());
 
@@ -1108,10 +1124,12 @@ mod iter {
       let a = iter::empty() >> iter::inspect(x => panic('not called')) >> iter::count
       let b = list::iter([1, 2, 3]) >> iter::inspect(x => !x) >> iter::toList >> string::from
       let c = list::iter([1, 2]) >> iter::inspect(x => `{x}`) >> iter::toList >> string::from
+      let d = list::iter(['hello', 'hi']) >> iter::inspect(x => x) >> iter::toList >> string::from
     "});
     assert_variable!(inspect; a, 0.0);
     assert_variable!(inspect; b, string "[1, 2, 3]");
     assert_variable!(inspect; c, string "[1, 2]");
+    assert_variable!(inspect; d, string "['hello', 'hi']");
 
     let inspect_not_iter = run("4 >> iter::inspect(x => x)");
     assert!(inspect_not_iter.is_err());
@@ -1148,12 +1166,14 @@ mod iter {
       let c = iter::once(1) >> product >> string::from
       let d = list::iter([1, 2, 4]) >> sum >> string::from
       let e = list::iter([1, 2, 4]) >> product >> string::from
+      let f = string::chars('hello') >> iter::reduce(acc => x => acc ++ x) >> string::from
     "});
     assert_variable!(reduce; a, string "None");
     assert_variable!(reduce; b, string "Some(1)");
     assert_variable!(reduce; c, string "Some(1)");
     assert_variable!(reduce; d, string "Some(7)");
     assert_variable!(reduce; e, string "Some(8)");
+    assert_variable!(reduce; f, string "Some('hello')");
 
     let reduce_infinite = run("iter::integers() >> iter::reduce(x => x => x)");
     assert!(reduce_infinite.is_err());
@@ -1205,6 +1225,7 @@ mod iter {
   }
 }
 
+#[cfg(not(miri))]
 mod docs {
   use bang_interpreter::stdlib::{ITER_ITEMS, LIST_ITEMS, MATHS_ITEMS, OPTION_ITEMS, STRING_ITEMS};
   use bang_interpreter::stdlib::{iter_docs, list_docs, maths_docs, option_docs, string_docs};

@@ -104,7 +104,7 @@ const STRING: TypeDescriptor = TypeDescriptor {
 pub const STRING_TYPE_ID: TypeId = TypeId(0);
 
 /// A string view - a reference to part of a string
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct StringView {
   pub(crate) string: Value,
   pub(crate) start: usize,
@@ -401,8 +401,8 @@ impl List {
     *self.0
   }
 }
-impl<T> From<Gc<T>> for List {
-  fn from(value: Gc<T>) -> Self {
+impl From<Gc<u8>> for List {
+  fn from(value: Gc<u8>) -> Self {
     Self(value.cast().into())
   }
 }
@@ -493,7 +493,7 @@ impl Value {
     debug_assert!(self.is_list());
 
     if self.is_object_type(LIST_TYPE_ID) {
-      List::from(self.as_object::<usize>()).items(heap)
+      List::from(self.as_object()).items(heap)
     } else {
       heap[self.as_object::<ListView>()].items(heap)
     }
