@@ -1,10 +1,13 @@
 #![allow(clippy::cast_precision_loss, reason = "string lengths are < 2^52")]
+use bang_gc::Gc;
+
 use super::macros::module;
 use crate::{
   VM, Value,
   object::{ITERATOR_TYPE_ID, Iterator},
   object::{NATIVE_CLOSURE_TWO_TYPE_ID, NativeClosureTwo},
   object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
+  object::{NONE_TYPE_ID, SOME_TYPE_ID},
   object::{STRING_VIEW_TYPE_ID, StringView},
   vm::ErrorKind,
 };
@@ -349,6 +352,27 @@ module!(string, STRING_ITEMS, string_types, string_docs, {
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
 
+  /// Parses a string into a number
+  ///
+  /// ## Example
+  /// ```bang
+  /// string::parseNumber('3') // Some(3.0)
+  /// string::parseNumber('3.14') // Some(3.14)
+  /// string::parseNumber('3.14e-2') // Some(0.0314)
+  /// string::parseNumber('three') // None
+  /// string::parseNumber('Infinity') // Some(inf)
+  /// ```
+  #[type(string => option<number>)]
+  fn parseNumber() = |vm, arg| {
+    let string = get_string(arg, vm)?;
+    let result = string.parse::<f64>().map(Value::from);
+
+    match result {
+      Ok(value) => Ok(Value::from_object(vm.heap.allocate(value), SOME_TYPE_ID)),
+      Err(_) => Ok(Value::from_object(Gc::NULL, NONE_TYPE_ID))
+    }
+  };
+
   /// Creates an iterator over the characters in the string.
   ///
   /// ## Example
@@ -359,13 +383,13 @@ module!(string, STRING_ITEMS, string_types, string_docs, {
   #[type(string => iterator<string>)]
   fn chars() = |vm, base| {
     fn next(vm: &mut VM, state: usize, base: Value) -> Option<(Value, usize)> {
-      let string = base.as_string(&vm.heap);
+      let string = base.as_string(&vm.heap).as_bytes();
 
       if state >= string.len() {
         return None;
       }
 
-      let length = match string.as_bytes()[state] {
+      let length = match string[state] {
         x if (x & 0b1111_0000) == 0b1111_0000 => 4,
         x if (x & 0b1110_0000) == 0b1110_0000 => 3,
         x if (x & 0b1100_0000) == 0b1100_0000 => 2,
@@ -374,6 +398,67 @@ module!(string, STRING_ITEMS, string_types, string_docs, {
 
       let view = vm.heap.allocate(StringView::new(vm, base, state, state + length));
       Some((Value::from_object(view, STRING_VIEW_TYPE_ID), state + length))
+    }
+
+    if !base.is_string() {
+      return Err(ErrorKind::TypeError { expected: "string", got: base.get_type(vm) });
+    }
+
+    let iterator = vm.heap.allocate(Iterator { base, next, is_infinite: false });
+    Ok(Value::from_object(iterator, ITERATOR_TYPE_ID))
+  };
+  /// Creates an iterator over the lines in a string
+  ///
+  /// Lines are split at line endings that are either newlines (\n) or sequences of a
+  /// carriage return followed by a line feed (\r\n).
+  ///
+  /// Any carriage return (\r) not immediately followed by a line feed (\n) does not split a line.
+  /// These carriage returns are thereby included in the produced lines.
+  ///
+  /// The final line ending is optional. A string that ends with a final line ending will return
+  /// the same lines as an otherwise identical string without a final line ending.
+  ///
+  /// ## Example
+  /// ```bang
+  /// 'hello
+  /// world
+  /// this has three lines'
+  ///   >> string::lines
+  ///   >> iter::toList // ['hello', 'world', 'this has three lines']
+  /// ```
+  #[type(string => iterator<string>)]
+  fn lines() = |vm, base| {
+    fn next(vm: &mut VM, state: usize, base: Value) -> Option<(Value, usize)> {
+      let string = base.as_string(&vm.heap).as_bytes();
+
+      if state >= string.len() {
+        return None;
+      }
+
+      let start = state;
+      let mut end = state;
+      let next_state = loop {
+        if end >= string.len() {
+          break end + 1;
+        }
+
+        if string[end] == b'\n' {
+          break end + 1;
+        }
+        if string[end] == b'\r' && end + 1 < string.len() && string[end + 1] == b'\n' {
+          break end + 2;
+        }
+
+        end += match string[end] {
+          x if (x & 0b1111_0000) == 0b1111_0000 => 4,
+          x if (x & 0b1110_0000) == 0b1110_0000 => 3,
+          x if (x & 0b1100_0000) == 0b1100_0000 => 2,
+          _ => 1,
+        };
+      };
+
+      let view = vm.heap.allocate(StringView::new(vm, base, start, end));
+      Some((Value::from_object(view, STRING_VIEW_TYPE_ID), next_state))
     }
 
     if !base.is_string() {

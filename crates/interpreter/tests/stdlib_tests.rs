@@ -544,6 +544,58 @@ mod string {
   }
 
   #[test]
+  fn lines() {
+    let mut lines = run(indoc! {"
+      let linesToString = x => (x >> string::lines >> iter::toList >> string::from)
+
+      let a = 'hello\nworld\nthis has three lines' >> linesToString
+      let b = 'hello\r\nworld\r\nthis has three lines\n' >> linesToString
+      let c = 'hello' >> linesToString
+      let d = '' >> linesToString
+      let e = 'a © b\nc ࠀ b\nd 🌈 b' >> linesToString
+    "});
+    assert_variable!(lines; a, string "['hello', 'world', 'this has three lines']");
+    assert_variable!(lines; b, string "['hello', 'world', 'this has three lines']");
+    assert_variable!(lines; c, string "['hello']");
+    assert_variable!(lines; d, string "[]");
+    assert_variable!(lines; e, string "['a © b', 'c ࠀ b', 'd 🌈 b']");
+
+    let not_string = run("string::lines(5)");
+    assert!(not_string.is_err());
+  }
+
+  #[test]
+  fn parse_number() {
+    let mut parse_number = run(indoc! {"
+      let a = string::parseNumber('3') >> string::from
+      let b = string::parseNumber('3.14') >> string::from
+      let c = string::parseNumber('3.14e-2') >> string::from
+      let d = string::parseNumber('three') >> string::from
+      let e = string::parseNumber('3.14e') >> string::from
+      let f = string::parseNumber('-77') >> string::from
+      let g = string::parseNumber('+77') >> string::from
+      let h = string::parseNumber('NaN') >> string::from
+      let i = string::parseNumber('Infinity') >> string::from
+      let j = string::parseNumber('Inf') >> string::from
+      let k = string::parseNumber('3.0') >> string::from
+    "});
+    assert_variable!(parse_number; a, string "Some(3)");
+    assert_variable!(parse_number; b, string "Some(3.14)");
+    assert_variable!(parse_number; c, string "Some(0.0314)");
+    assert_variable!(parse_number; d, string "None");
+    assert_variable!(parse_number; e, string "None");
+    assert_variable!(parse_number; f, string "Some(-77)");
+    assert_variable!(parse_number; g, string "Some(77)");
+    assert_variable!(parse_number; h, string "Some(NaN)");
+    assert_variable!(parse_number; i, string "Some(inf)");
+    assert_variable!(parse_number; j, string "Some(inf)");
+    assert_variable!(parse_number; k, string "Some(3)");
+
+    let not_string = run("string::parseNumber(5)");
+    assert!(not_string.is_err());
+  }
+
+  #[test]
   fn wrong_types() {
     let length_wrong_type = run("from string import { length }\nlet a = length(5)");
     assert!(length_wrong_type.is_err());
@@ -605,6 +657,35 @@ mod list {
     assert_variable!(contains; c, true);
     assert_variable!(contains; d, false);
     assert_variable!(contains; e, true);
+  }
+
+  #[test]
+  fn get() {
+    let get = run(indoc! {"
+      from list import { get }
+      from option import { isNone, unwrap }
+
+      let a = [] >> get(0) >> isNone
+      let b = [] >> get(-1) >> isNone
+      let c = [1, 2, 3] >> get(0) >> unwrap
+      let d = [1, 2, 3] >> get(1) >> unwrap
+      let e = [1, 2, 3] >> get(2) >> unwrap
+      let f = [1, 2, 3] >> get(3) >> isNone
+      let g = [1, 2, 3] >> get(-1) >> unwrap
+      let h = [1, 2, 3] >> get(-2) >> unwrap
+      let i = [1, 2, 3] >> get(-3) >> unwrap
+      let j = [1, 2, 3] >> get(-4) >> isNone
+    "});
+    assert_variable!(get; a, true);
+    assert_variable!(get; b, true);
+    assert_variable!(get; c, 1.0);
+    assert_variable!(get; d, 2.0);
+    assert_variable!(get; e, 3.0);
+    assert_variable!(get; f, true);
+    assert_variable!(get; g, 3.0);
+    assert_variable!(get; h, 2.0);
+    assert_variable!(get; i, 1.0);
+    assert_variable!(get; j, true);
   }
 }
 

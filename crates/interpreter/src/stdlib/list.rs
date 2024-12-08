@@ -1,8 +1,11 @@
+use bang_gc::Gc;
+
 use super::macros::module;
 use crate::{
   VM, Value,
   object::{ITERATOR_TYPE_ID, Iterator},
   object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
+  object::{NONE_TYPE_ID, SOME_TYPE_ID},
   vm::ErrorKind,
 };
 
@@ -79,6 +82,61 @@ module!(list, LIST_ITEMS, list_types, list_docs, {
 
     let iterator = vm.heap.allocate(Iterator { base, next, is_infinite: false });
     Ok(Value::from_object(iterator, ITERATOR_TYPE_ID))
+  };
+
+  /// Gets an item from the list at the given index
+  ///
+  /// The index is truncated to an integer, if it is negative, the index is
+  /// calculated from the end of the list.
+  ///
+  /// ## Example
+  /// ```bang
+  /// [1, 2, 3] >> list::get(1) // Some(2)
+  /// [1, 2, 3] >> list::get(5) // None
+  /// [1, 2, 3] >> list::get(-1) // Some(3)
+  /// [1, 2, 3] >> list::get(-5) // None
+  /// ```
+  #[type(number => list<^a> => option<^a>)]
+  fn get() = |vm, index| {
+    fn negative_func(vm: &mut VM, number: Value, list: Value) -> Result<Value, ErrorKind> {
+      let list = get_list(list, vm)?;
+
+      #[expect(clippy::cast_sign_loss, reason = "handled below")]
+      #[expect(clippy::cast_possible_truncation, reason = "documented behaviour")]
+      let index = -number.as_number() as usize;
+
+      if index > list.len() {
+        return Ok(Value::from_object(Gc::NULL, NONE_TYPE_ID));
+      }
+
+      let result = unsafe { *list.get_unchecked(list.len() - index) };
+      Ok(Value::from_object(vm.heap.allocate(result), SOME_TYPE_ID))
+    }
+    fn positive_func(vm: &mut VM, number: Value, list: Value) -> Result<Value, ErrorKind> {
+      let list = get_list(list, vm)?;
+
+      #[expect(clippy::cast_sign_loss, reason = "handled")]
+      #[expect(clippy::cast_possible_truncation, reason = "documented behaviour")]
+      let index = number.as_number() as usize;
+
+      if index >= list.len() {
+        return Ok(Value::from_object(Gc::NULL, NONE_TYPE_ID));
+      }
+
+      let result = unsafe { *list.get_unchecked(index) };
+      Ok(Value::from_object(vm.heap.allocate(result), SOME_TYPE_ID))
+    }
+
+    if !index.is_number() {
+      return Err(ErrorKind::TypeError { expected: "number", got: index.get_type(vm) });
+    }
+
+    let closure = if index.as_number() < 0.0 {
+      (vm.heap).allocate(NativeClosure::new("get", negative_func, index))
+    } else {
+      (vm.heap).allocate(NativeClosure::new("get", positive_func, index))
+    };
+    Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
 });
 

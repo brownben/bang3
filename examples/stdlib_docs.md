@@ -184,6 +184,18 @@ Returns a new string.
 'this is old' >> string::replaceOne('i')('I') // 'thIs is new'
 ```
 
+### parseNumber *(string => option<number>)*
+
+Parses a string into a number
+
+```bang
+string::parseNumber('3') // Some(3.0)
+string::parseNumber('3.14') // Some(3.14)
+string::parseNumber('3.14e-2') // Some(0.0314)
+string::parseNumber('three') // None
+string::parseNumber('Infinity') // Some(inf)
+```
+
 ### chars *(string => iterator<string>)*
 
 Creates an iterator over the characters in the string.
@@ -191,6 +203,27 @@ Creates an iterator over the characters in the string.
 ```bang
 'hello' >> string::chars >> iter::toList // ['h', 'e', 'l', 'l', 'o']
 'hi 🏃' >> string::chars >> iter::toList // ['h', 'i', ' ', '🏃']
+```
+
+### lines *(string => iterator<string>)*
+
+Creates an iterator over the lines in a string
+
+Lines are split at line endings that are either newlines (\n) or sequences of a
+carriage return followed by a line feed (\r\n).
+
+Any carriage return (\r) not immediately followed by a line feed (\n) does not split a line.
+These carriage returns are thereby included in the produced lines.
+
+The final line ending is optional. A string that ends with a final line ending will return
+the same lines as an otherwise identical string without a final line ending.
+
+```bang
+'hello
+world
+this has three lines'
+  >> string::lines
+  >> iter::toList // ['hello', 'world', 'this has three lines']
 ```
 
 ## maths
@@ -466,6 +499,20 @@ Creates an iterator over the values of the list
 ```bang
 [] >> list::iter // <iterator>
 [1, 2, 3] >> list::iter // <iterator>
+```
+
+### get *(number => list<^a> => option<^a>)*
+
+Gets an item from the list at the given index
+
+The index is truncated to an integer, if it is negative, the index is
+calculated from the end of the list.
+
+```bang
+[1, 2, 3] >> list::get(1) // Some(2)
+[1, 2, 3] >> list::get(5) // None
+[1, 2, 3] >> list::get(-1) // Some(3)
+[1, 2, 3] >> list::get(-5) // None
 ```
 
 ## option
