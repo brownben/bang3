@@ -830,11 +830,20 @@ mod iter {
       let b = iter::repeat(1) == iter::repeat(1)
       let c = iter::repeat(2) == iter::repeat(1)
       let d = iter::once(1) == iter::repeat(1)
+
+      let empty = iter::empty()
+      let one = iter::repeat(1)
+      let e = empty == empty
+      let f = one == one
+      let g = empty == one
     "});
-    assert_variable!(equality; a, true);
-    assert_variable!(equality; b, true);
+    assert_variable!(equality; a, false);
+    assert_variable!(equality; b, false);
     assert_variable!(equality; c, false);
     assert_variable!(equality; d, false);
+    assert_variable!(equality; e, true);
+    assert_variable!(equality; f, true);
+    assert_variable!(equality; g, false);
   }
 
   #[test]

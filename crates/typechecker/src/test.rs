@@ -46,6 +46,16 @@ fn has_type_error(source: &str) -> bool {
   !TypeChecker::check(&ast).problems().is_empty()
 }
 
+fn only_has_type_warnings(source: &str) -> bool {
+  let ast = parse(source.to_owned());
+  assert!(ast.errors.is_empty());
+
+  TypeChecker::check(&ast)
+    .problems()
+    .iter()
+    .all(|error| error.is_warning())
+}
+
 #[test]
 fn binary_operators() {
   assert_eq!(synthesize("1 + 2"), "number");
@@ -229,7 +239,8 @@ fn functions() {
 
     a == b
   "};
-  assert_eq!(synthesize(source), "boolean");
+  assert_eq!(synthesize_has_error(source), "boolean");
+  assert!(only_has_type_warnings(source));
 
   let source = indoc! {"
     let a = x => x + 1
@@ -497,7 +508,8 @@ fn builtin_functions() {
     identity == print
     emptyString == type
   "};
-  assert_eq!(synthesize(source), "boolean");
+  assert_eq!(synthesize_has_error(source), "boolean");
+  assert!(only_has_type_warnings(source));
 }
 
 #[test]

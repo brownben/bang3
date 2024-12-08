@@ -310,7 +310,18 @@ impl InferType for Binary {
         TypeArena::STRING
       }
       BinaryOperator::NotEqual | BinaryOperator::Equal => {
-        t.assert_type(right, left, self.right(ast).span(ast));
+        if t.types.unify(right, left).is_err() {
+          t.problems.push(TypeError::ExpectedDifferentType {
+            expected: t.types.type_to_string(left),
+            given: t.types.type_to_string(right),
+            span: self.right(ast).span(ast),
+          });
+        } else if t.types.is_function(left) || t.types.is_iterator(right) {
+          t.problems.push(TypeError::ReferentialEquality {
+            span: self.span(ast),
+          });
+        }
+
         TypeArena::BOOLEAN
       }
       BinaryOperator::Greater

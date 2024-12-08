@@ -540,16 +540,7 @@ const ITERATOR: TypeDescriptor = TypeDescriptor {
   display: |_, _| "<iterator>".to_owned(),
   debug: |_, _| "<iterator>".to_owned(),
   is_falsy: |_, _| false,
-  equals: |vm, a, b| {
-    if !b.is_object_type(ITERATOR_TYPE_ID) {
-      return false;
-    }
-
-    let a = &vm.heap[a.as_object::<Iterator>()];
-    let b = &vm.heap[b.as_object::<Iterator>()];
-
-    vm.equals(a.base, b.base) && ptr::fn_addr_eq(a.next, b.next) && a.is_infinite == b.is_infinite
-  },
+  equals: |_, a, b| a == b,
   call: None,
 };
 pub const ITERATOR_TYPE_ID: TypeId = TypeId(10);
@@ -572,19 +563,7 @@ const ITERATOR_TRANSFORM: TypeDescriptor = TypeDescriptor {
   display: |_, _| "<iterator>".to_owned(),
   debug: |_, _| "<iterator>".to_owned(),
   is_falsy: |_, _| false,
-  equals: |vm, a, b| {
-    if !b.is_object_type(ITERATOR_TRANSFORM_TYPE_ID) {
-      return false;
-    }
-
-    let a = &vm.heap[a.as_object::<IteratorTransform>()];
-    let b = &vm.heap[b.as_object::<IteratorTransform>()];
-
-    vm.equals(a.arg, b.arg)
-      && vm.equals(a.iterator, b.iterator)
-      && ptr::fn_addr_eq(a.next, b.next)
-      && a.is_infinite == b.is_infinite
-  },
+  equals: |_, a, b| a == b,
   call: None,
 };
 pub const ITERATOR_TRANSFORM_TYPE_ID: TypeId = TypeId(11);

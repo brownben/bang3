@@ -250,3 +250,23 @@ fn module_access_item_already_imported() {
     ────╯
   "});
 }
+
+#[test]
+fn referential_equality_warning() {
+  let source = indoc! {"
+    from string import { byteLength }
+
+    byteLength == string::length
+  "};
+  let output = run_typecheck(source);
+
+  assert_eq!(output, indoc! {"
+    ⚠ Warning: Referential Equality
+    functions and iterators only have referential equality defined
+    this can give unexpected behaviour
+
+        ╭─[STDIN:3]
+      3 │ byteLength == string::length
+    ────╯
+  "});
+}

@@ -281,6 +281,14 @@ impl TypeArena {
   pub fn is_never(&self, type_ref: TypeRef) -> bool {
     self[type_ref] == Type::Primitive(PrimitiveType::Never)
   }
+  /// Is the type ref point to a function type?
+  pub fn is_function(&self, type_ref: TypeRef) -> bool {
+    matches!(self[type_ref], Type::Function(_, _))
+  }
+  /// Is the type ref point to an iterator type?
+  pub fn is_iterator(&self, type_ref: TypeRef) -> bool {
+    matches!(self[type_ref], Type::Structure(Structure::Iterator, _))
+  }
 
   pub(crate) fn type_from_annotation(
     &mut self,

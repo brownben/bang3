@@ -151,6 +151,12 @@ pub enum Problem {
     /// The location of the error
     span: Span,
   },
+  /// Functions and iterators only have referential equality not structural equality
+  /// This can give unexpected results
+  ReferentialEquality {
+    /// The location of the error
+    span: Span,
+  },
 }
 impl Problem {
   /// The title of the error message
@@ -176,6 +182,7 @@ impl Problem {
       Self::UnexpectedParameter { .. } => "Unexpected Parameter",
       Self::NoReturnFromMatchGuard { .. } => "No Return from Match Guard",
       Self::ModuleAccessAlreadyImported { .. } => "Module Access Item Already Imported",
+      Self::ReferentialEquality { .. } => "Referential Equality",
     }
   }
 
@@ -223,7 +230,7 @@ impl Problem {
       }
       Self::FunctionReturnsNever { .. } => {
         "function returns `never` which indicates a lack of value, functions must return a value"
-          .to_string()
+          .to_owned()
       }
       Self::ModuleNotFound { module, .. } => {
         format!("could not find module `{module}`")
@@ -231,7 +238,7 @@ impl Problem {
       Self::ItemNotFound { module, item, .. } => {
         format!("could not find `{item}` in `{module}`")
       }
-      Self::UnknownTypeAnnotation { .. } => "type annotation is not a valid type".to_string(),
+      Self::UnknownTypeAnnotation { .. } => "type annotation is not a valid type".to_owned(),
       Self::UnexpectedParameter { type_, .. } => {
         format!("type `{type_}` does not accept a parameter")
       }
@@ -242,6 +249,9 @@ impl Problem {
         path, defined_as, ..
       } => {
         format!("`{path}` has been imported as `{defined_as}`")
+      }
+      Self::ReferentialEquality { .. } => {
+        "functions and iterators only have referential equality defined\nthis can give unexpected behaviour".to_owned()
       }
     }
   }
@@ -307,6 +317,7 @@ impl Problem {
         | Self::UnusedImport { .. }
         | Self::UnreachableCase { .. }
         | Self::ModuleAccessAlreadyImported { .. }
+        | Self::ReferentialEquality { .. }
     )
   }
 
@@ -353,7 +364,8 @@ impl Problem {
       | Self::UnknownTypeAnnotation { span, .. }
       | Self::UnexpectedParameter { span, .. }
       | Self::NoReturnFromMatchGuard { span, .. }
-      | Self::ModuleAccessAlreadyImported { span, .. } => *span,
+      | Self::ModuleAccessAlreadyImported { span, .. }
+      | Self::ReferentialEquality { span, .. } => *span,
     }
   }
 }
