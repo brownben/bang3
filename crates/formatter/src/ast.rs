@@ -4,6 +4,7 @@ use bang_syntax::{
   ast::{expression::*, statement::*, types::*},
 };
 use bumpalo::collections::Vec;
+use std::ptr;
 
 impl<'a, 'b> Formattable<'a, 'b, AST> for AST {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
@@ -124,6 +125,16 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for Block {
 impl<'a, 'b> Formattable<'a, 'b, AST> for Call {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     if let Some(argument) = self.argument(ast) {
+      // If it is a block or a function, we only need to wrap it in parentheses.
+      if is_stackable_bracket(argument, ast) {
+        return f.concat([
+          self.callee(ast).format(f, ast),
+          IR::Text("("),
+          argument.format(f, ast),
+          IR::Text(")"),
+        ]);
+      }
+
       // If it contains a comment, we have to break to preserve the comment.
       let line = if let Expression::Comment(_) = argument {
         IR::AlwaysLine
@@ -188,7 +199,7 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for Function {
 }
 impl<'a, 'b> Formattable<'a, 'b, AST> for Group {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
-    if let Expression::Block(_) | Expression::Function(_) = self.expression(ast) {
+    if is_stackable_bracket(self.expression(ast), ast) {
       return f.concat([
         IR::Text("("),
         self.expression(ast).format(f, ast),
@@ -258,9 +269,9 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for List {
             f.concat([expression.format(f, ast), IR::Text(","), IR::LineOrSpace])
           }),
         ),
+        last.format(f, ast),
+        IR::Option("", ","),
       ]),
-      last.format(f, ast),
-      IR::Option("", ","),
       IR::Line,
       IR::Text("]"),
     ])
@@ -571,6 +582,26 @@ fn unwrap<'a>(expression: &'a Expression, ast: &'a AST) -> &'a Expression {
       }
     }
     _ => expression,
+  }
+}
+
+/// Can this expression be directly placed on the same line as the previous without a break
+fn is_stackable_bracket(expression: &Expression, ast: &AST) -> bool {
+  if ptr::from_ref(unwrap(expression, ast)) != ptr::from_ref(expression) {
+    return false;
+  }
+
+  match expression {
+    Expression::Block(_) | Expression::Group(_) | Expression::List(_) => true,
+    Expression::Function(function) => is_stackable_bracket_nested(function.body(ast), ast),
+    _ => false,
+  }
+}
+fn is_stackable_bracket_nested(expression: &Expression, ast: &AST) -> bool {
+  match expression {
+    Expression::Block(_) | Expression::Group(_) | Expression::List(_) => true,
+    Expression::Function(function) => is_stackable_bracket_nested(function.body(ast), ast),
+    _ => false,
   }
 }
 

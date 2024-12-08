@@ -181,12 +181,64 @@ fn call() {
   assert_format!("function(((a)))", "function(a)", 25);
   assert_format!("function(((a)))", "function(\n  a\n)", 8);
 
-  assert_format!("function({a})", "function(a)", 25);
+  assert_format!("function({ a })", "function(a)", 20);
   assert_format!(
     "function({\na\n// comment\n})",
-    "function(\n  {\n    a\n    // comment\n  }\n)",
+    "function({\n  a\n  // comment\n})",
     25
   );
+
+  let source = indoc! {"
+    function({
+      let x = 5
+      let y = 2
+      x + y
+    })
+
+    function([
+      5555555555555555555555555555555555,
+      'some really long string which would cause the line to break for this',
+    ])
+
+    module::item(x => y => {
+      match x
+        | Some(x) -> 1
+        | None -> 2
+    })
+    module::item(x => y => (
+      match x
+        | Some(x) -> 1
+        | None -> 2
+    ))
+    module::item(x => y => [
+      match x
+        | Some(x) -> 1
+        | None -> 2,
+    ])
+
+    module::item(
+      x => y => match x
+        | Some(x) -> 1
+        | None -> 2
+    )
+    module::item(
+      x => y => if (x) y + 55555 else y + 100000000000000000000000000000000
+    )
+
+    iter::something
+      >> and_then::do
+      >> module::item(x => y => {
+        let a = x + y
+        let b = x - y
+        a / b
+      })
+      >> something(
+        match x
+          | Some(x) -> 1
+          | None -> 2
+      )
+  "};
+  assert_format!(source, source, 80);
 }
 
 #[test]
