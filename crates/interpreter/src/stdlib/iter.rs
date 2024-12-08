@@ -3,9 +3,10 @@ use crate::{
   VM, Value,
   object::{ITERATOR_TRANSFORM_TYPE_ID, IteratorTransform},
   object::{ITERATOR_TYPE_ID, Iterator, IteratorLength},
-  object::{LIST_TYPE_ID, NONE_TYPE_ID, SOME_TYPE_ID},
+  object::{LIST_TYPE_ID, List},
   object::{NATIVE_CLOSURE_TWO_TYPE_ID, NativeClosureTwo},
   object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
+  object::{NONE_TYPE_ID, SOME_TYPE_ID},
   vm::ErrorKind,
 };
 use bang_gc::Gc;
@@ -334,16 +335,14 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
       IteratorLength::Max(length) => length,
     };
 
-    let mut items = Vec::with_capacity(length);
+    let mut list = List::with_capacity(&mut vm.heap, length);
     let mut state = 0;
     while let Some((value, new_state)) = iter_next(vm, iterator, state)? {
-      items.push(value);
+      list = list.push(&mut vm.heap, value);
       state = new_state;
     };
-    let length = items.len();
 
-    let list = vm.heap.allocate_list(items.into_iter(), length);
-    Ok(Value::from_object(*list, LIST_TYPE_ID))
+    Ok(Value::from_object(list.as_ptr(), LIST_TYPE_ID))
   };
 
   /// Transforms the iterator by applying a function to each element

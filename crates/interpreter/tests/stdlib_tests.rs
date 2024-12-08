@@ -936,6 +936,11 @@ mod iter {
     assert_variable!(round_trip; a, string "[]");
     assert_variable!(round_trip; b, string "[1, 5, 10]");
 
+    let mut from_unknown_sized_iterator = run(indoc! {"
+      let a = iter::integers() >> iter::takeWhile(x => x < 16) >> iter::toList >> string::from
+    "});
+    assert_variable!(from_unknown_sized_iterator; a, string "[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]");
+
     let to_list_infinite = run("iter::repeat(1) >> iter::toList");
     assert!(to_list_infinite.is_err());
 
@@ -1160,14 +1165,18 @@ mod iter {
     let reduce_not_callable_inner = run("list::iter([1, 2]) >> iter::reduce(x => 5)");
     assert!(reduce_not_callable_inner.is_err());
 
-    let fold = run(indoc! {"
+    let mut fold = run(indoc! {"
       let a = list::iter([1, 2, 3]) >> iter::fold(0)(acc => x => acc + x)
       let b = list::iter([1, 2, 3]) >> iter::fold(4)(acc => x => acc + x)
       let c = iter::empty() >> iter::fold(0)(acc => x => acc + x)
+      let d = iter::empty() >> iter::fold('')(acc => x => acc ++ x)
+      let e = string::chars('hello world') >> iter::fold('')(acc => x => acc ++ x)
     "});
     assert_variable!(fold; a, 6.0);
     assert_variable!(fold; b, 10.0);
     assert_variable!(fold; c, 0.0);
+    assert_variable!(fold; d, string "");
+    assert_variable!(fold; e, string "hello world");
 
     let fold_infinite = run("iter::integers() >> iter::fold(0)(x => x => x)");
     assert!(fold_infinite.is_err());

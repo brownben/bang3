@@ -351,12 +351,54 @@ pub const NATIVE_CLOSURE_TWO_TYPE_ID: TypeId = TypeId(5);
 #[derive(Clone, Debug)]
 pub struct List(GcList<Value>);
 impl List {
-  pub fn is_empty(&self, vm: &VM) -> bool {
-    vm.heap[*self.0] == 0
+  pub fn with_capacity(heap: &mut Heap, capacity: usize) -> Self {
+    let new_list = heap.allocate_list_header::<Value>(capacity);
+    heap[*new_list] = 0;
+    Self(new_list)
+  }
+
+  pub fn length(&self, heap: &Heap) -> usize {
+    heap[*self.0]
+  }
+
+  pub fn is_empty(&self, heap: &Heap) -> bool {
+    heap[*self.0] == 0
+  }
+
+  pub fn push(self, heap: &mut Heap, new_item: Value) -> Self {
+    let capacity = self.0.capacity(heap);
+    let current_length = self.length(heap);
+
+    // If the item fits in the list, just add it to the list
+    if current_length < capacity {
+      heap[*self.0] = current_length + 1;
+      heap.get_list_buffer_mut(self.0)[current_length] = new_item;
+      return self;
+    }
+
+    // Else we need to allocate a new list with a bigger capacity
+    let new_capacity = capacity * 2;
+    let new_list = Self::with_capacity(heap, new_capacity);
+    heap[*new_list.0] = current_length + 1;
+
+    // Copy the old list to the new list
+    let old_list_ptr = heap.get_list_buffer_ptr(self.0);
+    let old_list_buffer = unsafe { slice::from_raw_parts(old_list_ptr, current_length) };
+    let new_list_buffer = heap.get_list_buffer_mut(new_list.0);
+    new_list_buffer[..current_length].copy_from_slice(old_list_buffer);
+
+    // add the new item to the list
+    new_list_buffer[current_length] = new_item;
+
+    new_list
   }
 
   pub fn items<'a>(&self, heap: &'a Heap) -> &'a [Value] {
     heap.get_list_buffer(self.0)
+  }
+
+  pub fn as_ptr(&self) -> Gc<usize> {
+    *self.0
   }
 }
 impl<T> From<Gc<T>> for List {
@@ -374,7 +416,7 @@ const LIST: TypeDescriptor = TypeDescriptor {
   },
   display: |vm, value| list_display(vm, List::from(value).items(&vm.heap)),
   debug: |vm, value| list_display(vm, List::from(value).items(&vm.heap)),
-  is_falsy: |vm, value| List::from(value).is_empty(vm),
+  is_falsy: |vm, value| List::from(value).is_empty(&vm.heap),
   equals: list_equality,
   call: None,
 };

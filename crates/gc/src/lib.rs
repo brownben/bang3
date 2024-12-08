@@ -235,16 +235,22 @@ impl Heap {
     list
   }
 
-  /// Get the buffer of a list allocated with [`Heap::allocate_list`].
+  /// Get the pointer to a buffer of a list allocated with [`Heap::allocate_list`].
   #[must_use]
-  pub fn get_list_buffer<T>(&self, pointer: GcList<T>) -> &[T] {
-    let length = self[*pointer];
-    let buffer_ptr = unsafe {
+  pub fn get_list_buffer_ptr<T>(&self, pointer: GcList<T>) -> *const T {
+    unsafe {
       pointer
         .get_pointer(self.raw.base)
         .add(mem::size_of::<usize>())
         .cast()
-    };
+    }
+  }
+
+  /// Get the buffer of a list allocated with [`Heap::allocate_list`].
+  #[must_use]
+  pub fn get_list_buffer<T>(&self, pointer: GcList<T>) -> &[T] {
+    let length = self[*pointer];
+    let buffer_ptr = self.get_list_buffer_ptr(pointer);
 
     unsafe { slice::from_raw_parts(buffer_ptr, length) }
   }
@@ -253,10 +259,7 @@ impl Heap {
   #[must_use]
   pub fn get_list_buffer_mut<T>(&mut self, pointer: GcList<T>) -> &mut [T] {
     let length = self[*pointer];
-    let buffer_ptr = pointer
-      .add(mem::size_of::<usize>())
-      .get_pointer(self.raw.base)
-      .cast();
+    let buffer_ptr = self.get_list_buffer_ptr(pointer).cast_mut();
 
     unsafe { slice::from_raw_parts_mut(buffer_ptr, length) }
   }
@@ -582,6 +585,16 @@ impl<T> fmt::Debug for Gc<T> {
 pub struct GcList<T: Sized> {
   header: Gc<usize>,
   _inner: PhantomData<T>,
+}
+impl<T> GcList<T> {
+  /// Gets the number of elements which can fit in this allocation for the list
+  #[must_use]
+  pub fn capacity(&self, heap: &Heap) -> usize {
+    let page = heap.get_page(self.page_index());
+    let block_size = page.class().block_size();
+
+    (block_size - mem::size_of::<usize>()) / core::mem::size_of::<T>()
+  }
 }
 impl<T> Clone for GcList<T> {
   fn clone(&self) -> Self {
