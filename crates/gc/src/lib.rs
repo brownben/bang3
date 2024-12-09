@@ -353,6 +353,19 @@ impl Heap {
     self.get_page(ptr.page_index()).mark(ptr.block_index());
   }
 
+  /// Check if a pointer is marked as used
+  #[inline]
+  #[must_use]
+  pub fn is_used<T>(&self, ptr: Gc<T>) -> bool {
+    if ptr.is_null() {
+      return true;
+    }
+
+    self
+      .get_page(ptr.page_index())
+      .is_block_allocated(ptr.block_index())
+  }
+
   /// Marks a pointer as freed, to free memory in the heap.
   ///
   /// If it is in a full page, the page will not be returned to the free list (until a
@@ -411,10 +424,7 @@ impl<T> ops::Index<Gc<T>> for Heap {
 
   fn index(&self, index: Gc<T>) -> &Self::Output {
     debug_assert!(!index.is_null());
-
-    let page = self.get_page(index.page_index());
-    let is_block_allocated = page.is_block_allocated(index.block_index());
-    debug_assert!(self.is_collecting || is_block_allocated, "use after free");
+    debug_assert!(self.is_collecting || self.is_used(index), "use after free");
 
     unsafe { &*index.get_pointer(self.raw.base).cast() }
   }
@@ -422,10 +432,7 @@ impl<T> ops::Index<Gc<T>> for Heap {
 impl<T> ops::IndexMut<Gc<T>> for Heap {
   fn index_mut(&mut self, index: Gc<T>) -> &mut Self::Output {
     debug_assert!(!index.is_null());
-
-    let page = self.get_page(index.page_index());
-    let is_block_allocated = page.is_block_allocated(index.block_index());
-    debug_assert!(self.is_collecting || is_block_allocated, "use after free");
+    debug_assert!(self.is_collecting || self.is_used(index), "use after free");
 
     unsafe { &mut *index.get_pointer(self.raw.base).cast() }
   }

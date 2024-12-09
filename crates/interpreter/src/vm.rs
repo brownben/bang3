@@ -228,8 +228,15 @@ impl<'context> VM<'context> {
   pub fn garbage_collect(&mut self) {
     fn mark_value(vm: &VM, value: Value) {
       if value.is_object() {
-        vm.heap.mark(value.as_object::<u8>());
-        (vm.get_type_descriptor(value).trace)(vm, value.as_object(), mark_value);
+        let ptr = value.as_object::<u8>();
+
+        // if it has already been marked as used, we don't need to trace it again
+        if vm.heap.is_used(ptr) {
+          return;
+        }
+
+        vm.heap.mark(ptr);
+        (vm.get_type_descriptor(value).trace)(vm, ptr, mark_value);
       }
     }
 
