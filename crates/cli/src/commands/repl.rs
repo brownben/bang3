@@ -85,7 +85,7 @@ fn run_repl_entry(vm: &mut VM, line: String) -> Result<(), ()> {
   };
 
   if let Err(error) = vm.run(&chunk) {
-    eprintln!("{}", Message::from(&error));
+    eprint!("{}", Message::from(&error));
   }
 
   Ok(())
@@ -101,7 +101,7 @@ fn print_expression_result_function(expression: &ast::Expression, ast: &AST) -> 
   let expression_function = match bang_interpreter::compile_expression(expression, ast) {
     Ok(chunk) => chunk,
     Err(error) => {
-      eprintln!("{}", Message::from(&error));
+      eprint!("{}", Message::from(&error));
       return Err(());
     }
   };
