@@ -2,13 +2,18 @@
 
 # Bang
 
-My attempt at creating my own language. A strongly typed, functional, bytecode interpreter written in Rust. Based on the syntax and style of the languages I have liked using. Complete with a custom opinionated code formatter, linter, type-checker.
+My programming language. A strongly typed, functional, bytecode interpreter written in Rust, with its own garbage collector.
+Based on the syntax and style of the languages I have liked using.
 
-### Examples
+Complete with a custom linter, opinionated code-formatter, type-checker, repl, and language server.
+
+### Documentation & Examples
+
+An overview and guide to Bang can be found [here](./docs/guide.md).
+
+Documentation for the standard library can be found [here](./docs/stdlib_docs.md).
 
 ```bang
-// Recursive Fibonacci
-
 let fibonacci = n => match n
   | ..2 -> 1
   | n -> fibonacci(n - 1) + fibonacci(n - 2)
@@ -16,23 +21,24 @@ let fibonacci = n => match n
 fibonacci(10)
 ```
 
-A quick walkthrough of the language can be found [here](/examples/syntax.bang).
-
 More examples can be found in the [/examples](./examples/) folder.
 
 ### Usage
 
 ```
+Bang! (v3.0.0)
+My language - a strongly typed, functional, bytecode interpreter.
+
 Usage: bang.exe <COMMAND>
 
 Commands:
-  run        Runs a file
+  run        Runs a Bang program
+  repl       Start an interactive Read-Eval-Print Loop (REPL)
   format     Formats source files
   lint       Checks for lint warnings
   typecheck  Checks the file for type errors
   print      Prints debugging information
-  lsp        Run the language server
-  help       Print this message or the help of the given subcommand(s)
+  lsp        Run the language server. For editors, not humans
 
 Options:
   -h, --help     Print help
@@ -50,6 +56,9 @@ cargo clippy
 
 # To run the tests:
 cargo test
+
+# To generate the standard library docs:
+cargo run -p bang-interpreter --bin stdlib-docs
 
 # To build Bang:
 cargo build --release
