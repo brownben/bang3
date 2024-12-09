@@ -21,6 +21,8 @@ const MODULES: [(&str, &[&str], GetDocs, GetType); 5] = [
   ("iter", &ITER_ITEMS, iter_docs, iter_types),
 ];
 
+const OUTPUT_FILE: &str = "docs/stdlib_docs.md";
+
 const HEADER: &str =
   "# Bang Standard Library\n\nDocumentation for the Bang Language Standard Library.\n\n";
 
@@ -56,7 +58,7 @@ fn main() -> io::Result<()> {
   let args: Vec<String> = env::args().collect();
   if let Some(arg) = args.get(1) {
     if arg == "--check" {
-      let existing = fs::read_to_string("examples/stdlib_docs.md")?;
+      let existing = fs::read_to_string(OUTPUT_FILE)?;
 
       if file != existing {
         println!("The standard library documentation is not up-to-date");
@@ -68,5 +70,5 @@ fn main() -> io::Result<()> {
     }
   }
 
-  fs::write("examples/stdlib_docs.md", file)
+  fs::write(OUTPUT_FILE, file)
 }
