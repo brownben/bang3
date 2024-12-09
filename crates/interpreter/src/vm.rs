@@ -86,12 +86,12 @@ impl<'context> VM<'context> {
   /// SAFETY: both `Value`s must be from this [`VM`]
   #[must_use]
   pub fn equals(&self, a: Value, b: Value) -> bool {
-    if a == b {
-      return true;
-    }
-
     if a.is_number() && b.is_number() {
       return (a.as_number() - b.as_number()).abs() < f64::EPSILON;
+    }
+
+    if a == b {
+      return true;
     }
 
     if a.is_object() && b.is_object() {

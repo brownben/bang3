@@ -195,12 +195,16 @@ fn equals() {
     let c = -5 == 5
     let d = 0 == -0
     let e = 0.3 == (0.1 + 0.2)
+    let f = (0 / 0) == maths::NAN
+    let g = maths::NAN == maths::NAN
   "});
   assert_variable!(numbers; a, false);
   assert_variable!(numbers; b, true);
   assert_variable!(numbers; c, false);
   assert_variable!(numbers; d, true);
   assert_variable!(numbers; e, true);
+  assert_variable!(numbers; f, false);
+  assert_variable!(numbers; g, false);
 
   let strings = run(indoc! {"
     let a = 'hello' == \"hello\"
