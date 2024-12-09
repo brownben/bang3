@@ -224,6 +224,11 @@ fn call() {
     module::item(
       x => y => if (x) y + 55555 else y + 100000000000000000000000000000000
     )
+    module::item(function(
+      x => y => match x
+        | Some(x) -> 1
+        | None -> 2
+    ))
 
     iter::something
       >> and_then::do

@@ -592,14 +592,14 @@ fn is_stackable_bracket(expression: &Expression, ast: &AST) -> bool {
   }
 
   match expression {
-    Expression::Block(_) | Expression::Group(_) | Expression::List(_) => true,
+    Expression::Block(_) | Expression::Call(_) | Expression::Group(_) | Expression::List(_) => true,
     Expression::Function(function) => is_stackable_bracket_nested(function.body(ast), ast),
     _ => false,
   }
 }
 fn is_stackable_bracket_nested(expression: &Expression, ast: &AST) -> bool {
   match expression {
-    Expression::Block(_) | Expression::Group(_) | Expression::List(_) => true,
+    Expression::Block(_) | Expression::Call(_) | Expression::Group(_) | Expression::List(_) => true,
     Expression::Function(function) => is_stackable_bracket_nested(function.body(ast), ast),
     _ => false,
   }
