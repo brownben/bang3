@@ -130,7 +130,7 @@ mod type_errors {
       });
     }
 
-    if let Some(module) = is_from_module(identifier) {
+    for module in is_from_module(identifier) {
       actions.push(lsp::CodeAction {
         title: format!("Qualify as `{module}::{identifier}`"),
         kind: Some(lsp::CodeActionKind::QUICKFIX),
@@ -141,24 +141,19 @@ mod type_errors {
     }
   }
 
-  fn is_from_module(identifier: &str) -> Option<&'static str> {
-    if bang_interpreter::stdlib::MATHS_ITEMS.contains(&identifier) {
-      return Some("maths");
-    }
-    if bang_interpreter::stdlib::STRING_ITEMS.contains(&identifier) {
-      return Some("string");
-    }
-    if bang_interpreter::stdlib::LIST_ITEMS.contains(&identifier) {
-      return Some("list");
-    }
-    if bang_interpreter::stdlib::OPTION_ITEMS.contains(&identifier) {
-      return Some("option");
-    }
-    if bang_interpreter::stdlib::ITER_ITEMS.contains(&identifier) {
-      return Some("iter");
-    }
+  fn is_from_module(identifier: &str) -> impl Iterator<Item = &'static str> {
+    const MODULES: [(&str, &[&str]); 5] = [
+      ("maths", &bang_interpreter::stdlib::MATHS_ITEMS),
+      ("string", &bang_interpreter::stdlib::STRING_ITEMS),
+      ("list", &bang_interpreter::stdlib::LIST_ITEMS),
+      ("option", &bang_interpreter::stdlib::OPTION_ITEMS),
+      ("iter", &bang_interpreter::stdlib::ITER_ITEMS),
+    ];
 
-    None
+    MODULES
+      .into_iter()
+      .filter(move |(_, items)| items.contains(&identifier))
+      .map(|(module, _)| module)
   }
 
   fn unreachable_case(file: &Document, error: &TypeError, span: Span) -> lsp::CodeAction {
