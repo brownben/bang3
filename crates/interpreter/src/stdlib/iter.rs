@@ -1,6 +1,7 @@
 use super::macros::module;
 use crate::{
   VM, Value,
+  object::{BangString, STRING_TYPE_ID},
   object::{ITERATOR_TRANSFORM_TYPE_ID, IteratorTransform},
   object::{ITERATOR_TYPE_ID, Iterator, IteratorLength},
   object::{LIST_TYPE_ID, List},
@@ -522,6 +523,139 @@ module!(iter, ITER_ITEMS, iter_types, iter_docs, {
     }
 
     let closure = vm.heap.allocate(NativeClosure::new("fold", func_one, arg));
+    Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
+  };
+
+  /// Sums the items in an iterator of numbers
+  ///
+  /// Takes each element, adds them together, and returns the result
+  ///
+  /// An empty iterator returns zero
+  ///
+  /// ## Example
+  /// ```bang
+  /// iter::integers() >> iter::takeWhile(x => x < 5) >> iter::sum // 10
+  /// iter::empty() >> iter::sum // 0
+  /// ```
+  #[type(iterator<number> => number)]
+  fn sum() = |vm, iter| {
+    if is_infinite(iter, vm) {
+      return Err(ErrorKind::Custom {
+        title: "Infinite Computation",
+        message: "cannot sum an infinite iterator into a value".to_owned()
+      });
+    };
+
+    let mut state = 0;
+    let mut sum = 0.0;
+
+    loop {
+      let Some((result, new_state)) = iter_next(vm, iter, state)? else { break };
+
+      if !result.is_number() {
+        return Err(ErrorKind::TypeError { expected: "number", got: result.get_type(vm) });
+      }
+
+      sum += result.as_number();
+      state = new_state;
+    };
+
+    Ok(Value::from(sum))
+  };
+  /// Multiplies the items in an iterator of numbers
+  ///
+  /// An empty iterator returns one
+  ///
+  /// ## Example
+  /// ```bang
+  /// list::iter([5, 4, 3]) >> iter::product // 60
+  /// iter::empty() >> iter::product // 1
+  /// ```
+  #[type(iterator<number> => number)]
+  fn product() = |vm, iter| {
+    if is_infinite(iter, vm) {
+      return Err(ErrorKind::Custom {
+        title: "Infinite Computation",
+        message: "cannot sum an infinite iterator into a value".to_owned()
+      });
+    };
+
+    let mut state = 0;
+    let mut product = 1.0;
+
+    loop {
+      let Some((result, new_state)) = iter_next(vm, iter, state)? else { break };
+
+      if !result.is_number() {
+        return Err(ErrorKind::TypeError { expected: "number", got: result.get_type(vm) });
+      }
+
+      product *= result.as_number();
+      state = new_state;
+    };
+
+    Ok(Value::from(product))
+  };
+  /// Joins an iterator of strings, placing the separator between each item
+  ///
+  /// ## Example
+  /// ```bang
+  /// list::iter(['a', 'b', 'c']) >> iter::join('') // 'abc'
+  /// list::iter(['a', 'b', 'c']) >> iter::join('-') // 'a-b-c'
+  /// ```
+  #[type(string => iterator<string> => string)]
+  fn join() = |vm, arg| {
+    fn func(vm: &mut VM, arg: Value, iterator: Value) -> Result<Value, ErrorKind> {
+      let length = match iterator_length(iterator, vm) {
+        IteratorLength::Infinite => {
+          return Err(ErrorKind::Custom {
+            title: "Infinite Computation",
+            message: "cannot join an infinite string".to_owned()
+          });
+        },
+        IteratorLength::Unknown => 8,
+        IteratorLength::Max(length) => length,
+      };
+
+      let string = BangString::with_capacity(&mut vm.heap, length * 3);
+      vm.push(Value::from_object(string.as_ptr(), STRING_TYPE_ID));
+      let list_location = unsafe { vm.peek_ptr() };
+
+      let string_join = {
+        // we can't borrow the string & result together - so we get the string without the lifetime
+        let string = arg.as_string(&vm.heap);
+        let slice = unsafe { std::slice::from_raw_parts(string.as_ptr(), string.len()) };
+        unsafe { std::str::from_utf8_unchecked(slice) }
+      };
+
+      let mut state = 0;
+      while let Some((value, new_state)) = iter_next(vm, iterator, state)? {
+        if !value.is_string() {
+          return Err(ErrorKind::TypeError { expected: "string", got: value.get_type(vm) });
+        }
+        let string_part = {
+          // we can't borrow the string & result together - so we get the string without the lifetime
+          let string = value.as_string(&vm.heap);
+          let slice = unsafe { std::slice::from_raw_parts(string.as_ptr(), string.len()) };
+          unsafe { std::str::from_utf8_unchecked(slice) }
+        };
+
+        let string = BangString::from(unsafe { *list_location }.as_object::<usize>());
+        let string = if state > 0 { string.push(&mut vm.heap, string_join) } else { string };
+        let updated_string = string.push(&mut vm.heap, string_part);
+        unsafe { *list_location = Value::from_object(updated_string.as_ptr(), STRING_TYPE_ID) };
+
+        state = new_state;
+      };
+
+      Ok(vm.pop())
+    }
+
+    if !arg.is_string() {
+      return Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) });
+    }
+
+    let closure = vm.heap.allocate(NativeClosure::new("join", func, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
 

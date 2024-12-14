@@ -51,12 +51,53 @@ pub const DEFAULT_TYPE_DESCRIPTORS: &[TypeDescriptor] = &[
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct BangString(GcList<u8>);
 impl BangString {
-  pub fn as_str(self, heap: &Heap) -> &str {
-    unsafe { str::from_utf8_unchecked(heap.get_list_buffer(self.0)) }
+  pub fn with_capacity(heap: &mut Heap, capacity: usize) -> Self {
+    let new_list = heap.allocate_list_header::<u8>(capacity);
+    heap[*new_list] = 0;
+    Self(new_list)
+  }
+
+  pub fn length(self, heap: &Heap) -> usize {
+    heap[*self.0]
   }
 
   pub fn is_empty(self, vm: &VM) -> bool {
     vm.heap[*self.0] == 0
+  }
+
+  pub fn push(self, heap: &mut Heap, new_string: &str) -> Self {
+    let capacity = self.0.capacity(heap);
+    let current_length = self.length(heap);
+
+    let list = if current_length + new_string.len() > capacity {
+      // If the item doesn't fit in the current list, reallocate
+      let new_capacity = (capacity * 2).max(current_length + new_string.len());
+      let new_list = Self::with_capacity(heap, new_capacity);
+
+      // Copy the old list to the new list
+      let old_list_buffer =
+        unsafe { slice::from_raw_parts(heap.get_list_buffer_ptr(self.0), current_length) };
+      let new_list_buffer = heap.get_list_buffer_mut(new_list.0);
+      new_list_buffer.copy_from_slice(old_list_buffer);
+
+      new_list
+    } else {
+      // if it does fit just use the current list
+      self
+    };
+
+    // add the new item to the list
+    heap[*list.0] = current_length + new_string.len();
+    heap.get_list_buffer_mut(list.0)[current_length..].copy_from_slice(new_string.as_bytes());
+    list
+  }
+
+  pub fn as_ptr(self) -> Gc<usize> {
+    *self.0
+  }
+
+  pub fn as_str(self, heap: &Heap) -> &str {
+    unsafe { str::from_utf8_unchecked(heap.get_list_buffer(self.0)) }
   }
 
   /// Concatenate two strings together
@@ -369,28 +410,28 @@ impl List {
     let capacity = self.0.capacity(heap);
     let current_length = self.length(heap);
 
-    // If the item fits in the list, just add it to the list
-    if current_length < capacity {
-      heap[*self.0] = current_length + 1;
-      heap.get_list_buffer_mut(self.0)[current_length] = new_item;
-      return self;
-    }
+    let list = if current_length == capacity {
+      // If the item doesn't fit in the current list, reallocate
+      let new_capacity = capacity * 2;
+      let new_list = Self::with_capacity(heap, new_capacity);
+      heap[*new_list.0] = current_length;
 
-    // Else we need to allocate a new list with a bigger capacity
-    let new_capacity = capacity * 2;
-    let new_list = Self::with_capacity(heap, new_capacity);
-    heap[*new_list.0] = current_length + 1;
+      // Copy the old list to the new list
+      let old_list_buffer =
+        unsafe { slice::from_raw_parts(heap.get_list_buffer_ptr(self.0), current_length) };
+      let new_list_buffer = heap.get_list_buffer_mut(new_list.0);
+      new_list_buffer.copy_from_slice(old_list_buffer);
 
-    // Copy the old list to the new list
-    let old_list_ptr = heap.get_list_buffer_ptr(self.0);
-    let old_list_buffer = unsafe { slice::from_raw_parts(old_list_ptr, current_length) };
-    let new_list_buffer = heap.get_list_buffer_mut(new_list.0);
-    new_list_buffer[..current_length].copy_from_slice(old_list_buffer);
+      new_list
+    } else {
+      // if it does fit just use the current list
+      self
+    };
 
     // add the new item to the list
-    new_list_buffer[current_length] = new_item;
-
-    new_list
+    heap[*list.0] = current_length + 1;
+    heap.get_list_buffer_mut(list.0)[current_length] = new_item;
+    list
   }
 
   pub fn items<'a>(&self, heap: &'a Heap) -> &'a [Value] {

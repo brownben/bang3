@@ -801,6 +801,39 @@ list::iter([1, 2, 3]) >> iter::fold(0)(acc => x => acc + x) // 6
 list::iter([1, 2, 3]) >> iter::fold(4)(acc => x => acc + x) // 10
 ```
 
+### sum *(iterator<number> => number)*
+
+Sums the items in an iterator of numbers
+
+Takes each element, adds them together, and returns the result
+
+An empty iterator returns zero
+
+```bang
+iter::integers() >> iter::takeWhile(x => x < 5) >> iter::sum // 10
+iter::empty() >> iter::sum // 0
+```
+
+### product *(iterator<number> => number)*
+
+Multiplies the items in an iterator of numbers
+
+An empty iterator returns one
+
+```bang
+list::iter([5, 4, 3]) >> iter::product // 60
+iter::empty() >> iter::product // 1
+```
+
+### join *(string => iterator<string> => string)*
+
+Joins an iterator of strings, placing the separator between each item
+
+```bang
+list::iter(['a', 'b', 'c']) >> iter::join('') // 'abc'
+list::iter(['a', 'b', 'c']) >> iter::join('-') // 'a-b-c'
+```
+
 ### takeWhile *((^a => boolean) => iterator<^a> => iterator<^a>)*
 
 Takes elements of an iterator while a predicate holds

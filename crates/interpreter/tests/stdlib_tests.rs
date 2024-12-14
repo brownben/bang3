@@ -1167,6 +1167,8 @@ mod iter {
       let d = list::iter([1, 2, 4]) >> sum >> string::from
       let e = list::iter([1, 2, 4]) >> product >> string::from
       let f = string::chars('hello') >> iter::reduce(acc => x => acc ++ x) >> string::from
+      let g = list::iter([1, 2, 4]) >> iter::map(x => x) >> sum >> string::from
+      let h = list::iter([1, 2, 4]) >> iter::map(string::from) >> iter::reduce(acc => x => acc ++ x) >> string::from
     "});
     assert_variable!(reduce; a, string "None");
     assert_variable!(reduce; b, string "Some(1)");
@@ -1174,6 +1176,8 @@ mod iter {
     assert_variable!(reduce; d, string "Some(7)");
     assert_variable!(reduce; e, string "Some(8)");
     assert_variable!(reduce; f, string "Some('hello')");
+    assert_variable!(reduce; g, string "Some(7)");
+    assert_variable!(reduce; h, string "Some('124')");
 
     let reduce_infinite = run("iter::integers() >> iter::reduce(x => x => x)");
     assert!(reduce_infinite.is_err());
@@ -1191,12 +1195,15 @@ mod iter {
       let c = iter::empty() >> iter::fold(0)(acc => x => acc + x)
       let d = iter::empty() >> iter::fold('')(acc => x => acc ++ x)
       let e = string::chars('hello world') >> iter::fold('')(acc => x => acc ++ x)
+      let f = list::iter([1, 2, 4]) >> iter::map(x => x) >> iter::fold(0)(acc => x => acc + x)
+      let f = list::iter([1, 2, 4]) >> iter::map(string::from) >> iter::fold('')(acc => x => acc ++ x)
     "});
     assert_variable!(fold; a, 6.0);
     assert_variable!(fold; b, 10.0);
     assert_variable!(fold; c, 0.0);
     assert_variable!(fold; d, string "");
     assert_variable!(fold; e, string "hello world");
+    assert_variable!(fold; f, string "124");
 
     let fold_infinite = run("iter::integers() >> iter::fold(0)(x => x => x)");
     assert!(fold_infinite.is_err());
@@ -1222,6 +1229,79 @@ mod iter {
     assert!(take_while_not_iter.is_err());
     let take_while_not_callable = run("iter::empty() >> iter::takeWhile(5)");
     assert!(take_while_not_callable.is_err());
+  }
+
+  #[test]
+  fn sum_product() {
+    let sum = run(indoc! {"
+      let a = iter::empty() >> iter::sum
+      let b = iter::once(1) >> iter::sum
+      let c = iter::integers() >> iter::takeWhile(x => x < 5) >> iter::sum
+      let d = list::iter([1, 3, 5]) >> iter::sum
+    "});
+    assert_variable!(sum; a, 0.0);
+    assert_variable!(sum; b, 1.0);
+    assert_variable!(sum; c, 10.0);
+    assert_variable!(sum; d, 9.0);
+
+    let sum_not_iter = run("4 >> iter::sum");
+    assert!(sum_not_iter.is_err());
+    let sum_not_numbers = run("iter::once('') >> iter::sum");
+    assert!(sum_not_numbers.is_err());
+    let sum_infinfite = run("iter::repeat(5) >> iter::sum");
+    assert!(sum_infinfite.is_err());
+
+    let product = run(indoc! {"
+      let a = iter::empty() >> iter::product
+      let b = iter::once(9) >> iter::product
+      let c = list::iter([1, 3, 5]) >> iter::product
+      let d = list::iter([5, 4, 3]) >> iter::product
+    "});
+    assert_variable!(product; a, 1.0);
+    assert_variable!(product; b, 9.0);
+    assert_variable!(product; c, 15.0);
+    assert_variable!(product; d, 60.0);
+
+    let product_not_iter = run("4 >> iter::product");
+    assert!(product_not_iter.is_err());
+    let product_not_numbers = run("iter::once('') >> iter::product");
+    assert!(product_not_numbers.is_err());
+    let product_infinite = run("iter::repeat(5) >> iter::product");
+    assert!(product_infinite.is_err());
+  }
+
+  #[test]
+  fn join() {
+    let mut simple = run(indoc! {"
+      let a = list::iter([]) >> iter::join('')
+      let b = list::iter([]) >> iter::join('-')
+      let c = string::chars('abc') >> iter::join('-')
+      let d = string::chars('abc') >> iter::join('')
+    "});
+    assert_variable!(simple; a, string "");
+    assert_variable!(simple; b, string "");
+    assert_variable!(simple; c, string "a-b-c");
+    assert_variable!(simple; d, string "abc");
+
+    let mut from_unknown_sized_iterator = run(indoc! {"
+      let a = iter::integers()
+        >> iter::takeWhile(x => x < 4)
+        >> iter::map(string::from)
+        >> iter::join('')
+    "});
+    assert_variable!(from_unknown_sized_iterator; a, string "0123");
+
+    let infinite_iter = run("iter::repeat(1) >> iter::join('')");
+    assert!(infinite_iter.is_err());
+
+    let non_iterator = run("6 >> iter::join('')");
+    assert!(non_iterator.is_err());
+
+    let no_joining_part = run("iter::empty() >> iter::join");
+    assert!(no_joining_part.is_err());
+
+    let non_string_joining_part = run("iter::empty() >> iter::join(7)");
+    assert!(non_string_joining_part.is_err());
   }
 }
 
