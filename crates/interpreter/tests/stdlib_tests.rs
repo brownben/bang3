@@ -1305,13 +1305,13 @@ mod iter {
   }
 }
 
-#[cfg(not(miri))]
 mod docs {
   use bang_interpreter::stdlib::{ITER_ITEMS, LIST_ITEMS, MATHS_ITEMS, OPTION_ITEMS, STRING_ITEMS};
   use bang_interpreter::stdlib::{iter_docs, list_docs, maths_docs, option_docs, string_docs};
   use indoc::indoc;
 
   #[test]
+  #[cfg_attr(miri, ignore)]
   fn typecheck() {
     for item in STRING_ITEMS {
       typecheck_docs("string", item, string_docs(item));
@@ -1335,6 +1335,7 @@ mod docs {
   }
 
   #[test]
+  #[cfg_attr(miri, ignore)]
   fn lint() {
     for item in STRING_ITEMS {
       lint_docs("string", item, string_docs(item));
@@ -1358,6 +1359,7 @@ mod docs {
   }
 
   #[test]
+  #[cfg_attr(miri, ignore)]
   fn format() {
     for item in STRING_ITEMS {
       format_docs("string", item, string_docs(item));
