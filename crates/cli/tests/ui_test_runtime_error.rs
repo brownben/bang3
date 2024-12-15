@@ -289,3 +289,47 @@ fn panics() {
     at line 1
   "});
 }
+
+#[test]
+fn assertions() {
+  let output = run("assert::equal('hello')('world')");
+  assert_eq!(output, indoc! {"
+    ✕ Error: Assertion Error
+    expected both values to be equal
+    first: 'hello' [type: string]
+    second: 'world' [type: string]
+
+        ╭─[STDIN:1]
+      1 │ assert::equal('hello')('world')
+    ────╯
+
+    in native function 'assert::equal'
+    at line 1
+  "});
+
+  let output = run("assert::true('')");
+  assert_eq!(output, indoc! {"
+    ✕ Error: Assertion Error
+    expected a truthy value, but got '' [type: string]
+
+        ╭─[STDIN:1]
+      1 │ assert::true('')
+    ────╯
+
+    in native function 'assert::true'
+    at line 1
+  "});
+
+  let output = run("assert::false(17)");
+  assert_eq!(output, indoc! {"
+    ✕ Error: Assertion Error
+    expected a falsy value, but got 17 [type: number]
+
+        ╭─[STDIN:1]
+      1 │ assert::false(17)
+    ────╯
+
+    in native function 'assert::false'
+    at line 1
+  "});
+}

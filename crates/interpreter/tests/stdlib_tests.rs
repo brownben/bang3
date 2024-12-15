@@ -882,9 +882,8 @@ mod option {
 }
 
 mod iter {
-  use core::f64;
-
   use super::{Value, assert_variable, indoc, run};
+  use core::f64;
 
   #[test]
   fn basic_types() {
@@ -1302,6 +1301,57 @@ mod iter {
 
     let non_string_joining_part = run("iter::empty() >> iter::join(7)");
     assert!(non_string_joining_part.is_err());
+  }
+}
+
+mod assert {
+  use super::{indoc, run};
+
+  #[test]
+  fn assert_eq() {
+    let are_equal = run(indoc! {"
+      assert::equal(1)(1)
+      assert::equal('jelly')('jelly')
+      assert::equal([45, 'world', false])([45, 'world', false])
+    "});
+    assert!(are_equal.is_ok());
+
+    let not_equal = run("assert::equal(1)(2)");
+    assert!(not_equal.is_err());
+    let not_equal = run("assert::equal(1)('jelly')");
+    assert!(not_equal.is_err());
+  }
+
+  #[test]
+  fn assert_true() {
+    let is_true = run(indoc! {"
+      assert::true(true)
+      assert::true(1)
+      assert::true('jelly')
+      assert::true([45, 'world', false])
+    "});
+    assert!(is_true.is_ok());
+
+    let is_not_true = run("assert::true(false)");
+    assert!(is_not_true.is_err());
+    let is_not_true = run("assert::true('')");
+    assert!(is_not_true.is_err());
+  }
+
+  #[test]
+  fn assert_false() {
+    let is_false = run(indoc! {"
+      assert::false(false)
+      assert::false(0)
+      assert::false('')
+      assert::false([])
+    "});
+    assert!(is_false.is_ok());
+
+    let is_not_false = run("assert::false(true)");
+    assert!(is_not_false.is_err());
+    let is_not_false = run("assert::false('jelly')");
+    assert!(is_not_false.is_err());
   }
 }
 

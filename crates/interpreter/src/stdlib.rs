@@ -101,6 +101,7 @@ impl Context for StandardContext {
       "list" => list(vm, item),
       "option" => option(vm, item),
       "iter" => iter(vm, item),
+      "assert" => assert(vm, item),
       _ => ImportResult::ModuleNotFound,
     }
   }
@@ -135,13 +136,17 @@ use option::{OptionModule, option};
 mod iter;
 use iter::{IterModule, iter};
 
+mod assert;
+use assert::{AssertModule, assert};
+
 /// The modules in bang's standard library
-pub const MODULES: [&dyn StdlibModule; 5] = [
+pub const MODULES: [&dyn StdlibModule; 6] = [
   &StringModule,
   &MathsModule,
   &ListModule,
   &OptionModule,
   &IterModule,
+  &AssertModule,
 ];
 /// The names of all the modules in the standard library
-pub const MODULE_NAMES: [&str; 5] = ["string", "maths", "list", "option", "iter"];
+pub const MODULE_NAMES: [&str; 6] = ["string", "maths", "list", "option", "iter", "assert"];

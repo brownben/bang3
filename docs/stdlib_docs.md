@@ -8,6 +8,7 @@ Documentation for the Bang Language Standard Library.
 - [list](#list)
 - [option](#option)
 - [iter](#iter)
+- [assert](#assert)
 
 
 ## string
@@ -846,5 +847,43 @@ Can be used to make an infinite iterator finite.
 iter::integers()
   >> iter::takeWhile(x => x < 5)
   >> iter::toList // [0, 1, 2, 3, 4]
+```
+
+## assert
+
+### equal *(^a => ^a => bool)*
+
+Asserts that two values are equal
+
+If the values are not equal, it panics stopping all execution.
+If they are equal true is returned.
+
+```
+assert::equal('hello')('hello')
+assert::equal('hello')('world') // Panics
+```
+
+### true *(^a => bool)*
+
+Asserts that a value is truthy
+
+If the value is not truthy, it panics stopping all execution.
+If it is truthy the value is returned.
+
+```
+assert::true(3.5 > 2)
+assert::true(1.5 < 1) // Panics
+```
+
+### false *(^a => bool)*
+
+Asserts that a value is falsy
+
+If the value is not falsy, it panics stopping all execution.
+If the value is falsy the value is returned.
+
+```
+assert::false(3.5 < 2)
+assert::false(1.5 > 1) // Panics
 ```
 
