@@ -326,13 +326,12 @@ let input = '4
 7'
 
 // standard function calls
-iter::toList(iter::filter(x => x % 2 == 0)(iter::map(option::unwrap)(iter::map(string::parseNumber)(string::lines(input)))))
+iter::toList(iter::filter(x => x % 2 == 0)(iter::filterMap(string::parseNumber)(string::lines(input))))
 
 // the equivalent using the pipeline operator
 input
   >> string::lines
-  >> iter::map(string::parseNumber)
-  >> iter::map(option::unwrap)
+  >> iter::filterMap(string::parseNumber)
   >> iter::filter(x => x % 2 == 0)
   >> iter::toList
 ```

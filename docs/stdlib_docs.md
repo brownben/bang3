@@ -761,7 +761,7 @@ Filters the iterator by keeping only the elements that pass the predicate
 If the predicate returns true, the element is kept, otherwise it is discarded
 
 ```bang
-  iter::integers()
+iter::integers()
   >> iter::takeWhile(x => x < 15)
   >> iter::filter(x => x >= 10)
   >> iter::toList // [10, 11, 12, 13, 14]
@@ -770,6 +770,30 @@ If the predicate returns true, the element is kept, otherwise it is discarded
   >> string::chars
   >> iter::filter(string::isAscii)
   >> iter::toList // ['H', 'i', ' ']
+```
+
+### filterMap *((^a => option<^b>) => iterator<^a> => iterator<^b>)*
+
+Creates an iterator that both filters and maps
+
+The returned iterator only has values for which the supplied functions returns `Some(value)`
+
+`filterMap` can be used to make chains of filter and map more concise.
+
+```bang
+
+let input = '12
+13
+14'
+
+input
+  >> string::lines
+  >> iter::map(string::parseNumber)
+  >> iter::filter(option::isSome)
+  >> iter::map(option::unwrap)
+
+// the above chain can be simplified with `filterMap` to:
+input >> string::lines >> iter::filterMap(string::parseNumber)
 ```
 
 ### reduce *((^a => ^a => ^a) => iterator<^a> => option<^a>)*
@@ -851,38 +875,38 @@ iter::integers()
 
 ## assert
 
-### equal *(^a => ^a => bool)*
+### equal *(^a => ^a => boolean)*
 
 Asserts that two values are equal
 
 If the values are not equal, it panics stopping all execution.
 If they are equal true is returned.
 
-```
+```bang
 assert::equal('hello')('hello')
 assert::equal('hello')('world') // Panics
 ```
 
-### true *(^a => bool)*
+### true *(^a => boolean)*
 
 Asserts that a value is truthy
 
 If the value is not truthy, it panics stopping all execution.
 If it is truthy the value is returned.
 
-```
+```bang
 assert::true(3.5 > 2)
 assert::true(1.5 < 1) // Panics
 ```
 
-### false *(^a => bool)*
+### false *(^a => boolean)*
 
 Asserts that a value is falsy
 
 If the value is not falsy, it panics stopping all execution.
 If the value is falsy the value is returned.
 
-```
+```bang
 assert::false(3.5 < 2)
 assert::false(1.5 > 1) // Panics
 ```

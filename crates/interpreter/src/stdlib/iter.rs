@@ -400,7 +400,7 @@ module!(iter, IterModule, {
   ///
   /// ## Example
   /// ```bang
-  ///   iter::integers()
+  /// iter::integers()
   ///   >> iter::takeWhile(x => x < 15)
   ///   >> iter::filter(x => x >= 10)
   ///   >> iter::toList // [10, 11, 12, 13, 14]
@@ -418,6 +418,49 @@ module!(iter, IterModule, {
         Some((result, new_state)) => match vm.call(func, result)? {
           Some(value) if value.is_truthy(vm) => return Ok(Some((result, new_state))),
           Some(_) | None => state = new_state,
+        }
+        None => return Ok(None),
+      }
+    }
+  });
+
+  /// Creates an iterator that both filters and maps
+  ///
+  /// The returned iterator only has values for which the supplied functions returns `Some(value)`
+  ///
+  /// `filterMap` can be used to make chains of filter and map more concise.
+  ///
+  /// ## Example
+  /// ```bang
+  ///
+  /// let input = '12
+  /// 13
+  /// 14'
+  ///
+  /// input
+  ///   >> string::lines
+  ///   >> iter::map(string::parseNumber)
+  ///   >> iter::filter(option::isSome)
+  ///   >> iter::map(option::unwrap)
+  ///
+  /// // the above chain can be simplified with `filterMap` to:
+  /// input >> string::lines >> iter::filterMap(string::parseNumber)
+  /// ```
+  #[type((^a => option<^b>) => iterator<^a> => iterator<^b>)]
+  fn filterMap() = function_transform!("filterMap", |vm, iterator, state, func| {
+    let mut state = state;
+    loop {
+      match iter_next(vm, iterator, state)? {
+        Some((result, new_state)) => {
+          let value = vm.call(func, result)?.unwrap();
+
+          if value.is_object_type(SOME_TYPE_ID) {
+            return Ok(Some((vm.heap[value.as_object::<Value>()], new_state)));
+          } else if value == NONE {
+            state = new_state;
+          } else {
+            return Err(ErrorKind::TypeError { expected: "option", got: value.get_type(vm) })
+          }
         }
         None => return Ok(None),
       }

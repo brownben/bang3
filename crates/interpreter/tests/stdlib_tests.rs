@@ -1152,6 +1152,32 @@ mod iter {
     assert!(filter_not_iter.is_err());
     let filter_not_callable = run("iter::once(1) >> iter::filter(5)");
     assert!(filter_not_callable.is_err());
+
+    let mut filter_map = run(indoc! {"
+      let a = 'Hi 👋'
+        >> string::chars
+        >> iter::filterMap(char => {
+          if (string::isAscii(char)) Some(string::toUppercase(char)) else None
+        })
+        >> iter::toList
+        >> string::from
+      let b = list::iter([1, 2, 3]) >> iter::filterMap(x => if (x % 2 == 1) Some(x + 1) else None) >> iter::sum
+      let c = iter::empty() >> iter::filterMap(_ => None) >> iter::count
+      let d = iter::once(5) >> iter::filterMap(_ => None) >> iter::count
+      let e = iter::once(5) >> iter::filterMap(_ => Some(4)) >> iter::count
+    "});
+    assert_variable!(filter_map; a, string "['H', 'I', ' ']");
+    assert_variable!(filter_map; b, 6.0);
+    assert_variable!(filter_map; c, 0.0);
+    assert_variable!(filter_map; d, 0.0);
+    assert_variable!(filter_map; e, 1.0);
+
+    let filter_map_not_iter = run("4 >> iter::filterMap(x => x)");
+    assert!(filter_map_not_iter.is_err());
+    let filter_map_not_option = run("iter::once(3) >> iter::filterMap(x => 44) >> iter::count");
+    assert!(filter_map_not_option.is_err());
+    let filter_map_not_callable = run("iter::once(1) >> iter::filterMap(5)");
+    assert!(filter_map_not_callable.is_err());
   }
 
   #[test]
