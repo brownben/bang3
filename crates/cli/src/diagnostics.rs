@@ -55,7 +55,7 @@ impl From<&bang_syntax::ParseError> for Message {
     Self {
       title: error.title(),
       body: error.message(),
-      hint: None,
+      hint: error.suggestion(),
       severity: Severity::Error,
     }
   }

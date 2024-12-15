@@ -320,3 +320,19 @@ fn keyword_as_import_item() {
   "};
   assert_eq!(output, expected);
 }
+
+#[test]
+fn extra_arguments() {
+  let file = "func(1, 2, 3)";
+  let output = run_stderr(file);
+  let expected = indoc! {"
+    ✕ Error: Multiple Function Arguments
+    function calls only take a single argument
+    hint: each argument should be in their own brackets e.g. `a(1, 2)` should be `a(1)(2)`
+
+        ╭─[STDIN:1]
+      1 │ func(1, 2, 3)
+    ────╯
+  "};
+  assert_eq!(output, expected);
+}

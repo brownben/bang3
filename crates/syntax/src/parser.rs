@@ -66,6 +66,14 @@ impl<'ast> Parser<'ast> {
     self.ast[self.current_token_id()]
   }
 
+  fn previous_token(&self) -> Token {
+    if self.position < self.ast.tokens.len() {
+      self.ast[TokenIdx::from(self.position - 1)]
+    } else {
+      self.ast[TokenIdx::from(self.ast.tokens.len() - 2)]
+    }
+  }
+
   fn current_kind(&self) -> TokenKind {
     if self.position < self.ast.tokens.len() {
       self.ast.tokens[self.position].kind
@@ -133,16 +141,20 @@ impl<'ast> Parser<'ast> {
     }
   }
 
+  fn resync(&mut self, kind: TokenKind) {
+    while self.current_kind() != kind
+      && !matches!(
+        self.current_kind(),
+        TokenKind::EndOfFile | TokenKind::EndOfLine
+      )
+    {
+      self.position += 1;
+    }
+  }
+
   fn resync_if_error(&mut self, kind: TokenKind) {
     if self.should_resync {
-      while self.current_kind() != kind
-        && !matches!(
-          self.current_kind(),
-          TokenKind::EndOfFile | TokenKind::EndOfLine
-        )
-      {
-        self.position += 1;
-      }
+      self.resync(kind);
     }
     self.should_resync = false;
   }
@@ -335,6 +347,15 @@ impl Parser<'_> {
     self.skip_newline();
     let argument = (self.current_kind() != TokenKind::RightParen).then(|| self.parse_expression());
     self.skip_newline();
+
+    // ignore additional arguments, with comma as not supported
+    if self.current_kind() == TokenKind::Comma {
+      let span = Span::from(self.current_token());
+      self.resync(TokenKind::RightParen);
+      let span = span.merge(self.previous_token().into());
+      self.add_error(ParseError::MultipleFunctionArgs(span));
+    };
+
     let closing = self.expect(TokenKind::RightParen);
 
     self.ast.add_expression(Call {
@@ -972,6 +993,8 @@ pub enum ParseError {
   },
   /// Keyword as Import Item
   KeywordAsImportItem(Token),
+  /// Function calls only accept one argument
+  MultipleFunctionArgs(Span),
 }
 impl ParseError {
   /// The title of the error message
@@ -993,6 +1016,7 @@ impl ParseError {
       Self::ReturnOutsideFunction(_) => "Return Outside of Function".into(),
       Self::NoSingleEqualOperator { .. } => "No Single Equal Operator".into(),
       Self::KeywordAsImportItem(_) => "Keyword as Import Item".into(),
+      Self::MultipleFunctionArgs(_) => "Multiple Function Arguments".into(),
     }
   }
 
@@ -1037,6 +1061,9 @@ impl ParseError {
       Self::KeywordAsImportItem(_) => {
         "import items may be keywords, but they must be renamed with `as` or accessed using module access".into()
       },
+      Self::MultipleFunctionArgs(_) => {
+        "function calls only take a single argument".into()
+      },
     }
   }
 
@@ -1046,6 +1073,13 @@ impl ParseError {
     let mut message = self.title();
     message.push('\n');
     message.push_str(&self.message());
+
+    if let Some(suggestion) = self.suggestion() {
+      message.push('\n');
+      message.push_str("hint: ");
+      message.push_str(&suggestion);
+    }
+
     message
   }
 
@@ -1067,6 +1101,19 @@ impl ParseError {
       ParseError::ReturnOutsideFunction(token) => token.into(),
       ParseError::NoSingleEqualOperator { token, .. } => token.into(),
       ParseError::KeywordAsImportItem(token) => token.into(),
+      ParseError::MultipleFunctionArgs(span) => *span,
+    }
+  }
+
+  /// A suggestion for how to fix the error
+  #[must_use]
+  pub fn suggestion(&self) -> Option<String> {
+    match self {
+      Self::MultipleFunctionArgs { .. } => Some(
+        "each argument should be in their own brackets e.g. `a(1, 2)` should be `a(1)(2)`"
+          .to_owned(),
+      ),
+      _ => None,
     }
   }
 

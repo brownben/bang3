@@ -1225,6 +1225,20 @@ mod fault_tolerant {
   }
 
   #[test]
+  fn call_extra_arguments() {
+    let ast = parse("func(4, 5)");
+    let expected = indoc! {"
+      ├─ Call
+      │  ├─ Callee
+      │  │  ╰─ Variable (func)
+      │  ╰─ Argument
+      │     ╰─ Number (4)
+    "};
+    assert!(ast.is_err());
+    assert_eq!(ast.to_string(), expected);
+  }
+
+  #[test]
   fn group_closing_bracket() {
     let ast = parse("(4 + 1");
     let expected = indoc! {"
