@@ -162,7 +162,7 @@ module!(string, StringModule, {
       return Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) });
     }
 
-    let closure = vm.heap.allocate(NativeClosure::new("contains", func, arg));
+    let closure = vm.heap.allocate(NativeClosure::new("string::contains", func, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
   /// Is a string a prefix of the given string?
@@ -184,7 +184,7 @@ module!(string, StringModule, {
       return Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) });
     }
 
-    let closure = vm.heap.allocate(NativeClosure::new("startsWith", func, arg));
+    let closure = vm.heap.allocate(NativeClosure::new("string::startsWith", func, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
   /// Is a string a suffix of the given string?
@@ -206,7 +206,7 @@ module!(string, StringModule, {
       return Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) });
     }
 
-    let closure = vm.heap.allocate(NativeClosure::new("endsWith", func, arg));
+    let closure = vm.heap.allocate(NativeClosure::new("string::endsWith", func, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
 
@@ -294,7 +294,7 @@ module!(string, StringModule, {
         return Err(ErrorKind::TypeError { expected: "string", got: b.get_type(vm) });
       }
 
-      let closure = (vm.heap).allocate(NativeClosureTwo::new("replaceAll", func_two, a, b));
+      let closure = (vm.heap).allocate(NativeClosureTwo::new("string::replaceAll", func_two, a, b));
       Ok(Value::from_object(closure, NATIVE_CLOSURE_TWO_TYPE_ID))
     }
     fn func_two(vm: &mut VM, pat: Value, rep: Value, string: Value) -> Result<Value, ErrorKind> {
@@ -310,7 +310,7 @@ module!(string, StringModule, {
       return Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) });
     }
 
-    let closure = (vm.heap).allocate(NativeClosure::new("replaceAll", func_one, arg));
+    let closure = (vm.heap).allocate(NativeClosure::new("string::replaceAll", func_one, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
 
@@ -330,7 +330,7 @@ module!(string, StringModule, {
         return Err(ErrorKind::TypeError { expected: "string", got: b.get_type(vm) });
       }
 
-      let closure = vm.heap.allocate(NativeClosureTwo::new("replaceOne", func_two, a, b));
+      let closure = vm.heap.allocate(NativeClosureTwo::new("string::replaceOne", func_two, a, b));
       Ok(Value::from_object(closure, NATIVE_CLOSURE_TWO_TYPE_ID))
     }
     fn func_two(vm: &mut VM, pat: Value, rep: Value, string: Value) -> Result<Value, ErrorKind> {
@@ -347,7 +347,7 @@ module!(string, StringModule, {
       return Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) });
     }
 
-    let closure = vm.heap.allocate(NativeClosure::new("replaceOne", func_one, arg));
+    let closure = vm.heap.allocate(NativeClosure::new("string::replaceOne", func_one, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
 

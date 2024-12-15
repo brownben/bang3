@@ -992,7 +992,7 @@ fn format_string() {
   assert_variable!(objects_display; f, string "<function identity>");
   assert_variable!(objects_display; g, string "<function>");
   assert_variable!(objects_display; h, string "<closure <function>>");
-  assert_variable!(objects_display; i, string "<closure <function pow>>");
+  assert_variable!(objects_display; i, string "<closure <function maths::pow>>");
 }
 
 #[test]

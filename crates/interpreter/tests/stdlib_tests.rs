@@ -315,7 +315,7 @@ mod string {
     assert_variable!(vm; f, string "<function identity>");
     assert_variable!(vm; g, string "<function>");
     assert_variable!(vm; h, string "<closure <function>>");
-    assert_variable!(vm; i, string "<closure <function pow>>");
+    assert_variable!(vm; i, string "<closure <function maths::pow>>");
     assert_variable!(vm; j, string "world");
   }
 

@@ -22,7 +22,10 @@ macro_rules! module {
         $(stringify!($constant_name) => module!(const $constant_type, vm, $constant),)*
         $(
           stringify!($function_name) => {
-            let native_function = NativeFunction::new(stringify!($function_name), $function);
+            let full_function_name = concat!(
+              stringify!($module_name), "::", stringify!($function_name)
+            );
+            let native_function = NativeFunction::new(full_function_name, $function);
             let allocated_function = vm.heap.allocate(native_function);
             let value = Value::from_object(allocated_function, NATIVE_FUNCTION_TYPE_ID);
             super::ImportResult::Value(value)

@@ -44,7 +44,6 @@ fn undefined_variable() {
     ────╯
 
     at line 1
-
   "});
 }
 
@@ -60,7 +59,6 @@ fn expected_number() {
     ────╯
 
     at line 1
-
   "});
 
   let output = run("false + 5");
@@ -73,7 +71,6 @@ fn expected_number() {
     ────╯
 
     at line 1
-
   "});
 }
 
@@ -89,7 +86,6 @@ fn expected_ordered() {
     ────╯
 
     at line 1
-
   "});
 
   let output = run("false <= 5");
@@ -102,7 +98,6 @@ fn expected_ordered() {
     ────╯
 
     at line 1
-
   "});
 }
 
@@ -118,7 +113,6 @@ fn import_not_found() {
     ────╯
 
     at line 1
-
   "});
 
   let output = run("from maths import { unknown }");
@@ -131,7 +125,6 @@ fn import_not_found() {
     ────╯
 
     at line 1
-
   "});
 }
 
@@ -147,7 +140,6 @@ fn not_callable() {
     ────╯
 
     at line 1
-
   "});
 }
 
@@ -176,7 +168,6 @@ fn traceback() {
     in function 'innerFunction' at line 4
     in function 'outerFunction' at line 6
     at line 8
-
   "});
 
   let source = indoc! {"
@@ -197,7 +188,6 @@ fn traceback() {
 
     in anonymous function at line 2
     at line 5
-
   "});
 }
 
@@ -218,9 +208,8 @@ fn traceback_native_functions() {
     ────╯
 
     in anonymous function at line 3
-    in native function 'map'
+    in native function 'option::map'
     at line 3
-
   "});
 
   let source = indoc! {"
@@ -239,9 +228,8 @@ fn traceback_native_functions() {
     ────╯
 
     in function 'inner' at line 3
-    in native function 'map'
+    in native function 'option::map'
     at line 4
-
   "});
 
   let source = indoc! {"
@@ -262,9 +250,8 @@ fn traceback_native_functions() {
     ────╯
 
     in function 'inner' at line 3
-    in native function 'map'
+    in native function 'option::map'
     at line 6
-
   "});
 
   let source = indoc! {"
@@ -281,10 +268,9 @@ fn traceback_native_functions() {
       3 │ map(string::length)(Some(5))
     ────╯
 
-    in native function 'length'
-    in native function 'map'
+    in native function 'string::length'
+    in native function 'option::map'
     at line 3
-
   "});
 }
 
@@ -301,6 +287,5 @@ fn panics() {
 
     in native function 'panic'
     at line 1
-
   "});
 }

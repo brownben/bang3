@@ -136,9 +136,9 @@ module!(list, ListModule, {
     }
 
     let closure = if index.as_number() < 0.0 {
-      (vm.heap).allocate(NativeClosure::new("get", negative_func, index))
+      (vm.heap).allocate(NativeClosure::new("list::get", negative_func, index))
     } else {
-      (vm.heap).allocate(NativeClosure::new("get", positive_func, index))
+      (vm.heap).allocate(NativeClosure::new("list::get", positive_func, index))
     };
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };

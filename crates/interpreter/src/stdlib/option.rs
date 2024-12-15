@@ -73,7 +73,7 @@ module!(option, OptionModule, {
       }
     }
 
-    let closure = (vm.heap).allocate(NativeClosure::new("unwrapOr", func, arg));
+    let closure = (vm.heap).allocate(NativeClosure::new("option::unwrapOr", func, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
 
@@ -128,7 +128,7 @@ module!(option, OptionModule, {
       return Err(ErrorKind::TypeError { expected: "function", got: arg.get_type(vm) })
     }
 
-    let closure = (vm.heap).allocate(NativeClosure::new("map", func, arg));
+    let closure = (vm.heap).allocate(NativeClosure::new("option::map", func, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
 });

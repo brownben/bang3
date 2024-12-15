@@ -265,7 +265,7 @@ module!(iter, IterModule, {
       });
     }
 
-    let closure = vm.heap.allocate(NativeClosure::new("find", func, arg));
+    let closure = vm.heap.allocate(NativeClosure::new("iter::find", func, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
   /// Searches for an element of an iterator, and returns its index
@@ -309,7 +309,7 @@ module!(iter, IterModule, {
       });
     }
 
-    let closure = vm.heap.allocate(NativeClosure::new("position", func, arg));
+    let closure = vm.heap.allocate(NativeClosure::new("iter::position", func, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
 
@@ -474,7 +474,7 @@ module!(iter, IterModule, {
       });
     }
 
-    let closure = vm.heap.allocate(NativeClosure::new("reduce", func, arg));
+    let closure = vm.heap.allocate(NativeClosure::new("iter::reduce", func, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
   /// Folds every element into an accumulator by applying an operation, returning the final result
@@ -495,7 +495,7 @@ module!(iter, IterModule, {
         return Err(ErrorKind::TypeError { expected: "function", got: b.get_type(vm) });
       }
 
-      let closure = vm.heap.allocate(NativeClosureTwo::new("fold", func_two, a, b));
+      let closure = vm.heap.allocate(NativeClosureTwo::new("iter::fold", func_two, a, b));
       Ok(Value::from_object(closure, NATIVE_CLOSURE_TWO_TYPE_ID))
     }
     fn func_two(vm: &mut VM, start: Value, func: Value, iter: Value) -> Result<Value, ErrorKind> {
@@ -523,7 +523,7 @@ module!(iter, IterModule, {
       Ok(accumulator)
     }
 
-    let closure = vm.heap.allocate(NativeClosure::new("fold", func_one, arg));
+    let closure = vm.heap.allocate(NativeClosure::new("iter::fold", func_one, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
 
@@ -656,7 +656,7 @@ module!(iter, IterModule, {
       return Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) });
     }
 
-    let closure = vm.heap.allocate(NativeClosure::new("join", func, arg));
+    let closure = vm.heap.allocate(NativeClosure::new("iter::join", func, arg));
     Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
   };
 
@@ -753,7 +753,8 @@ macro_rules! function_transform {
         });
       }
 
-      let closure = vm.heap.allocate(NativeClosure::new($name, func, arg));
+
+      let closure = vm.heap.allocate(NativeClosure::new(concat!("iter::", $name), func, arg));
       Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
     }
   };

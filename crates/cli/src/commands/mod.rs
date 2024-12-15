@@ -100,7 +100,7 @@ pub fn run(filename: &str) -> Result<CommandStatus, ()> {
 
     let line_index = ast.line_index();
     if let Some(traceback) = error.traceback(line_index) {
-      eprintln!("\n{traceback}");
+      eprint!("\n{traceback}");
     }
 
     return Err(());
