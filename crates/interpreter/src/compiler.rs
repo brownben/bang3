@@ -299,7 +299,7 @@ impl<'s> Compile<'s> for Call {
     } else {
       compiler.chunk.add_opcode(OpCode::Null, self.span(ast));
     }
-    compiler.chunk.add_opcode(OpCode::Call, self.span(ast));
+    (compiler.chunk).add_opcode(OpCode::Call, self.argument_span(ast));
     Ok(())
   }
 }
