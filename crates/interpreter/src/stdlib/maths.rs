@@ -1,3 +1,4 @@
+use super::StdlibModule;
 use super::macros::module;
 use crate::{
   VM, Value,
@@ -5,7 +6,7 @@ use crate::{
   vm::ErrorKind,
 };
 
-module!(maths, MATHS_ITEMS, maths_types, maths_docs, {
+module!(maths, MathsModule, {
   const /// The mathematical constant `π` (~3.141592…)
         PI: number = std::f64::consts::PI;
   const /// The mathematical constant `e` (Euler's number, ~2.718281…)

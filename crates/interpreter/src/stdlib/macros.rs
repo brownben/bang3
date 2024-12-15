@@ -1,9 +1,7 @@
 macro_rules! module {
   (
     $module_name:ident,
-    $module_items_name:ident,
-    $module_types_name:ident,
-    $module_docs_name:ident,
+    $module_struct_name:ident,
   {
     $(
       const $(#[doc = $constant_doc_comment:literal])*
@@ -34,35 +32,41 @@ macro_rules! module {
       }
     }
 
-    #[doc = concat!("All the items in the `", stringify!($module_name), "` module")]
-    pub const $module_items_name: [&str; module!(count $($constant_name)*) + module!(count $($function_name)*)] = [
-      $(stringify!($constant_name),)*
-      $(stringify!($function_name),)*
-    ];
-
-    #[doc = concat!("Get the type annotations for the items in the `", stringify!($module_name), "` module")]
-    #[must_use] pub fn $module_types_name(item: &str) -> Option<&'static str> {
-      match item {
-        $(
-          stringify!($constant_name) => Some(module!(const type $constant_type)),
-        )*
-        $(
-          stringify!($function_name) => Some(stringify!($function_type)),
-        )*
-        _ => None,
+    #[doc = concat!("The `", stringify!($module_name), "` module of Bang's Standard Library")]
+    pub struct $module_struct_name;
+    impl StdlibModule for $module_struct_name {
+      fn name(&self) -> &'static str {
+        stringify!($module_name)
       }
-    }
 
-    #[doc = concat!("Get doc comments for the items in the `", stringify!($module_name), "` module")]
-    #[must_use] pub fn $module_docs_name(item: &str) -> Option<&'static str> {
-      match item {
-        $(
-          stringify!($constant_name) => Some(concat!($($constant_doc_comment, "\n"),*)),
-        )*
-        $(
-          stringify!($function_name) => Some(concat!($($doc_comment, "\n"),*)),
-        )*
-        _ => None,
+      fn items(&self) -> &'static [&'static str] {
+        &[
+          $(stringify!($constant_name),)*
+          $(stringify!($function_name),)*
+        ]
+      }
+      fn docs(&self, item: &str) -> Option<&'static str> {
+        match item {
+          $(
+            stringify!($constant_name) => Some(concat!($($constant_doc_comment, "\n"),*)),
+          )*
+          $(
+            stringify!($function_name) => Some(concat!($($doc_comment, "\n"),*)),
+          )*
+          _ => None,
+        }
+      }
+
+      fn type_of(&self, item: &str) -> Option<&'static str> {
+        match item {
+          $(
+            stringify!($constant_name) => Some(module!(const type $constant_type)),
+          )*
+          $(
+            stringify!($function_name) => Some(stringify!($function_type)),
+          )*
+          _ => None,
+        }
       }
     }
   };

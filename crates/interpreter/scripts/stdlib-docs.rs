@@ -3,23 +3,10 @@
 //! Generates the standard library documentation, from the documentation for each item of the library.
 #![allow(clippy::print_stdout)]
 
-use bang_interpreter::stdlib::{ITER_ITEMS, LIST_ITEMS, MATHS_ITEMS, OPTION_ITEMS, STRING_ITEMS};
-use bang_interpreter::stdlib::{iter_docs, list_docs, maths_docs, option_docs, string_docs};
-use bang_interpreter::stdlib::{iter_types, list_types, maths_types, option_types, string_types};
+use bang_interpreter::stdlib::{MODULE_NAMES, MODULES};
 
 use std::fmt::Write;
 use std::{env, fs, io, process};
-
-type GetDocs = fn(&str) -> Option<&'static str>;
-type GetType = fn(&str) -> Option<&'static str>;
-
-const MODULES: [(&str, &[&str], GetDocs, GetType); 5] = [
-  ("string", &STRING_ITEMS, string_docs, string_types),
-  ("maths", &MATHS_ITEMS, maths_docs, maths_types),
-  ("list", &LIST_ITEMS, list_docs, list_types),
-  ("option", &OPTION_ITEMS, option_docs, option_types),
-  ("iter", &ITER_ITEMS, iter_docs, iter_types),
-];
 
 const OUTPUT_FILE: &str = "docs/stdlib_docs.md";
 
@@ -32,17 +19,17 @@ fn main() -> io::Result<()> {
   file.push_str(HEADER);
 
   file.push_str("**Modules:**\n");
-  for (module, _, _, _) in MODULES {
+  for module in MODULE_NAMES {
     writeln!(&mut file, "- [{module}](#{module})").unwrap();
   }
   file.push_str("\n\n");
 
-  for (module, items, docs, types) in MODULES {
-    write!(&mut file, "## {module}\n\n").unwrap();
+  for module in MODULES {
+    write!(&mut file, "## {}\n\n", module.name()).unwrap();
 
-    for item in items {
-      let docs = docs(item).unwrap();
-      let types = types(item).unwrap();
+    for item in module.items() {
+      let docs = module.docs(item).unwrap();
+      let types = module.type_of(item).unwrap();
 
       let docs = docs
         .lines()

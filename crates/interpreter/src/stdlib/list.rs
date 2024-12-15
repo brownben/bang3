@@ -1,3 +1,4 @@
+use super::StdlibModule;
 use super::macros::module;
 use crate::{
   VM, Value,
@@ -7,7 +8,7 @@ use crate::{
   vm::ErrorKind,
 };
 
-module!(list, LIST_ITEMS, list_types, list_docs, {
+module!(list, ListModule, {
   /// The number of elements in a list
   ///
   /// ## Example

@@ -147,18 +147,19 @@ impl InferType for Statement {
 }
 impl InferExpression for Import {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> TypeRef {
-    let module = StdlibModule::get(self.module(ast));
+    let Some(module) = StdlibModule::get(self.module(ast)) else {
+      t.problems.push(TypeError::ModuleNotFound {
+        module: self.module(ast).to_owned(),
+        span: self.module_span(ast),
+        did_you_mean: similarly_named(self.module(ast), stdlib::MODULE_NAMES),
+      });
+
+      return TypeArena::NEVER;
+    };
 
     for item in self.items(ast) {
       match module.import_value(&mut t.types, item.name) {
         ImportResult::Value(type_) => t.env.define_import(&item, type_, module.name()),
-        ImportResult::ModuleNotFound => {
-          t.problems.push(TypeError::ModuleNotFound {
-            module: self.module(ast).to_owned(),
-            span: self.module_span(ast),
-            did_you_mean: similarly_named(self.module(ast), stdlib::MODULES),
-          });
-        }
         ImportResult::ItemNotFound => {
           t.problems.push(TypeError::ItemNotFound {
             module: self.module(ast).to_owned(),
@@ -707,7 +708,14 @@ impl InferType for Match {
 }
 impl InferExpression for ModuleAccess {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> TypeRef {
-    let module = StdlibModule::get(self.module(ast));
+    let Some(module) = StdlibModule::get(self.module(ast)) else {
+      t.problems.push(TypeError::ModuleNotFound {
+        module: self.module(ast).to_owned(),
+        span: self.span(ast),
+        did_you_mean: similarly_named(self.module(ast), stdlib::MODULE_NAMES),
+      });
+      return TypeArena::UNKNOWN;
+    };
 
     let existing_import = t.env.variables().find_map(|var| match &var.kind {
       VariableKind::Declaration { .. } | VariableKind::Builtin { .. } => None,
@@ -736,14 +744,6 @@ impl InferExpression for ModuleAccess {
 
     match module.import_value(&mut t.types, self.item(ast)) {
       ImportResult::Value(type_) => t.types.instantiate(type_),
-      ImportResult::ModuleNotFound => {
-        t.problems.push(TypeError::ModuleNotFound {
-          module: self.module(ast).to_owned(),
-          span: self.span(ast),
-          did_you_mean: similarly_named(self.module(ast), stdlib::MODULES),
-        });
-        TypeArena::UNKNOWN
-      }
       ImportResult::ItemNotFound => {
         t.problems.push(TypeError::ItemNotFound {
           module: self.module(ast).to_owned(),

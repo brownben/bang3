@@ -1,3 +1,4 @@
+use super::StdlibModule;
 use super::macros::module;
 use crate::{
   VM, Value,
@@ -11,7 +12,7 @@ use crate::{
   vm::ErrorKind,
 };
 
-module!(iter, ITER_ITEMS, iter_types, iter_docs, {
+module!(iter, IterModule, {
   /// Creates an iterator that yields nothing
   ///
   /// ## Example

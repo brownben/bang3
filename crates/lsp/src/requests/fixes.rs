@@ -84,6 +84,7 @@ mod parse_errors {
 
 mod type_errors {
   use super::{Document, IntoDiagnostic, Span, delete_edit, insert_edit, replace_edit};
+  use bang_interpreter::stdlib::{MODULES, StdlibModule};
   use bang_typechecker::TypeError;
   use lsp_types as lsp;
 
@@ -142,18 +143,10 @@ mod type_errors {
   }
 
   fn is_from_module(identifier: &str) -> impl Iterator<Item = &'static str> {
-    const MODULES: [(&str, &[&str]); 5] = [
-      ("maths", &bang_interpreter::stdlib::MATHS_ITEMS),
-      ("string", &bang_interpreter::stdlib::STRING_ITEMS),
-      ("list", &bang_interpreter::stdlib::LIST_ITEMS),
-      ("option", &bang_interpreter::stdlib::OPTION_ITEMS),
-      ("iter", &bang_interpreter::stdlib::ITER_ITEMS),
-    ];
-
     MODULES
       .into_iter()
-      .filter(move |(_, items)| items.contains(&identifier))
-      .map(|(module, _)| module)
+      .filter(move |module| module.items().contains(&identifier))
+      .map(StdlibModule::name)
   }
 
   fn unreachable_case(file: &Document, error: &TypeError, span: Span) -> lsp::CodeAction {

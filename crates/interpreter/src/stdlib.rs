@@ -106,22 +106,42 @@ impl Context for StandardContext {
   }
 }
 
+/// Information about a module in the standard library
+pub trait StdlibModule {
+  /// The name of the module
+  fn name(&self) -> &'static str;
+  /// The items in the module
+  fn items(&self) -> &'static [&'static str];
+  /// Get the documentation for an item in the module
+  fn docs(&self, item: &str) -> Option<&'static str>;
+  /// Get the type of an item in the module
+  fn type_of(&self, item: &str) -> Option<&'static str>;
+}
+
 mod macros;
 
-/// The names of all the modules in the standard library
-pub const MODULES: [&str; 5] = ["maths", "string", "list", "option", "iter"];
-
 mod maths;
-pub use maths::{MATHS_ITEMS, maths, maths_docs, maths_types};
+use maths::{MathsModule, maths};
 
 mod string;
-pub use string::{STRING_ITEMS, string, string_docs, string_types};
+use string::{StringModule, string};
 
 mod list;
-pub use list::{LIST_ITEMS, list, list_docs, list_types};
+use list::{ListModule, list};
 
 mod option;
-pub use option::{OPTION_ITEMS, option, option_docs, option_types};
+use option::{OptionModule, option};
 
 mod iter;
-pub use iter::{ITER_ITEMS, iter, iter_docs, iter_types};
+use iter::{IterModule, iter};
+
+/// The modules in bang's standard library
+pub const MODULES: [&dyn StdlibModule; 5] = [
+  &StringModule,
+  &MathsModule,
+  &ListModule,
+  &OptionModule,
+  &IterModule,
+];
+/// The names of all the modules in the standard library
+pub const MODULE_NAMES: [&str; 5] = ["string", "maths", "list", "option", "iter"];

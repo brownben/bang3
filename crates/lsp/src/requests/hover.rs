@@ -3,14 +3,14 @@ use crate::documents::Document;
 use crate::locations::span_from_lsp_position;
 use lsp_types as lsp;
 
+use bang_interpreter::stdlib::MODULES;
 use bang_syntax::{AST, Span, ast::expression};
-use bang_typechecker::StdlibModule;
 
 pub fn hover(file: &Document, position: lsp::Position) -> Option<lsp::Hover> {
   let position = span_from_lsp_position(position, file);
 
   if let Some(module_access) = in_module_access_item(&file.ast, position) {
-    return Some(hover_module_access_item(&file.ast, module_access));
+    return hover_module_access_item(&file.ast, module_access);
   }
 
   let typechecker = file.typechecker();
@@ -34,25 +34,28 @@ pub fn hover(file: &Document, position: lsp::Position) -> Option<lsp::Hover> {
   })
 }
 
-fn hover_module_access_item(ast: &AST, module_access: &expression::ModuleAccess) -> lsp::Hover {
-  let module = StdlibModule::get(module_access.module(ast));
+fn hover_module_access_item(
+  ast: &AST,
+  module_access: &expression::ModuleAccess,
+) -> Option<lsp::Hover> {
+  let module_name = module_access.module(ast);
   let item_name = module_access.item(ast);
 
-  let type_ = module.type_info(item_name);
+  let module = MODULES.iter().find(|module| module.name() == module_name)?;
 
-  let mut contents = type_code_block(item_name, &type_.string);
+  let mut contents = type_code_block(item_name, module.type_of(item_name).unwrap_or(""));
   if let Some(documentation) = module.docs(item_name) {
     contents.push_str("---\n");
     contents.push_str(documentation);
   }
 
-  lsp::Hover {
+  Some(lsp::Hover {
     contents: lsp::HoverContents::Markup(lsp::MarkupContent {
       kind: lsp_types::MarkupKind::Markdown,
       value: contents,
     }),
     range: None,
-  }
+  })
 }
 
 fn type_code_block(variable_name: &str, variable_type: &str) -> String {

@@ -1,4 +1,5 @@
 #![allow(clippy::cast_precision_loss, reason = "string lengths are < 2^52")]
+use super::StdlibModule;
 use super::macros::module;
 use crate::{
   VM, Value,
@@ -10,7 +11,7 @@ use crate::{
   vm::ErrorKind,
 };
 
-module!(string, STRING_ITEMS, string_types, string_docs, {
+module!(string, StringModule, {
   const /// A newline character
         NEW_LINE: String = "\n";
   const /// A tab character

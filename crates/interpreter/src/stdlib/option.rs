@@ -1,3 +1,4 @@
+use super::StdlibModule;
 use super::macros::module;
 use crate::{
   VM, Value,
@@ -6,7 +7,7 @@ use crate::{
   vm::ErrorKind,
 };
 
-module!(option, OPTION_ITEMS, option_types, option_docs, {
+module!(option, OptionModule, {
   const /// No value
         None: option = NONE;
 

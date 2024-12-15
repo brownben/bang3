@@ -362,7 +362,9 @@ impl Variable {
     match &self.kind {
       VariableKind::Declaration { documentation, .. } => documentation.as_deref(),
       VariableKind::Builtin { documentation, .. } => documentation.as_deref(),
-      VariableKind::Import { module, item, .. } => StdlibModule::get(module).docs(item),
+      VariableKind::Import { module, item, .. } => {
+        StdlibModule::get(module).and_then(|module| module.docs(item))
+      }
     }
   }
 

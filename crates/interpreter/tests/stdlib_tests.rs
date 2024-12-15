@@ -1306,79 +1306,36 @@ mod iter {
 }
 
 mod docs {
-  use bang_interpreter::stdlib::{ITER_ITEMS, LIST_ITEMS, MATHS_ITEMS, OPTION_ITEMS, STRING_ITEMS};
-  use bang_interpreter::stdlib::{iter_docs, list_docs, maths_docs, option_docs, string_docs};
+  use bang_interpreter::stdlib::MODULES;
   use indoc::indoc;
 
   #[test]
   #[cfg_attr(miri, ignore)]
   fn typecheck() {
-    for item in STRING_ITEMS {
-      typecheck_docs("string", item, string_docs(item));
-    }
-
-    for item in MATHS_ITEMS {
-      typecheck_docs("maths", item, maths_docs(item));
-    }
-
-    for item in LIST_ITEMS {
-      typecheck_docs("list", item, list_docs(item));
-    }
-
-    for item in OPTION_ITEMS {
-      typecheck_docs("option", item, option_docs(item));
-    }
-
-    for item in ITER_ITEMS {
-      typecheck_docs("iter", item, iter_docs(item));
+    for module in MODULES {
+      for item in module.items() {
+        typecheck_docs(module.name(), item, module.docs(item));
+      }
     }
   }
 
   #[test]
   #[cfg_attr(miri, ignore)]
   fn lint() {
-    for item in STRING_ITEMS {
-      lint_docs("string", item, string_docs(item));
-    }
-
-    for item in MATHS_ITEMS {
-      lint_docs("maths", item, maths_docs(item));
-    }
-
-    for item in LIST_ITEMS {
-      lint_docs("list", item, list_docs(item));
-    }
-
-    for item in OPTION_ITEMS {
-      lint_docs("option", item, option_docs(item));
-    }
-
-    for item in ITER_ITEMS {
-      lint_docs("iter", item, iter_docs(item));
+    for module in MODULES {
+      for item in module.items() {
+        lint_docs(module.name(), item, module.docs(item));
+      }
     }
   }
 
   #[test]
   #[cfg_attr(miri, ignore)]
   fn format() {
-    for item in STRING_ITEMS {
-      format_docs("string", item, string_docs(item));
-    }
-
-    for item in MATHS_ITEMS {
-      format_docs("maths", item, maths_docs(item));
-    }
-
-    for item in LIST_ITEMS {
-      format_docs("list", item, list_docs(item));
-    }
-
-    for item in OPTION_ITEMS {
-      format_docs("option", item, option_docs(item));
-    }
-
-    for item in ITER_ITEMS {
-      format_docs("iter", item, iter_docs(item));
+    for module in MODULES {
+      for item in module.items() {
+        format_docs(module.name(), item, module.docs(item));
+      }
     }
   }
 

@@ -3,7 +3,7 @@ use crate::documents::Document;
 use crate::locations::span_from_lsp_position;
 use lsp_types as lsp;
 
-use bang_interpreter::stdlib::MODULES;
+use bang_interpreter::stdlib::MODULE_NAMES;
 use bang_syntax::{
   AST, Span,
   ast::{Expression, Statement},
@@ -193,7 +193,7 @@ fn variable_completion(
 }
 
 fn module_completions() -> lsp::CompletionList {
-  let items = MODULES
+  let items = MODULE_NAMES
     .into_iter()
     .map(|module| lsp::CompletionItem {
       kind: Some(lsp::CompletionItemKind::MODULE),
@@ -209,7 +209,7 @@ fn module_completions() -> lsp::CompletionList {
 }
 
 fn module_access_snippets() -> impl Iterator<Item = lsp::CompletionItem> {
-  MODULES.iter().map(|module| lsp::CompletionItem {
+  MODULE_NAMES.into_iter().map(|module| lsp::CompletionItem {
     kind: Some(lsp::CompletionItemKind::MODULE),
 
     label: (*module).to_owned(),
@@ -234,7 +234,9 @@ fn module_access_snippets() -> impl Iterator<Item = lsp::CompletionItem> {
 }
 
 fn module_item_completions(module: &str, skip_function_brackets: bool) -> lsp::CompletionList {
-  let module = StdlibModule::get(module);
+  let Some(module) = StdlibModule::get(module) else {
+    return lsp::CompletionList::default();
+  };
 
   let items = module
     .items()
