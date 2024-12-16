@@ -2,7 +2,7 @@ use super::{CommandStatus, compile, parse};
 use crate::diagnostics::{Message, highlight_source};
 
 use bang_interpreter::{Chunk, ChunkBuilder, HeapSize, OpCode, StandardContext, VM};
-use bang_syntax::{AST, Span, TokenKind, ast, tokenise};
+use bang_syntax::{AST, Span, Token, TokenKind, ast, tokenise};
 
 use anstream::{eprintln, println};
 use owo_colors::OwoColorize;
@@ -38,12 +38,13 @@ impl Highlighter for BangRustyLine {
 impl Validator for BangRustyLine {
   fn validate(&self, ctx: &mut ValidationContext) -> rustyline::Result<ValidationResult> {
     let input = ctx.input();
+    let tokens = tokenise(input).collect::<Vec<_>>();
 
-    if !brackets_approx_balanced(input) {
+    if !brackets_approx_balanced(&tokens) {
       return Ok(ValidationResult::Incomplete);
     }
 
-    if ends_with_unterminated_string(input) {
+    if ends_with_unterminated_string(&tokens) {
       return Ok(ValidationResult::Incomplete);
     }
 
@@ -128,10 +129,10 @@ fn print_expression_result_function(expression: &ast::Expression, ast: &AST) -> 
 ///
 /// This is not a perfect check that the source brackets are balanced,
 /// but it makes sure that there are the same number of opening and closing brackets.
-fn brackets_approx_balanced(source: &str) -> bool {
+fn brackets_approx_balanced(tokens: &[Token]) -> bool {
   let mut bracket_count = 0;
 
-  for token in tokenise(source) {
+  for token in tokens {
     match token.kind {
       TokenKind::LeftCurly | TokenKind::LeftParen | TokenKind::FormatStringStart => {
         bracket_count += 1;
@@ -147,13 +148,13 @@ fn brackets_approx_balanced(source: &str) -> bool {
 }
 
 /// Does the source end with a string that is not terminated?
-fn ends_with_unterminated_string(source: &str) -> bool {
-  if let Some(last_token) = tokenise(source).last()
-    && last_token.kind == TokenKind::String
-  {
-    let string = Span::from(last_token).source_text(source).as_bytes();
-    string.first() == string.last()
-  } else {
-    false
-  }
+fn ends_with_unterminated_string(tokens: &[Token]) -> bool {
+  let last_token_kind = (tokens.iter().rev())
+    .find(|token| token.kind != TokenKind::EndOfLine)
+    .map_or(TokenKind::Unknown, |token| token.kind);
+
+  matches!(
+    last_token_kind,
+    TokenKind::UnterminatedString | TokenKind::FormatStringUnterminated
+  )
 }
