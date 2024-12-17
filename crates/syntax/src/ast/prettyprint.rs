@@ -260,13 +260,22 @@ impl PrettyPrint for Pattern {
           display_literal(f, end, ast)?;
         };
       }
+      Self::List(list_pattern) if list_pattern.variables(ast).is_empty() => {
+        write!(f, "[")?;
+        if let Some(rest) = list_pattern.rest(ast) {
+          write!(f, "..{}", rest.name(ast))?;
+        }
+        write!(f, "]")?;
+      }
       Self::List(list_pattern) => {
         write!(f, "[")?;
-        match (list_pattern.first(ast), list_pattern.rest(ast)) {
-          (Some(first), Some(rest)) => write!(f, "{}, ..{}", first.name(ast), rest.name(ast))?,
-          (Some(first), None) => write!(f, "{}", first.name(ast))?,
-          (None, Some(rest)) => write!(f, "..{}", rest.name(ast))?,
-          (None, None) => {}
+        let (last, variables) = list_pattern.variables(ast).split_last().unwrap();
+        for variable in variables {
+          write!(f, "{}, ", variable.name(ast))?;
+        }
+        match list_pattern.rest(ast) {
+          Some(rest) => write!(f, "{}, ..{}", last.name(ast), rest.name(ast))?,
+          None => write!(f, "{}", last.name(ast))?,
         };
         write!(f, "]")?;
       }

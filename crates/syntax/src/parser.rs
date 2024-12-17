@@ -614,46 +614,54 @@ impl Parser<'_> {
     }
   }
 
-  fn pattern_list(&mut self, opening: TokenIdx) -> Pattern {
-    let (first, rest) = match self.current_kind() {
-      TokenKind::RightSquare => (None, None),
-      TokenKind::DotDot => {
-        let (_, _dots) = self.advance();
-        let rest = self.expect(TokenKind::Identifier);
-        _ = self.matches(TokenKind::Comma);
-
-        (None, rest)
-      }
+  fn is_nested_pattern(&mut self) -> bool {
+    matches!(
+      self.current_kind(),
       TokenKind::String
-      | TokenKind::Number
-      | TokenKind::True
-      | TokenKind::False
-      | TokenKind::LeftSquare => {
-        let first = self.current_token_id();
-        self.add_error(ParseError::NestedPattern(self.current_token()));
-        self.resync(TokenKind::RightSquare);
-        (Some(first), None)
-      }
-      _ => {
-        let first = self.expect(TokenKind::Identifier);
-        let rest = if self.matches(TokenKind::Comma) && self.matches(TokenKind::DotDot) {
-          self.expect(TokenKind::Identifier)
-        } else {
-          None
-        };
-        _ = self.matches(TokenKind::Comma);
+        | TokenKind::Number
+        | TokenKind::True
+        | TokenKind::False
+        | TokenKind::LeftSquare
+    )
+  }
 
-        (first, rest)
-      }
+  fn pattern_list(&mut self, opening: TokenIdx) -> Pattern {
+    let mut list = PatternList {
+      opening,
+      variables: ThinVec::new(),
+      rest: None,
+      closing: None,
     };
 
-    let closing = self.expect(TokenKind::RightSquare);
-    Pattern::List(PatternList {
-      opening,
-      first: first.map(|token| Variable { token }),
-      rest: rest.map(|token| Variable { token }),
-      closing,
-    })
+    loop {
+      if self.current_kind() == TokenKind::RightSquare {
+        break;
+      }
+
+      if self.is_nested_pattern() {
+        self.add_error(ParseError::NestedPattern(self.current_token()));
+        self.resync(TokenKind::RightSquare);
+        break;
+      }
+
+      if self.matches(TokenKind::DotDot) {
+        let rest = self.expect(TokenKind::Identifier);
+        list.rest = rest.map(|token| Variable { token });
+        _ = self.matches(TokenKind::Comma); // allow optional comma after rest
+        break;
+      }
+
+      if let Some(token) = self.expect(TokenKind::Identifier) {
+        list.variables.push(Variable { token });
+      }
+      if !self.matches(TokenKind::Comma) {
+        break;
+      }
+    }
+
+    self.resync_if_error(TokenKind::RightSquare);
+    list.closing = self.expect(TokenKind::RightSquare);
+    Pattern::List(list)
   }
 
   fn pattern_range(&mut self, start: Option<Literal>, dots: TokenIdx) -> Pattern {

@@ -754,6 +754,82 @@ fn match_expression() {
   assert_variable!(guards; g, 12.0);
   assert_variable!(guards; h, 3.0);
 
+  let option_patterns = run(indoc! {"
+    from option import { None, Some }
+
+    /// matches options properly and clears up properly
+    let matchFunction = x => {
+      let a = 1
+      let b = match x
+        | Some(_) -> 5
+        | None -> 10
+        | _ -> 100
+      let c = 2
+      a + b + c
+    }
+    let a = matchFunction(None)
+    let b = matchFunction(Some(5))
+    let c = matchFunction(false)
+    let d = matchFunction(-55)
+    let e = matchFunction('a string')
+
+    /// some variable is matched properly
+    let matchFunction = x => {
+      let a = 1
+      let b = match x
+        | Some(x) -> x
+        | _ -> 100
+      let c = 2
+      a + b + c
+    }
+    let f = matchFunction(Some(0))
+    let g = matchFunction(Some(1))
+    let h = matchFunction(Some(7))
+  "});
+  assert_variable!(option_patterns; a, 13.0);
+  assert_variable!(option_patterns; b, 8.0);
+  assert_variable!(option_patterns; c, 103.0);
+  assert_variable!(option_patterns; d, 103.0);
+  assert_variable!(option_patterns; e, 103.0);
+  assert_variable!(option_patterns; f, 3.0);
+  assert_variable!(option_patterns; g, 4.0);
+  assert_variable!(option_patterns; h, 10.0);
+
+  let option_pattern_guard = run(indoc! {"
+    from option import { None, Some }
+
+    let matchFunction = x => {
+      let a = 1
+      let b = match x
+        | Some(_) if false -> 5
+        | None if false -> 10
+        | _ -> 100
+      let c = 2
+      a + b + c
+    }
+    let a = matchFunction(None)
+    let b = matchFunction(Some(5))
+    let c = matchFunction(false)
+    let d = matchFunction(-55)
+  "});
+  assert_variable!(option_pattern_guard; a, 103.0);
+  assert_variable!(option_pattern_guard; b, 103.0);
+  assert_variable!(option_pattern_guard; c, 103.0);
+  assert_variable!(option_pattern_guard; d, 103.0);
+
+  let fibonnacci = run(indoc! {"
+    let fibonnacciMatch = n => match n
+      | ..2 -> 1
+      | n -> fibonnacciMatch(n - 1) + fibonnacciMatch(n - 2)
+    let a = fibonnacciMatch(0)
+    let b = fibonnacciMatch(6)
+  "});
+  assert_variable!(fibonnacci; a, 1.0);
+  assert_variable!(fibonnacci; b, 8.0);
+}
+
+#[test]
+fn match_expression_list_patterns() {
   let mut list_patterns = run(indoc! {"
     // checks that basic lists match properly, non-lists are regected,
     // and that the stack is maintained properly
@@ -852,78 +928,33 @@ fn match_expression() {
   assert_variable!(list_pattern_guards; j, 9.0);
   assert_variable!(list_pattern_guards; k, 9.0);
 
-  let option_patterns = run(indoc! {"
-    from option import { None, Some }
-
-    /// matches options properly and clears up properly
-    let matchFunction = x => {
-      let a = 1
+  let longer_list_patterns = run(indoc! {"
+    let func = x => {
+      let a = 10
       let b = match x
-        | Some(_) -> 5
-        | None -> 10
-        | _ -> 100
-      let c = 2
+        | [x, y, z, w, .._] -> x + y + z + w
+        | [x, y, z, .._] -> x + y + z
+        | [x, y, .._] -> x + y
+        | [x, .._] -> x
+        | [] -> 0
+      let c = 100
       a + b + c
     }
-    let a = matchFunction(None)
-    let b = matchFunction(Some(5))
-    let c = matchFunction(false)
-    let d = matchFunction(-55)
-    let e = matchFunction('a string')
-
-    /// some variable is matched properly
-    let matchFunction = x => {
-      let a = 1
-      let b = match x
-        | Some(x) -> x
-        | _ -> 100
-      let c = 2
-      a + b + c
-    }
-    let f = matchFunction(Some(0))
-    let g = matchFunction(Some(1))
-    let h = matchFunction(Some(7))
+    let a = func([])
+    let b = func([1])
+    let c = func([1, 2])
+    let d = func([1, 2, 1])
+    let e = func([1, 2, 3, 4])
+    let f = func([1, 1, 1, 1, 1])
+    let g = func([1, 1, 1, 1, 1, 1])
   "});
-  assert_variable!(option_patterns; a, 13.0);
-  assert_variable!(option_patterns; b, 8.0);
-  assert_variable!(option_patterns; c, 103.0);
-  assert_variable!(option_patterns; d, 103.0);
-  assert_variable!(option_patterns; e, 103.0);
-  assert_variable!(option_patterns; f, 3.0);
-  assert_variable!(option_patterns; g, 4.0);
-  assert_variable!(option_patterns; h, 10.0);
-
-  let option_pattern_guard = run(indoc! {"
-    from option import { None, Some }
-
-    let matchFunction = x => {
-      let a = 1
-      let b = match x
-        | Some(_) if false -> 5
-        | None if false -> 10
-        | _ -> 100
-      let c = 2
-      a + b + c
-    }
-    let a = matchFunction(None)
-    let b = matchFunction(Some(5))
-    let c = matchFunction(false)
-    let d = matchFunction(-55)
-  "});
-  assert_variable!(option_pattern_guard; a, 103.0);
-  assert_variable!(option_pattern_guard; b, 103.0);
-  assert_variable!(option_pattern_guard; c, 103.0);
-  assert_variable!(option_pattern_guard; d, 103.0);
-
-  let fibonnacci = run(indoc! {"
-    let fibonnacciMatch = n => match n
-      | ..2 -> 1
-      | n -> fibonnacciMatch(n - 1) + fibonnacciMatch(n - 2)
-    let a = fibonnacciMatch(0)
-    let b = fibonnacciMatch(6)
-  "});
-  assert_variable!(fibonnacci; a, 1.0);
-  assert_variable!(fibonnacci; b, 8.0);
+  assert_variable!(longer_list_patterns; a, 110.0);
+  assert_variable!(longer_list_patterns; b, 111.0);
+  assert_variable!(longer_list_patterns; c, 113.0);
+  assert_variable!(longer_list_patterns; d, 114.0);
+  assert_variable!(longer_list_patterns; e, 120.0);
+  assert_variable!(longer_list_patterns; f, 114.0);
+  assert_variable!(longer_list_patterns; g, 114.0);
 
   let sum = run(indoc! {"
     let sum = list => match list

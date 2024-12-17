@@ -358,15 +358,26 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for PatternList {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     f.concat([
       IR::Text("["),
-      match (self.first(ast), self.rest(ast)) {
-        (Some(first), Some(rest)) => f.concat([
-          IR::Text(first.name(ast)),
-          IR::Text(", .."),
-          IR::Text(rest.name(ast)),
-        ]),
-        (Some(first), None) => IR::Text(first.name(ast)),
-        (None, Some(rest)) => f.concat([IR::Text(".."), IR::Text(rest.name(ast))]),
-        (None, None) => IR::Empty,
+      f.concat_iterator(
+        (self.variables(ast).iter().enumerate()).map(|(index, variable)| {
+          if index > 0 {
+            f.concat([IR::Text(", "), IR::Text(variable.name(ast))])
+          } else {
+            IR::Text(variable.name(ast))
+          }
+        }),
+      ),
+      if let Some(rest) = self.rest(ast) {
+        f.concat([
+          if self.variables(ast).is_empty() {
+            IR::Text("..")
+          } else {
+            IR::Text(", ..")
+          },
+          rest.format(f, ast),
+        ])
+      } else {
+        IR::Empty
       },
       IR::Text("]"),
     ])

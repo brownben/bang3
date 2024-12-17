@@ -634,7 +634,7 @@ trait CompilePattern<'s> {
   ) -> Result<(), CompileError>;
 
   /// How many variables will be bound if this pattern is fully matched?
-  fn bound_vars_count(&self, ast: &AST) -> u8;
+  fn bound_vars_count(&self, ast: &AST) -> usize;
 }
 
 impl<'s> CompilePattern<'s> for Pattern {
@@ -654,7 +654,7 @@ impl<'s> CompilePattern<'s> for Pattern {
     }
   }
 
-  fn bound_vars_count(&self, ast: &AST) -> u8 {
+  fn bound_vars_count(&self, ast: &AST) -> usize {
     match self {
       Self::Identifier(variable) => variable.bound_vars_count(ast),
       Self::Literal(literal) => literal.bound_vars_count(ast),
@@ -678,7 +678,7 @@ impl<'s> CompilePattern<'s> for Variable {
     Ok(())
   }
 
-  fn bound_vars_count(&self, _: &AST) -> u8 {
+  fn bound_vars_count(&self, _: &AST) -> usize {
     1
   }
 }
@@ -699,7 +699,7 @@ impl<'s> CompilePattern<'s> for Literal {
     Ok(())
   }
 
-  fn bound_vars_count(&self, _: &AST) -> u8 {
+  fn bound_vars_count(&self, _: &AST) -> usize {
     0
   }
 }
@@ -711,18 +711,20 @@ impl<'s> CompilePattern<'s> for PatternList {
     case_end_jumps: &mut Vec<Jump>,
   ) -> Result<(), CompileError> {
     let span = self.span(ast);
+    #[expect(clippy::cast_precision_loss)]
+    let variable_count = self.variables(ast).len() as f64;
 
-    match (self.first(ast), self.rest(ast)) {
+    match (variable_count, self.rest(ast)) {
       // Empty List
-      (None, None) => {
+      (0.0, None) => {
         compiler.chunk.add_opcode(OpCode::ListLength, span);
         compiler.chunk.add_opcode(OpCode::Not, span);
 
         case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, span));
         compiler.chunk.add_opcode(OpCode::Pop, span);
       }
-      // Full List
-      (None, Some(rest)) => {
+      // No variables, then a rest
+      (0.0, Some(rest)) => {
         compiler.chunk.add_opcode(OpCode::ListLength, span);
         compiler.chunk.add_number(0.0, span);
         compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
@@ -733,44 +735,48 @@ impl<'s> CompilePattern<'s> for PatternList {
         (compiler.chunk).add_opcode(OpCode::Peek, span);
         compiler.define_variable(rest.name(ast), span)?;
       }
-      // List with a single item
-      (Some(first), None) => {
+      // Some number of variables, and then the rest
+      (variable_count, Some(rest)) => {
         compiler.chunk.add_opcode(OpCode::ListLength, span);
-        compiler.chunk.add_number(1.0, span);
-        compiler.chunk.add_opcode(OpCode::Equals, span);
-
-        case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, span));
-        compiler.chunk.add_opcode(OpCode::Pop, span);
-
-        (compiler.chunk).add_opcode(OpCode::ListHeadTail, span);
-        compiler.chunk.add_opcode(OpCode::Pop, span);
-        compiler.define_variable(first.name(ast), span)?;
-      }
-      // A list with at least one item
-      (Some(first), Some(rest)) => {
-        compiler.chunk.add_opcode(OpCode::ListLength, span);
-        compiler.chunk.add_number(1.0, span);
+        compiler.chunk.add_number(variable_count, span);
         compiler.chunk.add_opcode(OpCode::GreaterEqual, span);
 
         case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, span));
         compiler.chunk.add_opcode(OpCode::Pop, span);
 
-        (compiler.chunk).add_opcode(OpCode::ListHeadTail, span);
-        compiler.define_variable(first.name(ast), span)?;
-        compiler.define_variable(rest.name(ast), span)?;
+        compiler.chunk.add_opcode(OpCode::Peek, span);
+        for variable in self.variables(ast) {
+          (compiler.chunk).add_opcode(OpCode::ListHeadTail, variable.span(ast));
+          compiler.define_variable(variable.name(ast), variable.span(ast))?;
+        }
+        compiler.define_variable(rest.name(ast), rest.span(ast))?;
+      }
+      // An exact number of variables
+      (variable_count, None) => {
+        compiler.chunk.add_opcode(OpCode::ListLength, span);
+        compiler.chunk.add_number(variable_count, span);
+        compiler.chunk.add_opcode(OpCode::Equals, span);
+
+        case_end_jumps.push(compiler.add_jump(OpCode::JumpIfFalse, span));
+        compiler.chunk.add_opcode(OpCode::Pop, span);
+
+        compiler.chunk.add_opcode(OpCode::Peek, span);
+        for variable in self.variables(ast) {
+          (compiler.chunk).add_opcode(OpCode::ListHeadTail, variable.span(ast));
+          compiler.define_variable(variable.name(ast), variable.span(ast))?;
+        }
+        compiler.chunk.add_opcode(OpCode::Pop, span);
       }
     }
 
     Ok(())
   }
 
-  fn bound_vars_count(&self, ast: &AST) -> u8 {
-    match (self.first(ast), self.rest(ast)) {
-      (None, None) => 0,
-      (None, Some(_)) => 1,
-      (Some(_), None) => 1,
-      (Some(_), Some(_)) => 2,
-    }
+  fn bound_vars_count(&self, ast: &AST) -> usize {
+    let variables = self.variables(ast).len();
+    let rest = usize::from(self.rest(ast).is_some());
+
+    variables + rest
   }
 }
 impl<'s> CompilePattern<'s> for PatternRange {
@@ -814,7 +820,7 @@ impl<'s> CompilePattern<'s> for PatternRange {
     Ok(())
   }
 
-  fn bound_vars_count(&self, _: &AST) -> u8 {
+  fn bound_vars_count(&self, _: &AST) -> usize {
     0
   }
 }
@@ -849,7 +855,7 @@ impl<'s> CompilePattern<'s> for PatternOption {
     Ok(())
   }
 
-  fn bound_vars_count(&self, _: &AST) -> u8 {
+  fn bound_vars_count(&self, _: &AST) -> usize {
     match self.kind {
       Some(()) => 1,
       None => 0,

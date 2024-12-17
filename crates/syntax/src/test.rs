@@ -513,9 +513,9 @@ fn match_() {
     │     │  ╰─ Variable (y)
     │     ├─ Pattern ─ None
     │     │  ╰─ Number (2)
-    │     ├─ Pattern ─ [true]
+    │     ├─ Pattern ─ []
     │     │  ╰─ Number (3)
-    │     ╰─ Pattern ─ ['hello']
+    │     ╰─ Pattern ─ []
     │        ╰─ Number (4)
   "};
   assert_eq!(nested_pattern.to_string(), expected);
@@ -601,6 +601,9 @@ fn pattern_lists() {
     | [..x] -> 3
     | [x, ..y,] -> 4
     | [x,] -> 5
+    | [x, y] -> 6
+    | [x, y, ..z] -> 7
+    | [x, y, z] -> 8
   "});
   let expected = indoc! {"
     ├─ Match
@@ -616,8 +619,14 @@ fn pattern_lists() {
     │     │  ╰─ Number (3)
     │     ├─ Pattern ─ [x, ..y]
     │     │  ╰─ Number (4)
-    │     ╰─ Pattern ─ [x]
-    │        ╰─ Number (5)
+    │     ├─ Pattern ─ [x]
+    │     │  ╰─ Number (5)
+    │     ├─ Pattern ─ [x, y]
+    │     │  ╰─ Number (6)
+    │     ├─ Pattern ─ [x, y, ..z]
+    │     │  ╰─ Number (7)
+    │     ╰─ Pattern ─ [x, y, z]
+    │        ╰─ Number (8)
   "};
   assert!(ast.is_ok());
   assert_eq!(ast.to_string(), expected);
@@ -626,12 +635,8 @@ fn pattern_lists() {
   assert!(parse(empty_no_closing_bracket).is_err());
   let identifier_no_closing = "match x | [x -> 3";
   assert!(parse(identifier_no_closing).is_err());
-  let more_than_one_identifier = "match x | [x, y, z] -> 3";
-  assert!(parse(more_than_one_identifier).is_err());
   let nested_literal = "match x | [3] -> 3";
   assert!(parse(nested_literal).is_err());
-  let two_vars_no_rest = "match x | [x, y] -> 3";
-  assert!(parse(two_vars_no_rest).is_err());
 }
 
 #[test]

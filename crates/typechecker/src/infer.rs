@@ -650,8 +650,8 @@ impl InferType for Match {
 
           check_pattern(t, list_type, value_type, list.span(ast));
 
-          if let Some(first) = list.first(ast) {
-            (t.env).define_variable(first.name(ast), first.span(ast), generic, None);
+          for variable in list.variables(ast) {
+            (t.env).define_variable(variable.name(ast), variable.span(ast), generic, None);
           }
           if let Some(rest) = list.rest(ast) {
             (t.env).define_variable(rest.name(ast), rest.span(ast), value_type, None);

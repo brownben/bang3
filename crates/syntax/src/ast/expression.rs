@@ -566,14 +566,14 @@ impl PatternRange {
 #[derive(Debug)]
 pub struct PatternList {
   pub(crate) opening: TokenIdx,
-  pub(crate) first: Option<Variable>,
+  pub(crate) variables: ThinVec<Variable>,
   pub(crate) rest: Option<Variable>,
   pub(crate) closing: Option<TokenIdx>,
 }
 impl PatternList {
   /// Match the first item of the list to this variable
-  pub fn first<'a>(&'a self, _ast: &'a AST) -> Option<&'a Variable> {
-    self.first.as_ref()
+  pub fn variables(&self, _ast: &AST) -> &[Variable] {
+    self.variables.as_slice()
   }
   /// The rest of the list is matched to this variable
   pub fn rest<'a>(&'a self, _ast: &'a AST) -> Option<&'a Variable> {
@@ -588,7 +588,7 @@ impl PatternList {
       opening.merge(ast[end].into())
     } else if let Some(rest) = &self.rest {
       opening.merge(rest.span(ast))
-    } else if let Some(first) = &self.first {
+    } else if let Some(first) = &self.variables(ast).last() {
       opening.merge(first.span(ast))
     } else {
       opening

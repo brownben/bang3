@@ -499,6 +499,8 @@ fn match_() {
         length(xs) * hello
       }
       | [..whole] -> maths::NAN
+      | [x, y] -> 77
+      | [x, y, x, ..alphabet] -> None
   "};
   let match_lists_misformatted = indoc! {"
     match x
@@ -510,6 +512,8 @@ fn match_() {
         length(xs ) * hello
       }
       |  [..whole   ]          -> maths::NAN
+            | [x  , y   ,] ->   77
+      | [x  ,    y,    x, .. alphabet]   -> None
   "};
   assert_format!(match_lists, match_lists, 80);
   assert_format!(match_lists_misformatted, match_lists, 80);

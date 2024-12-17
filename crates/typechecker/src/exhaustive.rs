@@ -6,7 +6,7 @@ use bang_syntax::{
   AST, Span,
   ast::expression::{Literal, LiteralValue, MatchArm, Pattern},
 };
-use std::{cmp, fmt};
+use std::{cmp, collections::BTreeSet, fmt};
 
 fn unused_arms_errors(unused_arms: impl IntoIterator<Item = Span>) -> Vec<TypeError> {
   unused_arms
@@ -242,40 +242,27 @@ fn list<'a>(
   ast: &AST,
   match_span: Span,
 ) -> Vec<TypeError> {
-  let (mut empty, mut one, mut infinite) = (false, false, false);
   let mut unused_arms = vec![];
+
+  let mut min_length = usize::MAX;
+  let mut lengths_covered = BTreeSet::new();
 
   for arm in cases {
     match &arm.pattern {
-      Pattern::Identifier(_) if !empty || !infinite || !one => {
+      Pattern::Identifier(_) if min_length > 0 => {
         if arm.guard(ast).is_none() {
-          empty = true;
-          one = true;
-          infinite = true;
+          min_length = 0;
         }
       }
-      Pattern::List(list) => match (list.first(ast), list.rest(ast)) {
-        (None, None) if !empty => {
+      Pattern::List(list) => match (list.variables(ast).len(), list.rest(ast)) {
+        (num, None) if !lengths_covered.contains(&num) && num < min_length => {
           if arm.guard(ast).is_none() {
-            empty = true;
+            lengths_covered.insert(num);
           }
         }
-        (None, Some(_)) if !empty || !infinite || !one => {
+        (num, Some(_)) if num < min_length => {
           if arm.guard(ast).is_none() {
-            empty = true;
-            one = true;
-            infinite = true;
-          }
-        }
-        (Some(_), None) if !one => {
-          if arm.guard(ast).is_none() {
-            one = true;
-          }
-        }
-        (Some(_), Some(_)) if !infinite => {
-          if arm.guard(ast).is_none() {
-            one = true;
-            infinite = true;
+            min_length = num;
           }
         }
         _ => unused_arms.push(arm.span(ast)),
@@ -284,44 +271,41 @@ fn list<'a>(
     }
   }
 
-  if empty && one && infinite {
-    return if unused_arms.is_empty() {
-      Vec::new()
-    } else {
-      unused_arms_errors(unused_arms)
-    };
-  }
-
   let mut missing_cases = Vec::new();
-
-  if !empty {
-    missing_cases.push(MissingListPattern::Empty.into_error(match_span));
+  if min_length == usize::MAX {
+    missing_cases.push(MissingListPattern::Infinite.into_error(match_span));
+  } else {
+    for size in 0..min_length {
+      if !lengths_covered.contains(&size) {
+        missing_cases.push(MissingListPattern::FixedSize(size).into_error(match_span));
+      }
+    }
   }
-  if one && !infinite {
-    missing_cases.push(MissingListPattern::LongerThanOne.into_error(match_span));
-  } else if !infinite {
-    missing_cases.push(MissingListPattern::NonEmpty.into_error(match_span));
-  }
 
-  missing_cases
+  if unused_arms.is_empty() && missing_cases.is_empty() {
+    Vec::new()
+  } else if missing_cases.is_empty() {
+    unused_arms_errors(unused_arms)
+  } else {
+    missing_cases
+  }
 }
 #[derive(Debug, Clone)]
 pub enum MissingListPattern {
-  Empty,
-  LongerThanOne,
-  NonEmpty,
+  FixedSize(usize),
+  Infinite,
 }
 impl fmt::Display for MissingListPattern {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Self::Empty => {
+      Self::FixedSize(0) => {
         write!(f, "the arms don't cover an empty list")
       }
-      Self::NonEmpty => {
-        write!(f, "the arms don't cover a list with elements")
+      Self::FixedSize(size) => {
+        write!(f, "the arms don't cover a list with {size} elements")
       }
-      Self::LongerThanOne => {
-        write!(f, "the arms don't cover a list longer than one item")
+      Self::Infinite => {
+        write!(f, "the arms don't cover an infinite list")
       }
     }
   }

@@ -981,6 +981,52 @@ mod exhaustive {
 
     let arms_after_catch_all = "match 4 | _ -> 1 | [] -> 3 | [.._] -> 5";
     assert!(has_type_error(arms_after_catch_all));
+
+    let counting_up_list_lengths = indoc! {"
+      match []
+        | [] -> 0
+        | [_x] -> 1
+        | [_x, _y] -> 2
+        | [_x, _y, _z] -> 3
+        | [_x, _y, _z, _w] -> 4
+        | [.._] -> 5
+    "};
+    assert_eq!(synthesize(counting_up_list_lengths), "number");
+
+    let count_down_with_rest = indoc! {"
+      match []
+        | [_x, _y, _z, _w, .._] -> 4
+        | [_x, _y, _z, .._] -> 3
+        | [_x, _y, .._] -> 2
+        | [_x, .._] -> 1
+        | [] -> 0
+    "};
+    assert_eq!(synthesize(count_down_with_rest), "number");
+
+    let specific_length_after_catch_all = indoc! {"
+      match []
+        | [_x, _y, .._] -> 2
+        | [_x, _y, _z] -> 1
+        | [.._] -> 0
+    "};
+    assert!(has_type_error(specific_length_after_catch_all));
+    let no_catch_all = indoc! {"
+      match []
+        | [] -> 0
+        | [_x] -> 1
+        | [_x, _y] -> 2
+        | [_x, _y, _z] -> 3
+        | [_x, _y, _z, _w] -> 4
+    "};
+    assert!(has_type_error(no_catch_all));
+    let missing_specific_length = indoc! {"
+      match []
+        | [] -> 0
+        | [_x] -> 1
+        | [_x, _y, _z] -> 3
+        | [_x, _y, _z, .._] -> 4
+    "};
+    assert!(has_type_error(missing_specific_length));
   }
 
   #[test]

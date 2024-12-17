@@ -621,7 +621,7 @@ impl<'context> VM<'context> {
           self.push(length.into());
         }
         OpCode::ListHeadTail => {
-          let list = self.peek();
+          let list = self.pop();
 
           if !list.is_list() {
             break Some(ErrorKind::TypeError {
