@@ -336,3 +336,36 @@ fn extra_arguments() {
   "};
   assert_eq!(output, expected);
 }
+
+#[test]
+fn nested_pattern() {
+  let file = indoc! {"
+    match x
+      | Some(0) -> 0
+      | Some('hello') -> 1
+      | Some(y) -> y
+      | Some(..2) -> 2
+  "};
+  let output = run_stderr(file);
+  let expected = indoc! {"
+    ✕ Error: Nested Pattern
+    nested patterns are not supported yet
+
+        ╭─[STDIN:2]
+      2 │   | Some(0) -> 0
+    ────╯
+    ✕ Error: Nested Pattern
+    nested patterns are not supported yet
+
+        ╭─[STDIN:3]
+      3 │   | Some('hello') -> 1
+    ────╯
+    ✕ Error: Nested Pattern
+    nested patterns are not supported yet
+
+        ╭─[STDIN:5]
+      5 │   | Some(..2) -> 2
+    ────╯
+  "};
+  assert_eq!(output, expected);
+}

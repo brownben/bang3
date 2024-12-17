@@ -490,6 +490,35 @@ fn match_() {
     ├─ Comment (comment)
   "};
   assert_eq!(ast, expected);
+
+  let nested_pattern = parse(indoc! {"
+    match x
+      | Some(0) -> 0
+      | Some('hello') -> 1
+      | Some(y) -> y
+      | Some(..2) -> 2
+      | [true] -> 3
+      | ['hello'] -> 4
+  "});
+  assert!(nested_pattern.is_err());
+  let expected = indoc! {"
+    ├─ Match
+    │  ├─ Variable (x)
+    │  ╰─ Cases:
+    │     ├─ Pattern ─ None
+    │     │  ╰─ Number (0)
+    │     ├─ Pattern ─ None
+    │     │  ╰─ Number (1)
+    │     ├─ Pattern ─ Some(y)
+    │     │  ╰─ Variable (y)
+    │     ├─ Pattern ─ None
+    │     │  ╰─ Number (2)
+    │     ├─ Pattern ─ [true]
+    │     │  ╰─ Number (3)
+    │     ╰─ Pattern ─ ['hello']
+    │        ╰─ Number (4)
+  "};
+  assert_eq!(nested_pattern.to_string(), expected);
 }
 
 #[test]

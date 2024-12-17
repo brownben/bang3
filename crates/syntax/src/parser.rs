@@ -584,11 +584,22 @@ impl Parser<'_> {
       "None" => Pattern::Option(PatternOption::none(token)),
       "Some" => {
         let _opening_paren = self.expect(TokenKind::LeftParen);
-        let variable = if self.current_kind() == TokenKind::RightParen {
-          self.add_error(ParseError::MissingIdentifier(self.current_token()));
-          None
-        } else {
-          self.expect(TokenKind::Identifier)
+        let variable = match self.current_kind() {
+          TokenKind::RightParen => {
+            self.add_error(ParseError::MissingIdentifier(self.current_token()));
+            None
+          }
+          TokenKind::String
+          | TokenKind::Number
+          | TokenKind::True
+          | TokenKind::False
+          | TokenKind::DotDot
+          | TokenKind::LeftSquare => {
+            self.add_error(ParseError::NestedPattern(self.current_token()));
+            self.resync(TokenKind::RightParen);
+            None
+          }
+          _ => self.expect(TokenKind::Identifier),
         };
         let end = self.expect(TokenKind::RightParen);
 
@@ -612,6 +623,16 @@ impl Parser<'_> {
         _ = self.matches(TokenKind::Comma);
 
         (None, rest)
+      }
+      TokenKind::String
+      | TokenKind::Number
+      | TokenKind::True
+      | TokenKind::False
+      | TokenKind::LeftSquare => {
+        let first = self.current_token_id();
+        self.add_error(ParseError::NestedPattern(self.current_token()));
+        self.resync(TokenKind::RightSquare);
+        (Some(first), None)
       }
       _ => {
         let first = self.expect(TokenKind::Identifier);
@@ -995,6 +1016,8 @@ pub enum ParseError {
   KeywordAsImportItem(Token),
   /// Function calls only accept one argument
   MultipleFunctionArgs(Span),
+  /// Nested Patterns not supported
+  NestedPattern(Token),
 }
 impl ParseError {
   /// The title of the error message
@@ -1017,6 +1040,7 @@ impl ParseError {
       Self::NoSingleEqualOperator { .. } => "No Single Equal Operator".into(),
       Self::KeywordAsImportItem(_) => "Keyword as Import Item".into(),
       Self::MultipleFunctionArgs(_) => "Multiple Function Arguments".into(),
+      Self::NestedPattern(_) => "Nested Pattern".into(),
     }
   }
 
@@ -1064,6 +1088,9 @@ impl ParseError {
       Self::MultipleFunctionArgs(_) => {
         "function calls only take a single argument".into()
       },
+      Self::NestedPattern(_) => {
+        "nested patterns are not supported yet".into()
+      },
     }
   }
 
@@ -1086,22 +1113,23 @@ impl ParseError {
   /// The location of the error
   pub fn span(&self) -> Span {
     match self {
-      ParseError::Expected { recieved, .. } => recieved.into(),
-      ParseError::ExpectedExpression(token) => token.into(),
-      ParseError::ExpectedPattern(token) => token.into(),
-      ParseError::ExpectedPatternRangeEnd(token) => token.into(),
-      ParseError::ExpectedImportItem(token) => token.into(),
-      ParseError::ExpectedType(token) => token.into(),
-      ParseError::UnknownCharacter(token) => token.into(),
-      ParseError::MissingIdentifier(token) => token.into(),
-      ParseError::MissingModuleName(token) => token.into(),
-      ParseError::MissingPattern(token) => token.into(),
-      ParseError::UnterminatedString(token) => token.into(),
-      ParseError::BlockMustEndWithExpression(token) => token.into(),
-      ParseError::ReturnOutsideFunction(token) => token.into(),
-      ParseError::NoSingleEqualOperator { token, .. } => token.into(),
-      ParseError::KeywordAsImportItem(token) => token.into(),
-      ParseError::MultipleFunctionArgs(span) => *span,
+      Self::Expected { recieved, .. } => recieved.into(),
+      Self::ExpectedExpression(token) => token.into(),
+      Self::ExpectedPattern(token) => token.into(),
+      Self::ExpectedPatternRangeEnd(token) => token.into(),
+      Self::ExpectedImportItem(token) => token.into(),
+      Self::ExpectedType(token) => token.into(),
+      Self::UnknownCharacter(token) => token.into(),
+      Self::MissingIdentifier(token) => token.into(),
+      Self::MissingModuleName(token) => token.into(),
+      Self::MissingPattern(token) => token.into(),
+      Self::UnterminatedString(token) => token.into(),
+      Self::BlockMustEndWithExpression(token) => token.into(),
+      Self::ReturnOutsideFunction(token) => token.into(),
+      Self::NoSingleEqualOperator { token, .. } => token.into(),
+      Self::KeywordAsImportItem(token) => token.into(),
+      Self::MultipleFunctionArgs(span) => *span,
+      Self::NestedPattern(span) => span.into(),
     }
   }
 
