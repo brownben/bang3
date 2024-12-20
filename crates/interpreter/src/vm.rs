@@ -19,6 +19,17 @@ struct CallFrame {
   upvalues: Option<GcList<Value>>,
   native_return: bool,
 }
+impl Default for CallFrame {
+  fn default() -> Self {
+    Self {
+      ip: 0,
+      offset: 0,
+      chunk: ptr::null(),
+      upvalues: None,
+      native_return: false,
+    }
+  }
+}
 
 /// A virtual machine to execute compiled bytecode
 #[derive(Debug)]
@@ -108,8 +119,12 @@ impl<'context> VM<'context> {
     Value::from_object(*string, object::STRING_TYPE_ID)
   }
 
+  /// Gets the [`TypeDescriptor`] for a [`Value`]
+  ///
+  /// SAFETY: the [`Value`] must be an object, and be from this [`VM`]
   #[inline]
-  pub(crate) fn get_type_descriptor(&self, value: Value) -> &TypeDescriptor {
+  #[must_use]
+  pub fn get_type_descriptor(&self, value: Value) -> &TypeDescriptor {
     debug_assert!(value.is_object());
     let type_id = value.object_type();
 
@@ -119,51 +134,17 @@ impl<'context> VM<'context> {
 
   /// Temporarily stash a value to the stack.
   ///
-  /// Allows Native Methods to ensure values are not collected when executing other code.
-  pub fn stash_value(&mut self, value: Value) -> StashedValue {
-    self.stack.push(value);
-    StashedValue
+  /// Allows native functions to ensure values are not collected when executing other code.
+  ///
+  /// # Errors
+  /// Returns an error if the stack is full
+  pub fn stash_value(&mut self, value: Value) -> Result<StashedValue, ErrorKind> {
+    push!(return, self.stack, value);
+    Ok(StashedValue)
   }
   /// Gets a stashed value from the stack.
   pub fn pop_stashed_value(&mut self, _value: StashedValue) -> Value {
     self.stack.pop()
-  }
-
-  #[inline]
-  fn push_frame(
-    &mut self,
-    ip: usize,
-    offset: usize,
-    chunk: *const Chunk,
-    upvalues: Option<GcList<Value>>,
-  ) {
-    self.frames.push(CallFrame {
-      ip,
-      offset,
-      chunk,
-      upvalues,
-      native_return: false,
-    });
-  }
-  #[inline]
-  fn push_frame_from_native(&mut self, chunk: *const Chunk, upvalues: Option<GcList<Value>>) {
-    self.frames.push(CallFrame {
-      ip: 0,
-      offset: self.stack.len(),
-      chunk,
-      upvalues,
-      native_return: true,
-    });
-  }
-  #[inline]
-  fn push_native_frame(&mut self, upvalues: Option<GcList<Value>>, native_return: bool) {
-    self.frames.push(CallFrame {
-      ip: 0,
-      offset: self.stack.len() - 1,
-      chunk: ptr::null(),
-      upvalues,
-      native_return,
-    });
   }
 
   #[inline]
@@ -270,11 +251,16 @@ impl<'context> VM<'context> {
   /// # Errors
   /// Returns an error if the given value is not callable, or if a runtime error is
   /// encountered during the bytecode execution
-  pub(crate) fn call(&mut self, func: Value, argument: Value) -> Result<Option<Value>, ErrorKind> {
+  pub fn call(&mut self, func: Value, argument: Value) -> Result<Option<Value>, ErrorKind> {
     if func.is_constant_function() {
-      self.stack.push(func);
-      self.push_frame_from_native(func.as_function(&self.heap), None);
-      self.stack.push(argument);
+      push!(return, self.stack, func);
+      push!(return, self.frames, CallFrame {
+        offset: self.stack.len(),
+        chunk: func.as_function(&self.heap),
+        native_return: true,
+        ..CallFrame::default()
+      });
+      push!(return, self.stack, argument);
 
       let chunk = unsafe { &*func.as_function(&self.heap).as_ptr() };
       return self.main_loop::<false>(chunk).map_err(|error| error.kind);
@@ -282,19 +268,30 @@ impl<'context> VM<'context> {
 
     if func.is_object() {
       if func.is_object_type(object::CLOSURE_TYPE_ID) {
-        self.stack.push(func);
+        push!(return, self.stack, func);
         let closure = &self.heap[func.as_object::<Closure>()];
-        self.push_frame_from_native(closure.function(), Some(closure.upvalues));
-        self.stack.push(argument);
+        push!(return, self.frames, CallFrame {
+          offset: self.stack.len(),
+          chunk: closure.function(),
+          upvalues: Some(closure.upvalues),
+          native_return: true,
+          ..CallFrame::default()
+        });
+        push!(return, self.stack, argument);
 
         let chunk = unsafe { &*self.heap[func.as_object::<Closure>()].function().as_ptr() };
         return self.main_loop::<false>(chunk).map_err(|error| error.kind);
       }
 
       if let Some(native_function) = self.get_type_descriptor(func).call {
-        self.stack.push(func);
-        self.stack.push(argument);
-        self.push_native_frame(None, true);
+        push!(return, self.stack, func);
+        push!(return, self.stack, argument);
+        push!(return, self.frames, CallFrame {
+          offset: self.stack.len() - 1,
+          upvalues: None,
+          native_return: true,
+          ..CallFrame::default()
+        });
         let result = native_function(self, func.as_object(), argument)?;
         _ = self.frames.pop();
         let (_func, _argument) = (self.stack.pop(), self.stack.pop());
@@ -330,7 +327,7 @@ impl<'context> VM<'context> {
             ConstantValue::String(string) => self.allocate_string(string),
             ConstantValue::Function(function) => Value::from(ptr::from_ref(function)),
           };
-          self.stack.push(value);
+          push!(self.stack, value);
         }
         OpCode::ConstantLong => {
           let constant_position = chunk.get_long_value(ip + 1);
@@ -340,12 +337,12 @@ impl<'context> VM<'context> {
             ConstantValue::String(string) => self.allocate_string(string),
             ConstantValue::Function(function) => Value::from(ptr::from_ref(function)),
           };
-          self.stack.push(value);
+          push!(self.stack, value);
         }
-        OpCode::Number => self.stack.push(chunk.get_number(ip + 1).into()),
-        OpCode::True => self.stack.push(Value::TRUE),
-        OpCode::False => self.stack.push(Value::FALSE),
-        OpCode::Null => self.stack.push(Value::NULL),
+        OpCode::Number => push!(self.stack, chunk.get_number(ip + 1).into()),
+        OpCode::True => push!(self.stack, Value::TRUE),
+        OpCode::False => push!(self.stack, Value::FALSE),
+        OpCode::Null => push!(self.stack, Value::NULL),
 
         // Imports
         OpCode::Import => {
@@ -353,7 +350,7 @@ impl<'context> VM<'context> {
           let item = chunk.get_symbol(chunk.get_value(ip + 2).into()).as_str();
 
           match self.context.import_value(self, module, item) {
-            ImportResult::Value(value) => self.stack.push(value),
+            ImportResult::Value(value) => push!(self.stack, value),
             ImportResult::ModuleNotFound => {
               break Some(ErrorKind::ModuleNotFound {
                 module: module.to_owned(),
@@ -381,7 +378,7 @@ impl<'context> VM<'context> {
 
           if left.is_string() && right.is_string() {
             let new_string = BangString::concatenate(&mut self.heap, left, right);
-            self.stack.push(new_string);
+            push!(self.stack, new_string);
           } else {
             break Some(ErrorKind::TypeErrorBinary {
               expected: "two strings",
@@ -397,14 +394,14 @@ impl<'context> VM<'context> {
           } else {
             self.allocate_string(&value.display(self))
           };
-          self.stack.push(string);
+          push!(self.stack, string);
         }
 
         // Unary Operations
         OpCode::Negate => {
           let value = self.stack.pop();
           if value.is_number() {
-            self.stack.push(Value::from(-value.as_number()));
+            push!(self.stack, Value::from(-value.as_number()));
           } else {
             break Some(ErrorKind::TypeError {
               expected: "number",
@@ -414,17 +411,17 @@ impl<'context> VM<'context> {
         }
         OpCode::Not => {
           let value = self.stack.pop();
-          self.stack.push(value.is_falsy(self).into());
+          push!(self.stack, value.is_falsy(self).into());
         }
 
         // Equalities
         OpCode::Equals => {
           let (right, left) = (self.stack.pop(), self.stack.pop());
-          self.stack.push(self.equals(left, right).into());
+          push!(self.stack, self.equals(left, right).into());
         }
         OpCode::NotEquals => {
           let (right, left) = (self.stack.pop(), self.stack.pop());
-          self.stack.push((!self.equals(left, right)).into());
+          push!(self.stack, (!self.equals(left, right)).into());
         }
 
         // Comparisons
@@ -444,7 +441,7 @@ impl<'context> VM<'context> {
           let name = chunk.get_symbol(chunk.get_value(ip + 1).into());
 
           match self.globals.get(name) {
-            Some(value) => self.stack.push(*value),
+            Some(value) => push!(self.stack, *value),
             None => {
               break Some(ErrorKind::UndefinedVariable {
                 name: name.to_string(),
@@ -455,7 +452,7 @@ impl<'context> VM<'context> {
         OpCode::GetLocal => {
           let slot = chunk.get_value(ip + 1);
           let value = self.stack[offset + usize::from(slot)];
-          self.stack.push(value);
+          push!(self.stack, value);
         }
 
         // Functions
@@ -463,7 +460,13 @@ impl<'context> VM<'context> {
           let callee = self.stack[self.stack.len() - 2];
 
           if callee.is_constant_function() {
-            self.push_frame(ip, offset, chunk, None);
+            push!(self.frames, CallFrame {
+              ip,
+              offset,
+              chunk,
+              upvalues: None,
+              native_return: false,
+            });
 
             ip = 0;
             offset = self.stack.len() - 1;
@@ -472,7 +475,13 @@ impl<'context> VM<'context> {
             continue; // skip the ip increment, as we're jumping to a new chunk
           } else if callee.is_object_type(object::CLOSURE_TYPE_ID) {
             let upvalues = self.heap[callee.as_object::<Closure>()].upvalues;
-            self.push_frame(ip, offset, chunk, Some(upvalues));
+            push!(self.frames, CallFrame {
+              ip,
+              offset,
+              chunk,
+              upvalues: Some(upvalues),
+              native_return: false,
+            });
 
             ip = 0;
             offset = self.stack.len() - 1;
@@ -483,13 +492,16 @@ impl<'context> VM<'context> {
             && let Some(native_function) = self.get_type_descriptor(callee).call
           {
             let argument = self.stack.peek();
-            self.push_native_frame(None, false);
+            push!(self.frames, CallFrame {
+              offset: self.stack.len() - 1,
+              ..CallFrame::default()
+            });
 
             match native_function(self, callee.as_object(), argument) {
               Ok(value) => {
                 _ = self.frames.pop();
                 let (_argument, _callee) = (self.stack.pop(), self.stack.pop());
-                self.stack.push(value);
+                push!(self.stack, value);
               }
               Err(err) => break Some(err),
             }
@@ -509,7 +521,7 @@ impl<'context> VM<'context> {
             return Ok(Some(result));
           }
 
-          self.stack.push(result);
+          push!(self.stack, result);
 
           ip = frame.ip;
           offset = frame.offset;
@@ -523,7 +535,7 @@ impl<'context> VM<'context> {
           let local = &mut self.stack[offset + usize::from(index)];
           let allocated = Value::from_object(self.heap.allocate(*local), object::ALLOCATED_TYPE_ID);
           *local = allocated;
-          self.stack.push(allocated);
+          push!(self.stack, allocated);
         }
         OpCode::Closure => {
           let upvalue_count = chunk.get_value(ip + 1);
@@ -543,21 +555,21 @@ impl<'context> VM<'context> {
             self.heap.get_list_buffer(self.get_last_frame_upvalues())[usize::from(upvalue)];
           let value = self.heap[address.as_object::<Value>()];
 
-          self.stack.push(value);
+          push!(self.stack, value);
         }
         OpCode::GetAllocatedValue => {
           let slot = chunk.get_value(ip + 1);
           let address = self.stack[offset + usize::from(slot)];
           let value = self.heap[address.as_object::<Value>()];
 
-          self.stack.push(value);
+          push!(self.stack, value);
         }
         OpCode::GetAllocatedPointer => {
           let index = chunk.get_value(ip + 1);
           let allocated: Value =
             self.heap.get_list_buffer(self.get_last_frame_upvalues())[usize::from(index)];
 
-          self.stack.push(allocated);
+          push!(self.stack, allocated);
         }
 
         // Lists
@@ -580,7 +592,7 @@ impl<'context> VM<'context> {
             f64::NAN
           };
 
-          self.stack.push(length.into());
+          push!(self.stack, length.into());
         }
         OpCode::ListHeadTail => {
           let list = self.stack.pop();
@@ -596,18 +608,18 @@ impl<'context> VM<'context> {
           let head = *list_items.first().unwrap_or(&Value::NULL);
           let tail = (self.heap).allocate(object::ListView::new(self, list, 1, list_items.len()));
 
-          self.stack.push(head);
+          push!(self.stack, head);
           (self.stack).push(Value::from_object(tail, object::LIST_VIEW_TYPE_ID));
         }
 
         // Options
         OpCode::OptionIsSome => {
           let is_some = self.stack.peek().is_object_type(object::SOME_TYPE_ID);
-          self.stack.push(is_some.into());
+          push!(self.stack, is_some.into());
         }
         OpCode::OptionIsNone => {
           let is_none = self.stack.peek().is_object_type(object::NONE_TYPE_ID);
-          self.stack.push(is_none.into());
+          push!(self.stack, is_none.into());
         }
 
         // VM Operations
@@ -618,11 +630,11 @@ impl<'context> VM<'context> {
           let count = chunk.get_value(ip + 1);
           let value = self.stack.pop();
           self.stack.truncate(self.stack.len() - usize::from(count));
-          self.stack.push(value);
+          push!(self.stack, value);
         }
         OpCode::Peek => {
           let value = self.stack.peek();
-          self.stack.push(value);
+          push!(self.stack, value);
         }
         OpCode::Jump => {
           let jump = chunk.get_long_value(ip + 1);
@@ -803,6 +815,25 @@ impl<T> ops::Deref for Stack<T> {
   }
 }
 
+macro_rules! push {
+  (return, $stack:expr, $value:expr) => {{
+    if $stack.len() == $stack.capacity {
+      return Err(ErrorKind::StackOverflow);
+    }
+
+    $stack.push($value);
+  }};
+
+  ($stack:expr, $value:expr) => {{
+    if $stack.len() == $stack.capacity {
+      break Some(ErrorKind::StackOverflow);
+    }
+
+    $stack.push($value);
+  }};
+}
+use push;
+
 #[derive(Debug)]
 struct MainLoopError {
   ip: usize,
@@ -884,7 +915,7 @@ impl fmt::Display for RuntimeError {
 impl error::Error for RuntimeError {}
 
 #[derive(Debug, Clone)]
-pub(crate) enum ErrorKind {
+pub enum ErrorKind {
   TypeError {
     expected: &'static str,
     got: &'static str,
@@ -900,6 +931,7 @@ pub(crate) enum ErrorKind {
     type_: &'static str,
   },
   OutOfMemory,
+  StackOverflow,
   ModuleNotFound {
     module: String,
   },
@@ -920,6 +952,7 @@ impl ErrorKind {
       Self::UndefinedVariable { .. } => "Undefined Variable",
       Self::NotCallable { .. } => "Not Callable",
       Self::OutOfMemory => "Out of Memory",
+      Self::StackOverflow => "Stack Overflow",
       Self::ModuleNotFound { .. } => "Module Not Found",
       Self::ItemNotFound { .. } => "Item Not Found",
       Self::Custom { title, .. } => title,
@@ -936,6 +969,7 @@ impl ErrorKind {
         format!("`{type_}` is not callable, only functions are callable")
       }
       Self::OutOfMemory => "could not initialise enough memory for the heap".into(),
+      Self::StackOverflow => "stack has overflowed.".into(),
       Self::ModuleNotFound { module } => format!("could not find module `{module}`"),
       Self::ItemNotFound { module, item } => format!("could not find `{item}` in `{module}`"),
       Self::Custom { message, .. } => message.clone(),

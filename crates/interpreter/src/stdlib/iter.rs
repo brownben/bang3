@@ -339,13 +339,13 @@ module!(iter, IterModule, {
     // We save the list on the stack, so it can always be viewed by the GC tracer
     // We take a pointer to it, so we can update it if it needs to be resized
     let list = List::with_capacity(&mut vm.heap, length);
-    let mut list_location = vm.stash_value(Value::from_object(list.as_ptr(), LIST_TYPE_ID));
+    let mut list_location = vm.stash_value(Value::from_object(list.as_ptr(), LIST_TYPE_ID))?;
 
     let mut state = 0;
     while let Some((value, new_state)) = iter_next(vm, iterator, state)? {
       let list = List::from(vm.pop_stashed_value(list_location).as_object());
       let updated_list = list.push(&mut vm.heap, value);
-      list_location = vm.stash_value(Value::from_object(updated_list.as_ptr(), LIST_TYPE_ID));
+      list_location = vm.stash_value(Value::from_object(updated_list.as_ptr(), LIST_TYPE_ID))?;
 
       state = new_state;
     };
@@ -497,7 +497,7 @@ module!(iter, IterModule, {
 
       loop {
         let Some((iterator_result, new_state)) = iter_next(vm, iterator, state)? else { break };
-        let iterator_result = vm.stash_value(iterator_result);
+        let iterator_result = vm.stash_value(iterator_result)?;
         let Some(inner_function) = vm.call(func, accumulator)? else { break };
         let iterator_result = vm.pop_stashed_value(iterator_result);
         let Some(new_accumulator) = vm.call(inner_function, iterator_result)? else { break };
@@ -553,7 +553,7 @@ module!(iter, IterModule, {
 
       loop {
         let Some((iterator_result, new_state)) = iter_next(vm, iter, state)? else { break };
-        let iterator_result = vm.stash_value(iterator_result);
+        let iterator_result = vm.stash_value(iterator_result)?;
         let Some(inner_function) = vm.call(func, accumulator)? else { break };
         let iterator_result = vm.pop_stashed_value(iterator_result);
         let Some(new_accumulator) = vm.call(inner_function, iterator_result)? else { break };
@@ -661,7 +661,7 @@ module!(iter, IterModule, {
       };
 
       let string = BangString::with_capacity(&mut vm.heap, length * 3);
-      let mut string_location = vm.stash_value(Value::from_object(string.as_ptr(), STRING_TYPE_ID));
+      let mut string_ptr = vm.stash_value(Value::from_object(string.as_ptr(), STRING_TYPE_ID))?;
 
       let string_join = {
         // we can't borrow the string & result together - so we get the string without the lifetime
@@ -682,15 +682,15 @@ module!(iter, IterModule, {
           unsafe { std::str::from_utf8_unchecked(slice) }
         };
 
-        let string = BangString::from(vm.pop_stashed_value(string_location).as_object::<usize>());
+        let string = BangString::from(vm.pop_stashed_value(string_ptr).as_object::<usize>());
         let string = if state > 0 { string.push(&mut vm.heap, string_join) } else { string };
         let new_string = string.push(&mut vm.heap, string_part);
-        string_location = vm.stash_value(Value::from_object(new_string.as_ptr(), STRING_TYPE_ID));
+        string_ptr = vm.stash_value(Value::from_object(new_string.as_ptr(), STRING_TYPE_ID))?;
 
         state = new_state;
       };
 
-      Ok(vm.pop_stashed_value(string_location))
+      Ok(vm.pop_stashed_value(string_ptr))
     }
 
     if !arg.is_string() {
