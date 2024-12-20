@@ -333,3 +333,33 @@ fn assertions() {
     at line 1
   "});
 }
+
+#[test]
+fn stack_overflow() {
+  let output = run("let infiniteLoop = x => infiniteLoop(x)\ninfiniteLoop(1)");
+  assert_eq!(output, indoc! {"
+    ✕ Error: Stack Overflow\nthe stack has overflowed. consider increasing the stack size
+
+        ╭─[STDIN:1]
+      1 │ let infiniteLoop = x => infiniteLoop(x)
+    ────╯
+
+    in function 'infiniteLoop' at line 1
+    in function 'infiniteLoop' at line 1
+    in function 'infiniteLoop' at line 1
+    in function 'infiniteLoop' at line 1
+    in function 'infiniteLoop' at line 1
+    in function 'infiniteLoop' at line 1
+    in function 'infiniteLoop' at line 1
+    in function 'infiniteLoop' at line 1
+    in function 'infiniteLoop' at line 1
+    in function 'infiniteLoop' at line 1
+    ... 48 frames hidden
+    in function 'infiniteLoop' at line 1
+    in function 'infiniteLoop' at line 1
+    in function 'infiniteLoop' at line 1
+    in function 'infiniteLoop' at line 1
+    in function 'infiniteLoop' at line 1
+    at line 2
+  "});
+}

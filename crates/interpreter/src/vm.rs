@@ -896,19 +896,17 @@ impl RuntimeError {
   pub fn traceback(&self, line_index: &LineIndex) -> Option<String> {
     use std::fmt::Write;
 
-    if self.traceback.is_empty() {
-      return None;
-    }
-
-    let mut string = String::new();
-
-    for location in &self.traceback {
+    fn write_traceback_item(
+      string: &mut String,
+      line_index: &LineIndex,
+      location: &StackTraceLocation,
+    ) {
       if let Some(span) = location.span {
         let line = line_index.line(span);
 
         match &location.kind {
           StackTraceLocationKind::Root => {
-            writeln!(&mut string, "at line {line}").unwrap();
+            writeln!(string, "at line {line}").unwrap();
           }
           StackTraceLocationKind::Function(name) if name.is_empty() => {
             writeln!(string, "in anonymous function at line {line}").unwrap();
@@ -924,6 +922,26 @@ impl RuntimeError {
           }
           StackTraceLocationKind::Root => unreachable!(),
         };
+      }
+    }
+
+    if self.traceback.is_empty() {
+      return None;
+    }
+
+    let mut string = String::new();
+
+    if self.traceback.len() > 16 {
+      for location in &self.traceback[..10] {
+        write_traceback_item(&mut string, line_index, location);
+      }
+      writeln!(string, "... {} frames hidden", self.traceback.len() - 16).unwrap();
+      for location in &self.traceback[self.traceback.len() - 6..] {
+        write_traceback_item(&mut string, line_index, location);
+      }
+    } else {
+      for location in &self.traceback {
+        write_traceback_item(&mut string, line_index, location);
       }
     }
 
@@ -1007,7 +1025,7 @@ impl ErrorKind {
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct StackTraceLocation {
   kind: StackTraceLocationKind,
   span: Option<Span>,
@@ -1048,7 +1066,15 @@ impl StackTraceLocation {
     }
   }
 }
-#[derive(Clone, Debug)]
+impl Default for StackTraceLocation {
+  fn default() -> Self {
+    Self {
+      kind: StackTraceLocationKind::Root,
+      span: None,
+    }
+  }
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum StackTraceLocationKind {
   Function(SmartString),
   Root,
