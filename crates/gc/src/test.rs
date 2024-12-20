@@ -11,6 +11,13 @@ fn allocate_small_size() {
   let e = allocator.allocate_bytes(257);
   let f = allocator.allocate_bytes(83);
 
+  assert!(allocator.is_used(a));
+  assert!(allocator.is_used(b));
+  assert!(allocator.is_used(c));
+  assert!(allocator.is_used(d));
+  assert!(allocator.is_used(e));
+  assert!(allocator.is_used(f));
+
   // objects of the same size are allocated contiguously
   assert_eq!(a.addr() + 64, b.addr());
   assert_eq!(b.addr() + 64, c.addr());
@@ -29,6 +36,11 @@ fn allocate_reams() {
   let c = allocator.allocate_bytes(10);
   let d = allocator.allocate_bytes(5021);
 
+  assert!(allocator.is_used(a));
+  assert!(allocator.is_used(b));
+  assert!(allocator.is_used(c));
+  assert!(allocator.is_used(d));
+
   assert_eq!(a.addr() + PAGE_SIZE * 2, b.addr());
   assert_eq!(b.addr() + 64, c.addr());
   assert_eq!(b.addr() + PAGE_SIZE, d.addr());
@@ -45,6 +57,10 @@ fn allocate_sweep_allocate_uses_same_address() {
   allocator.mark(b);
   allocator.mark(c);
   allocator.finish_gc();
+
+  assert!(!allocator.is_used(a));
+  assert!(allocator.is_used(b));
+  assert!(allocator.is_used(c));
 
   let d = allocator.allocate_bytes(60);
   assert_eq!(a.addr(), d.addr());

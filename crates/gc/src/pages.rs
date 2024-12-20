@@ -165,7 +165,7 @@ impl PageDescriptorRef {
     if unlink {
       ream.prev = None;
       ream.next = None;
-      ream.gc_bits = 0;
+      ream.gc_bits = 1;
     }
   }
   /// Split a ream into two, with the first one of size `prefix_size` pages
@@ -238,6 +238,10 @@ impl PageDescriptorRef {
   }
   /// Is the given block allocated?
   pub fn is_block_allocated(&self, block_index: usize) -> bool {
+    if self.as_ref().class == BlockClass::Ream {
+      return self.as_ref().gc_bits > 0;
+    }
+
     let block_index = block_index / self.as_ref().class.block_size();
     let gc_bits = self.as_ref().gc_bits;
     let block_mask = 1u64 << block_index;
