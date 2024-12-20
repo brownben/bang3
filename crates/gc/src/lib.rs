@@ -604,8 +604,12 @@ impl<T> GcList<T> {
   #[must_use]
   pub fn capacity(&self, heap: &Heap) -> usize {
     let page = heap.get_page(self.page_index());
-    let block_size = page.class().block_size();
 
+    if page.class() == BlockClass::Ream {
+      return (usize::from(page.pages()) * PAGE_SIZE) / core::mem::size_of::<T>();
+    }
+
+    let block_size = page.class().block_size();
     (block_size - mem::size_of::<usize>()) / core::mem::size_of::<T>()
   }
 }
