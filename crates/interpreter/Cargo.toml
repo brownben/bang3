@@ -12,11 +12,7 @@ smartstring.workspace = true
 
 [dev-dependencies]
 indoc.workspace = true
-
-# for checking stdlib documentation
-bang-typechecker = { path = "../typechecker" }
-bang-linter = { path = "../linter" }
-bang-formatter = { path = "../formatter" }
+bang-stdlib = { path = "../stdlib" }
 
 [features]
 gc-stress-test = []
@@ -24,8 +20,3 @@ debug-stack = []
 
 [lints]
 workspace = true
-
-[[bin]]
-name = "stdlib-docs"
-path = "scripts/stdlib-docs.rs"
-doc = false

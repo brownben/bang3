@@ -66,19 +66,19 @@ impl Value {
 
   /// Create a new [Value] from a pointer to the heap
   #[must_use]
-  pub(crate) const fn from_object<T>(object: Gc<T>, type_: TypeId) -> Self {
+  pub const fn from_object<T>(object: Gc<T>, type_: TypeId) -> Self {
     Self(ptr::without_provenance(
       TO_POINTER | type_.0 << 32 | object.addr_const() | OBJECT,
     ))
   }
   /// Is the [Value] a pointer to the heap?
   #[must_use]
-  pub(crate) fn is_object(self) -> bool {
+  pub fn is_object(self) -> bool {
     (self.0.addr() & TO_POINTER) == TO_POINTER && self.0.addr() & TAG == OBJECT
   }
   /// Is the [Value] an object of the given type?
   #[must_use]
-  pub(crate) fn is_object_type(self, type_: TypeId) -> bool {
+  pub fn is_object_type(self, type_: TypeId) -> bool {
     self.is_object() && self.object_type() == type_
   }
   /// Get the type of a pointer to the heap
@@ -86,7 +86,7 @@ impl Value {
   /// SAFETY: Undefined behaviour if [Value] is not a pointer to the heap.
   /// Use [`Value::is_object`] to check if it is a pointer to the heap.
   #[must_use]
-  pub(crate) fn object_type(self) -> TypeId {
+  pub fn object_type(self) -> TypeId {
     debug_assert!(self.is_object());
 
     let raw = self.0.addr() & FROM_POINTER;
@@ -96,7 +96,8 @@ impl Value {
   ///
   /// SAFETY: Undefined behaviour if [Value] is not a pointer to the heap.
   /// Use [`Value::is_object`] to check if it is a pointer to the heap.
-  pub(crate) fn as_object<T>(self) -> Gc<T> {
+  #[expect(clippy::missing_panics_doc, reason = "u32 < usize")]
+  pub fn as_object<T>(self) -> Gc<T> {
     debug_assert!(self.is_object());
 
     let raw = self.0.addr() & FROM_POINTER;
@@ -242,7 +243,7 @@ impl From<()> for Value {
 
 /// The id of an object type in the VM
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct TypeId(pub(crate) usize);
+pub struct TypeId(pub(crate) usize);
 
 // To check if a value is a number, or a tagged pointer
 // Sign bit is not set, but all bits of the exponent, and 2 bits of the mantissa are set (so real NaNs can be represented)

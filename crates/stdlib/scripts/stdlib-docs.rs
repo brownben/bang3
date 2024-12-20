@@ -3,7 +3,7 @@
 //! Generates the standard library documentation, from the documentation for each item of the library.
 #![allow(clippy::print_stdout)]
 
-use bang_interpreter::stdlib::{MODULE_NAMES, MODULES};
+use bang_stdlib::{MODULE_NAMES, MODULES};
 
 use std::fmt::Write;
 use std::{env, fs, io, process};

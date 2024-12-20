@@ -84,7 +84,7 @@ mod parse_errors {
 
 mod type_errors {
   use super::{Document, IntoDiagnostic, Span, delete_edit, insert_edit, replace_edit};
-  use bang_interpreter::stdlib::{MODULES, StdlibModule};
+  use bang_stdlib::{MODULES, StdlibModule};
   use bang_typechecker::TypeError;
   use lsp_types as lsp;
 

@@ -2,8 +2,9 @@ use super::FormatOptions;
 use super::diagnostics::{CodeFrame, Message, Severity};
 
 use bang_formatter::FormatterConfig;
-use bang_interpreter::{StandardContext, VM};
+use bang_interpreter::VM;
 use bang_lsp::LanguageServer;
+use bang_stdlib::StandardContext;
 use bang_syntax::{AST, tokenise};
 
 use anstream::{eprintln, println};

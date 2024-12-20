@@ -9,6 +9,7 @@ bang-interpreter = { path = "../interpreter" }
 bang-linter = { path = "../linter" }
 bang-lsp = { path = "../lsp" }
 bang-syntax = { path = "../syntax" }
+bang-stdlib = { path = "../stdlib" }
 bang-typechecker = { path = "../typechecker" }
 
 anstream.workspace = true

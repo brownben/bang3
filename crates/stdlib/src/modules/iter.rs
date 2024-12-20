@@ -1,15 +1,14 @@
-use super::StdlibModule;
-use super::macros::module;
-use crate::{
-  VM, Value,
+use crate::StdlibModule;
+use crate::macros::module;
+use bang_interpreter::{
+  ErrorKind, VM, Value,
+  object::SOME_TYPE_ID,
   object::{BangString, STRING_TYPE_ID},
   object::{ITERATOR_TRANSFORM_TYPE_ID, IteratorTransform},
   object::{ITERATOR_TYPE_ID, Iterator, IteratorLength},
   object::{LIST_TYPE_ID, List},
   object::{NATIVE_CLOSURE_TWO_TYPE_ID, NativeClosureTwo},
   object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
-  object::{NONE, SOME_TYPE_ID},
-  vm::ErrorKind,
 };
 
 module!(iter, IterModule, {
@@ -112,7 +111,7 @@ module!(iter, IterModule, {
 
     match result {
       Some(value) => Ok(Value::from_object(vm.heap.allocate(value), SOME_TYPE_ID)),
-      None => Ok(NONE)
+      None => Ok(Value::NONE)
     }
   };
   /// Gets the last element from the iterator
@@ -143,7 +142,7 @@ module!(iter, IterModule, {
 
     match last {
       Some(value) => Ok(Value::from_object(vm.heap.allocate(value), SOME_TYPE_ID)),
-      None => Ok(NONE)
+      None => Ok(Value::NONE)
     }
   };
 
@@ -254,7 +253,7 @@ module!(iter, IterModule, {
 
       match result {
         Some(value) => Ok(Value::from_object(vm.heap.allocate(value), SOME_TYPE_ID)),
-        None => Ok(NONE)
+        None => Ok(Value::NONE)
       }
     }
 
@@ -298,7 +297,7 @@ module!(iter, IterModule, {
 
       match result {
         Some(value) => Ok(Value::from_object(vm.heap.allocate(value), SOME_TYPE_ID)),
-        None => Ok(NONE)
+        None => Ok(Value::NONE)
       }
     }
 
@@ -455,7 +454,7 @@ module!(iter, IterModule, {
 
           if value.is_object_type(SOME_TYPE_ID) {
             return Ok(Some((vm.heap[value.as_object::<Value>()], new_state)));
-          } else if value == NONE {
+          } else if value == Value::NONE {
             state = new_state;
           } else {
             return Err(ErrorKind::TypeError { expected: "option", got: value.get_type(vm) })
@@ -492,7 +491,7 @@ module!(iter, IterModule, {
       };
 
       let Some((mut accumulator, mut state)) = iter_next(vm, iterator, 0)? else {
-        return Ok(NONE);
+        return Ok(Value::NONE);
       };
 
       loop {

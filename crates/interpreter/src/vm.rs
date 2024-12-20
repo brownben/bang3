@@ -67,7 +67,8 @@ pub struct VM<'context> {
   frames: Stack<CallFrame>,
   globals: HashMap<SmartString, Value>,
 
-  pub(crate) heap: Heap,
+  /// The heap
+  pub heap: Heap,
   gc_threshold: usize,
 
   context: &'context dyn Context,
@@ -962,33 +963,54 @@ impl fmt::Display for RuntimeError {
 }
 impl error::Error for RuntimeError {}
 
+/// The kind of an error which occured in the runtime
 #[derive(Debug, Clone)]
 pub enum ErrorKind {
+  /// A type error
   TypeError {
+    /// The expected type
     expected: &'static str,
+    /// The type recieved
     got: &'static str,
   },
+  /// A type error
   TypeErrorBinary {
+    /// The expected type
     expected: &'static str,
+    /// The type recieved
     got: String,
   },
+  /// Accessing a variable which does not exist
   UndefinedVariable {
+    /// the name of the variable
     name: String,
   },
+  /// The value is not callable
   NotCallable {
+    /// the type of the value
     type_: &'static str,
   },
+  /// Enough memory could not be allocated for the heap
   OutOfMemory,
+  /// Too many items in the stack
   StackOverflow,
+  /// A module couldn't be found
   ModuleNotFound {
+    /// the name of the module
     module: String,
   },
+  /// An item could not be found with a specific name in a module
   ItemNotFound {
+    /// the name of the module
     module: String,
+    /// the name of the item which could not be found
     item: String,
   },
+  /// A different kind of error, specified by the creator
   Custom {
+    /// the title of the error
     title: &'static str,
+    /// the message of the error
     message: String,
   },
 }

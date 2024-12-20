@@ -1,7 +1,8 @@
 use super::{CommandStatus, compile, parse};
 use crate::diagnostics::{Message, highlight_source};
 
-use bang_interpreter::{Chunk, ChunkBuilder, OpCode, StandardContext, VM};
+use bang_interpreter::{Chunk, ChunkBuilder, OpCode, VM};
+use bang_stdlib::StandardContext;
 use bang_syntax::{AST, Span, Token, TokenKind, ast, tokenise};
 
 use anstream::{eprintln, println};

@@ -2,7 +2,8 @@
 //!
 //! Check that the output of the interpreted code is correct.
 
-use bang_interpreter::{Config, EmptyContext, StandardContext, VM, Value, compile};
+use bang_interpreter::{Config, EmptyContext, VM, Value, compile};
+use bang_stdlib::StandardContext;
 use bang_syntax::parse;
 use indoc::indoc;
 

@@ -1,11 +1,10 @@
-use super::StdlibModule;
-use super::macros::module;
-use crate::{
-  VM, Value,
+use crate::StdlibModule;
+use crate::macros::module;
+use bang_interpreter::{
+  ErrorKind, VM, Value,
+  object::SOME_TYPE_ID,
   object::{ITERATOR_TYPE_ID, Iterator, IteratorLength},
   object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
-  object::{NONE, SOME_TYPE_ID},
-  vm::ErrorKind,
 };
 
 module!(list, ListModule, {
@@ -110,7 +109,7 @@ module!(list, ListModule, {
       let index = -number.as_number() as usize;
 
       if index > list.len() {
-        return Ok(NONE);
+        return Ok(Value::NONE);
       }
 
       let result = unsafe { *list.get_unchecked(list.len() - index) };
@@ -124,7 +123,7 @@ module!(list, ListModule, {
       let index = number.as_number() as usize;
 
       if index >= list.len() {
-        return Ok(NONE);
+        return Ok(Value::NONE);
       }
 
       let result = unsafe { *list.get_unchecked(index) };

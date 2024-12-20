@@ -3,7 +3,7 @@ use crate::documents::Document;
 use crate::locations::span_from_lsp_position;
 use lsp_types as lsp;
 
-use bang_interpreter::stdlib::MODULE_NAMES;
+use bang_stdlib::MODULE_NAMES;
 use bang_syntax::{
   AST, Span,
   ast::{Expression, Statement},

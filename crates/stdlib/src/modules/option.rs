@@ -1,15 +1,14 @@
-use super::StdlibModule;
-use super::macros::module;
-use crate::{
-  VM, Value,
+use crate::StdlibModule;
+use crate::macros::module;
+use bang_interpreter::{
+  ErrorKind, VM, Value,
   object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
-  object::{NONE, NONE_TYPE_ID, SOME_TYPE_ID},
-  vm::ErrorKind,
+  object::{NONE_TYPE_ID, SOME_TYPE_ID},
 };
 
 module!(option, OptionModule, {
   const /// No value
-        None: option = NONE;
+        None: option = Value::NONE;
 
   /// Some value
   #[type(^a => option<^a>)]
@@ -45,7 +44,7 @@ module!(option, OptionModule, {
   fn unwrap() = |vm, arg| {
     if arg.is_object_type(SOME_TYPE_ID) {
       Ok(vm.heap[arg.as_object::<Value>()])
-    } else if arg == NONE {
+    } else if arg == Value::NONE {
       Err(ErrorKind::Custom {
         title: "Panic",
         message: "called `option::unwrap` on a `None` value".to_string()
@@ -64,7 +63,7 @@ module!(option, OptionModule, {
   #[type(^a => option<^a> => ^a)]
   fn unwrapOr() = |vm, arg| {
     fn func(vm: &mut VM, alternative: Value, option: Value) -> Result<Value, ErrorKind> {
-      if option == NONE {
+      if option == Value::NONE {
         Ok(alternative)
       } else if option.is_object_type(SOME_TYPE_ID) {
         Ok(vm.heap[option.as_object::<Value>()])
@@ -88,7 +87,7 @@ module!(option, OptionModule, {
   /// ```
   #[type(option<option<^a>> => option<^a>)]
   fn flatten() = |vm, arg| {
-    if arg == NONE {
+    if arg == Value::NONE {
       Ok(arg)
     } else if arg.is_object_type(SOME_TYPE_ID) {
       Ok(vm.heap[arg.as_object::<Value>()])
@@ -111,7 +110,7 @@ module!(option, OptionModule, {
   #[type((^a => ^b) => option<^a> => option<^b>)]
   fn map() = |vm, arg| {
     fn func(vm: &mut VM, function: Value, option: Value) -> Result<Value, ErrorKind> {
-      if option == NONE {
+      if option == Value::NONE {
         Ok(option)
       } else if option.is_object_type(SOME_TYPE_ID) {
         let inner_value = vm.heap[option.as_object::<Value>()];

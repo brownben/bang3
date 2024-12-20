@@ -21,7 +21,7 @@ jobs:
       - name: Lint
         run: cargo clippy --workspace -- -D warnings
       - name: Standard Library Documentation
-        run: cargo run -p bang-interpreter --bin stdlib-docs -- --check
+        run: cargo run -p bang-stdlib --bin stdlib-docs -- --check
       - name: Test
         run: |
           cargo test --workspace --verbose

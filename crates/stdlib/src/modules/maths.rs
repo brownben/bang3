@@ -1,9 +1,8 @@
-use super::StdlibModule;
-use super::macros::module;
-use crate::{
-  VM, Value,
+use crate::StdlibModule;
+use crate::macros::module;
+use bang_interpreter::{
+  ErrorKind, VM, Value,
   object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
-  vm::ErrorKind,
 };
 
 module!(maths, MathsModule, {

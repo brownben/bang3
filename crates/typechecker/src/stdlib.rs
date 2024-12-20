@@ -4,7 +4,7 @@ use crate::{
   enviroment::{StaticTypeInfo, VariableType},
   types::{Type, TypeArena, TypeRef, TypeScheme},
 };
-pub use bang_interpreter::stdlib::MODULE_NAMES;
+pub use bang_stdlib::MODULE_NAMES;
 
 /// The result of importing a value from a module.
 #[derive(Clone)]
@@ -21,11 +21,11 @@ impl From<TypeRef> for ImportResult {
 }
 
 /// Get type and doc information for a module in the standard library.
-pub struct StdlibModule(&'static dyn bang_interpreter::stdlib::StdlibModule);
+pub struct StdlibModule(&'static dyn bang_stdlib::StdlibModule);
 impl StdlibModule {
   /// Gets a module by name.
   pub fn get(module_name: &str) -> Option<Self> {
-    bang_interpreter::stdlib::MODULES
+    bang_stdlib::MODULES
       .into_iter()
       .find(|module| module.name() == module_name)
       .map(Self)
@@ -69,7 +69,7 @@ impl StdlibModule {
   }
 }
 impl ops::Deref for StdlibModule {
-  type Target = dyn bang_interpreter::stdlib::StdlibModule;
+  type Target = dyn bang_stdlib::StdlibModule;
 
   fn deref(&self) -> &Self::Target {
     self.0

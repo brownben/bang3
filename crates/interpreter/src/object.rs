@@ -48,6 +48,7 @@ pub const DEFAULT_TYPE_DESCRIPTORS: &[TypeDescriptor] = &[
 
 /// A string on the heap
 #[repr(C)]
+#[must_use]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct BangString(GcList<u8>);
 impl BangString {
@@ -57,10 +58,12 @@ impl BangString {
     Self(new_list)
   }
 
+  #[must_use]
   pub fn length(self, heap: &Heap) -> usize {
     heap[*self.0]
   }
 
+  #[must_use]
   pub fn is_empty(self, vm: &VM) -> bool {
     vm.heap[*self.0] == 0
   }
@@ -96,6 +99,7 @@ impl BangString {
     *self.0
   }
 
+  #[must_use]
   pub fn as_str(self, heap: &Heap) -> &str {
     unsafe { str::from_utf8_unchecked(heap.get_list_buffer(self.0)) }
   }
@@ -145,6 +149,7 @@ const STRING: TypeDescriptor = TypeDescriptor {
 pub const STRING_TYPE_ID: TypeId = TypeId(0);
 
 /// A string view - a reference to part of a string
+#[must_use]
 #[derive(Clone, Debug)]
 pub struct StringView {
   pub(crate) string: Value,
@@ -173,10 +178,12 @@ impl StringView {
     }
   }
 
+  #[must_use]
   pub fn from_ptr<T>(ptr: Gc<T>, heap: &Heap) -> &str {
     heap[ptr.cast::<StringView>()].as_str(heap)
   }
 
+  #[must_use]
   pub fn as_str<'a>(&'a self, heap: &'a Heap) -> &'a str {
     debug_assert!(self.string.is_string());
 
@@ -209,7 +216,7 @@ impl Value {
   /// SAFETY: Undefined behaviour if [Value] is not a string
   /// Use [`Value::is_string`] to check if it is a string
   #[must_use]
-  pub(crate) fn as_string(self, heap: &Heap) -> &str {
+  pub fn as_string(self, heap: &Heap) -> &str {
     if self.is_object_type(STRING_TYPE_ID) {
       BangString::from(self.as_object::<usize>()).as_str(heap)
     } else {
@@ -228,6 +235,7 @@ fn string_equality(vm: &VM, a: Value, b: Value) -> bool {
 }
 
 /// A closure - a function which has captured variables from the surrounding scope.
+#[must_use]
 #[derive(Clone, Debug)]
 pub struct Closure {
   func: *const Chunk,
@@ -276,10 +284,7 @@ pub struct NativeFunction {
 }
 impl NativeFunction {
   /// Create a new native function
-  pub(crate) fn new(
-    name: &'static str,
-    func: fn(&mut VM, Value) -> Result<Value, ErrorKind>,
-  ) -> Self {
+  pub fn new(name: &'static str, func: fn(&mut VM, Value) -> Result<Value, ErrorKind>) -> Self {
     Self { name, func }
   }
 }
@@ -311,7 +316,7 @@ pub struct NativeClosure {
 }
 impl NativeClosure {
   /// Create a new native closure
-  pub(crate) fn new(
+  pub fn new(
     name: &'static str,
     func: fn(&mut VM, Value, Value) -> Result<Value, ErrorKind>,
     arg1: Value,
@@ -351,7 +356,7 @@ pub struct NativeClosureTwo {
 }
 impl NativeClosureTwo {
   /// Create a new native function
-  pub(crate) fn new(
+  pub fn new(
     name: &'static str,
     func: fn(&mut VM, Value, Value, Value) -> Result<Value, ErrorKind>,
     arg1: Value,
@@ -389,6 +394,7 @@ const NATIVE_CLOSURE_TWO: TypeDescriptor = TypeDescriptor {
 pub const NATIVE_CLOSURE_TWO_TYPE_ID: TypeId = TypeId(5);
 
 /// A list of values
+#[must_use]
 #[derive(Clone, Debug)]
 pub struct List(GcList<Value>);
 impl List {
@@ -398,10 +404,12 @@ impl List {
     Self(new_list)
   }
 
+  #[must_use]
   pub fn length(&self, heap: &Heap) -> usize {
     heap[*self.0]
   }
 
+  #[must_use]
   pub fn is_empty(&self, heap: &Heap) -> bool {
     heap[*self.0] == 0
   }
@@ -434,6 +442,7 @@ impl List {
     list
   }
 
+  #[must_use]
   pub fn items<'a>(&self, heap: &'a Heap) -> &'a [Value] {
     heap.get_list_buffer(self.0)
   }
@@ -464,6 +473,7 @@ const LIST: TypeDescriptor = TypeDescriptor {
 pub const LIST_TYPE_ID: TypeId = TypeId(6);
 
 /// A list view - a reference to part of a list
+#[must_use]
 #[derive(Clone)]
 pub struct ListView {
   pub(crate) list: Value,
@@ -496,10 +506,12 @@ impl ListView {
     &heap[ptr.cast::<ListView>()]
   }
 
+  #[must_use]
   pub fn is_empty(&self, vm: &VM) -> bool {
     self.items(&vm.heap).is_empty()
   }
 
+  #[must_use]
   pub fn items<'a>(&'a self, heap: &'a Heap) -> &'a [Value] {
     &self.list.as_list(heap)[self.start..self.end]
   }
@@ -530,7 +542,7 @@ impl Value {
   /// SAFETY: Undefined behaviour if [Value] is not a string
   /// Use [`Value::is_list`] to check if it is a string
   #[must_use]
-  pub(crate) fn as_list(self, heap: &Heap) -> &[Value] {
+  pub fn as_list(self, heap: &Heap) -> &[Value] {
     debug_assert!(self.is_list());
 
     if self.is_object_type(LIST_TYPE_ID) {
@@ -608,7 +620,9 @@ const OPTION_NONE: TypeDescriptor = TypeDescriptor {
 };
 pub const NONE_TYPE_ID: TypeId = TypeId(9);
 
-pub const NONE: Value = Value::from_object(Gc::NULL, NONE_TYPE_ID);
+impl Value {
+  pub const NONE: Value = Value::from_object(Gc::NULL, NONE_TYPE_ID);
+}
 
 pub struct Iterator {
   pub base: Value,

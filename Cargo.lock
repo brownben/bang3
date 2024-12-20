@@ -83,6 +83,7 @@ dependencies = [
  "bang-interpreter",
  "bang-linter",
  "bang-lsp",
+ "bang-stdlib",
  "bang-syntax",
  "bang-typechecker",
  "clap",
@@ -108,11 +109,9 @@ version = "3.0.0"
 name = "bang-interpreter"
 version = "3.0.0"
 dependencies = [
- "bang-formatter",
  "bang-gc",
- "bang-linter",
+ "bang-stdlib",
  "bang-syntax",
- "bang-typechecker",
  "indoc",
  "rustc-hash",
  "smartstring",
@@ -130,13 +129,25 @@ name = "bang-lsp"
 version = "3.0.0"
 dependencies = [
  "bang-formatter",
- "bang-interpreter",
  "bang-linter",
+ "bang-stdlib",
  "bang-syntax",
  "bang-typechecker",
  "lsp-server",
  "lsp-types",
  "serde_json",
+]
+
+[[package]]
+name = "bang-stdlib"
+version = "3.0.0"
+dependencies = [
+ "bang-formatter",
+ "bang-interpreter",
+ "bang-linter",
+ "bang-syntax",
+ "bang-typechecker",
+ "indoc",
 ]
 
 [[package]]
@@ -151,7 +162,7 @@ dependencies = [
 name = "bang-typechecker"
 version = "3.0.0"
 dependencies = [
- "bang-interpreter",
+ "bang-stdlib",
  "bang-syntax",
  "indoc",
 ]

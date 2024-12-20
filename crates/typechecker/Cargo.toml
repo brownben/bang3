@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 bang-syntax = { path = "../syntax" }
-bang-interpreter = { path = "../interpreter" }
+bang-stdlib = { path = "../stdlib" }
 indoc.workspace = true
 
 [lints]

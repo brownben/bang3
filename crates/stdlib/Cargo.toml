@@ -1,18 +1,24 @@
 [package]
-name = "bang-lsp"
+name = "bang-stdlib"
 version = "3.0.0"
 edition = "2024"
 
 [dependencies]
+bang-interpreter = { path = "../interpreter" }
+
+[dev-dependencies]
+indoc.workspace = true
+
+# for checking stdlib documentation
 bang-formatter = { path = "../formatter" }
 bang-linter = { path = "../linter" }
 bang-syntax = { path = "../syntax" }
-bang-stdlib = { path = "../stdlib" }
 bang-typechecker = { path = "../typechecker" }
-
-lsp-server.workspace = true
-lsp-types.workspace = true
-serde_json.workspace = true
 
 [lints]
 workspace = true
+
+[[bin]]
+name = "stdlib-docs"
+path = "scripts/stdlib-docs.rs"
+doc = false

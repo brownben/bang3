@@ -6,8 +6,9 @@
 
 mod bytecode;
 mod compiler;
-mod object;
-pub mod stdlib;
+#[doc(hidden)]
+pub mod object;
+mod stdlib;
 mod value;
 mod vm;
 
@@ -42,6 +43,6 @@ pub fn compile_expression(
 pub use bang_gc::HeapSize;
 pub use bytecode::{Chunk, ChunkBuilder, OpCode};
 pub use compiler::CompileError;
-pub use stdlib::{EmptyContext, StandardContext};
+pub use stdlib::{Context, EmptyContext, ImportResult};
 pub use value::Value;
-pub use vm::{Config, RuntimeError, VM};
+pub use vm::{Config, ErrorKind, RuntimeError, VM};

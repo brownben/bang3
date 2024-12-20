@@ -1,14 +1,13 @@
 #![allow(clippy::cast_precision_loss, reason = "string lengths are < 2^52")]
-use super::StdlibModule;
-use super::macros::module;
-use crate::{
-  VM, Value,
+use crate::StdlibModule;
+use crate::macros::module;
+use bang_interpreter::{
+  ErrorKind, VM, Value,
+  object::SOME_TYPE_ID,
   object::{ITERATOR_TYPE_ID, Iterator, IteratorLength},
   object::{NATIVE_CLOSURE_TWO_TYPE_ID, NativeClosureTwo},
   object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
-  object::{NONE, SOME_TYPE_ID},
   object::{STRING_VIEW_TYPE_ID, StringView},
-  vm::ErrorKind,
 };
 
 module!(string, StringModule, {
@@ -368,7 +367,7 @@ module!(string, StringModule, {
 
     match result {
       Ok(value) => Ok(Value::from_object(vm.heap.allocate(value), SOME_TYPE_ID)),
-      Err(_) => Ok(NONE)
+      Err(_) => Ok(Value::NONE)
     }
   };
 

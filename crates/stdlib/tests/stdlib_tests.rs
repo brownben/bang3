@@ -2,7 +2,8 @@
 //!
 //! Check that the standard library works as expected.
 
-use bang_interpreter::{Config, StandardContext, VM, Value, compile};
+use bang_interpreter::{Config, VM, Value, compile};
+use bang_stdlib::StandardContext;
 use bang_syntax::parse;
 use indoc::indoc;
 
@@ -1381,7 +1382,7 @@ mod assert {
 }
 
 mod docs {
-  use bang_interpreter::stdlib::MODULES;
+  use bang_stdlib::MODULES;
   use indoc::indoc;
 
   #[test]

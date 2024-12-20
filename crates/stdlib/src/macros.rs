@@ -15,8 +15,8 @@ macro_rules! module {
   }) => {
     #[allow(unused_variables)]
     #[doc = concat!("The `", stringify!($module_name), "` module of Bang's Standard Library")]
-    pub fn $module_name(vm: &mut VM, item: &str) -> super::ImportResult {
-      use crate::object::{NativeFunction, NATIVE_FUNCTION_TYPE_ID};
+    pub fn $module_name(vm: &mut VM, item: &str) -> bang_interpreter::ImportResult {
+      use bang_interpreter::object::{NativeFunction, NATIVE_FUNCTION_TYPE_ID};
 
       match item {
         $(stringify!($constant_name) => module!(const $constant_type, vm, $constant),)*
@@ -28,10 +28,10 @@ macro_rules! module {
             let native_function = NativeFunction::new(full_function_name, $function);
             let allocated_function = vm.heap.allocate(native_function);
             let value = Value::from_object(allocated_function, NATIVE_FUNCTION_TYPE_ID);
-            super::ImportResult::Value(value)
+            bang_interpreter::ImportResult::Value(value)
           },
         )*
-        _ => super::ImportResult::ItemNotFound,
+        _ => bang_interpreter::ImportResult::ItemNotFound,
       }
     }
 
