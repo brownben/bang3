@@ -31,6 +31,35 @@ impl Default for CallFrame {
   }
 }
 
+/// The configuration for the [`VM`]
+#[derive(Debug)]
+pub struct Config {
+  /// The size of the heap to allocate
+  pub heap_size: HeapSize,
+  /// The size of the primary stack to allocate
+  pub stack_size: usize,
+  /// The size of the call stack to allocate
+  pub call_stack_size: usize,
+}
+impl Config {
+  /// A configuration with the smallest possible heap
+  pub const SMALL: Self = Self {
+    heap_size: HeapSize::Small,
+    stack_size: 512,
+    call_stack_size: 64,
+  };
+}
+impl Default for Config {
+  fn default() -> Self {
+    Self {
+      heap_size: HeapSize::default(),
+      // sizes are one less than the power of 2, so it fits neatly in a ream
+      stack_size: 1023,
+      call_stack_size: 63,
+    }
+  }
+}
+
 /// A virtual machine to execute compiled bytecode
 #[derive(Debug)]
 pub struct VM<'context> {
@@ -49,8 +78,8 @@ impl<'context> VM<'context> {
   ///
   /// # Errors
   /// Returns an error if the heap could not be initialized
-  pub fn new(heap_size: HeapSize, context: &'context dyn Context) -> Result<Self, RuntimeError> {
-    let Some(mut heap) = Heap::new(heap_size) else {
+  pub fn new(config: &Config, context: &'context dyn Context) -> Result<Self, RuntimeError> {
+    let Some(mut heap) = Heap::new(config.heap_size) else {
       return Err(RuntimeError {
         kind: ErrorKind::OutOfMemory,
         traceback: Vec::new(),
@@ -58,8 +87,8 @@ impl<'context> VM<'context> {
     };
 
     let mut vm = Self {
-      stack: Stack::new(512, &mut heap),
-      frames: Stack::new(64, &mut heap),
+      stack: Stack::new(config.stack_size, &mut heap),
+      frames: Stack::new(config.call_stack_size, &mut heap),
       globals: HashMap::default(),
       heap,
       gc_threshold: 6,
@@ -732,12 +761,13 @@ impl<T> Stack<T> {
   fn new(size: usize, heap: &mut Heap) -> Self {
     let gc = heap.allocate_list_header::<T>(size);
     let pointer = heap.get_list_buffer_ptr(gc).cast_mut();
+    let capacity = gc.capacity(heap);
 
     Self {
       gc,
       pointer,
       len: 0,
-      capacity: size,
+      capacity,
     }
   }
 
@@ -969,7 +999,7 @@ impl ErrorKind {
         format!("`{type_}` is not callable, only functions are callable")
       }
       Self::OutOfMemory => "could not initialise enough memory for the heap".into(),
-      Self::StackOverflow => "stack has overflowed.".into(),
+      Self::StackOverflow => "the stack has overflowed. consider increasing the stack size".into(),
       Self::ModuleNotFound { module } => format!("could not find module `{module}`"),
       Self::ItemNotFound { module, item } => format!("could not find `{item}` in `{module}`"),
       Self::Custom { message, .. } => message.clone(),

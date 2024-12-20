@@ -2,8 +2,7 @@
 //!
 //! Check that the output of the interpreted code is correct.
 
-use bang_gc::HeapSize;
-use bang_interpreter::{EmptyContext, StandardContext, VM, Value, compile};
+use bang_interpreter::{Config, EmptyContext, StandardContext, VM, Value, compile};
 use bang_syntax::parse;
 use indoc::indoc;
 
@@ -11,7 +10,7 @@ fn run(source: &str) -> Result<VM, ()> {
   let ast = parse(source.to_owned());
   assert!(ast.is_valid());
   let chunk = compile(&ast).unwrap();
-  let mut vm = VM::new(HeapSize::Small, &StandardContext).unwrap();
+  let mut vm = VM::new(&Config::SMALL, &StandardContext).unwrap();
   vm.run(&chunk).map_err(|_| ())?;
   Ok(vm)
 }
@@ -1105,13 +1104,13 @@ fn cant_import_anything_with_empty_context() {
   let ast = parse("from maths import { abs }".to_owned());
   assert!(ast.is_valid());
   let chunk = compile(&ast).unwrap();
-  let mut vm = VM::new(HeapSize::Small, &EmptyContext).unwrap();
+  let mut vm = VM::new(&Config::SMALL, &EmptyContext).unwrap();
   assert!(vm.run(&chunk).is_err());
 
   let ast = parse("maths::abs".to_owned());
   assert!(ast.is_valid());
   let chunk = compile(&ast).unwrap();
-  let mut vm = VM::new(HeapSize::Small, &EmptyContext).unwrap();
+  let mut vm = VM::new(&Config::SMALL, &EmptyContext).unwrap();
   assert!(vm.run(&chunk).is_err());
 }
 

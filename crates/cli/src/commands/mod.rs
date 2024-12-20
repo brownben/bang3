@@ -2,7 +2,7 @@ use super::FormatOptions;
 use super::diagnostics::{CodeFrame, Message, Severity};
 
 use bang_formatter::FormatterConfig;
-use bang_interpreter::{HeapSize, StandardContext, VM};
+use bang_interpreter::{StandardContext, VM};
 use bang_lsp::LanguageServer;
 use bang_syntax::{AST, tokenise};
 
@@ -86,7 +86,7 @@ pub fn run(filename: &str) -> Result<CommandStatus, ()> {
   let ast = parse(filename, source)?;
   let chunk = compile(&ast)?;
 
-  let mut vm = match VM::new(HeapSize::Standard, &StandardContext) {
+  let mut vm = match VM::new(&bang_interpreter::Config::default(), &StandardContext) {
     Ok(vm) => vm,
     Err(error) => {
       eprintln!("{}", Message::from(&error));

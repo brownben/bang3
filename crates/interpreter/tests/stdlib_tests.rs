@@ -2,8 +2,7 @@
 //!
 //! Check that the standard library works as expected.
 
-use bang_gc::HeapSize;
-use bang_interpreter::{StandardContext, VM, Value, compile};
+use bang_interpreter::{Config, StandardContext, VM, Value, compile};
 use bang_syntax::parse;
 use indoc::indoc;
 
@@ -11,7 +10,7 @@ fn run(source: &str) -> Result<VM, ()> {
   let ast = parse(source.to_owned());
   assert!(ast.is_valid());
   let chunk = compile(&ast).unwrap();
-  let mut vm = VM::new(HeapSize::Small, &StandardContext).unwrap();
+  let mut vm = VM::new(&Config::SMALL, &StandardContext).unwrap();
   vm.run(&chunk).map_err(|_| ())?;
   Ok(vm)
 }

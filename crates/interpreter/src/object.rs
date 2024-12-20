@@ -695,7 +695,6 @@ pub const ALLOCATED_TYPE_ID: TypeId = TypeId(12);
 mod test {
   use super::*;
   use crate::{EmptyContext, VM};
-  use bang_gc::HeapSize;
 
   #[test]
   fn type_ids_match() {
@@ -718,7 +717,7 @@ mod test {
 
   #[test]
   fn type_ids_match_in_vm() {
-    let mut vm = VM::new(HeapSize::Small, &EmptyContext).unwrap();
+    let mut vm = VM::new(&crate::Config::SMALL, &EmptyContext).unwrap();
 
     let empty_allocation = vm.heap.allocate(());
     let get_type_name = |value| vm.get_type_descriptor(value).type_name;

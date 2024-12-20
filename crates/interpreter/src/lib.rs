@@ -44,4 +44,4 @@ pub use bytecode::{Chunk, ChunkBuilder, OpCode};
 pub use compiler::CompileError;
 pub use stdlib::{EmptyContext, StandardContext};
 pub use value::Value;
-pub use vm::{RuntimeError, VM};
+pub use vm::{Config, RuntimeError, VM};

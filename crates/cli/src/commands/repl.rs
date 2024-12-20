@@ -1,7 +1,7 @@
 use super::{CommandStatus, compile, parse};
 use crate::diagnostics::{Message, highlight_source};
 
-use bang_interpreter::{Chunk, ChunkBuilder, HeapSize, OpCode, StandardContext, VM};
+use bang_interpreter::{Chunk, ChunkBuilder, OpCode, StandardContext, VM};
 use bang_syntax::{AST, Span, Token, TokenKind, ast, tokenise};
 
 use anstream::{eprintln, println};
@@ -56,7 +56,7 @@ pub fn repl() -> Result<CommandStatus, ()> {
   println!("{}", crate::coloured_header());
   println!("{}", "exit using ctrl+d, or ctrl+c".dimmed());
 
-  let mut vm = match VM::new(HeapSize::Standard, &StandardContext) {
+  let mut vm = match VM::new(&bang_interpreter::Config::default(), &StandardContext) {
     Ok(vm) => vm,
     Err(error) => {
       eprintln!("{}", Message::from(&error));
