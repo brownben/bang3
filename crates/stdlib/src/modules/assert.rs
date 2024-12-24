@@ -33,8 +33,7 @@ module!(assert, AssertModule, {
       }
     }
 
-    let closure = vm.heap.allocate(NativeClosure::new("assert::equal", func, value));
-    Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
+    Ok(vm.allocate_value(NativeClosure::new("assert::equal", func, value), NATIVE_CLOSURE_TYPE_ID))
   };
 
   /// Asserts that a value is truthy

@@ -43,9 +43,7 @@ impl Context for StandardContext {
           message,
         })
       }),
-      NativeFunction::new("Some", |vm, arg| {
-        Ok(Value::from_object(vm.heap.allocate(arg), SOME_TYPE_ID))
-      }),
+      NativeFunction::new("Some", |vm, arg| Ok(vm.allocate_value(arg, SOME_TYPE_ID))),
     ]
   }
 

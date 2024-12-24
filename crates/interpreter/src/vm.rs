@@ -2,9 +2,9 @@ use super::{
   bytecode::{Chunk, ConstantValue, OpCode},
   object::{self, BangString, Closure, TypeDescriptor},
   stdlib::{Context, ImportResult},
-  value::Value,
+  value::{TypeId, Value},
 };
-use bang_gc::{GcList, Heap, HeapSize};
+use bang_gc::{Gc, GcList, Heap, HeapSize};
 use bang_syntax::{LineIndex, Span};
 
 use rustc_hash::FxHashMap as HashMap;
@@ -99,11 +99,9 @@ impl<'context> VM<'context> {
 
     for function in vm.context.global_functions() {
       let name = function.name;
-      let function = vm.heap.allocate(function);
-      vm.define_global(
-        name,
-        Value::from_object(function, object::NATIVE_FUNCTION_TYPE_ID),
-      );
+
+      let function = vm.allocate_value(function, object::NATIVE_FUNCTION_TYPE_ID);
+      vm.define_global(name, function);
     }
     for (constant_name, constant) in vm.context.global_constants() {
       vm.define_global(constant_name, constant);
@@ -148,6 +146,11 @@ impl<'context> VM<'context> {
     let string = self.heap.allocate_list(value.bytes(), value.len());
     Value::from_object(*string, object::STRING_TYPE_ID)
   }
+  /// Allocates a value in the [`VM`] returns a [`Value`] pointing to it
+  pub fn allocate_value<T>(&mut self, value: T, type_id: TypeId) -> Value {
+    let value = self.heap.allocate(value);
+    Value::from_object(value, type_id)
+  }
 
   /// Gets the [`TypeDescriptor`] for a [`Value`]
   ///
@@ -161,7 +164,6 @@ impl<'context> VM<'context> {
     debug_assert!(type_id.0 < self.types.len());
     unsafe { self.types.get_unchecked(type_id.0) }
   }
-
   /// Temporarily stash a value to the stack.
   ///
   /// Allows native functions to ensure values are not collected when executing other code.
@@ -170,6 +172,20 @@ impl<'context> VM<'context> {
   /// Returns an error if the stack is full
   pub fn stash_value(&mut self, value: Value) -> Result<StashedValue, ErrorKind> {
     push!(return, self.stack, value);
+    Ok(StashedValue)
+  }
+  /// Temporarily stash an object to the stack.
+  ///
+  /// Allows native functions to ensure values are not collected when executing other code.
+  ///
+  /// # Errors
+  /// Returns an error if the stack is full
+  pub fn stash_object<T>(
+    &mut self,
+    value: Gc<T>,
+    type_id: TypeId,
+  ) -> Result<StashedValue, ErrorKind> {
+    push!(return, self.stack, Value::from_object(value, type_id));
     Ok(StashedValue)
   }
   /// Gets a stashed value from the stack.
@@ -572,12 +588,11 @@ impl<'context> VM<'context> {
           let upvalues = (self.stack).drain(self.stack.len() - usize::from(upvalue_count));
           let upvalue_list = (self.heap).allocate_list(upvalues, upvalue_count.into());
 
-          let value = self.stack.pop(); // assume is function, as bytecode is valid
-          let closure =
-            (self.heap).allocate(Closure::new(value.as_function(&self.heap), upvalue_list));
-          self
-            .stack
-            .push(Value::from_object(closure, object::CLOSURE_TYPE_ID));
+          let function = self.stack.pop(); // assume is function, as bytecode is valid
+          let closure = Closure::new(function.as_function(&self.heap), upvalue_list);
+
+          let value = self.allocate_value(closure, object::CLOSURE_TYPE_ID);
+          self.stack.push(value);
         }
         OpCode::GetUpvalue => {
           let upvalue = chunk.get_value(ip + 1);

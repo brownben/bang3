@@ -66,7 +66,7 @@ impl Value {
 
   /// Create a new [Value] from a pointer to the heap
   #[must_use]
-  pub const fn from_object<T>(object: Gc<T>, type_: TypeId) -> Self {
+  pub(crate) const fn from_object<T>(object: Gc<T>, type_: TypeId) -> Self {
     Self(ptr::without_provenance(
       TO_POINTER | type_.0 << 32 | object.addr_const() | OBJECT,
     ))

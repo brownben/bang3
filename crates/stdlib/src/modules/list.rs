@@ -51,8 +51,7 @@ module!(list, ListModule, {
       Ok(result.into())
     }
 
-    let closure = (vm.heap).allocate(NativeClosure::new("contains", func, arg));
-    Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
+    Ok(vm.allocate_value(NativeClosure::new("list::contains", func, arg), NATIVE_CLOSURE_TYPE_ID))
   };
 
   /// Creates an iterator over the values of the list
@@ -79,12 +78,12 @@ module!(list, ListModule, {
     }
     let length = base.as_list(&vm.heap).len();
 
-    let iterator = vm.heap.allocate(Iterator {
+    let iterator = Iterator {
       base,
       next,
       length: IteratorLength::Max(length)
-    });
-    Ok(Value::from_object(iterator, ITERATOR_TYPE_ID))
+    };
+    Ok(vm.allocate_value(iterator, ITERATOR_TYPE_ID))
   };
 
   /// Gets an item from the list at the given index
@@ -113,7 +112,7 @@ module!(list, ListModule, {
       }
 
       let result = unsafe { *list.get_unchecked(list.len() - index) };
-      Ok(Value::from_object(vm.heap.allocate(result), SOME_TYPE_ID))
+      Ok(vm.allocate_value(result, SOME_TYPE_ID))
     }
     fn positive_func(vm: &mut VM, number: Value, list: Value) -> Result<Value, ErrorKind> {
       let list = get_list(list, vm)?;
@@ -127,7 +126,7 @@ module!(list, ListModule, {
       }
 
       let result = unsafe { *list.get_unchecked(index) };
-      Ok(Value::from_object(vm.heap.allocate(result), SOME_TYPE_ID))
+      Ok(vm.allocate_value(result, SOME_TYPE_ID))
     }
 
     if !index.is_number() {
@@ -135,11 +134,11 @@ module!(list, ListModule, {
     }
 
     let closure = if index.as_number() < 0.0 {
-      (vm.heap).allocate(NativeClosure::new("list::get", negative_func, index))
+      NativeClosure::new("list::get", negative_func, index)
     } else {
-      (vm.heap).allocate(NativeClosure::new("list::get", positive_func, index))
+      NativeClosure::new("list::get", positive_func, index)
     };
-    Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
+    Ok(vm.allocate_value(closure, NATIVE_CLOSURE_TYPE_ID))
   };
 });
 

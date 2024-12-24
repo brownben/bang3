@@ -161,8 +161,7 @@ module!(string, StringModule, {
       return Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) });
     }
 
-    let closure = vm.heap.allocate(NativeClosure::new("string::contains", func, arg));
-    Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
+    Ok(vm.allocate_value(NativeClosure::new("string::contains", func, arg), NATIVE_CLOSURE_TYPE_ID))
   };
   /// Is a string a prefix of the given string?
   ///
@@ -183,8 +182,8 @@ module!(string, StringModule, {
       return Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) });
     }
 
-    let closure = vm.heap.allocate(NativeClosure::new("string::startsWith", func, arg));
-    Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
+    let closure = NativeClosure::new("string::startsWith", func, arg);
+    Ok(vm.allocate_value(closure, NATIVE_CLOSURE_TYPE_ID))
   };
   /// Is a string a suffix of the given string?
   ///
@@ -205,8 +204,7 @@ module!(string, StringModule, {
       return Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) });
     }
 
-    let closure = vm.heap.allocate(NativeClosure::new("string::endsWith", func, arg));
-    Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
+    Ok(vm.allocate_value(NativeClosure::new("string::endsWith", func, arg), NATIVE_CLOSURE_TYPE_ID))
   };
 
   /// Returns a string with leading and trailing whitespace removed
@@ -228,8 +226,7 @@ module!(string, StringModule, {
     if start == 0 && end == string.len() {
       Ok(arg)
     } else {
-      let view = vm.heap.allocate(StringView::new(vm, arg, start, end));
-      Ok(Value::from_object(view, STRING_VIEW_TYPE_ID))
+      Ok(vm.allocate_value(StringView::new(vm, arg, start, end), STRING_VIEW_TYPE_ID))
     }
   };
   /// Returns a string with leading whitespace removed
@@ -250,8 +247,7 @@ module!(string, StringModule, {
     if start == 0  {
       Ok(arg)
     } else {
-      let view = vm.heap.allocate(StringView::new(vm, arg, start, string.len()));
-      Ok(Value::from_object(view, STRING_VIEW_TYPE_ID))
+      Ok(vm.allocate_value(StringView::new(vm, arg, start, string.len()), STRING_VIEW_TYPE_ID))
     }
   };
   /// Returns a string with trailing whitespace removed
@@ -272,8 +268,7 @@ module!(string, StringModule, {
     if end == string.len() {
       Ok(arg)
     } else {
-      let view = vm.heap.allocate(StringView::new(vm, arg, 0, end));
-      Ok(Value::from_object(view, STRING_VIEW_TYPE_ID))
+      Ok(vm.allocate_value(StringView::new(vm, arg, 0, end), STRING_VIEW_TYPE_ID))
     }
   };
 
@@ -293,8 +288,8 @@ module!(string, StringModule, {
         return Err(ErrorKind::TypeError { expected: "string", got: b.get_type(vm) });
       }
 
-      let closure = (vm.heap).allocate(NativeClosureTwo::new("string::replaceAll", func_two, a, b));
-      Ok(Value::from_object(closure, NATIVE_CLOSURE_TWO_TYPE_ID))
+      let closure = NativeClosureTwo::new("string::replaceAll", func_two, a, b);
+      Ok(vm.allocate_value(closure, NATIVE_CLOSURE_TWO_TYPE_ID))
     }
     fn func_two(vm: &mut VM, pat: Value, rep: Value, string: Value) -> Result<Value, ErrorKind> {
       let output = str::replace(
@@ -309,8 +304,8 @@ module!(string, StringModule, {
       return Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) });
     }
 
-    let closure = (vm.heap).allocate(NativeClosure::new("string::replaceAll", func_one, arg));
-    Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
+    let closure = NativeClosure::new("string::replaceAll", func_one, arg);
+    Ok(vm.allocate_value(closure, NATIVE_CLOSURE_TYPE_ID))
   };
 
 
@@ -329,8 +324,8 @@ module!(string, StringModule, {
         return Err(ErrorKind::TypeError { expected: "string", got: b.get_type(vm) });
       }
 
-      let closure = vm.heap.allocate(NativeClosureTwo::new("string::replaceOne", func_two, a, b));
-      Ok(Value::from_object(closure, NATIVE_CLOSURE_TWO_TYPE_ID))
+      let closure = NativeClosureTwo::new("string::replaceOne", func_two, a, b);
+      Ok(vm.allocate_value(closure, NATIVE_CLOSURE_TWO_TYPE_ID))
     }
     fn func_two(vm: &mut VM, pat: Value, rep: Value, string: Value) -> Result<Value, ErrorKind> {
       let output = str::replacen(
@@ -346,8 +341,8 @@ module!(string, StringModule, {
       return Err(ErrorKind::TypeError { expected: "string", got: arg.get_type(vm) });
     }
 
-    let closure = vm.heap.allocate(NativeClosure::new("string::replaceOne", func_one, arg));
-    Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
+    let closure = NativeClosure::new("string::replaceOne", func_one, arg);
+    Ok(vm.allocate_value(closure, NATIVE_CLOSURE_TYPE_ID))
   };
 
   /// Parses a string into a number
@@ -366,7 +361,7 @@ module!(string, StringModule, {
     let result = string.parse::<f64>().map(Value::from);
 
     match result {
-      Ok(value) => Ok(Value::from_object(vm.heap.allocate(value), SOME_TYPE_ID)),
+      Ok(value) => Ok(vm.allocate_value(value, SOME_TYPE_ID)),
       Err(_) => Ok(Value::NONE)
     }
   };
@@ -394,8 +389,8 @@ module!(string, StringModule, {
         _ => 1,
       };
 
-      let view = vm.heap.allocate(StringView::new(vm, base, state, state + length));
-      Some((Value::from_object(view, STRING_VIEW_TYPE_ID), state + length))
+      let view = StringView::new(vm, base, state, state + length);
+      Some((vm.allocate_value(view, STRING_VIEW_TYPE_ID), state + length))
     }
 
     if !base.is_string() {
@@ -403,12 +398,12 @@ module!(string, StringModule, {
     }
     let length = base.as_string(&vm.heap).chars().count();
 
-    let iterator = vm.heap.allocate(Iterator {
+    let iterator = Iterator {
       base,
       next,
       length: IteratorLength::Max(length),
-    });
-    Ok(Value::from_object(iterator, ITERATOR_TYPE_ID))
+    };
+    Ok(vm.allocate_value(iterator, ITERATOR_TYPE_ID))
   };
   /// Creates an iterator over the lines in a string
   ///
@@ -460,8 +455,8 @@ module!(string, StringModule, {
         };
       };
 
-      let view = vm.heap.allocate(StringView::new(vm, base, start, end));
-      Some((Value::from_object(view, STRING_VIEW_TYPE_ID), next_state))
+      let view = StringView::new(vm, base, start, end);
+      Some((vm.allocate_value(view, STRING_VIEW_TYPE_ID), next_state))
     }
 
     if !base.is_string() {
@@ -469,12 +464,12 @@ module!(string, StringModule, {
     }
     let length = base.as_string(&vm.heap).lines().count();
 
-    let iterator = vm.heap.allocate(Iterator {
+    let iterator = Iterator {
       base,
       next,
       length: IteratorLength::Max(length),
-    });
-    Ok(Value::from_object(iterator, ITERATOR_TYPE_ID))
+    };
+    Ok(vm.allocate_value(iterator, ITERATOR_TYPE_ID))
   };
 });
 

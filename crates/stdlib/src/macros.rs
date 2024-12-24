@@ -26,8 +26,7 @@ macro_rules! module {
               stringify!($module_name), "::", stringify!($function_name)
             );
             let native_function = NativeFunction::new(full_function_name, $function);
-            let allocated_function = vm.heap.allocate(native_function);
-            let value = Value::from_object(allocated_function, NATIVE_FUNCTION_TYPE_ID);
+            let value = vm.allocate_value(native_function, NATIVE_FUNCTION_TYPE_ID);
             bang_interpreter::ImportResult::Value(value)
           },
         )*

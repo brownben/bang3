@@ -210,8 +210,7 @@ module!(maths, MathsModule, {
       return Err(ErrorKind::TypeError { expected: "number", got: arg.get_type(vm) })
     }
 
-    let closure = vm.heap.allocate(NativeClosure::new("maths::pow", func, arg));
-    Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
+    Ok(vm.allocate_value(NativeClosure::new("maths::pow", func, arg), NATIVE_CLOSURE_TYPE_ID))
   };
   /// Returns the logarithm of the number with respect to an arbitrary base
   ///
@@ -235,8 +234,7 @@ module!(maths, MathsModule, {
       return Err(ErrorKind::TypeError { expected: "number", got: arg.get_type(vm) })
     }
 
-    let closure = vm.heap.allocate(NativeClosure::new("maths::log", func, arg));
-    Ok(Value::from_object(closure, NATIVE_CLOSURE_TYPE_ID))
+    Ok(vm.allocate_value(NativeClosure::new("maths::log", func, arg), NATIVE_CLOSURE_TYPE_ID))
   };
 
   /// Convert an angle from radians to degrees
