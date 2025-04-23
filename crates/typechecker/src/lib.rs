@@ -1,6 +1,5 @@
 //! # Typechecker
 //! Typechecks Bang source code
-#![feature(let_chains)]
 #![deny(unsafe_code)]
 
 mod enviroment;

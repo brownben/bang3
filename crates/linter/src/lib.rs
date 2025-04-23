@@ -1,7 +1,6 @@
 //! # Linter
 //! Static analysis to find possible problems in an AST
 
-#![feature(let_chains)]
 #![deny(unsafe_code)]
 
 use bang_syntax::{

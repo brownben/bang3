@@ -17,7 +17,6 @@
 //!   - Module Items in Import
 //! - Selection Ranges
 
-#![feature(let_chains)]
 #![deny(unsafe_code)]
 
 mod documents;

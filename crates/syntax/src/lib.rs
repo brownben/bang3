@@ -13,8 +13,6 @@
 //! (adding an error), otherwise if an error is found it will skip to the start of a new
 //! line and try parsing again.
 
-#![feature(let_chains)]
-
 pub mod ast;
 mod parser;
 mod span;

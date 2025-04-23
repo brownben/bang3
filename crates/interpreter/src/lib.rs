@@ -1,7 +1,6 @@
 //! # Bytecode Interpreter
 //! Bytecode compiler and virtual machine for running Bang code.
 
-#![feature(let_chains)]
 #![allow(unsafe_code)]
 
 mod bytecode;

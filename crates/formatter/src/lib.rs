@@ -9,7 +9,6 @@
 //!
 //! Based upon the algorithm described by Philip Wadler in [`A prettier printer`](https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf).
 
-#![feature(let_chains)]
 #![deny(unsafe_code)]
 
 mod ast;
