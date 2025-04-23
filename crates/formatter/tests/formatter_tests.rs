@@ -187,6 +187,7 @@ fn call() {
     "function({\n  a\n  // comment\n})",
     25
   );
+  assert_format!("function(((a)))", "function(\n  a\n)", 5);
 
   let source = indoc! {"
     function({

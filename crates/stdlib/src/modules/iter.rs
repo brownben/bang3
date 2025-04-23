@@ -131,7 +131,7 @@ module!(iter, IterModule, {
         title: "Infinite Computation",
         message: "cannot get the last element of an infinite list".to_owned()
       });
-    };
+    }
 
     let mut last = None;
     let mut state = 0;
@@ -486,7 +486,7 @@ module!(iter, IterModule, {
           title: "Infinite Computation",
           message: "cannot reduce an infinite iterator into a value".to_owned()
         });
-      };
+      }
 
       let Some((mut accumulator, mut state)) = iter_next(vm, iterator, 0)? else {
         return Ok(Value::NONE);
@@ -542,7 +542,7 @@ module!(iter, IterModule, {
           title: "Infinite Computation",
           message: "cannot fold an infinite iterator into a value".to_owned()
         });
-      };
+      }
 
       let mut state = 0;
       let mut accumulator = start;
@@ -582,7 +582,7 @@ module!(iter, IterModule, {
         title: "Infinite Computation",
         message: "cannot sum an infinite iterator into a value".to_owned()
       });
-    };
+    }
 
     let mut state = 0;
     let mut sum = 0.0;
@@ -616,7 +616,7 @@ module!(iter, IterModule, {
         title: "Infinite Computation",
         message: "cannot sum an infinite iterator into a value".to_owned()
       });
-    };
+    }
 
     let mut state = 0;
     let mut product = 1.0;

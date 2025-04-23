@@ -178,7 +178,6 @@ impl ASTEquality for Block {
       }
       while let Some(Statement::Comment(_)) = b {
         b = other_statements.next();
-        continue;
       }
 
       if !a.equals(&b, ast) {
@@ -428,7 +427,7 @@ impl ReturnAnalysis for If {
         .then(ast)
         .ends_with_return(ast)
         .or(otherwise.ends_with_return(ast));
-    };
+    }
 
     None
   }

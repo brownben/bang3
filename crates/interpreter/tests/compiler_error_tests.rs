@@ -5,6 +5,7 @@
 
 use bang_interpreter::{CompileError, compile};
 use bang_syntax::parse;
+use std::fmt::Write;
 
 fn integer_to_identifier(integer: u32) -> String {
   fn to_char(integer: u32) -> char {
@@ -77,7 +78,7 @@ fn too_many_symbols() {
   fn generate_symbols(count: u32) -> String {
     let mut source = String::new();
     for i in 0..=count {
-      source.push_str(&format!("let {} = 1\n", integer_to_identifier(i)));
+      writeln!(source, "let {} = 1", integer_to_identifier(i)).unwrap();
     }
     source
   }
@@ -101,7 +102,7 @@ fn too_many_constants() {
   fn generate_constants(count: u32) -> String {
     let mut source = String::new();
     for i in 0..=count {
-      source.push_str(&format!("'string: {i}'\n"));
+      writeln!(source, "'string: {i}'").unwrap();
     }
     source
   }
@@ -142,9 +143,9 @@ fn too_many_list_items() {
 
   let mut source = "[".to_owned();
   for number in 0..=257 {
-    write!(source, "  {number},\n").unwrap();
+    writeln!(source, "  {number},").unwrap();
   }
-  source.push_str("]");
+  source.push(']');
 
   let ast = parse(source);
   match compile(&ast) {

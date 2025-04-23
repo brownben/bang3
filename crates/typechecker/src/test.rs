@@ -1,5 +1,6 @@
 use crate::{
   TypeChecker,
+  error::Problem,
   infer::{ExpressionType, InferType},
   types::TypeArena,
 };
@@ -53,7 +54,7 @@ fn only_has_type_warnings(source: &str) -> bool {
   TypeChecker::check(&ast)
     .problems()
     .iter()
-    .all(|error| error.is_warning())
+    .all(Problem::is_warning)
 }
 
 #[test]

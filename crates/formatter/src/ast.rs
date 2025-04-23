@@ -4,7 +4,6 @@ use bang_syntax::{
   ast::{expression::*, statement::*, types::*},
 };
 use bumpalo::collections::Vec;
-use std::ptr;
 
 impl<'a, 'b> Formattable<'a, 'b, AST> for AST {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
@@ -445,7 +444,7 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for Import {
     let mut items = Vec::from_iter_in(self.items(ast), f.allocator);
     if f.config.sort_imports && !items.is_sorted_by_key(|item| item.name) {
       items.sort_by_key(|item| item.name);
-    };
+    }
 
     if items.is_empty() {
       return f.concat([
@@ -596,9 +595,26 @@ fn unwrap<'a>(expression: &'a Expression, ast: &'a AST) -> &'a Expression {
   }
 }
 
+fn is_unwrappable(expression: &Expression, ast: &AST) -> bool {
+  match expression {
+    Expression::Group(_) => true,
+    Expression::Block(block) => {
+      if block.len() == 1
+        && let Some(statement) = block.statements(ast).next()
+        && let Statement::Expression(_) = statement
+      {
+        true
+      } else {
+        false
+      }
+    }
+    _ => false,
+  }
+}
+
 /// Can this expression be directly placed on the same line as the previous without a break
 fn is_stackable_bracket(expression: &Expression, ast: &AST) -> bool {
-  if ptr::from_ref(unwrap(expression, ast)) != ptr::from_ref(expression) {
+  if is_unwrappable(expression, ast) {
     return false;
   }
 

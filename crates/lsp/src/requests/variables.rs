@@ -69,7 +69,7 @@ pub fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::
         new_text: format!(" as {new_name}"),
       });
     }
-  };
+  }
 
   for used in &declaration.used {
     text_edits.push(lsp::TextEdit {

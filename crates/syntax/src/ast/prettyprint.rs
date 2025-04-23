@@ -258,7 +258,7 @@ impl PrettyPrint for Pattern {
         if let Some(end) = &range.end {
           write!(f, " ")?;
           display_literal(f, end, ast)?;
-        };
+        }
       }
       Self::List(list_pattern) if list_pattern.variables(ast).is_empty() => {
         write!(f, "[")?;
@@ -276,7 +276,7 @@ impl PrettyPrint for Pattern {
         match list_pattern.rest(ast) {
           Some(rest) => write!(f, "{}, ..{}", last.name(ast), rest.name(ast))?,
           None => write!(f, "{}", last.name(ast))?,
-        };
+        }
         write!(f, "]")?;
       }
       Self::Option(option) => {
@@ -287,7 +287,7 @@ impl PrettyPrint for Pattern {
         }
       }
       Self::Invalid => write!(f, "invalid")?,
-    };
+    }
 
     writeln!(f)
   }

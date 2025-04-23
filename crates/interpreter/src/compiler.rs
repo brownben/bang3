@@ -414,7 +414,7 @@ impl<'s> Compile<'s> for Literal {
       LiteralValue::Boolean(false) => compiler.chunk.add_opcode(OpCode::False, self.span(ast)),
       LiteralValue::Number(value) => compiler.chunk.add_number(value, self.span(ast)),
       LiteralValue::String(value) => compiler.add_constant(value, self.span(ast))?,
-    };
+    }
 
     Ok(())
   }

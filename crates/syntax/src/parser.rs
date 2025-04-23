@@ -263,7 +263,7 @@ impl<'ast> Parser<'ast> {
         expected: TokenKind::Identifier,
         recieved: self.ast[token],
       });
-    };
+    }
 
     Some(Variable { token })
   }
@@ -280,7 +280,7 @@ impl<'ast> Parser<'ast> {
         expected: TokenKind::Identifier,
         recieved: self.ast[token],
       });
-    };
+    }
 
     Some(Variable { token })
   }
@@ -319,7 +319,7 @@ impl Parser<'_> {
         Statement::Comment(_) => {}
         Statement::Expression(_) | Statement::Return(_) => ends_with_expression = true,
         Statement::Import(_) | Statement::Let(_) => ends_with_expression = false,
-      };
+      }
 
       statements.push(self.ast.add_statement(statement));
       self.skip_newline();
@@ -354,7 +354,7 @@ impl Parser<'_> {
       self.resync(TokenKind::RightParen);
       let span = span.merge(self.previous_token().into());
       self.add_error(ParseError::MultipleFunctionArgs(span));
-    };
+    }
 
     let closing = self.expect(TokenKind::RightParen);
 

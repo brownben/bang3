@@ -692,7 +692,7 @@ impl<'context> VM<'context> {
           }
         }
         OpCode::Halt => break None,
-      };
+      }
 
       #[cfg(feature = "debug-stack")]
       self.debug_stack(instruction);
@@ -930,14 +930,14 @@ impl RuntimeError {
           StackTraceLocationKind::Function(name) => {
             writeln!(string, "in function '{name}' at line {line}").unwrap();
           }
-        };
+        }
       } else {
         match &location.kind {
           StackTraceLocationKind::Function(name) => {
             writeln!(string, "in native function '{name}'").unwrap();
           }
           StackTraceLocationKind::Root => unreachable!(),
-        };
+        }
       }
     }
 

@@ -1461,7 +1461,7 @@ mod docs {
     let ast = bang_syntax::parse(doc_example);
     if !ast.is_valid() {
       let errors = (ast.errors.iter())
-        .map(|error| error.full_message())
+        .map(bang_syntax::ParseError::full_message)
         .fold(String::new(), |a, b| a + b.as_str() + "\n\n");
 
       panic!(
@@ -1478,7 +1478,7 @@ mod docs {
     let type_checker = bang_typechecker::TypeChecker::check(&ast);
     if !type_checker.problems().is_empty() {
       let errors = (type_checker.problems().iter())
-        .map(|error| error.full_message())
+        .map(bang_typechecker::TypeError::full_message)
         .fold(String::new(), |a, b| a + b.as_str() + "\n\n");
 
       panic!(
@@ -1495,7 +1495,7 @@ mod docs {
     if !problems.is_empty() {
       let errors = problems
         .iter()
-        .map(|error| error.full_message())
+        .map(bang_linter::LintDiagnostic::full_message)
         .fold(String::new(), |a, b| a + b.as_str() + "\n\n");
 
       panic!(

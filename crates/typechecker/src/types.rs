@@ -92,7 +92,7 @@ impl TypeArena {
       (_, Type::Variable(var)) => self.link(var, a),
 
       (_, _) => return Err(()),
-    };
+    }
 
     Ok(())
   }

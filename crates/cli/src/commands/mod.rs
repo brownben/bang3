@@ -20,7 +20,7 @@ pub enum CommandStatus {
 fn read_file(filename: &str) -> Result<String, ()> {
   if filename == "-" {
     return read_stdin();
-  };
+  }
 
   match fs::read_to_string(filename) {
     Ok(file) if file.is_empty() => {
@@ -146,7 +146,7 @@ pub fn format(options: &FormatOptions) -> Result<CommandStatus, ()> {
   if formatted_source != ast.source && fs::write(&options.file, formatted_source).is_err() {
     eprintln!("{}", Message::error("Problem writing to file".into()));
     return Err(());
-  };
+  }
 
   Ok(CommandStatus::Success)
 }

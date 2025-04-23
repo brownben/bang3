@@ -217,7 +217,7 @@ impl DisplayIR<'_, '_> {
 
     if size < 0 {
       return false;
-    };
+    }
 
     match self {
       DisplayIR::Empty | DisplayIR::Line { .. } => true,

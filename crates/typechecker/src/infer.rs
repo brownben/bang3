@@ -73,7 +73,7 @@ impl TypeChecker {
             otherwise: self.types.type_to_string(else_),
             span,
           });
-        };
+        }
         Some(then)
       }
     };
@@ -87,7 +87,7 @@ impl TypeChecker {
             otherwise: self.types.type_to_string(else_),
             span,
           });
-        };
+        }
         Some(then)
       }
     };
@@ -168,7 +168,7 @@ impl InferExpression for Import {
             did_you_mean: similarly_named(item.name, module.items().iter().copied()),
           });
         }
-      };
+      }
     }
 
     TypeArena::NEVER
