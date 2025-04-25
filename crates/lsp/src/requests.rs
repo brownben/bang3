@@ -23,7 +23,7 @@ use hover::hover;
 use inlay_hints::inlay_hints;
 use selection_range::selection_ranges;
 use symbols::document_symbols;
-use variables::{get_references, goto_definition, rename};
+use variables::{get_references, goto_definition, is_valid_identifier, rename};
 
 pub fn handle(
   request: lsp_server::Request,
@@ -71,6 +71,15 @@ pub fn handle(
       let (request_id, params) = get_params::<Rename>(request);
       let file = files.get(&params.text_document_position.text_document.uri);
       let position = params.text_document_position.position;
+
+      if !is_valid_identifier(&params.new_name) {
+        return Some(lsp_server::Response::new_err(
+          request_id,
+          0,
+          format!("`{}` is not a valid identifier", params.new_name),
+        ));
+      }
+
       let result = rename(file, position, &params.new_name);
 
       Some(lsp_server::Response::new_ok(request_id, result))

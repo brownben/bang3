@@ -34,6 +34,12 @@ pub fn get_references(file: &Document, position: lsp::Position) -> Option<Vec<ls
   Some(references)
 }
 
+pub fn is_valid_identifier(string: &str) -> bool {
+  string
+    .chars()
+    .all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
 pub fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::WorkspaceEdit {
   let position = span_from_lsp_position(position, file);
 
