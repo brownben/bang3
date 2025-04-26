@@ -547,6 +547,14 @@ impl Parser<'_> {
     self.ast.add_expression(ModuleAccess { module, item })
   }
 
+  /// For use skipping an extra `.` after `..`
+  fn ignore_extra_dot(&mut self) {
+    if self.current_kind() == TokenKind::Dot {
+      let (_, token) = self.advance();
+      self.add_error(ParseError::ExtraDot(self.ast[token]));
+    }
+  }
+
   fn pattern(&mut self) -> Pattern {
     if self.current_kind() == TokenKind::RightArrow {
       self.add_error(ParseError::MissingPattern(self.current_token()));
@@ -568,6 +576,7 @@ impl Parser<'_> {
 
     if self.current_kind() == TokenKind::DotDot {
       let (_, dots) = self.advance();
+      self.ignore_extra_dot();
 
       if self.current_kind() == TokenKind::RightArrow || self.current_kind() == TokenKind::If {
         Pattern::Range(PatternRange::new(start, dots, None))
@@ -645,6 +654,8 @@ impl Parser<'_> {
       }
 
       if self.matches(TokenKind::DotDot) {
+        self.ignore_extra_dot();
+
         let rest = self.expect(TokenKind::Identifier);
         list.rest = rest.map(|token| Variable { token });
         _ = self.matches(TokenKind::Comma); // allow optional comma after rest
@@ -665,6 +676,8 @@ impl Parser<'_> {
   }
 
   fn pattern_range(&mut self, start: Option<Literal>, dots: TokenIdx) -> Pattern {
+    self.ignore_extra_dot();
+
     match self.current_kind() {
       TokenKind::String | TokenKind::Number => {
         let (_, token) = self.advance();
@@ -1026,6 +1039,8 @@ pub enum ParseError {
   MultipleFunctionArgs(Span),
   /// Nested Patterns not supported
   NestedPattern(Token),
+  /// `...` instead of `..`
+  ExtraDot(Token),
 }
 impl ParseError {
   /// The title of the error message
@@ -1049,6 +1064,7 @@ impl ParseError {
       Self::KeywordAsImportItem(_) => "Keyword as Import Item".into(),
       Self::MultipleFunctionArgs(_) => "Multiple Function Arguments".into(),
       Self::NestedPattern(_) => "Nested Pattern".into(),
+      Self::ExtraDot(_) => "Extra Dot".into(),
     }
   }
 
@@ -1099,6 +1115,9 @@ impl ParseError {
       Self::NestedPattern(_) => {
         "nested patterns are not supported yet".into()
       },
+      Self::ExtraDot(_) => {
+        "Patterns only uses two dots (`..`), not three (`...`)".into()
+      },
     }
   }
 
@@ -1138,6 +1157,7 @@ impl ParseError {
       Self::KeywordAsImportItem(token) => token.into(),
       Self::MultipleFunctionArgs(span) => *span,
       Self::NestedPattern(span) => span.into(),
+      Self::ExtraDot(span) => span.into(),
     }
   }
 
@@ -1165,6 +1185,7 @@ impl ParseError {
       Self::MissingModuleName(_) => true,
       Self::MissingPattern(_) => true,
       Self::KeywordAsImportItem(_) => true,
+      Self::ExtraDot(_) => true,
       _ => false,
     }
   }

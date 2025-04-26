@@ -369,3 +369,35 @@ fn nested_pattern() {
   "};
   assert_eq!(output, expected);
 }
+
+#[test]
+fn extra_dot() {
+  let file = indoc! {"
+    match x
+      | ...'a' -> 0
+      | 3...'b' -> 1
+      | [..._x] -> 2
+  "};
+  let output = run_stderr(file);
+  let expected = indoc! {"
+    ✕ Error: Extra Dot
+    Patterns only uses two dots (`..`), not three (`...`)
+
+        ╭─[STDIN:2]
+      2 │   | ...'a' -> 0
+    ────╯
+    ✕ Error: Extra Dot
+    Patterns only uses two dots (`..`), not three (`...`)
+
+        ╭─[STDIN:3]
+      3 │   | 3...'b' -> 1
+    ────╯
+    ✕ Error: Extra Dot
+    Patterns only uses two dots (`..`), not three (`...`)
+
+        ╭─[STDIN:4]
+      4 │   | [..._x] -> 2
+    ────╯
+  "};
+  assert_eq!(output, expected);
+}

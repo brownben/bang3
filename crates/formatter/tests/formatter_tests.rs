@@ -531,6 +531,9 @@ fn match_() {
   "};
   assert_format!(match_options, match_options, 80);
   assert_format!(match_options_misformatted, match_options, 80);
+
+  // extra dot in pattern is removed
+  assert_format!("match n | 1... -> a", "match n\n  | 1.. -> a", 100);
 }
 
 #[test]

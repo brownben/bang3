@@ -89,6 +89,7 @@ impl Tokeniser<'_> {
       b'|' => (TokenKind::Pipe, 1),
       b'-' if matches!(next_character, Some(b'>')) => (TokenKind::RightArrow, 2),
       b'.' if matches!(next_character, Some(b'.')) => (TokenKind::DotDot, 2),
+      b'.' => (TokenKind::Dot, 1),
 
       // Operators
       b'+' if matches!(next_character, Some(b'+')) => (TokenKind::PlusPlus, 2),
@@ -402,6 +403,8 @@ pub enum TokenKind {
   RightArrow,
   /// `..`
   DotDot,
+  /// `.`
+  Dot,
 
   // Whitespace + Comments
   /// A comment, consisting of `//` then any number of characters before a newline
@@ -524,6 +527,7 @@ impl fmt::Display for TokenKind {
       Self::Pipe => write!(f, "|"),
       Self::RightArrow => write!(f, "->"),
       Self::DotDot => write!(f, ".."),
+      Self::Dot => write!(f, "."),
 
       // Whitespace + Comments
       Self::Comment => write!(f, "Comment"),

@@ -686,6 +686,42 @@ fn match_missing_parts() {
 }
 
 #[test]
+fn pattern_extra_dot() {
+  let ast = parse("match x | 1... -> 2");
+  let expected = indoc! {"
+    ├─ Match
+    │  ├─ Variable (x)
+    │  ╰─ Cases:
+    │     ╰─ Pattern ─ 1 ..
+    │        ╰─ Number (2)
+  "};
+  assert_eq!(ast.to_string(), expected);
+  assert_eq!(ast.errors.len(), 1);
+
+  let ast = parse("match x | [_, ...x] -> 2");
+  let expected = indoc! {"
+  ├─ Match
+  │  ├─ Variable (x)
+  │  ╰─ Cases:
+  │     ╰─ Pattern ─ [_, ..x]
+  │        ╰─ Number (2)
+  "};
+  assert_eq!(ast.to_string(), expected);
+  assert_eq!(ast.errors.len(), 1);
+
+  let ast = parse("match x | 1...'hello' -> 2");
+  let expected = indoc! {"
+  ├─ Match
+  │  ├─ Variable (x)
+  │  ╰─ Cases:
+  │     ╰─ Pattern ─ 1 .. 'hello'
+  │        ╰─ Number (2)
+  "};
+  assert_eq!(ast.to_string(), expected);
+  assert_eq!(ast.errors.len(), 1);
+}
+
+#[test]
 fn unary() {
   let ast = parse_to_string("!false");
   let expected = indoc! {"
