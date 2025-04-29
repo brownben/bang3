@@ -1054,7 +1054,7 @@ mod iter {
   }
 
   #[test]
-  fn find_position() {
+  fn find() {
     let mut find = run(indoc! {"
       let a = iter::empty() >> iter::find(x => x % 3 == 0) >> string::from
       let b = iter::repeat(6) >> iter::find(x => x % 3 == 0) >> string::from
@@ -1077,7 +1077,10 @@ mod iter {
     assert!(find_not_iter.is_err());
     let find_not_callable = run("iter::empty() >> iter::find(5)");
     assert!(find_not_callable.is_err());
+  }
 
+  #[test]
+  fn position() {
     let mut position = run(indoc! {"
       let a = iter::empty() >> iter::position(x => x % 3 == 0) >> string::from
       let b = iter::repeat(6) >> iter::position(x => x % 3 == 0) >> string::from
@@ -1118,7 +1121,10 @@ mod iter {
     assert!(map_not_iter.is_err());
     let map_not_callable = run("iter::empty() >> iter::map(5)");
     assert!(map_not_callable.is_err());
+  }
 
+  #[test]
+  fn inspect() {
     let mut inspect = run(indoc! {"
       let a = iter::empty() >> iter::inspect(x => panic('not called')) >> iter::count
       let b = list::iter([1, 2, 3]) >> iter::inspect(x => !x) >> iter::toList >> string::from
@@ -1134,7 +1140,10 @@ mod iter {
     assert!(inspect_not_iter.is_err());
     let inspect_not_callable = run("iter::once(1) >> iter::inspect(5)");
     assert!(inspect_not_callable.is_err());
+  }
 
+  #[test]
+  fn filter() {
     let mut filter = run(indoc! {"
       let a = 'Hi 👋'
         >> string::chars
@@ -1152,7 +1161,10 @@ mod iter {
     assert!(filter_not_iter.is_err());
     let filter_not_callable = run("iter::once(1) >> iter::filter(5)");
     assert!(filter_not_callable.is_err());
+  }
 
+  #[test]
+  fn filter_map() {
     let mut filter_map = run(indoc! {"
       let a = 'Hi 👋'
         >> string::chars
@@ -1213,7 +1225,10 @@ mod iter {
     assert!(reduce_not_callable.is_err());
     let reduce_not_callable_inner = run("list::iter([1, 2]) >> iter::reduce(x => 5)");
     assert!(reduce_not_callable_inner.is_err());
+  }
 
+  #[test]
+  fn fold() {
     let mut fold = run(indoc! {"
       let a = list::iter([1, 2, 3]) >> iter::fold(0)(acc => x => acc + x)
       let b = list::iter([1, 2, 3]) >> iter::fold(4)(acc => x => acc + x)

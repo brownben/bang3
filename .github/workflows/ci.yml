@@ -46,5 +46,5 @@ jobs:
           tool: cargo-nextest
       - name: Test
         run: |
-          cargo miri nextest run --no-fail-fast --workspace
+          cargo miri nextest run -p bang -p bang-interpreter -p bang-gc -p bang-stdlib --no-fail-fast
           cargo miri nextest run -p bang-interpreter -F gc-stress-test --no-fail-fast

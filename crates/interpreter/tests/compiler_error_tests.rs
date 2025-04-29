@@ -48,7 +48,7 @@ fn invalid_ast() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore)] // reason: test has pathological input, so are very slow
+#[cfg_attr(miri, ignore)] // reason: test has pathological input, so is very slow
 fn too_many_local_variables() {
   fn generate_local_variables(count: u32) -> String {
     let mut source = "{\n".to_owned();
@@ -73,7 +73,7 @@ fn too_many_local_variables() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore)] // reason: test has pathological input, so are very slow
+#[cfg_attr(miri, ignore)] // reason: test has pathological input, so is very slow
 fn too_many_symbols() {
   fn generate_symbols(count: u32) -> String {
     let mut source = String::new();
@@ -97,7 +97,7 @@ fn too_many_symbols() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore)] // reason: test has pathological input, so are very slow
+#[cfg_attr(miri, ignore)] // reason: test has pathological input, so is very slow
 fn too_many_constants() {
   fn generate_constants(count: u32) -> String {
     let mut source = String::new();
@@ -121,7 +121,7 @@ fn too_many_constants() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore)] // reason: test has pathological input, so are very slow
+#[cfg_attr(miri, ignore)] // reason: test has pathological input, so is very slow
 fn too_big_jump() {
   let mut source = "if (x) {".to_owned();
   for _ in 0..=u16::MAX {
@@ -138,6 +138,7 @@ fn too_big_jump() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // reason: test has pathological input, so is very slow
 fn too_many_list_items() {
   use std::fmt::Write;
 

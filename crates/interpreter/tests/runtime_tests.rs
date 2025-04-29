@@ -663,37 +663,6 @@ fn match_expression() {
   assert_variable!(literal_multi_case; c, 3.0);
   assert_variable!(literal_multi_case; d, 1.0);
 
-  let max_range = run(indoc! {"
-    let a = match 5 | ..10 -> 1 | _ -> 2
-    let b = match 10 | ..10 -> 1 | _ -> 2
-    let c = match 15 | ..10 -> 1 | _ -> 2
-  "});
-  assert_variable!(max_range; a, 1.0);
-  assert_variable!(max_range; b, 1.0);
-  assert_variable!(max_range; c, 2.0);
-
-  let min_range = run(indoc! {"
-    let a = match 5 | 10.. -> 1 | _ -> 2
-    let b = match 10 | 10.. -> 1 | _ -> 2
-    let c = match 15 | 10.. -> 1 | _ -> 2
-  "});
-  assert_variable!(min_range; a, 2.0);
-  assert_variable!(min_range; b, 1.0);
-  assert_variable!(min_range; c, 1.0);
-
-  let both_range = run(indoc! {"
-    let a = match 5 | 10..15 -> 1 | _ -> 2
-    let b = match 10 | 10..15 -> 1 | _ -> 2
-    let c = match 12 | 10..15 -> 1 | _ -> 2
-    let d = match 15 | 10..15 -> 1 | _ -> 2
-    let e = match 20 | 10..15 -> 1 | _ -> 2
-  "});
-  assert_variable!(both_range; a, 2.0);
-  assert_variable!(both_range; b, 1.0);
-  assert_variable!(both_range; c, 1.0);
-  assert_variable!(both_range; d, 1.0);
-  assert_variable!(both_range; e, 2.0);
-
   let temporaries_cleaned_up = run(indoc! {"
     let a = match false
       | true -> 1
@@ -735,25 +704,6 @@ fn match_expression() {
   assert_variable!(temporaries_cleaned_up; g, 12.0);
   assert_variable!(temporaries_cleaned_up; h, 6.0);
 
-  let guards = run(indoc! {"
-    let a = match true | true if false -> 1 | false -> 2 | _ -> 3
-    let b = match true | true if true -> 1 | false -> 2 | _ -> 3
-    let c = match 5 | ..6 if false -> 1 | 2..8 if true -> 2 | _ -> 3
-    let d = match 5 | ..6 if true -> 1 | 2..8 if true -> 2 | _ -> 3
-    let e = match 12 | c if c > 3 -> 1 | _ -> 2
-    let f = match 12 | c if c > 15 -> 1 | c if c > 10 -> 2 | _ -> 3
-    let g = match 12 | c if c > 10 -> c | _ -> 3
-    let h = match 12 | c if false -> c | _ -> 3
-  "});
-  assert_variable!(guards; a, 3.0);
-  assert_variable!(guards; b, 1.0);
-  assert_variable!(guards; c, 2.0);
-  assert_variable!(guards; d, 1.0);
-  assert_variable!(guards; e, 1.0);
-  assert_variable!(guards; f, 2.0);
-  assert_variable!(guards; g, 12.0);
-  assert_variable!(guards; h, 3.0);
-
   let option_patterns = run(indoc! {"
     from option import { None, Some }
 
@@ -794,38 +744,40 @@ fn match_expression() {
   assert_variable!(option_patterns; f, 3.0);
   assert_variable!(option_patterns; g, 4.0);
   assert_variable!(option_patterns; h, 10.0);
+}
 
-  let option_pattern_guard = run(indoc! {"
-    from option import { None, Some }
-
-    let matchFunction = x => {
-      let a = 1
-      let b = match x
-        | Some(_) if false -> 5
-        | None if false -> 10
-        | _ -> 100
-      let c = 2
-      a + b + c
-    }
-    let a = matchFunction(None)
-    let b = matchFunction(Some(5))
-    let c = matchFunction(false)
-    let d = matchFunction(-55)
+#[test]
+fn match_ranges() {
+  let max_range = run(indoc! {"
+    let a = match 5 | ..10 -> 1 | _ -> 2
+    let b = match 10 | ..10 -> 1 | _ -> 2
+    let c = match 15 | ..10 -> 1 | _ -> 2
   "});
-  assert_variable!(option_pattern_guard; a, 103.0);
-  assert_variable!(option_pattern_guard; b, 103.0);
-  assert_variable!(option_pattern_guard; c, 103.0);
-  assert_variable!(option_pattern_guard; d, 103.0);
+  assert_variable!(max_range; a, 1.0);
+  assert_variable!(max_range; b, 1.0);
+  assert_variable!(max_range; c, 2.0);
 
-  let fibonnacci = run(indoc! {"
-    let fibonnacciMatch = n => match n
-      | ..2 -> 1
-      | n -> fibonnacciMatch(n - 1) + fibonnacciMatch(n - 2)
-    let a = fibonnacciMatch(0)
-    let b = fibonnacciMatch(6)
+  let min_range = run(indoc! {"
+    let a = match 5 | 10.. -> 1 | _ -> 2
+    let b = match 10 | 10.. -> 1 | _ -> 2
+    let c = match 15 | 10.. -> 1 | _ -> 2
   "});
-  assert_variable!(fibonnacci; a, 1.0);
-  assert_variable!(fibonnacci; b, 8.0);
+  assert_variable!(min_range; a, 2.0);
+  assert_variable!(min_range; b, 1.0);
+  assert_variable!(min_range; c, 1.0);
+
+  let both_range = run(indoc! {"
+    let a = match 5 | 10..15 -> 1 | _ -> 2
+    let b = match 10 | 10..15 -> 1 | _ -> 2
+    let c = match 12 | 10..15 -> 1 | _ -> 2
+    let d = match 15 | 10..15 -> 1 | _ -> 2
+    let e = match 20 | 10..15 -> 1 | _ -> 2
+  "});
+  assert_variable!(both_range; a, 2.0);
+  assert_variable!(both_range; b, 1.0);
+  assert_variable!(both_range; c, 1.0);
+  assert_variable!(both_range; d, 1.0);
+  assert_variable!(both_range; e, 2.0);
 }
 
 #[test]
@@ -883,6 +835,97 @@ fn match_expression_list_patterns() {
   assert_variable!(list_patterns; m, string "[1, 2]");
   assert_variable!(list_patterns; n, ());
 
+  let longer_list_patterns = run(indoc! {"
+    let func = x => {
+      let a = 10
+      let b = match x
+        | [x, y, z, w, .._] -> x + y + z + w
+        | [x, y, z, .._] -> x + y + z
+        | [x, y, .._] -> x + y
+        | [x, .._] -> x
+        | [] -> 0
+      let c = 100
+      a + b + c
+    }
+    let a = func([])
+    let b = func([1])
+    let c = func([1, 2])
+    let d = func([1, 2, 1])
+    let e = func([1, 2, 3, 4])
+    let f = func([1, 1, 1, 1, 1])
+    let g = func([1, 1, 1, 1, 1, 1])
+  "});
+  assert_variable!(longer_list_patterns; a, 110.0);
+  assert_variable!(longer_list_patterns; b, 111.0);
+  assert_variable!(longer_list_patterns; c, 113.0);
+  assert_variable!(longer_list_patterns; d, 114.0);
+  assert_variable!(longer_list_patterns; e, 120.0);
+  assert_variable!(longer_list_patterns; f, 114.0);
+  assert_variable!(longer_list_patterns; g, 114.0);
+}
+
+#[test]
+fn match_applications() {
+  let fibonnacci = run(indoc! {"
+    let fibonnacciMatch = n => match n
+      | ..2 -> 1
+      | n -> fibonnacciMatch(n - 1) + fibonnacciMatch(n - 2)
+    let a = fibonnacciMatch(0)
+    let b = fibonnacciMatch(6)
+  "});
+  assert_variable!(fibonnacci; a, 1.0);
+  assert_variable!(fibonnacci; b, 8.0);
+
+  let sum = run(indoc! {"
+    let sum = list => match list
+      | [] -> 0
+      | [x, ..y] -> x + sum(y)
+    let a = [] >> sum
+    let b = [1] >> sum
+    let c = [1, 2, 3] >> sum
+    let d = [256, 128, 128, 1] >> sum
+  "});
+  assert_variable!(sum; a, 0.0);
+  assert_variable!(sum; b, 1.0);
+  assert_variable!(sum; c, 6.0);
+  assert_variable!(sum; d, 513.0);
+
+  let length = run(indoc! {"
+    let length = list => match list
+      | [] -> 0
+      | [_, ..xs] -> 1 + length(xs)
+    let a = [] >> length
+    let b = [1] >> length
+    let c = [1, 2, 3] >> length
+    let d = [256, false, 128, 1, '', 4] >> length
+  "});
+  assert_variable!(length; a, 0.0);
+  assert_variable!(length; b, 1.0);
+  assert_variable!(length; c, 3.0);
+  assert_variable!(length; d, 6.0);
+}
+
+#[test]
+fn match_guards() {
+  let guards = run(indoc! {"
+    let a = match true | true if false -> 1 | false -> 2 | _ -> 3
+    let b = match true | true if true -> 1 | false -> 2 | _ -> 3
+    let c = match 5 | ..6 if false -> 1 | 2..8 if true -> 2 | _ -> 3
+    let d = match 5 | ..6 if true -> 1 | 2..8 if true -> 2 | _ -> 3
+    let e = match 12 | c if c > 3 -> 1 | _ -> 2
+    let f = match 12 | c if c > 15 -> 1 | c if c > 10 -> 2 | _ -> 3
+    let g = match 12 | c if c > 10 -> c | _ -> 3
+    let h = match 12 | c if false -> c | _ -> 3
+  "});
+  assert_variable!(guards; a, 3.0);
+  assert_variable!(guards; b, 1.0);
+  assert_variable!(guards; c, 2.0);
+  assert_variable!(guards; d, 1.0);
+  assert_variable!(guards; e, 1.0);
+  assert_variable!(guards; f, 2.0);
+  assert_variable!(guards; g, 12.0);
+  assert_variable!(guards; h, 3.0);
+
   let list_pattern_guards = run(indoc! {"
     let func = x => y => {
       let a = 1
@@ -928,61 +971,27 @@ fn match_expression_list_patterns() {
   assert_variable!(list_pattern_guards; j, 9.0);
   assert_variable!(list_pattern_guards; k, 9.0);
 
-  let longer_list_patterns = run(indoc! {"
-    let func = x => {
-      let a = 10
+  let option_pattern_guard = run(indoc! {"
+    from option import { None, Some }
+
+    let matchFunction = x => {
+      let a = 1
       let b = match x
-        | [x, y, z, w, .._] -> x + y + z + w
-        | [x, y, z, .._] -> x + y + z
-        | [x, y, .._] -> x + y
-        | [x, .._] -> x
-        | [] -> 0
-      let c = 100
+        | Some(_) if false -> 5
+        | None if false -> 10
+        | _ -> 100
+      let c = 2
       a + b + c
     }
-    let a = func([])
-    let b = func([1])
-    let c = func([1, 2])
-    let d = func([1, 2, 1])
-    let e = func([1, 2, 3, 4])
-    let f = func([1, 1, 1, 1, 1])
-    let g = func([1, 1, 1, 1, 1, 1])
+    let a = matchFunction(None)
+    let b = matchFunction(Some(5))
+    let c = matchFunction(false)
+    let d = matchFunction(-55)
   "});
-  assert_variable!(longer_list_patterns; a, 110.0);
-  assert_variable!(longer_list_patterns; b, 111.0);
-  assert_variable!(longer_list_patterns; c, 113.0);
-  assert_variable!(longer_list_patterns; d, 114.0);
-  assert_variable!(longer_list_patterns; e, 120.0);
-  assert_variable!(longer_list_patterns; f, 114.0);
-  assert_variable!(longer_list_patterns; g, 114.0);
-
-  let sum = run(indoc! {"
-    let sum = list => match list
-      | [] -> 0
-      | [x, ..y] -> x + sum(y)
-    let a = [] >> sum
-    let b = [1] >> sum
-    let c = [1, 2, 3] >> sum
-    let d = [256, 128, 128, 1] >> sum
-  "});
-  assert_variable!(sum; a, 0.0);
-  assert_variable!(sum; b, 1.0);
-  assert_variable!(sum; c, 6.0);
-  assert_variable!(sum; d, 513.0);
-
-  let length = run(indoc! {"
-    let length = list => match list
-      | [] -> 0
-      | [_, ..xs] -> 1 + length(xs)
-    let a = [] >> length
-    let b = [1] >> length
-    let c = [1, 2, 3] >> length
-    let d = [256, false, 128, 1, '', 4] >> length
-  "});
-  assert_variable!(length; a, 0.0);
-  assert_variable!(length; b, 1.0);
-  assert_variable!(length; c, 3.0);
-  assert_variable!(length; d, 6.0);
+  assert_variable!(option_pattern_guard; a, 103.0);
+  assert_variable!(option_pattern_guard; b, 103.0);
+  assert_variable!(option_pattern_guard; c, 103.0);
+  assert_variable!(option_pattern_guard; d, 103.0);
 }
 
 #[test]
