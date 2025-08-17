@@ -1,6 +1,7 @@
 use super::{Heap, HeapSize, PAGE_SIZE};
 use crate::Gc;
 
+#[allow(clippy::many_single_char_names)]
 #[test]
 fn allocate_small_size() {
   let mut allocator = Heap::new(HeapSize::Standard).unwrap();
@@ -80,6 +81,7 @@ fn allocate_then_free_everything() {
   allocator.finish_gc();
 }
 
+#[allow(clippy::many_single_char_names)]
 #[test]
 fn allocate_then_free_nothing() {
   let mut allocator = Heap::new(HeapSize::Standard).unwrap();

@@ -7,7 +7,7 @@ use bang_stdlib::StandardContext;
 use bang_syntax::parse;
 use indoc::indoc;
 
-fn run(source: &str) -> Result<VM, ()> {
+fn run(source: &str) -> Result<VM<'_>, ()> {
   let ast = parse(source.to_owned());
   assert!(ast.is_valid());
   let chunk = compile(&ast).unwrap();

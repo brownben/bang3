@@ -43,18 +43,18 @@ fn main() -> io::Result<()> {
 
   // if `--check` is passed as an argument, ensure the existing docs match
   let args: Vec<String> = env::args().collect();
-  if let Some(arg) = args.get(1) {
-    if arg == "--check" {
-      let existing = fs::read_to_string(OUTPUT_FILE)?;
+  if let Some(arg) = args.get(1)
+    && arg == "--check"
+  {
+    let existing = fs::read_to_string(OUTPUT_FILE)?;
 
-      if file != existing {
-        println!("The standard library documentation is not up-to-date");
-        process::exit(1);
-      }
-
-      println!("The standard library documentation is up-to-date");
-      return Ok(());
+    if file != existing {
+      println!("The standard library documentation is not up-to-date");
+      process::exit(1);
     }
+
+    println!("The standard library documentation is up-to-date");
+    return Ok(());
   }
 
   fs::write(OUTPUT_FILE, file)

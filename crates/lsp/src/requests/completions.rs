@@ -323,10 +323,10 @@ fn in_module_access(
   position: Span,
 ) -> Option<&bang_syntax::ast::expression::ModuleAccess> {
   for expression in &ast.expressions {
-    if let Expression::ModuleAccess(module_access) = expression {
-      if module_access.span(ast).contains(position) {
-        return Some(module_access);
-      }
+    if let Expression::ModuleAccess(module_access) = expression
+      && module_access.span(ast).contains(position)
+    {
+      return Some(module_access);
     }
   }
 

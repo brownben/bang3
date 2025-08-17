@@ -198,7 +198,7 @@ impl LintRule for LossOfPrecision {
     "numbers are stored as double-precision floating-point numbers according to the IEEE 754 standard\nwhen the literal is converted to a number, precision will be lost and the value may not be what was intended"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
-    fn clean_up_number_literal(raw: &str) -> Cow<str> {
+    fn clean_up_number_literal(raw: &str) -> Cow<'_, str> {
       // If the number is already clean, return it
       if !raw.contains('_') && !raw.starts_with('0') && !raw.starts_with('.') && !raw.ends_with('0')
       {
@@ -402,10 +402,10 @@ impl LintRule for UnnecessaryReturn {
     "the return statement is unnecessary, as a block will return the last expression"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
-    if let Expression::Function(function) = &expression {
-      if let Some(return_span) = function.body(ast).ends_with_return(ast) {
-        context.add_diagnostic(&Self, return_span);
-      }
+    if let Expression::Function(function) = &expression
+      && let Some(return_span) = function.body(ast).ends_with_return(ast)
+    {
+      context.add_diagnostic(&Self, return_span);
     }
   }
 }

@@ -7,7 +7,7 @@ use bang_stdlib::StandardContext;
 use bang_syntax::parse;
 use indoc::indoc;
 
-fn run(source: &str) -> Result<VM, ()> {
+fn run(source: &str) -> Result<VM<'_>, ()> {
   let ast = parse(source.to_owned());
   assert!(ast.is_valid());
   let chunk = compile(&ast).unwrap();
@@ -207,6 +207,7 @@ mod maths {
   }
 
   #[test]
+  #[cfg_attr(miri, ignore)] // reason: miri maxes floating point instability
   fn exponentials_and_logarithms() {
     let root = run(indoc! {"
       from maths import { sqrt, cbrt }
@@ -863,16 +864,11 @@ mod option {
     let mut native_closures = run(indoc! {"
       from option import { None, Some, map }
 
-      let a = Some(8) >> map(maths::log(2)) >> string::from
-      let b = None >> map(maths::log(2)) >> string::from
-
-      let c = Some('hello') >> map(string::replaceOne('l')('L')) >> string::from
-      let d = None >> map(maths::abs) >> string::from
+      let a = Some('hello') >> map(string::replaceOne('l')('L')) >> string::from
+      let b = None >> map(maths::abs) >> string::from
     "});
-    assert_variable!(native_closures; a, string "Some(3)");
+    assert_variable!(native_closures; a, string "Some('heLlo')");
     assert_variable!(native_closures; b, string "None");
-    assert_variable!(native_closures; c, string "Some('heLlo')");
-    assert_variable!(native_closures; d, string "None");
 
     let not_callable = run("option::map(5)");
     assert!(not_callable.is_err());

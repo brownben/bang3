@@ -277,7 +277,7 @@ const CLOSURE: TypeDescriptor = TypeDescriptor {
 pub const CLOSURE_TYPE_ID: TypeId = TypeId(2);
 
 /// A native function
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct NativeFunction {
   pub(crate) name: &'static str,
   pub(crate) func: fn(&mut VM, Value) -> Result<Value, ErrorKind>,

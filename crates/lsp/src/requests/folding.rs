@@ -11,10 +11,10 @@ pub fn folding_ranges(file: &Document) -> Vec<lsp::FoldingRange> {
   let line_index = file.ast.line_index();
 
   for expression in &file.ast.expressions {
-    if let Some(span) = expression_folding_range(expression, &file.ast) {
-      if line_index.line(span) != line_index.final_line(span) {
-        ranges.push(folding_range_from_span(span, file));
-      }
+    if let Some(span) = expression_folding_range(expression, &file.ast)
+      && line_index.line(span) != line_index.final_line(span)
+    {
+      ranges.push(folding_range_from_span(span, file));
     }
   }
 

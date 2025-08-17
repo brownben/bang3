@@ -70,10 +70,10 @@ const PD_SECTION_SIZE: usize = PD_PAGES * PAGE_SIZE;
 pub const MAX_REAM_SIZE: usize = (u16::MAX as usize + 1) * PAGE_SIZE;
 
 const fn bytes_to_pages(n: usize) -> usize {
-  if n % PAGE_SIZE != 0 {
-    n / PAGE_SIZE + 1
-  } else {
+  if n.is_multiple_of(PAGE_SIZE) {
     n / PAGE_SIZE
+  } else {
+    n / PAGE_SIZE + 1
   }
 }
 

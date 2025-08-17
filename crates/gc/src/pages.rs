@@ -337,7 +337,7 @@ impl PdPointer {
   fn new(value: NonZero<u32>) -> Self {
     // check that the pointer is to a page descriptor and is aligned
     debug_assert!(value.get() < PD_SECTION_SIZE.try_into().unwrap());
-    debug_assert!(value.get() % u32::try_from(PageDescriptor::SIZE).unwrap() == 0);
+    debug_assert!((value.get()).is_multiple_of(u32::try_from(PageDescriptor::SIZE).unwrap()));
 
     Self { value }
   }
