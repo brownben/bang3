@@ -70,6 +70,12 @@ pub fn repl() -> Result<CommandStatus, ()> {
 
   while let Ok(line) = rl.readline(">> ") {
     rl.add_history_entry(line.as_str()).unwrap();
+
+    // if `exit` or `quit` are not defined as variables, but used -> exit the repl
+    if (line.trim() == "exit" || line.trim() == "quit") && vm.get_global(line.trim()).is_none() {
+      return Ok(CommandStatus::Success);
+    }
+
     _ = run_repl_entry(&mut vm, line);
   }
 
