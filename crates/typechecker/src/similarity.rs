@@ -75,7 +75,7 @@ fn jaro_winkler_similarity(a: &str, b: &str) -> f64 {
     .take_while(|(a, b)| a == b)
     .count();
 
-  similarity + (0.1 * prefix_length as f64 * (1.0 - similarity))
+  (0.1 * prefix_length as f64).mul_add(1.0 - similarity, similarity)
 }
 
 #[cfg(test)]

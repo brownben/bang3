@@ -16,7 +16,7 @@ pub enum ImportResult {
 }
 impl From<TypeRef> for ImportResult {
   fn from(type_: TypeRef) -> Self {
-    ImportResult::Value(TypeScheme::monomorphic(type_))
+    Self::Value(TypeScheme::monomorphic(type_))
   }
 }
 

@@ -90,8 +90,8 @@ pub enum HeapSize {
 impl HeapSize {
   fn bytes(self) -> usize {
     match self {
-      HeapSize::Standard => HEAP_SIZE,
-      HeapSize::Small => MAX_REAM_SIZE,
+      Self::Standard => HEAP_SIZE,
+      Self::Small => MAX_REAM_SIZE,
     }
   }
 }
@@ -498,7 +498,7 @@ impl Gc<u8> {
   /// A null pointer, to pointing to no value.
   ///
   /// Is ignored by the Garbage Collector
-  pub const NULL: Gc<u8> = Self {
+  pub const NULL: Self = Self {
     value: NonZero::new(u32::MAX - 7).unwrap(),
     _type: PhantomData,
   };
@@ -560,7 +560,7 @@ impl<T> Gc<T> {
 
   /// Adds an offset to the pointer
   fn add(self, offset: usize) -> Self {
-    Gc {
+    Self {
       value: self.value.checked_add(offset.try_into().unwrap()).unwrap(),
       _type: PhantomData,
     }

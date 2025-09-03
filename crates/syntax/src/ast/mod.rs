@@ -198,16 +198,15 @@ pub(crate) struct TypeIdx(NonZero<u32>);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct TokenIdx(NonZero<u32>);
 impl TokenIdx {
+  pub fn new(index: usize) -> Self {
+    Self(NonZero::new(u32::try_from(index + 1).unwrap()).unwrap())
+  }
+
   fn next(self) -> Self {
     Self(NonZero::new(self.0.get() + 1).unwrap())
   }
 
   fn range(self, end: Self) -> impl Iterator<Item = Self> {
     (self.0.get()..=end.0.get()).map(|x| Self(NonZero::new(x).unwrap()))
-  }
-}
-impl From<usize> for TokenIdx {
-  fn from(value: usize) -> Self {
-    Self(NonZero::new(u32::try_from(value + 1).unwrap()).unwrap())
   }
 }

@@ -350,7 +350,7 @@ impl TypeArena {
           did_you_mean: similarly_named(name, Self::STRUCTURE_NAMES),
         }),
       },
-      Annotation::Invalid(_) => Ok(TypeArena::UNKNOWN),
+      Annotation::Invalid(_) => Ok(Self::UNKNOWN),
     }
   }
 
@@ -360,10 +360,10 @@ impl TypeArena {
     span: Span,
   ) -> Result<TypeRef, TypeError> {
     match primitive {
-      "number" => Ok(TypeArena::NUMBER),
-      "string" => Ok(TypeArena::STRING),
-      "boolean" => Ok(TypeArena::BOOLEAN),
-      "_" => Ok(TypeArena::NEVER),
+      "number" => Ok(Self::NUMBER),
+      "string" => Ok(Self::STRING),
+      "boolean" => Ok(Self::BOOLEAN),
+      "_" => Ok(Self::NEVER),
       "list" => {
         // If it doesn't have a parameter, make it generic
         let type_ = self.new_type_var();
@@ -445,9 +445,9 @@ pub enum Structure {
 impl fmt::Display for Structure {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Structure::List => write!(f, "list"),
-      Structure::Option => write!(f, "option"),
-      Structure::Iterator => write!(f, "iterator"),
+      Self::List => write!(f, "list"),
+      Self::Option => write!(f, "option"),
+      Self::Iterator => write!(f, "iterator"),
     }
   }
 }
@@ -465,14 +465,14 @@ pub struct TypeScheme {
 }
 impl TypeScheme {
   pub fn new(type_: TypeRef, number_quantified_vars: u32) -> Self {
-    TypeScheme {
+    Self {
       number_quantified_vars,
       type_,
     }
   }
 
   pub fn monomorphic(type_: TypeRef) -> Self {
-    TypeScheme {
+    Self {
       number_quantified_vars: 0,
       type_,
     }

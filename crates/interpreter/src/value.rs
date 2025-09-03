@@ -221,6 +221,7 @@ impl From<bool> for Value {
     if value { Self::TRUE } else { Self::FALSE }
   }
 }
+#[allow(clippy::fallible_impl_from, reason = "usize is the same size as f64")]
 impl From<f64> for Value {
   fn from(value: f64) -> Self {
     Self(ptr::without_provenance(value.to_bits().try_into().unwrap()))
@@ -298,6 +299,7 @@ mod test {
   }
 
   #[test]
+  #[expect(clippy::float_cmp, reason = "we want exact equality here")]
   fn number() {
     for number in [0.0, 1.0, 2.0, 4.0, 8.0, 123.0, -0.0, -2.0, 123.45] {
       let num = Value::from(number);

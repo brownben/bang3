@@ -295,19 +295,19 @@ impl OpCode {
   #[must_use]
   pub fn length(self) -> usize {
     match self {
-      OpCode::Number => 9,
-      OpCode::ConstantLong | OpCode::Jump | OpCode::JumpIfFalse | OpCode::Import => 3,
-      OpCode::Constant
-      | OpCode::DefineGlobal
-      | OpCode::GetGlobal
-      | OpCode::GetLocal
-      | OpCode::GetUpvalue
-      | OpCode::PopBelow
-      | OpCode::Allocate
-      | OpCode::Closure
-      | OpCode::GetAllocatedValue
-      | OpCode::GetAllocatedPointer
-      | OpCode::List => 2,
+      Self::Number => 9,
+      Self::ConstantLong | Self::Jump | Self::JumpIfFalse | Self::Import => 3,
+      Self::Constant
+      | Self::DefineGlobal
+      | Self::GetGlobal
+      | Self::GetLocal
+      | Self::GetUpvalue
+      | Self::PopBelow
+      | Self::Allocate
+      | Self::Closure
+      | Self::GetAllocatedValue
+      | Self::GetAllocatedPointer
+      | Self::List => 2,
       _ => 1,
     }
   }
@@ -316,7 +316,7 @@ impl From<u8> for OpCode {
   #[inline]
   fn from(value: u8) -> Self {
     // SAFETY: Assume bytecode is valid, so value is a valid OpCode
-    debug_assert!(value <= OpCode::Halt as u8);
+    debug_assert!(value <= Self::Halt as u8);
 
     unsafe { mem::transmute(value) }
   }
@@ -343,8 +343,8 @@ impl From<Chunk> for ConstantValue {
     Self::Function(value)
   }
 }
-impl PartialEq<ConstantValue> for ConstantValue {
-  fn eq(&self, other: &ConstantValue) -> bool {
+impl PartialEq<Self> for ConstantValue {
+  fn eq(&self, other: &Self) -> bool {
     match (self, other) {
       (Self::String(a), Self::String(b)) => a == b,
       _ => false,

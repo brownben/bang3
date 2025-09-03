@@ -511,15 +511,15 @@ mod string {
     assert_variable!(replace; g, string "helo");
     assert_variable!(replace; h, string "hello");
 
-    let replace_one_arg_a_non_string = run("string::replaceOne(1)");
-    assert!(replace_one_arg_a_non_string.is_err());
-    let replace_one_arg_b_non_string = run("string::replaceOne('')(5)");
-    assert!(replace_one_arg_b_non_string.is_err());
+    let replace_one_arg_one_non_string = run("string::replaceOne(1)");
+    assert!(replace_one_arg_one_non_string.is_err());
+    let replace_one_arg_two_non_string = run("string::replaceOne('')(5)");
+    assert!(replace_one_arg_two_non_string.is_err());
 
-    let replace_all_arg_a_non_string = run("string::replaceAll(1)");
-    assert!(replace_all_arg_a_non_string.is_err());
-    let replace_all_arg_b_non_string = run("string::replaceAll('')(5)");
-    assert!(replace_all_arg_b_non_string.is_err());
+    let replace_all_arg_one_non_string = run("string::replaceAll(1)");
+    assert!(replace_all_arg_one_non_string.is_err());
+    let replace_all_arg_two_non_string = run("string::replaceAll('')(5)");
+    assert!(replace_all_arg_two_non_string.is_err());
   }
 
   #[test]

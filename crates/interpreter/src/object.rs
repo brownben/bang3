@@ -180,7 +180,7 @@ impl StringView {
 
   #[must_use]
   pub fn from_ptr<T>(ptr: Gc<T>, heap: &Heap) -> &str {
-    heap[ptr.cast::<StringView>()].as_str(heap)
+    heap[ptr.cast::<Self>()].as_str(heap)
   }
 
   #[must_use]
@@ -502,8 +502,8 @@ impl ListView {
     }
   }
 
-  pub fn from_ptr<T>(ptr: Gc<T>, heap: &Heap) -> &ListView {
-    &heap[ptr.cast::<ListView>()]
+  pub fn from_ptr<T>(ptr: Gc<T>, heap: &Heap) -> &Self {
+    &heap[ptr.cast::<Self>()]
   }
 
   #[must_use]
@@ -542,7 +542,7 @@ impl Value {
   /// SAFETY: Undefined behaviour if [Value] is not a string
   /// Use [`Value::is_list`] to check if it is a string
   #[must_use]
-  pub fn as_list(self, heap: &Heap) -> &[Value] {
+  pub fn as_list(self, heap: &Heap) -> &[Self] {
     debug_assert!(self.is_list());
 
     if self.is_object_type(LIST_TYPE_ID) {
@@ -621,7 +621,7 @@ const OPTION_NONE: TypeDescriptor = TypeDescriptor {
 pub const NONE_TYPE_ID: TypeId = TypeId(9);
 
 impl Value {
-  pub const NONE: Value = Value::from_object(Gc::NULL, NONE_TYPE_ID);
+  pub const NONE: Self = Self::from_object(Gc::NULL, NONE_TYPE_ID);
 }
 
 pub struct Iterator {

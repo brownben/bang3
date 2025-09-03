@@ -26,12 +26,12 @@ impl Type {
   /// The location of the type
   pub fn span(&self, ast: &AST) -> Span {
     match self {
-      Type::Primitive(primitive) => primitive.span(ast),
-      Type::Variable(variable) => variable.span(ast),
-      Type::Function(function) => function.span(ast),
-      Type::Group(group) => group.span(ast),
-      Type::Structure(structure) => structure.span(ast),
-      Type::Invalid(invalid) => invalid.span(ast),
+      Self::Primitive(primitive) => primitive.span(ast),
+      Self::Variable(variable) => variable.span(ast),
+      Self::Function(function) => function.span(ast),
+      Self::Group(group) => group.span(ast),
+      Self::Structure(structure) => structure.span(ast),
+      Self::Invalid(invalid) => invalid.span(ast),
     }
   }
 }

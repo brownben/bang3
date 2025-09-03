@@ -11,7 +11,7 @@ members = [
   "crates/syntax",
   "crates/typechecker",
 ]
-default-members = ["crates/cli"]
+default-run = "bang"
 
 [workspace.dependencies]
 # formatter
@@ -43,10 +43,14 @@ assert_cmd = "2.0.17"
 [workspace.lints]
 rust.missing_docs = "warn"
 clippy.pedantic = "warn"
+clippy.nursery = "warn"
 clippy.match_same_arms = { level = "allow", priority = 1 }
 clippy.struct_excessive_bools = { level = "allow", priority = 1 }
 clippy.wildcard_imports = { level = "allow", priority = 1 }
 clippy.print_stdout = { level = "warn", priority = 1 }
+clippy.missing_const_for_fn = { level = "allow", priority = 1 }
+clippy.option_if_let_else = { level = "allow", priority = 1 }
+clippy.iter_with_drain = { level = "allow", priority = 1 }
 
 [profile.release]
 codegen-units = 1

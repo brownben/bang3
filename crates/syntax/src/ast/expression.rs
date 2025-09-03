@@ -185,7 +185,7 @@ impl Call {
     let end = self
       .closing
       .map(|closing| Span::from(ast[closing]))
-      .or(self.argument(ast).map(|a| a.span(ast)))
+      .or_else(|| self.argument(ast).map(|a| a.span(ast)))
       .unwrap_or_default();
     Span::from(ast[self.opening]).merge(end)
   }
@@ -525,16 +525,17 @@ impl Pattern {
   /// The location of the pattern
   pub fn span(&self, ast: &AST) -> Span {
     match self {
-      Pattern::Identifier(identifier) => identifier.span(ast),
-      Pattern::Literal(literal) => literal.span(ast),
-      Pattern::Range(range) => range.span(ast),
-      Pattern::List(list) => list.span(ast),
-      Pattern::Option(option) => option.span(ast),
-      Pattern::Invalid => Span::default(),
+      Self::Identifier(identifier) => identifier.span(ast),
+      Self::Literal(literal) => literal.span(ast),
+      Self::Range(range) => range.span(ast),
+      Self::List(list) => list.span(ast),
+      Self::Option(option) => option.span(ast),
+      Self::Invalid => Span::default(),
     }
   }
 }
 /// A range, e.g. `1..2`, `..'b'` - is a comparison against the start and end
+///
 /// The start or end missing indicates an open range. It is inclusive of both values.
 /// The only literals which can be used as part of a range are numbers and strings (ordered).
 #[derive(Debug)]
@@ -655,7 +656,7 @@ impl ModuleAccess {
 
   /// The location of the expression
   pub fn span(&self, ast: &AST) -> Span {
-    let end = self.item.unwrap_or(self.module.next());
+    let end = self.item.unwrap_or_else(|| self.module.next());
 
     Span::from(ast[self.module]).merge(ast[end].into())
   }
