@@ -401,3 +401,24 @@ fn extra_dot() {
   "};
   assert_eq!(output, expected);
 }
+
+#[test]
+fn end_of_file() {
+  let file = "let x";
+  let output = run_stderr(file);
+  let expected = indoc! {"
+    ✕ Error: Expected =
+    expected = but got End of File
+
+        ╭─[STDIN:1]
+      1 │ let x
+    ────╯
+    ✕ Error: Expected Expression
+    expected expression but got End of File
+
+        ╭─[STDIN:1]
+      1 │ let x
+    ────╯
+  "};
+  assert_eq!(output, expected);
+}

@@ -41,6 +41,7 @@ impl Tokeniser<'_> {
   /// Get the next token from the source code
   fn get_next_token(&mut self) -> (TokenKind, usize) {
     if self.is_end(self.position) {
+      self.position += 1; // move past the end, as we only want one EOF token
       return (TokenKind::EndOfFile, 0);
     }
 
@@ -247,7 +248,13 @@ impl Iterator for Tokeniser<'_> {
   type Item = Token;
 
   fn next(&mut self) -> Option<Self::Item> {
-    if self.is_end(self.position) {
+    // if the source is empty, immediately return no tokens
+    if self.source.is_empty() {
+      return None;
+    }
+
+    // if we are past the end of the source (already returned EOF), return no more tokens
+    if self.position > self.source.len() {
       return None;
     }
 

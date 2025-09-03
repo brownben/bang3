@@ -100,6 +100,7 @@ fn tokens_fibonacci_example() {
     242 │ )
     243 │ )
     244 │ New Line
+    246 │ End of File
     ────╯
   "};
   assert_eq!(output, expected);

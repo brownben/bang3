@@ -38,6 +38,10 @@ impl Span {
   /// Get the source text for a `Span` from a source string
   #[must_use]
   pub fn source_text(self, source_text: &str) -> &str {
+    if self.start == self.end {
+      return "";
+    }
+
     let start = self.start as usize;
     let end = self.end as usize;
 

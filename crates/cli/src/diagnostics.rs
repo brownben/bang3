@@ -159,7 +159,7 @@ pub fn highlight_source(output: &mut dyn fmt::Write, source: &str) -> fmt::Resul
   let mut last = 0;
   for token in tokenise(source) {
     // if there is a gap between tokens, add spaces for the gap
-    if token.start != last {
+    if token.start != last && token.length > 0 {
       for _ in 0..(token.start - last) {
         write!(output, " ").unwrap();
       }
