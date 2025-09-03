@@ -201,7 +201,7 @@ impl NumberRange {
 }
 impl From<f64> for NumberRange {
   fn from(value: f64) -> Self {
-    NumberRange(value, value)
+    Self(value, value)
   }
 }
 impl PartialOrd for NumberRange {

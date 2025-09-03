@@ -4,7 +4,7 @@ use bang_syntax::{
   ast::{AST, expression::*, statement::*},
 };
 
-pub(super) fn unwrap<'a>(expression: &'a Expression, ast: &'a AST) -> &'a Expression {
+pub fn unwrap<'a>(expression: &'a Expression, ast: &'a AST) -> &'a Expression {
   match expression {
     Expression::Comment(comment) => unwrap(comment.expression(ast), ast),
     Expression::Group(group) => unwrap(group.expression(ast), ast),
@@ -28,7 +28,7 @@ pub(super) fn unwrap<'a>(expression: &'a Expression, ast: &'a AST) -> &'a Expres
   }
 }
 
-pub(super) fn is_zero(expression: &Expression, ast: &AST) -> bool {
+pub fn is_zero(expression: &Expression, ast: &AST) -> bool {
   if let Expression::Literal(literal) = &expression
     && let LiteralValue::Number(value) = &literal.value(ast)
   {
@@ -38,7 +38,7 @@ pub(super) fn is_zero(expression: &Expression, ast: &AST) -> bool {
   false
 }
 
-pub(super) trait IsConstant {
+pub trait IsConstant {
   fn is_constant(&self, ast: &AST) -> bool;
 }
 
@@ -121,7 +121,7 @@ impl IsConstant for Return {
   }
 }
 
-pub(super) trait ASTEquality {
+pub trait ASTEquality {
   fn equals(&self, other: &Self, ast: &AST) -> bool;
 }
 
@@ -304,7 +304,7 @@ impl<T: ASTEquality> ASTEquality for &T {
   }
 }
 
-pub(super) trait ReturnAnalysis {
+pub trait ReturnAnalysis {
   /// Does the AST node always return?
   fn always_returns(&self, ast: &AST) -> bool;
 
@@ -319,64 +319,64 @@ pub(super) trait ReturnAnalysis {
 impl ReturnAnalysis for Statement {
   fn always_returns(&self, ast: &AST) -> bool {
     match self {
-      Statement::Comment(_) => false,
-      Statement::Expression(expression) => expression.expression(ast).always_returns(ast),
-      Statement::Import(_) => false,
-      Statement::Let(let_) => let_.value(ast).always_returns(ast),
-      Statement::Return(_) => true,
+      Self::Comment(_) => false,
+      Self::Expression(expression) => expression.expression(ast).always_returns(ast),
+      Self::Import(_) => false,
+      Self::Let(let_) => let_.value(ast).always_returns(ast),
+      Self::Return(_) => true,
     }
   }
 
   fn ends_with_return(&self, ast: &AST) -> Option<Span> {
     match self {
-      Statement::Comment(_) => None,
-      Statement::Expression(expression) => expression.expression(ast).ends_with_return(ast),
-      Statement::Import(_) => None,
-      Statement::Let(_) => None,
-      Statement::Return(return_) => Some(return_.span(ast)),
+      Self::Comment(_) => None,
+      Self::Expression(expression) => expression.expression(ast).ends_with_return(ast),
+      Self::Import(_) => None,
+      Self::Let(_) => None,
+      Self::Return(return_) => Some(return_.span(ast)),
     }
   }
 }
 impl ReturnAnalysis for Expression {
   fn always_returns(&self, ast: &AST) -> bool {
     match self {
-      Expression::Binary(binary) => binary.always_returns(ast),
-      Expression::Block(block) => block.always_returns(ast),
-      Expression::Call(call) => call.always_returns(ast),
-      Expression::Comment(comment) => comment.expression(ast).always_returns(ast),
-      Expression::FormatString(format_string) => format_string.always_returns(ast),
-      Expression::Function(_) => false,
-      Expression::Group(group) => group.expression(ast).always_returns(ast),
-      Expression::If(if_) => if_.always_returns(ast),
-      Expression::List(list) => list.always_returns(ast),
-      Expression::Literal(_) => false,
-      Expression::Match(match_) => match_.always_returns(ast),
-      Expression::ModuleAccess(_) => false,
-      Expression::Unary(unary) => unary.expression(ast).always_returns(ast),
-      Expression::Variable(_) => false,
-      Expression::Invalid(_) => false,
+      Self::Binary(binary) => binary.always_returns(ast),
+      Self::Block(block) => block.always_returns(ast),
+      Self::Call(call) => call.always_returns(ast),
+      Self::Comment(comment) => comment.expression(ast).always_returns(ast),
+      Self::FormatString(format_string) => format_string.always_returns(ast),
+      Self::Function(_) => false,
+      Self::Group(group) => group.expression(ast).always_returns(ast),
+      Self::If(if_) => if_.always_returns(ast),
+      Self::List(list) => list.always_returns(ast),
+      Self::Literal(_) => false,
+      Self::Match(match_) => match_.always_returns(ast),
+      Self::ModuleAccess(_) => false,
+      Self::Unary(unary) => unary.expression(ast).always_returns(ast),
+      Self::Variable(_) => false,
+      Self::Invalid(_) => false,
     }
   }
 
   fn ends_with_return(&self, ast: &AST) -> Option<Span> {
     match self {
-      Expression::Block(block) => block.ends_with_return(ast),
-      Expression::Comment(comment) => comment.expression(ast).ends_with_return(ast),
-      Expression::Group(group) => group.expression(ast).ends_with_return(ast),
-      Expression::If(if_) => if_.ends_with_return(ast),
-      Expression::List(list) => list.ends_with_return(ast),
-      Expression::Match(match_) => match_.ends_with_return(ast),
-      Expression::Unary(unary) => unary.expression(ast).ends_with_return(ast),
+      Self::Block(block) => block.ends_with_return(ast),
+      Self::Comment(comment) => comment.expression(ast).ends_with_return(ast),
+      Self::Group(group) => group.expression(ast).ends_with_return(ast),
+      Self::If(if_) => if_.ends_with_return(ast),
+      Self::List(list) => list.ends_with_return(ast),
+      Self::Match(match_) => match_.ends_with_return(ast),
+      Self::Unary(unary) => unary.expression(ast).ends_with_return(ast),
 
       // Can never end with a return
-      Expression::Function(_)
-      | Expression::Literal(_)
-      | Expression::ModuleAccess(_)
-      | Expression::Variable(_)
-      | Expression::Invalid(_) => None,
+      Self::Function(_)
+      | Self::Literal(_)
+      | Self::ModuleAccess(_)
+      | Self::Variable(_)
+      | Self::Invalid(_) => None,
 
       // Could feasibly end with a return, but would be contrived code not making sense
-      Expression::Binary(_) | Expression::Call(_) | Expression::FormatString(_) => None,
+      Self::Binary(_) | Self::Call(_) | Self::FormatString(_) => None,
     }
   }
 }
@@ -426,7 +426,7 @@ impl ReturnAnalysis for If {
       return self
         .then(ast)
         .ends_with_return(ast)
-        .or(otherwise.ends_with_return(ast));
+        .or_else(|| otherwise.ends_with_return(ast));
     }
 
     None

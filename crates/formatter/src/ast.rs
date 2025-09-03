@@ -5,8 +5,8 @@ use bang_syntax::{
 };
 use bumpalo::collections::Vec;
 
-impl<'a, 'b> Formattable<'a, 'b, AST> for AST {
-  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
+impl<'a, 'b> Formattable<'a, 'b, Self> for AST {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a Self) -> IR<'a, 'b> {
     if self.root_statements.is_empty() {
       return IR::Empty;
     }
@@ -30,21 +30,21 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for AST {
 impl<'a, 'b> Formattable<'a, 'b, AST> for Expression {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     match self {
-      Expression::Binary(binary) => binary.format(f, ast),
-      Expression::Block(block) => block.format(f, ast),
-      Expression::Call(call) => call.format(f, ast),
-      Expression::Comment(comment) => comment.format(f, ast),
-      Expression::FormatString(format_string) => format_string.format(f, ast),
-      Expression::Function(function) => function.format(f, ast),
-      Expression::Group(group) => group.format(f, ast),
-      Expression::If(if_) => if_.format(f, ast),
-      Expression::List(list) => list.format(f, ast),
-      Expression::Literal(literal) => literal.format(f, ast),
-      Expression::Match(match_) => match_.format(f, ast),
-      Expression::ModuleAccess(module_access) => module_access.format(f, ast),
-      Expression::Unary(unary) => unary.format(f, ast),
-      Expression::Variable(variable) => variable.format(f, ast),
-      Expression::Invalid(_) => IR::Empty,
+      Self::Binary(binary) => binary.format(f, ast),
+      Self::Block(block) => block.format(f, ast),
+      Self::Call(call) => call.format(f, ast),
+      Self::Comment(comment) => comment.format(f, ast),
+      Self::FormatString(format_string) => format_string.format(f, ast),
+      Self::Function(function) => function.format(f, ast),
+      Self::Group(group) => group.format(f, ast),
+      Self::If(if_) => if_.format(f, ast),
+      Self::List(list) => list.format(f, ast),
+      Self::Literal(literal) => literal.format(f, ast),
+      Self::Match(match_) => match_.format(f, ast),
+      Self::ModuleAccess(module_access) => module_access.format(f, ast),
+      Self::Unary(unary) => unary.format(f, ast),
+      Self::Variable(variable) => variable.format(f, ast),
+      Self::Invalid(_) => IR::Empty,
     }
   }
 }
@@ -333,15 +333,15 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for MatchArm {
 impl<'a, 'b> Formattable<'a, 'b, AST> for Pattern {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     match self {
-      Pattern::Identifier(variable) => variable.format(f, ast),
-      Pattern::Literal(literal) => literal.format(f, ast),
-      Pattern::Range(range) => f.concat([
+      Self::Identifier(variable) => variable.format(f, ast),
+      Self::Literal(literal) => literal.format(f, ast),
+      Self::Range(range) => f.concat([
         (range.start).as_ref().format(f, ast),
         IR::Text(".."),
         (range.end).as_ref().format(f, ast),
       ]),
-      Pattern::List(list) => list.format(f, ast),
-      Pattern::Option(option) => match option.kind {
+      Self::List(list) => list.format(f, ast),
+      Self::Option(option) => match option.kind {
         Some(()) => f.concat([
           IR::Text("Some("),
           option.variable().format(f, ast),
@@ -349,7 +349,7 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for Pattern {
         ]),
         None => IR::Text("None"),
       },
-      Pattern::Invalid => IR::Empty,
+      Self::Invalid => IR::Empty,
     }
   }
 }
@@ -426,11 +426,11 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for Variable {
 impl<'a, 'b> Formattable<'a, 'b, AST> for Statement {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     match self {
-      Statement::Comment(comment) => comment.format(f, ast),
-      Statement::Expression(expression) => expression.expression(ast).format(f, ast),
-      Statement::Import(import) => import.format(f, ast),
-      Statement::Let(let_) => let_.format(f, ast),
-      Statement::Return(return_) => return_.format(f, ast),
+      Self::Comment(comment) => comment.format(f, ast),
+      Self::Expression(expression) => expression.expression(ast).format(f, ast),
+      Self::Import(import) => import.format(f, ast),
+      Self::Let(let_) => let_.format(f, ast),
+      Self::Return(return_) => return_.format(f, ast),
     }
   }
 }
@@ -520,12 +520,12 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for Return {
 impl<'a, 'b> Formattable<'a, 'b, AST> for Type {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     match self {
-      Type::Primitive(type_primitive) => type_primitive.format(f, ast),
-      Type::Variable(type_variable) => type_variable.format(f, ast),
-      Type::Function(type_function) => type_function.format(f, ast),
-      Type::Group(type_group) => type_group.format(f, ast),
-      Type::Structure(structure) => structure.format(f, ast),
-      Type::Invalid(_) => IR::Empty,
+      Self::Primitive(type_primitive) => type_primitive.format(f, ast),
+      Self::Variable(type_variable) => type_variable.format(f, ast),
+      Self::Function(type_function) => type_function.format(f, ast),
+      Self::Group(type_group) => type_group.format(f, ast),
+      Self::Structure(structure) => structure.format(f, ast),
+      Self::Invalid(_) => IR::Empty,
     }
   }
 }

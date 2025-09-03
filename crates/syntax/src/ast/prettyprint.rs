@@ -400,12 +400,12 @@ impl PrettyPrint for Return {
 impl PrettyPrint for Type {
   fn pretty(&self, f: &mut fmt::Formatter, ast: &AST, prefix: &str, last: bool) -> fmt::Result {
     match self {
-      Type::Primitive(type_primitive) => type_primitive.pretty(f, ast, prefix, last),
-      Type::Variable(type_variable) => type_variable.pretty(f, ast, prefix, last),
-      Type::Function(type_function) => type_function.pretty(f, ast, prefix, last),
-      Type::Group(type_group) => type_group.pretty(f, ast, prefix, last),
-      Type::Structure(structure) => structure.pretty(f, ast, prefix, last),
-      Type::Invalid(_) => write!(f, "Invalid"),
+      Self::Primitive(type_primitive) => type_primitive.pretty(f, ast, prefix, last),
+      Self::Variable(type_variable) => type_variable.pretty(f, ast, prefix, last),
+      Self::Function(type_function) => type_function.pretty(f, ast, prefix, last),
+      Self::Group(type_group) => type_group.pretty(f, ast, prefix, last),
+      Self::Structure(structure) => structure.pretty(f, ast, prefix, last),
+      Self::Invalid(_) => write!(f, "Invalid"),
     }
   }
 }

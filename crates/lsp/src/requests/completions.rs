@@ -340,7 +340,7 @@ fn in_module_access(
 fn complete_function_bracket_in_pipeline(ast: &AST, position: Span) -> bool {
   for expression in &ast.expressions {
     if let Expression::Binary(binary) = expression
-      && let bang_syntax::ast::expression::BinaryOperator::Pipeline = binary.operator(ast)
+      && binary.operator(ast) == bang_syntax::ast::expression::BinaryOperator::Pipeline
       && let right = binary.right(ast)
       && let Expression::Invalid(_) | Expression::ModuleAccess(_) | Expression::Variable(_) = right
       && right.span(ast).contains(position)

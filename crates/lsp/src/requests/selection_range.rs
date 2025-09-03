@@ -57,11 +57,11 @@ impl SelectionRange for Statement {
     let parent = &mut range;
 
     match self {
-      Statement::Comment(_) => range,
-      Statement::Expression(expression_stmt) => expression_stmt.selection_range(file, span, parent),
-      Statement::Import(_) => range,
-      Statement::Let(let_) => let_.selection_range(file, span, parent),
-      Statement::Return(return_) => return_.selection_range(file, span, parent),
+      Self::Comment(_) => range,
+      Self::Expression(expression_stmt) => expression_stmt.selection_range(file, span, parent),
+      Self::Import(_) => range,
+      Self::Let(let_) => let_.selection_range(file, span, parent),
+      Self::Return(return_) => return_.selection_range(file, span, parent),
     }
   }
 }
@@ -85,7 +85,7 @@ impl SelectionRange for statement::Let {
     let value = self.value(&file.ast).selection_range(file, span, parent);
     let annotation = (self.annotation(&file.ast)).selection_range(file, span, parent);
 
-    value.or(annotation).or(parent.take())
+    value.or(annotation).or_else(|| parent.take())
   }
 }
 impl SelectionRange for statement::Return {
@@ -97,7 +97,7 @@ impl SelectionRange for statement::Return {
   ) -> Option<lsp_types::SelectionRange> {
     let expression = (self.expression(&file.ast)).selection_range(file, span, parent);
 
-    expression.or(parent.take())
+    expression.or_else(|| parent.take())
   }
 }
 
@@ -116,22 +116,22 @@ impl SelectionRange for Expression {
     let parent = &mut range;
 
     match self {
-      Expression::Binary(binary) => binary.selection_range(file, span, parent),
-      Expression::Block(block) => block.selection_range(file, span, parent),
-      Expression::Call(call) => call.selection_range(file, span, parent),
-      Expression::FormatString(format_string) => format_string.selection_range(file, span, parent),
-      Expression::Function(function) => function.selection_range(file, span, parent),
-      Expression::Group(group) => group.selection_range(file, span, parent),
-      Expression::If(if_) => if_.selection_range(file, span, parent),
-      Expression::List(list) => list.selection_range(file, span, parent),
-      Expression::Match(match_) => match_.selection_range(file, span, parent),
-      Expression::Unary(unary) => unary.selection_range(file, span, parent),
+      Self::Binary(binary) => binary.selection_range(file, span, parent),
+      Self::Block(block) => block.selection_range(file, span, parent),
+      Self::Call(call) => call.selection_range(file, span, parent),
+      Self::FormatString(format_string) => format_string.selection_range(file, span, parent),
+      Self::Function(function) => function.selection_range(file, span, parent),
+      Self::Group(group) => group.selection_range(file, span, parent),
+      Self::If(if_) => if_.selection_range(file, span, parent),
+      Self::List(list) => list.selection_range(file, span, parent),
+      Self::Match(match_) => match_.selection_range(file, span, parent),
+      Self::Unary(unary) => unary.selection_range(file, span, parent),
 
-      Expression::Comment(_)
-      | Expression::Literal(_)
-      | Expression::ModuleAccess(_)
-      | Expression::Variable(_)
-      | Expression::Invalid(_) => range,
+      Self::Comment(_)
+      | Self::Literal(_)
+      | Self::ModuleAccess(_)
+      | Self::Variable(_)
+      | Self::Invalid(_) => range,
     }
   }
 }
@@ -145,7 +145,7 @@ impl SelectionRange for expression::Binary {
     let left = self.left(&file.ast).selection_range(file, span, parent);
     let right = self.right(&file.ast).selection_range(file, span, parent);
 
-    left.or(right).or(parent.take())
+    left.or(right).or_else(|| parent.take())
   }
 }
 impl SelectionRange for expression::Block {
@@ -160,7 +160,7 @@ impl SelectionRange for expression::Block {
       .map(|statement| statement.selection_range(file, span, parent))
       .find(Option::is_some)
       .flatten()
-      .or(parent.take())
+      .or_else(|| parent.take())
   }
 }
 impl SelectionRange for expression::Call {
@@ -173,7 +173,7 @@ impl SelectionRange for expression::Call {
     let callee = self.callee(&file.ast).selection_range(file, span, parent);
     let argument = self.argument(&file.ast).selection_range(file, span, parent);
 
-    callee.or(argument).or(parent.take())
+    callee.or(argument).or_else(|| parent.take())
   }
 }
 impl SelectionRange for expression::FormatString {
@@ -188,7 +188,7 @@ impl SelectionRange for expression::FormatString {
       .map(|expression| expression.selection_range(file, span, parent))
       .find(Option::is_some)
       .flatten()
-      .or(parent.take())
+      .or_else(|| parent.take())
   }
 }
 impl SelectionRange for expression::Function {
@@ -200,7 +200,7 @@ impl SelectionRange for expression::Function {
   ) -> Option<lsp_types::SelectionRange> {
     let body = self.body(&file.ast).selection_range(file, span, parent);
 
-    body.or(parent.take())
+    body.or_else(|| parent.take())
   }
 }
 impl SelectionRange for expression::Group {
@@ -212,7 +212,7 @@ impl SelectionRange for expression::Group {
   ) -> Option<lsp_types::SelectionRange> {
     let expression = (self.expression(&file.ast)).selection_range(file, span, parent);
 
-    expression.or(parent.take())
+    expression.or_else(|| parent.take())
   }
 }
 impl SelectionRange for expression::If {
@@ -226,7 +226,7 @@ impl SelectionRange for expression::If {
     let then = self.then(&file.ast).selection_range(file, span, parent);
     let otherwise = (self.otherwise(&file.ast)).selection_range(file, span, parent);
 
-    condition.or(then).or(otherwise).or(parent.take())
+    condition.or(then).or(otherwise).or_else(|| parent.take())
   }
 }
 impl SelectionRange for expression::List {
@@ -238,7 +238,7 @@ impl SelectionRange for expression::List {
   ) -> Option<lsp_types::SelectionRange> {
     (self.items(&file.ast))
       .find_map(|item| item.selection_range(file, span, parent))
-      .or(parent.take())
+      .or_else(|| parent.take())
   }
 }
 impl SelectionRange for expression::Match {
@@ -257,7 +257,7 @@ impl SelectionRange for expression::Match {
       .map(|arm| arm.selection_range(file, span, parent))
       .find(Option::is_some)
       .flatten()
-      .or(parent.take())
+      .or_else(|| parent.take())
   }
 }
 impl SelectionRange for expression::MatchArm {
@@ -303,7 +303,7 @@ impl SelectionRange for expression::Unary {
   ) -> Option<lsp_types::SelectionRange> {
     let expression = (self.expression(&file.ast)).selection_range(file, span, parent);
 
-    expression.or(parent.take())
+    expression.or_else(|| parent.take())
   }
 }
 
@@ -322,12 +322,12 @@ impl SelectionRange for Type {
     let parent = &mut range;
 
     match self {
-      Type::Primitive(_) => range,
-      Type::Variable(_) => range,
-      Type::Function(function) => function.selection_range(file, span, parent),
-      Type::Group(group) => group.selection_range(file, span, parent),
-      Type::Structure(structure) => structure.selection_range(file, span, parent),
-      Type::Invalid(_) => range,
+      Self::Primitive(_) => range,
+      Self::Variable(_) => range,
+      Self::Function(function) => function.selection_range(file, span, parent),
+      Self::Group(group) => group.selection_range(file, span, parent),
+      Self::Structure(structure) => structure.selection_range(file, span, parent),
+      Self::Invalid(_) => range,
     }
   }
 }
@@ -341,7 +341,7 @@ impl SelectionRange for types::TypeFunction {
     let param = (self.parameter(&file.ast)).selection_range(file, span, parent);
     let return_type = self.return_(&file.ast).selection_range(file, span, parent);
 
-    param.or(return_type).or(parent.take())
+    param.or(return_type).or_else(|| parent.take())
   }
 }
 impl SelectionRange for types::TypeGroup {
@@ -351,7 +351,7 @@ impl SelectionRange for types::TypeGroup {
     span: Span,
     parent: &mut Option<lsp_types::SelectionRange>,
   ) -> Option<lsp_types::SelectionRange> {
-    (self.type_(&file.ast).selection_range(file, span, parent)).or(parent.take())
+    (self.type_(&file.ast).selection_range(file, span, parent)).or_else(|| parent.take())
   }
 }
 impl SelectionRange for types::TypeStructure {
@@ -363,7 +363,7 @@ impl SelectionRange for types::TypeStructure {
   ) -> Option<lsp_types::SelectionRange> {
     let parameter = (self.parameter(&file.ast)).selection_range(file, span, parent);
 
-    parameter.or(parent.take())
+    parameter.or_else(|| parent.take())
   }
 }
 

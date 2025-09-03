@@ -50,15 +50,15 @@ impl<'ast> Parser<'ast> {
     self.ast.errors.push(error);
   }
 
-  fn is_finished(&mut self) -> bool {
+  fn is_finished(&self) -> bool {
     self.current_kind() == TokenKind::EndOfFile
   }
 
   fn current_token_id(&self) -> TokenIdx {
     if self.position < self.ast.tokens.len() {
-      TokenIdx::from(self.position)
+      TokenIdx::new(self.position)
     } else {
-      TokenIdx::from(self.ast.tokens.len() - 1)
+      TokenIdx::new(self.ast.tokens.len() - 1)
     }
   }
 
@@ -68,9 +68,9 @@ impl<'ast> Parser<'ast> {
 
   fn previous_token(&self) -> Token {
     if self.position < self.ast.tokens.len() {
-      self.ast[TokenIdx::from(self.position - 1)]
+      self.ast[TokenIdx::new(self.position - 1)]
     } else {
-      self.ast[TokenIdx::from(self.ast.tokens.len() - 2)]
+      self.ast[TokenIdx::new(self.ast.tokens.len() - 2)]
     }
   }
 
@@ -623,7 +623,7 @@ impl Parser<'_> {
     }
   }
 
-  fn is_nested_pattern(&mut self) -> bool {
+  fn is_nested_pattern(&self) -> bool {
     matches!(
       self.current_kind(),
       TokenKind::String
@@ -784,7 +784,7 @@ impl Parser<'_> {
     self.expect_newline();
 
     let start = start_curly;
-    let end = end_curly.unwrap_or(self.current_token_id());
+    let end = end_curly.unwrap_or_else(|| self.current_token_id());
 
     Statement::Import(Import {
       keyword,

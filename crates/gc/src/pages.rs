@@ -19,7 +19,7 @@ pub struct PageDescriptor {
   _padding: [u8; 5],
 }
 impl PageDescriptor {
-  pub const SIZE: usize = mem::size_of::<PageDescriptor>();
+  pub const SIZE: usize = mem::size_of::<Self>();
   const _ASSERT_SIZE: () = assert!(Self::SIZE == 24);
 }
 
@@ -65,7 +65,7 @@ impl BlockClass {
 
   /// The number of blocks in a page of this class.
   pub fn block_count(self) -> usize {
-    if let Self::Ream = self {
+    if self == Self::Ream {
       return 1;
     }
 
@@ -108,7 +108,7 @@ impl PageDescriptorRef {
     PdPointer::new(unsafe { NonZero::new_unchecked(ptr.try_into().unwrap_unchecked()) })
   }
   /// Get the page descriptor at index offset from this page.
-  pub fn offset(self, offset: isize) -> PageDescriptorRef {
+  pub fn offset(self, offset: isize) -> Self {
     Self {
       pd: unsafe { self.pd.offset(offset) },
       alloc_base: self.alloc_base,
@@ -122,17 +122,17 @@ impl PageDescriptorRef {
   }
 
   /// Gets the page descriptor after this one in a list
-  pub fn next(&self) -> Option<PageDescriptorRef> {
+  pub fn next(&self) -> Option<Self> {
     let next = self.as_ref().next?;
     Some(Self::new(next, self.alloc_base))
   }
   /// Gets the page descriptor before this one in a list
-  pub fn prev(&self) -> Option<PageDescriptorRef> {
+  pub fn prev(&self) -> Option<Self> {
     let prev = self.as_ref().prev?;
     Some(Self::new(prev, self.alloc_base))
   }
   /// Remove this page descriptor from the list it is in
-  pub fn unlink(mut self) -> PageDescriptorRef {
+  pub fn unlink(mut self) -> Self {
     let mut prev = self.prev().expect("page to be linked");
 
     if let Some(mut next) = self.next() {
@@ -169,10 +169,7 @@ impl PageDescriptorRef {
     }
   }
   /// Split a ream into two, with the first one of size `prefix_size` pages
-  pub fn split(
-    mut self,
-    prefix_size: u16,
-  ) -> Option<(PageDescriptorRef, Option<PageDescriptorRef>)> {
+  pub fn split(mut self, prefix_size: u16) -> Option<(Self, Option<Self>)> {
     debug_assert!(self.is_ream());
 
     match self.pages().cmp(&prefix_size) {
@@ -302,7 +299,7 @@ impl PageList {
   }
 
   /// Get the first page in the list
-  pub fn first(&mut self) -> Option<PageDescriptorRef> {
+  pub fn first(&self) -> Option<PageDescriptorRef> {
     self.root.next()
   }
 

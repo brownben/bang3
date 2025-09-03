@@ -383,7 +383,7 @@ impl LintRule for UnnecessaryClosure {
 
     if let Expression::Function(function) = &expression
       && let Expression::Binary(binary) = unwrap(function.body(ast), ast)
-      && let BinaryOperator::Pipeline = binary.operator(ast)
+      && binary.operator(ast) == BinaryOperator::Pipeline
       && let Expression::Variable(variable) = unwrap(binary.left(ast), ast)
       && variable.name(ast) == function.parameter.name(ast)
     {

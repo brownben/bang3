@@ -76,7 +76,7 @@ impl Tokeniser<'_> {
         (TokenKind::LeftCurly, 1)
       }
       b'}' => {
-        if let Some(BlockLocation::FormatStringExpression) = self.curly_stack.pop() {
+        if self.curly_stack.pop() == Some(BlockLocation::FormatStringExpression) {
           self.format_string()
         } else {
           (TokenKind::RightCurly, 1)

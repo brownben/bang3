@@ -75,13 +75,13 @@ impl LineEnding {
   #[inline]
   pub(super) const fn as_str(self) -> &'static str {
     match self {
-      LineEnding::LineFeed => "\n",
-      LineEnding::CarriageReturnLineFeed => "\r\n",
+      Self::LineFeed => "\n",
+      Self::CarriageReturnLineFeed => "\r\n",
 
       #[cfg(not(target_os = "windows"))]
-      LineEnding::Native => "\n",
+      Self::Native => "\n",
       #[cfg(target_os = "windows")]
-      LineEnding::Native => "\r\n",
+      Self::Native => "\r\n",
     }
   }
 }

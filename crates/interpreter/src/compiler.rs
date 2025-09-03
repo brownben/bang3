@@ -193,21 +193,21 @@ trait Compile<'s> {
 impl<'s> Compile<'s> for Expression {
   fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
     match self {
-      Expression::Binary(binary) => binary.compile(compiler, ast),
-      Expression::Block(block) => block.compile(compiler, ast),
-      Expression::Call(call) => call.compile(compiler, ast),
-      Expression::Comment(comment) => comment.compile(compiler, ast),
-      Expression::FormatString(format_string) => format_string.compile(compiler, ast),
-      Expression::Function(function) => function.compile(compiler, ast),
-      Expression::Group(group) => group.compile(compiler, ast),
-      Expression::If(if_) => if_.compile(compiler, ast),
-      Expression::List(list) => list.compile(compiler, ast),
-      Expression::Literal(literal) => literal.compile(compiler, ast),
-      Expression::Match(match_) => match_.compile(compiler, ast),
-      Expression::ModuleAccess(module_access) => module_access.compile(compiler, ast),
-      Expression::Unary(unary) => unary.compile(compiler, ast),
-      Expression::Variable(variable) => variable.compile(compiler, ast),
-      Expression::Invalid(_) => Err(CompileError::InvalidAST),
+      Self::Binary(binary) => binary.compile(compiler, ast),
+      Self::Block(block) => block.compile(compiler, ast),
+      Self::Call(call) => call.compile(compiler, ast),
+      Self::Comment(comment) => comment.compile(compiler, ast),
+      Self::FormatString(format_string) => format_string.compile(compiler, ast),
+      Self::Function(function) => function.compile(compiler, ast),
+      Self::Group(group) => group.compile(compiler, ast),
+      Self::If(if_) => if_.compile(compiler, ast),
+      Self::List(list) => list.compile(compiler, ast),
+      Self::Literal(literal) => literal.compile(compiler, ast),
+      Self::Match(match_) => match_.compile(compiler, ast),
+      Self::ModuleAccess(module_access) => module_access.compile(compiler, ast),
+      Self::Unary(unary) => unary.compile(compiler, ast),
+      Self::Variable(variable) => variable.compile(compiler, ast),
+      Self::Invalid(_) => Err(CompileError::InvalidAST),
     }
   }
 }
@@ -586,11 +586,11 @@ impl<'s> Compile<'s> for Variable {
 impl<'s> Compile<'s> for Statement {
   fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
     match self {
-      Statement::Comment(_) => Ok(()),
-      Statement::Expression(expression) => expression.expression(ast).compile(compiler, ast),
-      Statement::Import(import) => import.compile(compiler, ast),
-      Statement::Let(let_) => let_.compile(compiler, ast),
-      Statement::Return(return_) => return_.compile(compiler, ast),
+      Self::Comment(_) => Ok(()),
+      Self::Expression(expression) => expression.expression(ast).compile(compiler, ast),
+      Self::Import(import) => import.compile(compiler, ast),
+      Self::Let(let_) => let_.compile(compiler, ast),
+      Self::Return(return_) => return_.compile(compiler, ast),
     }
   }
 }

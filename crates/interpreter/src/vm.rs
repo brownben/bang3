@@ -199,7 +199,7 @@ impl<'context> VM<'context> {
   }
 
   #[inline]
-  fn should_garbage_collect(&mut self) -> bool {
+  fn should_garbage_collect(&self) -> bool {
     #[cfg(feature = "gc-stress-test")]
     {
       // Collect garbage after every instruction
@@ -1077,7 +1077,7 @@ impl StackTraceLocation {
       StackTraceLocationKind::Function(chunk.name.clone())
     };
 
-    StackTraceLocation {
+    Self {
       kind,
       span: Some(span),
     }

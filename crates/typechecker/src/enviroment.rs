@@ -220,7 +220,7 @@ impl Enviroment {
     variable.type_ = type_;
   }
 
-  pub(crate) fn get_variable(&mut self, identifier: &str) -> Option<TypeScheme> {
+  pub(crate) fn get_variable(&self, identifier: &str) -> Option<TypeScheme> {
     for variable in self.variables.iter().rev() {
       if variable.name() == identifier {
         return Some(variable.type_);
@@ -416,8 +416,8 @@ impl VariableType {
   #[must_use]
   pub fn is_function(&self) -> bool {
     match self {
-      VariableType::Variable => false,
-      VariableType::Function | VariableType::FunctionNoArgs => true,
+      Self::Variable => false,
+      Self::Function | Self::FunctionNoArgs => true,
     }
   }
 }

@@ -139,7 +139,7 @@ impl Import {
   pub fn items_span(&self, ast: &AST) -> Span {
     let start = self
       .start
-      .map_or(ast[self.keyword].into(), |token| Span::from(ast[token]));
+      .map_or_else(|| ast[self.keyword].into(), |token| Span::from(ast[token]));
     let end = Span::from(ast[self.end]);
 
     start.merge(end)

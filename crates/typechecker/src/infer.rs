@@ -103,10 +103,10 @@ impl TypeChecker {
   }
 }
 
-pub(crate) trait InferType {
+pub trait InferType {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType;
 }
-pub(crate) trait InferExpression {
+pub trait InferExpression {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> TypeRef;
 }
 
@@ -137,11 +137,11 @@ impl InferType for AST {
 impl InferType for Statement {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     match self {
-      Statement::Comment(_) => ExpressionType::NEVER,
-      Statement::Expression(expression) => expression.expression(ast).infer(t, ast),
-      Statement::Import(import) => ExpressionType::Expression(import.infer(t, ast)),
-      Statement::Let(let_) => let_.infer(t, ast),
-      Statement::Return(return_) => return_.infer(t, ast),
+      Self::Comment(_) => ExpressionType::NEVER,
+      Self::Expression(expression) => expression.expression(ast).infer(t, ast),
+      Self::Import(import) => ExpressionType::Expression(import.infer(t, ast)),
+      Self::Let(let_) => let_.infer(t, ast),
+      Self::Return(return_) => return_.infer(t, ast),
     }
   }
 }
@@ -251,23 +251,23 @@ impl InferType for Return {
 impl InferType for Expression {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     match self {
-      Expression::Binary(binary) => binary.infer(t, ast),
-      Expression::Block(block) => block.infer(t, ast),
-      Expression::Call(call) => call.infer(t, ast),
-      Expression::Comment(comment) => comment.infer(t, ast),
-      Expression::FormatString(format_string) => format_string.infer(t, ast),
-      Expression::Group(group) => group.infer(t, ast),
-      Expression::If(if_) => if_.infer(t, ast),
-      Expression::List(list) => list.infer(t, ast),
-      Expression::Match(match_) => match_.infer(t, ast),
-      Expression::Unary(unary) => unary.infer(t, ast),
+      Self::Binary(binary) => binary.infer(t, ast),
+      Self::Block(block) => block.infer(t, ast),
+      Self::Call(call) => call.infer(t, ast),
+      Self::Comment(comment) => comment.infer(t, ast),
+      Self::FormatString(format_string) => format_string.infer(t, ast),
+      Self::Group(group) => group.infer(t, ast),
+      Self::If(if_) => if_.infer(t, ast),
+      Self::List(list) => list.infer(t, ast),
+      Self::Match(match_) => match_.infer(t, ast),
+      Self::Unary(unary) => unary.infer(t, ast),
 
       // Expressions which only have an expression, and can never return
-      Expression::Function(function) => ExpressionType::Expression(function.infer(t, ast)),
-      Expression::Literal(literal) => ExpressionType::Expression(literal.infer(t, ast)),
-      Expression::ModuleAccess(module) => ExpressionType::Expression(module.infer(t, ast)),
-      Expression::Variable(variable) => ExpressionType::Expression(variable.infer(t, ast)),
-      Expression::Invalid(_) => ExpressionType::Expression(TypeArena::UNKNOWN),
+      Self::Function(function) => ExpressionType::Expression(function.infer(t, ast)),
+      Self::Literal(literal) => ExpressionType::Expression(literal.infer(t, ast)),
+      Self::ModuleAccess(module) => ExpressionType::Expression(module.infer(t, ast)),
+      Self::Variable(variable) => ExpressionType::Expression(variable.infer(t, ast)),
+      Self::Invalid(_) => ExpressionType::Expression(TypeArena::UNKNOWN),
     }
   }
 }
@@ -736,7 +736,7 @@ impl InferExpression for ModuleAccess {
     if let Some((alias, definition_location)) = existing_import {
       t.problems.push(TypeError::ModuleAccessAlreadyImported {
         path: format!("{}::{}", self.module(ast), self.item(ast)),
-        defined_as: alias.clone().unwrap_or(self.item(ast).to_owned()),
+        defined_as: alias.clone().unwrap_or_else(|| self.item(ast).to_owned()),
         definition_location,
         span: self.span(ast),
       });
@@ -799,7 +799,7 @@ impl InferExpression for Variable {
 /// An expression can have a regular expression type,
 /// or it can return a from a function which may have a different type
 #[must_use]
-pub(crate) enum ExpressionType {
+pub enum ExpressionType {
   Expression(TypeRef),
   Return(TypeRef),
   Both(TypeRef, TypeRef),

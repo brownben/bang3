@@ -39,7 +39,7 @@ pub enum ImportResult {
 }
 impl<T: Into<Value>> From<T> for ImportResult {
   fn from(value: T) -> Self {
-    ImportResult::Value(value.into())
+    Self::Value(value.into())
   }
 }
 
