@@ -18,9 +18,16 @@ impl<'source> From<&'source str> for Tokeniser<'source> {
   fn from(value: &'source str) -> Self {
     assert!(value.len() < u32::MAX as usize);
 
+    // if the source code starts with a shebang, skip it
+    let position = if value.starts_with("#!") {
+      value.as_bytes().iter().take_while(|c| **c != b'\n').count()
+    } else {
+      0
+    };
+
     Self {
-      source: value.as_ref(),
-      position: 0,
+      source: value.as_bytes(),
+      position,
       curly_stack: Vec::with_capacity(8),
     }
   }

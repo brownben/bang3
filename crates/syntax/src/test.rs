@@ -1709,3 +1709,43 @@ mod types {
     assert_eq!(ast.to_string(), expected);
   }
 }
+
+#[test]
+fn shebang() {
+  let path_shebang = parse("#!/usr/bin/env bang\n5");
+  assert!(path_shebang.is_valid());
+  assert_eq!(path_shebang.to_string(), indoc! {"
+    ├─ Number (5)
+  "});
+
+  let shebang_for_other_program = parse("#!/usr/bin/env python3\n'hello'");
+  assert!(shebang_for_other_program.is_valid());
+  assert_eq!(shebang_for_other_program.to_string(), indoc! {"
+    ├─ String 'hello'
+  "});
+
+  let just_bang = parse("#! bang \n\n 1 + 5");
+  assert!(just_bang.is_valid());
+  assert_eq!(just_bang.to_string(), indoc! {"
+    ├─ Binary (+)
+    │  ├─ Number (1)
+    │  ╰─ Number (5)
+  "});
+
+  let run_command = parse("#! bang run \n\n 1 + 5");
+  assert!(run_command.is_valid());
+  assert_eq!(run_command.to_string(), indoc! {"
+    ├─ Binary (+)
+    │  ├─ Number (1)
+    │  ╰─ Number (5)
+  "});
+
+  let no_space_before = parse("  #! bang run \n\n 1 + 5");
+  assert!(no_space_before.is_err());
+
+  let must_be_firstline = parse("\n #! bang run \n\n 1 + 5");
+  assert!(must_be_firstline.is_err());
+
+  let no_content_before = parse("5 #! bang run \n\n 1 + 5");
+  assert!(no_content_before.is_err());
+}
