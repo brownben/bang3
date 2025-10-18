@@ -15,19 +15,18 @@ macro_rules! module {
   }) => {
     #[allow(unused_variables)]
     #[doc = concat!("The `", stringify!($module_name), "` module of Bang's Standard Library")]
-    pub fn $module_name(vm: &mut VM, item: &str) -> bang_interpreter::ImportResult {
-      use bang_interpreter::object::{NativeFunction, NATIVE_FUNCTION_TYPE_ID};
+    pub fn $module_name(item: &str) -> bang_interpreter::ImportResult {
+      use bang_interpreter::object::{NativeFunction};
 
       match item {
-        $(stringify!($constant_name) => module!(const $constant_type, vm, $constant),)*
+        $(stringify!($constant_name) => module!(const $constant_type, $constant),)*
         $(
           stringify!($function_name) => {
             let full_function_name = concat!(
               stringify!($module_name), "::", stringify!($function_name)
             );
             let native_function = NativeFunction::new(full_function_name, $function);
-            let value = vm.allocate_value(native_function, NATIVE_FUNCTION_TYPE_ID);
-            bang_interpreter::ImportResult::Value(value)
+            bang_interpreter::ImportResult::NativeFunction(native_function)
           },
         )*
         _ => bang_interpreter::ImportResult::ItemNotFound,
@@ -80,11 +79,11 @@ macro_rules! module {
   (const type $type:ident) => {
     stringify!($type)
   };
-  (const String, $vm:expr, $value:expr) => {
-    $vm.allocate_string($value).into()
+  (const String, $value:expr) => {
+    bang_interpreter::ImportResult::ConstantString($value)
   };
-  (const $_type:ident, $vm:expr, $value:expr) => {
-    $value.into()
+  (const $_type:ident, $value:expr) => {
+    bang_interpreter::ImportResult::Constant($value.into())
   };
 
   // Count

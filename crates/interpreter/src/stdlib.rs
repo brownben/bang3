@@ -2,7 +2,7 @@
 //!
 //! Definitions for modules in the standard library.
 
-use crate::{Value, object::NativeFunction, vm::VM};
+use crate::{Value, object::NativeFunction};
 use std::fmt;
 
 /// A context is the environment in which the VM runs.
@@ -21,8 +21,8 @@ pub trait Context: fmt::Debug {
   }
 
   /// Import a value from a module
-  fn import_value(&self, vm: &mut VM, module: &str, item: &str) -> ImportResult {
-    let (_vm, _module, _item) = (vm, module, item);
+  fn import_value(&self, module: &str, item: &str) -> ImportResult {
+    let (_module, _item) = (module, item);
     ImportResult::ModuleNotFound
   }
 }
@@ -31,7 +31,11 @@ pub trait Context: fmt::Debug {
 #[derive(Clone)]
 pub enum ImportResult {
   /// The value which was requested
-  Value(Value),
+  Constant(Value),
+  /// A constant string which was requested
+  ConstantString(&'static str),
+  /// A native function which was requested
+  NativeFunction(NativeFunction),
   /// The module was not found
   ModuleNotFound,
   /// The item was not found in the module
@@ -39,7 +43,7 @@ pub enum ImportResult {
 }
 impl<T: Into<Value>> From<T> for ImportResult {
   fn from(value: T) -> Self {
-    Self::Value(value.into())
+    Self::Constant(value.into())
   }
 }
 

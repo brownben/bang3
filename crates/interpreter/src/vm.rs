@@ -395,8 +395,16 @@ impl<'context> VM<'context> {
           let module = chunk.get_symbol(chunk.get_value(ip + 1).into()).as_str();
           let item = chunk.get_symbol(chunk.get_value(ip + 2).into()).as_str();
 
-          match self.context.import_value(self, module, item) {
-            ImportResult::Value(value) => push!(self.stack, value),
+          match self.context.import_value(module, item) {
+            ImportResult::Constant(value) => push!(self.stack, value),
+            ImportResult::ConstantString(string) => {
+              let value = self.allocate_string(string);
+              push!(self.stack, value);
+            }
+            ImportResult::NativeFunction(native_function) => {
+              let value = self.allocate_value(native_function, object::NATIVE_FUNCTION_TYPE_ID);
+              push!(self.stack, value);
+            }
             ImportResult::ModuleNotFound => {
               break Some(ErrorKind::ModuleNotFound {
                 module: module.to_owned(),

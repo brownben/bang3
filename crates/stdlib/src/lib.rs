@@ -3,7 +3,7 @@
 //! Definitions for modules in the standard library.
 
 use bang_interpreter::{
-  Context, ErrorKind, ImportResult, VM, Value,
+  Context, ErrorKind, ImportResult, Value,
   object::{NativeFunction, SOME_TYPE_ID},
 };
 
@@ -47,14 +47,14 @@ impl Context for StandardContext {
     ]
   }
 
-  fn import_value(&self, vm: &mut VM, module: &str, item: &str) -> ImportResult {
+  fn import_value(&self, module: &str, item: &str) -> ImportResult {
     match module {
-      "maths" => modules::maths(vm, item),
-      "string" => modules::string(vm, item),
-      "list" => modules::list(vm, item),
-      "option" => modules::option(vm, item),
-      "iter" => modules::iter(vm, item),
-      "assert" => modules::assert(vm, item),
+      "maths" => modules::maths(item),
+      "string" => modules::string(item),
+      "list" => modules::list(item),
+      "option" => modules::option(item),
+      "iter" => modules::iter(item),
+      "assert" => modules::assert(item),
       _ => ImportResult::ModuleNotFound,
     }
   }
