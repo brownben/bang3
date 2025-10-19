@@ -107,11 +107,11 @@ pub enum IR<'source, 'allocator> {
   /// Give two options, use the first if the group is broken, else the second
   Option(&'source str, &'source str),
   /// A combination of multiple IRs
-  Concat(Vec<'allocator, IR<'source, 'allocator>>),
+  Concat(Vec<'allocator, Self>),
   /// Indent the given IR, if a line break present
-  Indent(Box<'allocator, IR<'source, 'allocator>>),
+  Indent(Box<'allocator, Self>),
   /// Mark a section where there are different options to break source code
-  Group(Box<'allocator, IR<'source, 'allocator>>),
+  Group(Box<'allocator, Self>),
 }
 impl<'a, 'b> IR<'a, 'b> {
   /// Check if the option has any always lines
@@ -208,7 +208,7 @@ pub enum DisplayIR<'a, 'b> {
     indentation: config::Indentation,
     line_ending: config::LineEnding,
   },
-  Collection(Vec<'b, DisplayIR<'a, 'b>>),
+  Collection(Vec<'b, Self>),
 }
 impl DisplayIR<'_, '_> {
   /// Will the display item fit in the given size?

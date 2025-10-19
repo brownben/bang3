@@ -37,10 +37,9 @@ macro_rules! assert_variable {
     assert_eq!(value, Value::from($value));
   };
 }
-use assert_variable;
 
 mod builtin_functions {
-  use super::{Value, assert_variable, run};
+  use super::{Value, run};
 
   #[test]
   fn print() {
@@ -90,7 +89,7 @@ mod builtin_functions {
 }
 
 mod maths {
-  use super::{Value, assert_variable, indoc, run};
+  use super::{Value, indoc, run};
 
   #[test]
   fn constants() {
@@ -286,7 +285,7 @@ mod maths {
 }
 
 mod string {
-  use super::{Value, assert_variable, indoc, run};
+  use super::{Value, indoc, run};
 
   #[test]
   fn to_string() {
@@ -612,7 +611,7 @@ mod string {
 }
 
 mod list {
-  use super::{Value, assert_variable, indoc, run};
+  use super::{Value, indoc, run};
 
   #[test]
   fn length() {
@@ -691,7 +690,7 @@ mod list {
 }
 
 mod option {
-  use super::{Value, assert_variable, indoc, run};
+  use super::{Value, indoc, run};
 
   #[test]
   fn basic_types() {
@@ -878,7 +877,7 @@ mod option {
 }
 
 mod iter {
-  use super::{Value, assert_variable, indoc, run};
+  use super::{Value, indoc, run};
   use core::f64;
 
   #[test]

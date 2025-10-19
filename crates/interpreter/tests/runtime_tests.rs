@@ -37,7 +37,6 @@ macro_rules! assert_variable {
     assert_eq!(value, Value::from($value));
   };
 }
-use assert_variable;
 
 #[test]
 fn numeric_operators() {

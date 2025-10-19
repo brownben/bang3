@@ -492,8 +492,7 @@ module!(iter, IterModule, {
         return Ok(Value::NONE);
       };
 
-      loop {
-        let Some((iterator_result, new_state)) = iter_next(vm, iterator, state)? else { break };
+      while let Some((iterator_result, new_state)) = iter_next(vm, iterator, state)? {
         let iterator_result = vm.stash_value(iterator_result)?;
         let Some(inner_function) = vm.call(func, accumulator)? else { break };
         let iterator_result = vm.pop_stashed_value(iterator_result);
@@ -547,8 +546,7 @@ module!(iter, IterModule, {
       let mut state = 0;
       let mut accumulator = start;
 
-      loop {
-        let Some((iterator_result, new_state)) = iter_next(vm, iter, state)? else { break };
+      while let Some((iterator_result, new_state)) = iter_next(vm, iter, state)? {
         let iterator_result = vm.stash_value(iterator_result)?;
         let Some(inner_function) = vm.call(func, accumulator)? else { break };
         let iterator_result = vm.pop_stashed_value(iterator_result);
@@ -587,9 +585,7 @@ module!(iter, IterModule, {
     let mut state = 0;
     let mut sum = 0.0;
 
-    loop {
-      let Some((result, new_state)) = iter_next(vm, iter, state)? else { break };
-
+    while let Some((result, new_state)) = iter_next(vm, iter, state)? {
       if !result.is_number() {
         return Err(ErrorKind::TypeError { expected: "number", got: result.get_type(vm) });
       }
@@ -621,9 +617,7 @@ module!(iter, IterModule, {
     let mut state = 0;
     let mut product = 1.0;
 
-    loop {
-      let Some((result, new_state)) = iter_next(vm, iter, state)? else { break };
-
+    while let Some((result, new_state)) = iter_next(vm, iter, state)? {
       if !result.is_number() {
         return Err(ErrorKind::TypeError { expected: "number", got: result.get_type(vm) });
       }
