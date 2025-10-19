@@ -662,6 +662,10 @@ impl<'context> VM<'context> {
           let length = if value.is_list() {
             value.as_list(&self.heap).len() as f64
           } else {
+            // we use NaN rather than an error here so that when used in a match
+            // expression on a potentially hetrogeneous variables it doesn't error early
+            //
+            // there is no way for a user to use this opcode directly
             f64::NAN
           };
 
