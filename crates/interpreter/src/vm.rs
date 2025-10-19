@@ -615,7 +615,7 @@ impl<'context> VM<'context> {
           let closure = Closure::new(function.as_function(&self.heap), upvalue_list);
 
           let value = self.allocate_value(closure, object::CLOSURE_TYPE_ID);
-          self.stack.push(value);
+          push!(self.stack, value);
           next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::GetUpvalue => {
@@ -652,7 +652,7 @@ impl<'context> VM<'context> {
           let items = self.stack.drain(start_of_items);
 
           let list = self.heap.allocate_list(items, length.into());
-          (self.stack).push(Value::from_object(*list, object::LIST_TYPE_ID));
+          push!(self.stack, Value::from_object(*list, object::LIST_TYPE_ID));
           next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::ListLength => {
@@ -685,9 +685,10 @@ impl<'context> VM<'context> {
           let list_items = list.as_list(&self.heap);
           let head = *list_items.first().unwrap_or(&Value::NULL);
           let tail = (self.heap).allocate(object::ListView::new(self, list, 1, list_items.len()));
+          let tail = Value::from_object(tail, object::LIST_VIEW_TYPE_ID);
 
           push!(self.stack, head);
-          (self.stack).push(Value::from_object(tail, object::LIST_VIEW_TYPE_ID));
+          push!(self.stack, tail);
           next_instruction!(self, instruction, ip, chunk);
         }
 
@@ -786,6 +787,7 @@ macro_rules! numeric_operation {
     let (right, left) = ($vm.stack.pop(), $vm.stack.pop());
 
     if left.is_number() && right.is_number() {
+      // we don't use the push macro, as we know there is space as we have removed 2 items
       $vm.stack.push(Value::from(left.as_number() $operator right.as_number()));
     } else if right.is_number() {
       break Some(ErrorKind::TypeError { expected: "number", got: left.get_type(&$vm) });
@@ -803,8 +805,10 @@ macro_rules! comparison_operation {
     let (right, left) = ($vm.stack.pop(), $vm.stack.pop());
 
     if left.is_number() && right.is_number() {
+      // we don't use the push macro, as we know there is space as we have removed 2 items
       $vm.stack.push(Value::from(left.as_number() $operator right.as_number()));
     } else if left.is_string() && right.is_string() {
+      // we don't use the push macro, as we know there is space as we have removed 2 items
       $vm.stack.push(Value::from(left.as_string(&$vm.heap) $operator right.as_string(&$vm.heap)));
     } else {
       break Some(ErrorKind::TypeErrorBinary {
