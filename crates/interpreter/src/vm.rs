@@ -200,17 +200,7 @@ impl<'context> VM<'context> {
 
   #[inline]
   fn should_garbage_collect(&self) -> bool {
-    #[cfg(feature = "gc-stress-test")]
-    {
-      // Collect garbage after every instruction
-      // Means any problems in the marking will be caught faster
-      true
-    }
-
-    #[cfg(not(feature = "gc-stress-test"))]
-    {
-      self.heap.full_page_count() > self.gc_threshold
-    }
+    self.heap.full_page_count() > self.gc_threshold
   }
   /// Run the garbage collector
   pub fn garbage_collect(&mut self) {
@@ -360,9 +350,8 @@ impl<'context> VM<'context> {
     let mut offset = if MAIN_SCRIPT { 0 } else { self.stack.len() - 1 };
     let mut chunk = chunk;
 
+    let mut instruction = chunk.get(ip);
     let error = loop {
-      let instruction = chunk.get(ip);
-
       match instruction {
         // Constants
         OpCode::Constant => {
@@ -374,6 +363,7 @@ impl<'context> VM<'context> {
             ConstantValue::Function(function) => Value::from(ptr::from_ref(function)),
           };
           push!(self.stack, value);
+          next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::ConstantLong => {
           let constant_position = chunk.get_long_value(ip + 1);
@@ -384,11 +374,24 @@ impl<'context> VM<'context> {
             ConstantValue::Function(function) => Value::from(ptr::from_ref(function)),
           };
           push!(self.stack, value);
+          next_instruction!(self, instruction, ip, chunk);
         }
-        OpCode::Number => push!(self.stack, chunk.get_number(ip + 1).into()),
-        OpCode::True => push!(self.stack, Value::TRUE),
-        OpCode::False => push!(self.stack, Value::FALSE),
-        OpCode::Null => push!(self.stack, Value::NULL),
+        OpCode::Number => {
+          push!(self.stack, chunk.get_number(ip + 1).into());
+          next_instruction!(self, instruction, ip, chunk);
+        }
+        OpCode::True => {
+          push!(self.stack, Value::TRUE);
+          next_instruction!(self, instruction, ip, chunk);
+        }
+        OpCode::False => {
+          push!(self.stack, Value::FALSE);
+          next_instruction!(self, instruction, ip, chunk);
+        }
+        OpCode::Null => {
+          push!(self.stack, Value::NULL);
+          next_instruction!(self, instruction, ip, chunk);
+        }
 
         // Imports
         OpCode::Import => {
@@ -417,28 +420,30 @@ impl<'context> VM<'context> {
               });
             }
           }
+          next_instruction!(self, instruction, ip, chunk);
         }
 
         // Numeric Operations
-        OpCode::Add => numeric_operation!((self, chunk), +),
-        OpCode::Subtract => numeric_operation!((self, chunk), -),
-        OpCode::Multiply => numeric_operation!((self, chunk), *),
-        OpCode::Divide => numeric_operation!((self, chunk), /),
-        OpCode::Remainder => numeric_operation!((self, chunk), %),
+        OpCode::Add => numeric_operation!((self,instruction, ip, chunk), +),
+        OpCode::Subtract => numeric_operation!((self,instruction, ip, chunk), -),
+        OpCode::Multiply => numeric_operation!((self,instruction, ip, chunk), *),
+        OpCode::Divide => numeric_operation!((self,instruction, ip, chunk), /),
+        OpCode::Remainder => numeric_operation!((self,instruction, ip, chunk), %),
 
         // String Operations
         OpCode::AddString => {
           let (right, left) = (self.stack.pop(), self.stack.pop());
 
-          if left.is_string() && right.is_string() {
-            let new_string = BangString::concatenate(&mut self.heap, left, right);
-            push!(self.stack, new_string);
-          } else {
+          if !left.is_string() || !right.is_string() {
             break Some(ErrorKind::TypeErrorBinary {
               expected: "two strings",
               got: format!("a {} and a {}", left.get_type(self), right.get_type(self)),
             });
           }
+
+          let new_string = BangString::concatenate(&mut self.heap, left, right);
+          push!(self.stack, new_string);
+          next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::ToString => {
           let value = self.stack.pop();
@@ -449,40 +454,46 @@ impl<'context> VM<'context> {
             self.allocate_string(&value.display(self))
           };
           push!(self.stack, string);
+          next_instruction!(self, instruction, ip, chunk);
         }
 
         // Unary Operations
         OpCode::Negate => {
           let value = self.stack.pop();
-          if value.is_number() {
-            push!(self.stack, Value::from(-value.as_number()));
-          } else {
+
+          if !value.is_number() {
             break Some(ErrorKind::TypeError {
               expected: "number",
               got: value.get_type(self),
             });
           }
+
+          push!(self.stack, Value::from(-value.as_number()));
+          next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::Not => {
           let value = self.stack.pop();
           push!(self.stack, value.is_falsy(self).into());
+          next_instruction!(self, instruction, ip, chunk);
         }
 
         // Equalities
         OpCode::Equals => {
           let (right, left) = (self.stack.pop(), self.stack.pop());
           push!(self.stack, self.equals(left, right).into());
+          next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::NotEquals => {
           let (right, left) = (self.stack.pop(), self.stack.pop());
           push!(self.stack, (!self.equals(left, right)).into());
+          next_instruction!(self, instruction, ip, chunk);
         }
 
         // Comparisons
-        OpCode::Greater => comparison_operation!((self, chunk), >),
-        OpCode::GreaterEqual => comparison_operation!((self, chunk), >=),
-        OpCode::Less => comparison_operation!((self, chunk), <),
-        OpCode::LessEqual => comparison_operation!((self, chunk), <=),
+        OpCode::Greater => comparison_operation!((self, instruction, ip, chunk), >),
+        OpCode::GreaterEqual => comparison_operation!((self, instruction, ip, chunk), >=),
+        OpCode::Less => comparison_operation!((self, instruction, ip, chunk), <),
+        OpCode::LessEqual => comparison_operation!((self, instruction, ip, chunk), <=),
 
         // Variables
         OpCode::DefineGlobal => {
@@ -490,6 +501,7 @@ impl<'context> VM<'context> {
           let value = self.stack.pop();
 
           self.globals.insert(name, value);
+          next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::GetGlobal => {
           let name = chunk.get_symbol(chunk.get_value(ip + 1).into());
@@ -502,11 +514,13 @@ impl<'context> VM<'context> {
               });
             }
           }
+          next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::GetLocal => {
           let slot = chunk.get_value(ip + 1);
           let value = self.stack[offset + usize::from(slot)];
           push!(self.stack, value);
+          next_instruction!(self, instruction, ip, chunk);
         }
 
         // Functions
@@ -525,8 +539,7 @@ impl<'context> VM<'context> {
             ip = 0;
             offset = self.stack.len() - 1;
             chunk = unsafe { &*callee.as_function(&self.heap).as_ptr() };
-
-            continue; // skip the ip increment, as we're jumping to a new chunk
+            instruction = chunk.get(ip); // no ip increment, as we're jumping to a new chunk
           } else if callee.is_object_type(object::CLOSURE_TYPE_ID) {
             let upvalues = self.heap[callee.as_object::<Closure>()].upvalues;
             push!(self.frames, CallFrame {
@@ -540,8 +553,7 @@ impl<'context> VM<'context> {
             ip = 0;
             offset = self.stack.len() - 1;
             chunk = unsafe { &*self.heap[callee.as_object::<Closure>()].function().as_ptr() };
-
-            continue; // skip the ip increment, as we're jumping to a new chunk
+            instruction = chunk.get(ip); // no ip increment, as we're jumping to a new chunk
           } else if callee.is_object()
             && let Some(native_function) = self.get_type_descriptor(callee).call
           {
@@ -556,6 +568,7 @@ impl<'context> VM<'context> {
                 _ = self.frames.pop();
                 let (_argument, _callee) = (self.stack.pop(), self.stack.pop());
                 push!(self.stack, value);
+                next_instruction!(self, instruction, ip, chunk);
               }
               Err(err) => break Some(err),
             }
@@ -581,6 +594,7 @@ impl<'context> VM<'context> {
           offset = frame.offset;
           // SAFETY: callee stays on stack, so call stack reference will always exist
           chunk = unsafe { &*frame.chunk };
+          next_instruction!(self, instruction, ip, chunk);
         }
 
         // Closures
@@ -590,6 +604,7 @@ impl<'context> VM<'context> {
           let allocated = Value::from_object(self.heap.allocate(*local), object::ALLOCATED_TYPE_ID);
           *local = allocated;
           push!(self.stack, allocated);
+          next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::Closure => {
           let upvalue_count = chunk.get_value(ip + 1);
@@ -601,6 +616,7 @@ impl<'context> VM<'context> {
 
           let value = self.allocate_value(closure, object::CLOSURE_TYPE_ID);
           self.stack.push(value);
+          next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::GetUpvalue => {
           let upvalue = chunk.get_value(ip + 1);
@@ -609,6 +625,7 @@ impl<'context> VM<'context> {
           let value = self.heap[address.as_object::<Value>()];
 
           push!(self.stack, value);
+          next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::GetAllocatedValue => {
           let slot = chunk.get_value(ip + 1);
@@ -616,6 +633,7 @@ impl<'context> VM<'context> {
           let value = self.heap[address.as_object::<Value>()];
 
           push!(self.stack, value);
+          next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::GetAllocatedPointer => {
           let index = chunk.get_value(ip + 1);
@@ -623,6 +641,7 @@ impl<'context> VM<'context> {
             self.heap.get_list_buffer(self.get_last_frame_upvalues())[usize::from(index)];
 
           push!(self.stack, allocated);
+          next_instruction!(self, instruction, ip, chunk);
         }
 
         // Lists
@@ -634,6 +653,7 @@ impl<'context> VM<'context> {
 
           let list = self.heap.allocate_list(items, length.into());
           (self.stack).push(Value::from_object(*list, object::LIST_TYPE_ID));
+          next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::ListLength => {
           let value = self.stack.peek();
@@ -646,6 +666,7 @@ impl<'context> VM<'context> {
           };
 
           push!(self.stack, length.into());
+          next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::ListHeadTail => {
           let list = self.stack.pop();
@@ -663,52 +684,51 @@ impl<'context> VM<'context> {
 
           push!(self.stack, head);
           (self.stack).push(Value::from_object(tail, object::LIST_VIEW_TYPE_ID));
+          next_instruction!(self, instruction, ip, chunk);
         }
 
         // Options
         OpCode::OptionIsSome => {
           let is_some = self.stack.peek().is_object_type(object::SOME_TYPE_ID);
           push!(self.stack, is_some.into());
+          next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::OptionIsNone => {
           let is_none = self.stack.peek().is_object_type(object::NONE_TYPE_ID);
           push!(self.stack, is_none.into());
+          next_instruction!(self, instruction, ip, chunk);
         }
 
         // VM Operations
         OpCode::Pop => {
           self.stack.pop();
+          next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::PopBelow => {
           let count = chunk.get_value(ip + 1);
           let value = self.stack.pop();
           self.stack.truncate(self.stack.len() - usize::from(count));
           push!(self.stack, value);
+          next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::Peek => {
           let value = self.stack.peek();
           push!(self.stack, value);
+          next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::Jump => {
           let jump = chunk.get_long_value(ip + 1);
           ip += usize::from(jump);
+          next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::JumpIfFalse => {
           let jump = chunk.get_long_value(ip + 1);
           if self.stack.peek().is_falsy(self) {
             ip += usize::from(jump);
           }
+          next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::Halt => break None,
-      }
-
-      #[cfg(feature = "debug-stack")]
-      self.debug_stack(instruction);
-
-      ip += instruction.length();
-
-      if self.should_garbage_collect() {
-        self.garbage_collect();
       }
     };
 
@@ -739,8 +759,26 @@ impl<'context> VM<'context> {
   }
 }
 
+macro_rules! next_instruction {
+  ($vm:expr, $instruction:expr, $ip:expr, $chunk:expr) => {{
+    #[cfg(feature = "gc-stress-test")]
+    $vm.garbage_collect();
+
+    if $vm.should_garbage_collect() {
+      $vm.garbage_collect();
+    }
+
+    #[cfg(feature = "debug-stack")]
+    self.debug_stack(instruction);
+
+    $ip += $instruction.length();
+    $instruction = $chunk.get($ip);
+  }};
+}
+use next_instruction;
+
 macro_rules! numeric_operation {
-  (($vm:expr, $chunk:expr), $operator:tt) => {{
+  (($vm:expr, $instruction:expr, $ip:expr, $chunk:expr), $operator:tt) => {{
     let (right, left) = ($vm.stack.pop(), $vm.stack.pop());
 
     if left.is_number() && right.is_number() {
@@ -750,12 +788,14 @@ macro_rules! numeric_operation {
     } else {
       break Some(ErrorKind::TypeError { expected: "number", got: right.get_type(&$vm) });
     }
+
+    next_instruction!($vm, $instruction, $ip, $chunk);
   }}
 }
 use numeric_operation;
 
 macro_rules! comparison_operation {
-  (($vm:expr, $chunk:expr), $operator:tt) => {{
+  (($vm:expr, $instruction:expr, $ip:expr, $chunk:expr), $operator:tt) => {{
     let (right, left) = ($vm.stack.pop(), $vm.stack.pop());
 
     if left.is_number() && right.is_number() {
@@ -768,6 +808,8 @@ macro_rules! comparison_operation {
         got: format!("a `{}` and a `{}`", left.get_type(&$vm), right.get_type(&$vm)),
       });
     }
+
+    next_instruction!($vm, $instruction, $ip, $chunk);
   }}
 }
 use comparison_operation;
