@@ -483,9 +483,14 @@ impl Parser<'_> {
   fn list(&mut self, start: TokenIdx) -> ExpressionIdx {
     self.skip_newline();
     let mut items = ThinVec::new();
+    let mut last_item_comma = true;
 
     loop {
       self.skip_newline();
+
+      if !last_item_comma {
+        self.add_error(ParseError::MissingComma(self.current_token()));
+      }
 
       if self.is_finished() || self.current_kind() == TokenKind::RightSquare {
         break;
@@ -495,8 +500,11 @@ impl Parser<'_> {
 
       match self.current_kind() {
         TokenKind::RightSquare | TokenKind::EndOfFile => break,
-        TokenKind::Comma => _ = self.advance(),
-        _ => {}
+        TokenKind::Comma => {
+          last_item_comma = true;
+          _ = self.advance();
+        }
+        _ => last_item_comma = false,
       }
     }
     let end = self.expect(TokenKind::RightSquare);
@@ -1017,6 +1025,8 @@ pub enum ParseError {
   MissingModuleName(Token),
   /// Missing Pattern
   MissingPattern(Token),
+  /// Missing Token
+  MissingComma(Token),
 
   /// Unterminated String Literal
   UnterminatedString(Token),
@@ -1057,6 +1067,7 @@ impl ParseError {
       Self::MissingIdentifier(_) => "Missing Identifier".into(),
       Self::MissingModuleName(_) => "Missing Module Name in Import".into(),
       Self::MissingPattern(_) => "Missing Pattern".into(),
+      Self::MissingComma(_) => "Missing Comma".into(),
       Self::UnterminatedString(_) => "Unterminated String".into(),
       Self::BlockMustEndWithExpression(_) => "Block Must End With Expression".into(),
       Self::ReturnOutsideFunction(_) => "Return Outside of Function".into(),
@@ -1094,6 +1105,7 @@ impl ParseError {
       Self::MissingIdentifier(_) => "expected identifier for variable name".into(),
       Self::MissingModuleName(_) => "expected module name for import".into(),
       Self::MissingPattern(_) => "expected pattern to match on".into(),
+      Self::MissingComma(_) => "expected there to be a comma between items".into(),
       Self::UnterminatedString(_) => "missing closing quote for string".into(),
       Self::BlockMustEndWithExpression(_) => {
         "a block must return a value, so must end with an expression rather than a declaration"
@@ -1150,6 +1162,7 @@ impl ParseError {
       Self::MissingIdentifier(token) => token.into(),
       Self::MissingModuleName(token) => token.into(),
       Self::MissingPattern(token) => token.into(),
+      Self::MissingComma(token) => token.into(),
       Self::UnterminatedString(token) => token.into(),
       Self::BlockMustEndWithExpression(token) => token.into(),
       Self::ReturnOutsideFunction(token) => token.into(),

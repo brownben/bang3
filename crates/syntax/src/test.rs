@@ -1194,6 +1194,15 @@ fn list() {
     │  ╰─ Number (7)
   "});
 
+  let missing_comma = parse("[5 6, 7]");
+  assert!(!missing_comma.is_valid());
+  assert_eq!(missing_comma.to_string(), indoc! {"
+     ├─ List
+     │  ├─ Number (5)
+     │  ├─ Number (6)
+     │  ╰─ Number (7)
+  "});
+
   let complex_expression = parse("[x => x + 1, print(55 + 2)]");
   assert!(complex_expression.is_valid());
   assert_eq!(complex_expression.to_string(), indoc! {"

@@ -422,3 +422,18 @@ fn end_of_file() {
   "};
   assert_eq!(output, expected);
 }
+
+#[test]
+fn missing_comma() {
+  let file = "[1 2, 3]";
+  let output = run_stderr(file);
+  let expected = indoc! {"
+    ✕ Error: Missing Comma
+    expected there to be a comma between items
+
+        ╭─[STDIN:1]
+      1 │ [1 2, 3]
+    ────╯
+  "};
+  assert_eq!(output, expected);
+}
