@@ -70,6 +70,18 @@ impl<'ast: 'allocator, 'allocator> Formatter<'ast, 'allocator> {
     IR::Group(Box::new_in(ir, self.allocator))
   }
 
+  pub(crate) fn group_break_if_line<const N: usize>(
+    &self,
+    mut ir: [IR<'ast, 'allocator>; N],
+  ) -> IR<'ast, 'allocator> {
+    let ir = match N {
+      1 => mem::take(&mut ir[0]),
+      _ => self.concat(ir),
+    };
+
+    IR::GroupQuickBreak(Box::new_in(ir, self.allocator))
+  }
+
   /// Merge multiple IRs into a single IR
   pub(crate) fn concat<const N: usize>(
     &self,
@@ -112,6 +124,7 @@ pub enum IR<'source, 'allocator> {
   Indent(Box<'allocator, Self>),
   /// Mark a section where there are different options to break source code
   Group(Box<'allocator, Self>),
+  GroupQuickBreak(Box<'allocator, Self>),
 }
 impl<'a, 'b> IR<'a, 'b> {
   /// Check if the option has any always lines
@@ -123,6 +136,7 @@ impl<'a, 'b> IR<'a, 'b> {
       IR::Concat(x) => x.iter().any(IR::has_always_line),
       IR::Indent(ir) => ir.has_always_line(),
       IR::Group(group) => group.has_always_line(),
+      IR::GroupQuickBreak(group) => group.has_always_line(),
     }
   }
 
@@ -178,6 +192,16 @@ impl<'a, 'b> IR<'a, 'b> {
           ir.display(line_length, indentation, false, config, allocator)
         }
       }
+      IR::GroupQuickBreak(ir) => {
+        let option_a = ir.display(line_length, indentation, true, config, allocator);
+        let has_line_break = option_a.contains_line();
+
+        if !has_line_break && option_a.fits(config.print_width, line_length) {
+          option_a
+        } else {
+          ir.display(line_length, indentation, false, config, allocator)
+        }
+      }
     }
   }
 }
@@ -191,7 +215,8 @@ impl fmt::Debug for IR<'_, '_> {
       Self::AlwaysLine => write!(f, "ForcedLine"),
       Self::Concat(items) => f.debug_list().entries(items).finish(),
       Self::Indent(ir) => f.debug_tuple("Indent").field(ir).finish(),
-      Self::Group(a) => f.debug_tuple("Union").field(a).finish(),
+      Self::Group(a) => f.debug_tuple("Group").field(a).finish(),
+      Self::GroupQuickBreak(a) => f.debug_tuple("GroupQuickBreak").field(a).finish(),
       Self::Option(a, b) => f.debug_tuple("Option").field(a).field(b).finish(),
     }
   }

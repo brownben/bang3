@@ -755,6 +755,24 @@ fn lists() {
   assert_format!("[1, 2, 3]", "[\n  1,\n  2,\n  3,\n]", 5);
 }
 
+#[test]
+fn pipeline_with_long_function() {
+  let code = indoc! {"
+    input
+      >> someReallyLongFunctionNameThatExceedsTheLineLimit('hello world this is long')
+      >> anotherLongFunctionNameThatAlsoExceedsTheLineLimit(10)
+      >> finalFunction()
+  "};
+  assert_format!(code, code, 80);
+
+  let code = indoc! {"
+    let b = list::iter([1, 2, 3])
+      >> iter::filterMap(x => if (x % 2 == 1) Some(x + 1) else None)
+      >> iter::sum
+  "};
+  assert_format!(code, code, 80);
+}
+
 mod types {
   use super::*;
 

@@ -54,7 +54,7 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for Binary {
       // If a pipeline, flatten it so all operators break at the same time
       let mut output = Vec::new_in(f.allocator);
       pipeline(f, self, ast, &mut output);
-      return f.group([f.indent([IR::Concat(output)])]);
+      return f.group_break_if_line([f.indent([IR::Concat(output)])]);
     }
 
     f.concat([
