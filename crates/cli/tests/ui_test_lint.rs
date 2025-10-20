@@ -339,3 +339,19 @@ fn loss_of_precision() {
     ────╯
   "});
 }
+
+#[test]
+fn subtraction_zero_comparison() {
+  let source = "a - b < 0";
+  let output = run_lint(source);
+
+  assert_eq!(output, indoc! {"
+    ⚠ Warning: Subtraction Zero Comparison
+    a comparison between two numbers is clearer than a subtraction compared to zero
+    e.g. `x - y == 0` can be written as `x == y`
+
+        ╭─[STDIN:1]
+      1 │ a - b < 0
+    ────╯
+  "});
+}

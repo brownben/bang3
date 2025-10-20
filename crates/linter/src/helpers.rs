@@ -29,10 +29,8 @@ pub fn unwrap<'a>(expression: &'a Expression, ast: &'a AST) -> &'a Expression {
 }
 
 pub fn is_zero(expression: &Expression, ast: &AST) -> bool {
-  if let Expression::Literal(literal) = &expression
-    && let LiteralValue::Number(value) = &literal.value(ast)
-  {
-    return *value == 0.0;
+  if let Expression::Literal(literal) = &expression {
+    return literal.value(ast) == LiteralValue::Number(0.0);
   }
 
   false

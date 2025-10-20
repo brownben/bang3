@@ -305,3 +305,22 @@ fn to_string_module_access() {
 
   assert!(lint("from string import { toString }\n toString(5)").is_ok());
 }
+
+#[test]
+fn subtraction_zero_comparison() {
+  assert!(lint("a - b < 0").is_err());
+  assert!(lint("a - b > 0").is_err());
+  assert!(lint("a - b != 0").is_err());
+  assert!(lint("a - b == 0").is_err());
+  assert!(lint("a - b <= 0").is_err());
+  assert!(lint("a - b >= 0").is_err());
+
+  assert!(lint("0 > a - b").is_err());
+  assert!(lint("0 < a - b").is_err());
+
+  assert!(lint("(a - b) > (0)").is_err());
+  assert!(lint("((a - b) > (0))").is_err());
+
+  assert!(lint("a - b + 1 > 0").is_ok());
+  assert!(lint("a + b > 0").is_ok());
+}

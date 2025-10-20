@@ -9,7 +9,7 @@ use bang_syntax::{
 };
 use std::borrow::Cow;
 
-pub const RULES: [&dyn LintRule; 17] = [
+pub const RULES: [&dyn LintRule; 18] = [
   &ConstantCondition,
   &ConstantStringInFormatString,
   &DoubleComparisonChain,
@@ -20,6 +20,7 @@ pub const RULES: [&dyn LintRule; 17] = [
   &NegativeZero,
   &SelfAssignment,
   &SelfComparison,
+  &SubtractionZeroComparison,
   &ToStringModuleAccess,
   &UnderscoreVariableUse,
   &UnnecessaryClosure,
@@ -315,6 +316,49 @@ impl LintRule for SelfComparison {
       && binary.left(ast).equals(binary.right(ast), ast)
     {
       context.add_diagnostic(&Self, binary.span(ast));
+    }
+  }
+}
+
+pub struct SubtractionZeroComparison;
+impl LintRule for SubtractionZeroComparison {
+  fn name(&self) -> &'static str {
+    "Subtraction Zero Comparison"
+  }
+  fn message(&self) -> &'static str {
+    "a comparison between two numbers is clearer than a subtraction compared to zero\ne.g. `x - y == 0` can be written as `x == y`"
+  }
+  fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
+    fn is_comparison(operator: BinaryOperator) -> bool {
+      matches!(
+        operator,
+        BinaryOperator::Equal
+          | BinaryOperator::NotEqual
+          | BinaryOperator::Greater
+          | BinaryOperator::GreaterEqual
+          | BinaryOperator::Less
+          | BinaryOperator::LessEqual
+      )
+    }
+
+    fn is_subtraction(expression: &Expression, ast: &AST) -> bool {
+      if let Expression::Binary(binary) = expression {
+        return binary.operator(ast) == BinaryOperator::Subtract;
+      }
+      false
+    }
+
+    if let Expression::Binary(binary) = &expression
+      && is_comparison(binary.operator(ast))
+    {
+      let left = unwrap(binary.left(ast), ast);
+      let right = unwrap(binary.right(ast), ast);
+
+      if (is_zero(left, ast) && is_subtraction(right, ast))
+        || (is_subtraction(left, ast) && is_zero(right, ast))
+      {
+        context.add_diagnostic(&Self, binary.span(ast));
+      }
     }
   }
 }
