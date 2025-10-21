@@ -324,3 +324,13 @@ fn subtraction_zero_comparison() {
   assert!(lint("a - b + 1 > 0").is_ok());
   assert!(lint("a + b > 0").is_ok());
 }
+
+#[test]
+fn branches_duplicate_condition() {
+  assert!(lint("if (a < b) true else false ").is_err());
+  assert!(lint("if (a < b) false else true ").is_err());
+  assert!(lint("if (a) false else true ").is_err());
+  assert!(lint("if (a) { false } else (true) ").is_err());
+
+  assert!(lint("if (a) { false or true } else (false) ").is_ok());
+}

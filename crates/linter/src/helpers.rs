@@ -36,6 +36,35 @@ pub fn is_zero(expression: &Expression, ast: &AST) -> bool {
   false
 }
 
+pub fn is_comparison(operator: BinaryOperator) -> bool {
+  matches!(
+    operator,
+    BinaryOperator::Greater
+      | BinaryOperator::GreaterEqual
+      | BinaryOperator::Less
+      | BinaryOperator::LessEqual
+  )
+}
+
+pub fn is_comparison_or_equality(operator: BinaryOperator) -> bool {
+  matches!(
+    operator,
+    BinaryOperator::Equal
+      | BinaryOperator::NotEqual
+      | BinaryOperator::Greater
+      | BinaryOperator::GreaterEqual
+      | BinaryOperator::Less
+      | BinaryOperator::LessEqual
+  )
+}
+
+pub fn is_subtraction(expression: &Expression, ast: &AST) -> bool {
+  if let Expression::Binary(binary) = expression {
+    return binary.operator(ast) == BinaryOperator::Subtract;
+  }
+  false
+}
+
 pub trait IsConstant {
   fn is_constant(&self, ast: &AST) -> bool;
 }

@@ -1,15 +1,15 @@
 //! Definitions of the lint rules
-use super::{
-  Context, LintRule,
-  helpers::{ASTEquality, IsConstant, ReturnAnalysis, is_zero, unwrap},
-};
-use bang_syntax::{
-  AST, Span,
-  ast::{expression::*, statement::*},
-};
 use std::borrow::Cow;
 
-pub const RULES: [&dyn LintRule; 18] = [
+use bang_syntax::ast::{expression::*, statement::*};
+use bang_syntax::{AST, Span};
+
+use super::helpers::{ASTEquality, IsConstant, ReturnAnalysis};
+use super::helpers::{is_comparison, is_comparison_or_equality, is_subtraction, is_zero, unwrap};
+use super::{Context, LintRule};
+
+pub const RULES: [&dyn LintRule; 19] = [
+  &BranchesDuplicateCondition,
   &ConstantCondition,
   &ConstantStringInFormatString,
   &DoubleComparisonChain,
@@ -29,6 +29,33 @@ pub const RULES: [&dyn LintRule; 18] = [
   &UselessMatch,
   &YodaEquality,
 ];
+
+struct BranchesDuplicateCondition;
+impl LintRule for BranchesDuplicateCondition {
+  fn name(&self) -> &'static str {
+    "Branches Duplicate Condition"
+  }
+  fn message(&self) -> &'static str {
+    "both branches of the if are boolean literals based on the condition, consider simplifying to just the condition itself"
+  }
+  fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
+    let Expression::If(if_) = &expression else {
+      return;
+    };
+    let Some(otherwise) = &if_.otherwise(ast) else {
+      return;
+    };
+
+    if let Expression::Literal(a) = unwrap(if_.then(ast), ast)
+      && let Expression::Literal(b) = unwrap(otherwise, ast)
+      && let LiteralValue::Boolean(a) = a.value(ast)
+      && let LiteralValue::Boolean(b) = b.value(ast)
+      && a != b
+    {
+      context.add_diagnostic(&Self, if_.span(ast));
+    }
+  }
+}
 
 pub struct ConstantCondition;
 impl LintRule for ConstantCondition {
@@ -89,16 +116,6 @@ impl LintRule for DoubleComparisonChain {
     "the expression can be simplified into a single condition\n`a == b or a > b` can be simplified to `a >= b`"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
-    fn is_comparison(operator: BinaryOperator) -> bool {
-      matches!(
-        operator,
-        BinaryOperator::Greater
-          | BinaryOperator::GreaterEqual
-          | BinaryOperator::Less
-          | BinaryOperator::LessEqual
-      )
-    }
-
     // a == b or a > b
     if let Expression::Binary(binary) = expression
       && binary.operator(ast) == BinaryOperator::Or
@@ -329,27 +346,8 @@ impl LintRule for SubtractionZeroComparison {
     "a comparison between two numbers is clearer than a subtraction compared to zero\ne.g. `x - y == 0` can be written as `x == y`"
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
-    fn is_comparison(operator: BinaryOperator) -> bool {
-      matches!(
-        operator,
-        BinaryOperator::Equal
-          | BinaryOperator::NotEqual
-          | BinaryOperator::Greater
-          | BinaryOperator::GreaterEqual
-          | BinaryOperator::Less
-          | BinaryOperator::LessEqual
-      )
-    }
-
-    fn is_subtraction(expression: &Expression, ast: &AST) -> bool {
-      if let Expression::Binary(binary) = expression {
-        return binary.operator(ast) == BinaryOperator::Subtract;
-      }
-      false
-    }
-
     if let Expression::Binary(binary) = &expression
-      && is_comparison(binary.operator(ast))
+      && is_comparison_or_equality(binary.operator(ast))
     {
       let left = unwrap(binary.left(ast), ast);
       let right = unwrap(binary.right(ast), ast);

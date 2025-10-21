@@ -355,3 +355,26 @@ fn subtraction_zero_comparison() {
     ────╯
   "});
 }
+
+#[test]
+fn branches_duplicate_condition() {
+  let code = indoc! {"
+    if (a) {
+        // with a comment
+        true
+    } else false
+  "};
+
+  let output = run_lint(code);
+  assert_eq!(output, indoc! {"
+      ⚠ Warning: Branches Duplicate Condition
+      both branches of the if are boolean literals based on the condition, consider simplifying to just the condition itself
+
+          ╭─[STDIN:1]
+        1 │ if (a) {
+        2 │     // with a comment
+        3 │     true
+        4 │ } else false
+      ────╯
+  "});
+}
