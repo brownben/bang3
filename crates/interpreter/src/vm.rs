@@ -40,6 +40,11 @@ pub struct Config {
   pub stack_size: usize,
   /// The size of the call stack to allocate
   pub call_stack_size: usize,
+
+  /// The number of pages which need to be filled before a GC is triggered
+  ///
+  /// It must 2 or greater. The GC threshold will be adjusted after each collection
+  pub starting_gc_threshold: usize,
 }
 impl Config {
   /// A configuration with the smallest possible heap
@@ -47,6 +52,7 @@ impl Config {
     heap_size: HeapSize::Small,
     stack_size: 512,
     call_stack_size: 64,
+    starting_gc_threshold: 4,
   };
 }
 impl Default for Config {
@@ -56,6 +62,7 @@ impl Default for Config {
       // sizes are one less than the power of 2, so it fits neatly in a ream
       stack_size: 1023,
       call_stack_size: 63,
+      starting_gc_threshold: 6,
     }
   }
 }
@@ -92,7 +99,7 @@ impl<'context> VM<'context> {
       frames: Stack::new(config.call_stack_size, &mut heap),
       globals: HashMap::default(),
       heap,
-      gc_threshold: 6,
+      gc_threshold: config.starting_gc_threshold.max(2),
       context,
       types: object::DEFAULT_TYPE_DESCRIPTORS,
     };
