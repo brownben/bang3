@@ -744,7 +744,7 @@ fn unknown_imports() {
 
   assert_eq!(
     synthesize_has_error("from unknown_goo import { unknown_aaa }\n unknown_aaa"),
-    "unknown"
+    "^a"
   );
 
   // unknown module acccess

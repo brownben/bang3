@@ -714,7 +714,7 @@ impl InferExpression for ModuleAccess {
         span: self.span(ast),
         did_you_mean: similarly_named(self.module(ast), stdlib::MODULE_NAMES),
       });
-      return TypeArena::UNKNOWN;
+      return t.new_type_var();
     };
 
     let existing_import = t.env.variables().find_map(|var| match &var.kind {
@@ -751,7 +751,7 @@ impl InferExpression for ModuleAccess {
           span: self.span(ast),
           did_you_mean: similarly_named(self.item(ast), module.items().iter().copied()),
         });
-        TypeArena::UNKNOWN
+        t.new_type_var()
       }
     }
   }
@@ -790,7 +790,7 @@ impl InferExpression for Variable {
         did_you_mean: similarly_named(self.name(ast), t.env.variables().map(Variable::name)),
         possible_imports: stdlib::modules_defining_item(self.name(ast)),
       });
-      TypeArena::UNKNOWN
+      t.new_type_var()
     }
   }
 }

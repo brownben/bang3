@@ -103,12 +103,6 @@ fn undefined_variable_possible_imports() {
         ╭─[STDIN:1]
       1 │ let _x = sin(3.14)
     ────╯
-    ✕ Error: Type Not Callable
-    expected a function, `unknown` is not callable
-
-        ╭─[STDIN:1]
-      1 │ let _x = sin(3.14)
-    ────╯
   "});
 }
 
