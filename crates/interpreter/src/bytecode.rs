@@ -75,6 +75,14 @@ impl Chunk {
       format!("<function {}>", self.name)
     }
   }
+
+  /// Get all the constant bytecode Chunks in this Chunk
+  pub fn chunks(&self) -> impl Iterator<Item = &Self> {
+    self.constants.iter().filter_map(|constant| match constant {
+      ConstantValue::String(_) => None,
+      ConstantValue::Function(chunk) => Some(chunk),
+    })
+  }
 }
 
 /// Create a bytecode chunk

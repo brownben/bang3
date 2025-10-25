@@ -225,6 +225,59 @@ fn bytecode_fibonacci_example() {
     0039 │ Pop
     0040 │ Halt
    ──────╯
+
+         ╭─[Bytecode: fibonacciMatch]
+    0000 │ GetLocal (0)
+    0002 │ Peek
+    0003 │ Number 2.0
+    0012 │ LessEqual
+    0013 │ JumpIfFalse 13 (0029)
+    0016 │ Pop
+    0017 │ Number 1.0
+    0026 │ Jump 33 (0062)
+    0029 │ Pop
+    0030 │ Peek
+    0031 │ Recursive
+    0032 │ GetLocal (2)
+    0034 │ Number 1.0
+    0043 │ Subtract
+    0044 │ Call
+    0045 │ Recursive
+    0046 │ GetLocal (2)
+    0048 │ Number 2.0
+    0057 │ Subtract
+    0058 │ Call
+    0059 │ Add
+    0060 │ PopBelow (1)
+    0062 │ PopBelow (1)
+    0064 │ Return
+    0065 │ PopBelow (1)
+   ──────╯
+
+         ╭─[Bytecode: fibonacciIf]
+    0000 │ GetLocal (0)
+    0002 │ Number 2.0
+    0011 │ LessEqual
+    0012 │ JumpIfFalse 13 (0028)
+    0015 │ Pop
+    0016 │ Number 1.0
+    0025 │ Jump 30 (0058)
+    0028 │ Pop
+    0029 │ Recursive
+    0030 │ GetLocal (0)
+    0032 │ Number 1.0
+    0041 │ Subtract
+    0042 │ Call
+    0043 │ Recursive
+    0044 │ GetLocal (0)
+    0046 │ Number 2.0
+    0055 │ Subtract
+    0056 │ Call
+    0057 │ Add
+    0058 │ Return
+    0059 │ PopBelow (1)
+   ──────╯
+
   "};
   assert_eq!(output, expected);
 }

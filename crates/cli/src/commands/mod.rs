@@ -231,9 +231,17 @@ pub fn print_chunk(filename: &str) -> Result<CommandStatus, ()> {
   let ast = parse(filename, source)?;
   let chunk = compile(&ast)?;
 
-  print!("{chunk}");
+  display_chunk(&chunk);
 
   Ok(CommandStatus::Success)
+}
+
+fn display_chunk(chunk: &bang_interpreter::Chunk) {
+  println!("{chunk}");
+
+  for sub_chunk in chunk.chunks() {
+    display_chunk(sub_chunk);
+  }
 }
 
 pub fn language_server() -> CommandStatus {
