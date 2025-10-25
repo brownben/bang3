@@ -603,6 +603,10 @@ impl<'context> VM<'context> {
           chunk = unsafe { &*frame.chunk };
           next_instruction!(self, instruction, ip, chunk);
         }
+        OpCode::Recursive => {
+          push!(self.stack, Value::from(ptr::from_ref(chunk)));
+          next_instruction!(self, instruction, ip, chunk);
+        }
 
         // Closures
         OpCode::Allocate => {

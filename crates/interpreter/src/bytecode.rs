@@ -256,6 +256,8 @@ pub enum OpCode {
   Call,
   /// Returns the top item of the stack as the result from the current function
   Return,
+  /// Places the current function onto the stack - so it can be called recursively
+  Recursive,
 
   // Closures
   /// Allocates the top value on the stack.

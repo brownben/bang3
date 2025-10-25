@@ -1175,3 +1175,22 @@ fn lists() {
   assert_variable!(nested; b, true);
   assert_variable!(nested; c, string "[true, false, <function>]");
 }
+
+#[test]
+fn recursion() {
+  let global_matching_main_no_recursion = run(indoc! {"
+        main()
+    "});
+  assert!(global_matching_main_no_recursion.is_err());
+
+  let recursive_function_stored_in_local = run(indoc! {"
+    {
+        let loop = x => {
+            if (x == 0) { return 0 }
+            loop(x - 1)
+        }
+        loop(5)
+    }
+  "});
+  assert!(recursive_function_stored_in_local.is_ok());
+}
