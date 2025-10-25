@@ -3,21 +3,15 @@ use bang_syntax::{
   AST, Span,
   ast::{expression::*, statement::*},
 };
-use std::{error, fmt, mem};
-
-struct CompilerFunctionStack<'s> {
-  chunk: ChunkBuilder<'s>,
-  locals: Vec<Local<'s>>,
-  closures: Vec<(u8, VariableStatus)>,
-}
+use std::{error, fmt, mem, ops};
 
 pub struct Compiler<'s> {
   chunk: ChunkBuilder<'s>,
   stack: Vec<CompilerFunctionStack<'s>>,
 
-  scope_depth: u8,
-  locals: Vec<Local<'s>>,
-  closures: Vec<(u8, VariableStatus)>,
+  scope_depth: u16,
+  locals: Locals<'s>,
+  upvalues: Upvalues,
 }
 impl<'s> Compiler<'s> {
   fn new() -> Self {
@@ -26,8 +20,8 @@ impl<'s> Compiler<'s> {
       stack: Vec::with_capacity(2),
 
       scope_depth: 0,
-      locals: Vec::new(),
-      closures: Vec::with_capacity(8),
+      locals: Locals::new(),
+      upvalues: Upvalues::new(),
     }
   }
   fn finish(mut self) -> Chunk {
@@ -53,9 +47,7 @@ impl<'s> Compiler<'s> {
   pub fn compile_expression(expression: &Expression, ast: &AST) -> Result<Chunk, CompileError> {
     let mut compiler = Compiler::new();
     expression.compile(&mut compiler, ast)?;
-    compiler
-      .chunk
-      .add_opcode(OpCode::Return, expression.span(ast));
+    (compiler.chunk).add_opcode(OpCode::Return, expression.span(ast));
     Ok(compiler.finish())
   }
 
@@ -64,17 +56,17 @@ impl<'s> Compiler<'s> {
     self.stack.push(CompilerFunctionStack {
       chunk,
       locals: mem::take(&mut self.locals),
-      closures: mem::take(&mut self.closures),
+      upvalues: mem::take(&mut self.upvalues),
     });
 
     self.begin_scope();
   }
-  fn finish_chunk(&mut self) -> Result<(Chunk, Vec<(u8, VariableStatus)>), CompileError> {
+  fn finish_chunk(&mut self) -> (Chunk, Upvalues) {
     let stack_item = self.stack.pop().unwrap();
     self.locals = stack_item.locals;
 
     let chunk = mem::replace(&mut self.chunk, stack_item.chunk);
-    Ok((chunk.finalize(), stack_item.closures))
+    (chunk.finalize(), stack_item.upvalues)
   }
 
   fn add_constant(
@@ -130,10 +122,7 @@ impl<'s> Compiler<'s> {
   fn end_scope(&mut self, span: Span) -> Result<(), CompileError> {
     let mut count: usize = 0;
 
-    while let Some(last) = self.locals.last()
-      && last.depth == self.scope_depth
-    {
-      self.locals.pop();
+    while self.locals.pop_if_depth(self.scope_depth).is_some() {
       count += 1;
     }
 
@@ -151,11 +140,7 @@ impl<'s> Compiler<'s> {
   }
   fn define_variable(&mut self, name: &'s str, span: Span) -> Result<(), CompileError> {
     if self.scope_depth > 0 {
-      self.locals.push(Local {
-        name,
-        depth: self.scope_depth,
-        status: VariableStatus::Open,
-      });
+      self.locals.add(name, self.scope_depth)?;
     } else {
       self.chunk.add_opcode(OpCode::DefineGlobal, span);
       self.add_symbol(name, span)?;
@@ -169,12 +154,69 @@ impl<'s> Compiler<'s> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Jump(usize);
 
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct Locals<'s>(Vec<Local<'s>>);
+impl<'s> Locals<'s> {
+  fn new() -> Self {
+    Self(Vec::with_capacity(8))
+  }
+
+  fn add(&mut self, name: &'s str, depth: u16) -> Result<(), CompileError> {
+    if self.0.len() >= u8::MAX.into() {
+      return Err(CompileError::TooManyLocalVariables);
+    }
+
+    self.0.push(Local {
+      name,
+      depth,
+      status: VariableStatus::Open,
+    });
+
+    Ok(())
+  }
+
+  fn pop_if_depth(&mut self, depth: u16) -> Option<Local<'s>> {
+    if let Some(last) = self.0.last()
+      && last.depth == depth
+    {
+      self.0.pop()
+    } else {
+      None
+    }
+  }
+
+  fn find(&self, name: &str) -> Option<u8> {
+    self
+      .0
+      .iter()
+      .rposition(|local| local.name == name)
+      .map(|index| u8::try_from(index).unwrap()) // max size checked on add
+  }
+
+  fn len(&self) -> u8 {
+    self.0.len().try_into().unwrap() // max size checked on add
+  }
+}
+impl<'s> ops::Index<u8> for Locals<'s> {
+  type Output = Local<'s>;
+
+  fn index(&self, index: u8) -> &Self::Output {
+    &self.0[usize::from(index)]
+  }
+}
+impl ops::IndexMut<u8> for Locals<'_> {
+  fn index_mut(&mut self, index: u8) -> &mut Self::Output {
+    &mut self.0[usize::from(index)]
+  }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Local<'s> {
   name: &'s str,
-  depth: u8,
+  depth: u16,
   status: VariableStatus,
 }
+
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 enum VariableStatus {
   /// The local variable is a normal variable on the stack
@@ -182,8 +224,67 @@ enum VariableStatus {
   Open,
   /// The variable has been allocated to the heap, but exists on the stack
   Closed,
-  /// The variable is in an outer function, and must be accessed through the call stack
-  Upvalue,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct Upvalues(Vec<UpvalueAction>);
+impl Upvalues {
+  fn new() -> Self {
+    Self(Vec::with_capacity(8))
+  }
+
+  fn len(&self) -> u8 {
+    self.0.len().try_into().unwrap() // max size checked on add
+  }
+  fn is_empty(&self) -> bool {
+    self.0.is_empty()
+  }
+
+  fn iter(&self) -> impl Iterator<Item = UpvalueAction> {
+    self.0.iter().copied()
+  }
+
+  fn add(&mut self, action: UpvalueAction) -> Result<u8, CompileError> {
+    let Ok(index) = u8::try_from(self.0.len()) else {
+      return Err(CompileError::TooManyClosures);
+    };
+
+    self.0.push(action);
+    Ok(index)
+  }
+
+  fn find(&self, action: UpvalueAction) -> Option<u8> {
+    self
+      .0
+      .iter()
+      .rposition(|x| *x == action)
+      .map(|x| u8::try_from(x).unwrap()) // max size checked on add
+  }
+
+  fn find_or_add(&mut self, action: UpvalueAction) -> Result<u8, CompileError> {
+    if let Some(index) = self.find(action) {
+      Ok(index)
+    } else {
+      self.add(action)
+    }
+  }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum UpvalueAction {
+  // Move the local variable to the heap, and store it's pointer
+  Allocate(u8 /* index of the local to allocate */),
+  /// Get a pointer to an allocated variable from the stack
+  GetLocal(u8 /* index of the local holding the pointer */),
+  /// Get a pointer to an allocated variable from the call stack
+  GetUpvalue(u8 /* index of the upvalue to get */),
+}
+
+#[derive(Debug, Clone)]
+struct CompilerFunctionStack<'s> {
+  chunk: ChunkBuilder<'s>,
+  locals: Locals<'s>,
+  upvalues: Upvalues,
 }
 
 trait Compile<'s> {
@@ -337,29 +438,33 @@ impl<'s> Compile<'s> for Function {
     compiler.chunk.add_opcode(OpCode::Return, self.span(ast));
     compiler.end_scope(self.span(ast))?;
 
-    let (function_chunk, upvalues) = compiler.finish_chunk()?;
+    let (function_chunk, upvalues) = compiler.finish_chunk();
     compiler.add_constant(function_chunk, self.span(ast))?;
 
-    if !upvalues.is_empty() {
-      for (upvalue_index, status) in &upvalues {
-        compiler.chunk.add_opcode(
-          match status {
-            VariableStatus::Open => OpCode::Allocate,
-            VariableStatus::Closed => OpCode::GetLocal,
-            VariableStatus::Upvalue => OpCode::GetAllocatedPointer,
-          },
-          self.span(ast),
-        );
-        compiler.chunk.add_value(*upvalue_index, self.span(ast));
-      }
+    // if there are no upvalues, we don't need to wrap the function in a closure
+    if upvalues.is_empty() {
+      return Ok(());
+    }
 
-      compiler.chunk.add_opcode(OpCode::Closure, self.span(ast));
-      if let Ok(value) = u8::try_from(upvalues.len()) {
-        compiler.chunk.add_value(value, self.span(ast));
-      } else {
-        return Err(CompileError::TooManyClosures);
+    for upvalue in upvalues.iter() {
+      match upvalue {
+        UpvalueAction::Allocate(local_index) => {
+          compiler.chunk.add_opcode(OpCode::Allocate, self.span(ast));
+          compiler.chunk.add_value(local_index, self.span(ast));
+        }
+        UpvalueAction::GetLocal(local_index) => {
+          compiler.chunk.add_opcode(OpCode::GetLocal, self.span(ast));
+          compiler.chunk.add_value(local_index, self.span(ast));
+        }
+        UpvalueAction::GetUpvalue(upvalue_index) => {
+          (compiler.chunk).add_opcode(OpCode::GetAllocatedPointer, self.span(ast));
+          compiler.chunk.add_value(upvalue_index, self.span(ast));
+        }
       }
     }
+
+    compiler.chunk.add_opcode(OpCode::Closure, self.span(ast));
+    compiler.chunk.add_value(upvalues.len(), self.span(ast));
 
     Ok(())
   }
@@ -510,84 +615,52 @@ impl<'s> Compile<'s> for Unary {
     Ok(())
   }
 }
+
 impl<'s> Compile<'s> for Variable {
   fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
     let span = self.span(ast);
 
     // See if the variable is local to the current function
-    if let Some(local_position) = compiler
-      .locals
-      .iter()
-      .rposition(|local| local.name == self.name(ast))
-    {
+    if let Some(local_position) = compiler.locals.find(self.name(ast)) {
       match compiler.locals[local_position].status {
         VariableStatus::Open => compiler.chunk.add_opcode(OpCode::GetLocal, span),
         VariableStatus::Closed => compiler.chunk.add_opcode(OpCode::GetAllocatedValue, span),
-        VariableStatus::Upvalue => unreachable!("we are only checking the current scope"),
       }
-      if let Ok(local_position) = u8::try_from(local_position) {
-        compiler.chunk.add_value(local_position, span);
-      } else {
-        return Err(CompileError::TooManyLocalVariables);
-      }
-
-      return Ok(());
-    }
-
-    // Check for it being a closure of an outer function
-    if let Some((stack_index, local_index)) =
-      compiler
-        .stack
-        .iter()
-        .enumerate()
-        .rev()
-        .find_map(|(stack_index, function)| {
-          function
-            .locals
-            .iter()
-            .rposition(|local| local.name == self.name(ast))
-            .map(|local_index| (stack_index, local_index))
-        })
-    {
-      // it is a closure, so mark in the outer function that it need to be closed over
-      let local_status = mem::replace(
-        &mut compiler.stack[stack_index].locals[local_index].status,
-        VariableStatus::Closed,
-      );
-
-      // add it to all the functions between as an upvalue so it can be accessed
-      let (mut index, mut status) = (local_index, local_status);
-      for closures in compiler
-        .stack
-        .iter_mut()
-        .skip(stack_index)
-        .map(|x| &mut x.closures)
-      {
-        index = closures
-          .iter()
-          .rposition(|(i, _)| usize::from(*i) == index)
-          .unwrap_or_else(|| {
-            closures.push((u8::try_from(index).unwrap_or(0), status));
-            closures.len() - 1
-          });
-        status = VariableStatus::Upvalue;
-      }
-
-      compiler.chunk.add_opcode(OpCode::GetUpvalue, span);
-      if let Ok(index) = u8::try_from(index) {
-        compiler.chunk.add_value(index, span);
-      } else {
-        return Err(CompileError::TooManyClosures);
-      }
+      compiler.chunk.add_value(local_position, span);
 
       return Ok(());
     }
 
     // if the variable name matches the current chunk (and the chunk is not the root chunk)
-    // then it is a recursive lookup. if the function is named it is a variable, and there is
-    // no way to for another value to shadow it before the body of the function.
+    // then it is a recursive lookup. as we have checked locals first, nothing else can shadow it
     if compiler.chunk.name == self.name(ast) && !compiler.stack.is_empty() {
       compiler.chunk.add_opcode(OpCode::Recursive, span);
+      return Ok(());
+    }
+
+    // Check for it being a closure of an outer function
+    if let Some((stack_index, local_index)) = find_local_variable(&compiler.stack, self.name(ast)) {
+      let origin_function = &mut compiler.stack[stack_index];
+      let original_status = origin_function.locals[local_index].status;
+
+      // mark the variable as closed over in the origin function, and create the upvalue
+      origin_function.locals[local_index].status = VariableStatus::Closed;
+      let mut upvalue_index = (origin_function.upvalues).find_or_add(match original_status {
+        VariableStatus::Open => UpvalueAction::Allocate(local_index),
+        VariableStatus::Closed => UpvalueAction::GetLocal(local_index),
+      })?;
+
+      // walk down the function stack, creating a chain of upvalues from the
+      // source function to the current function
+      for function in &mut compiler.stack[stack_index + 1..] {
+        let upvalues = &mut function.upvalues;
+        upvalue_index = upvalues.find_or_add(UpvalueAction::GetUpvalue(upvalue_index))?;
+      }
+
+      // finally, add the opcode to get the upvalue in the current function
+      compiler.chunk.add_opcode(OpCode::GetUpvalue, span);
+      compiler.chunk.add_value(upvalue_index, span);
+
       return Ok(());
     }
 
@@ -597,6 +670,17 @@ impl<'s> Compile<'s> for Variable {
 
     Ok(())
   }
+}
+
+/// walk backwards up the stack to find if the variable is defined in any parent function
+fn find_local_variable(stack: &[CompilerFunctionStack], name: &str) -> Option<(usize, u8)> {
+  for (index, function) in stack.iter().enumerate().rev() {
+    if let Some(local_index) = function.locals.find(name) {
+      return Some((index, local_index));
+    }
+  }
+
+  None
 }
 
 impl<'s> Compile<'s> for Statement {
@@ -853,11 +937,8 @@ impl<'s> CompilePattern<'s> for PatternOption {
       compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
 
       (compiler.chunk).add_opcode(OpCode::GetAllocatedValue, self.span(ast));
-      if let Ok(match_value_location) = u8::try_from(compiler.locals.len() - 1) {
-        (compiler.chunk).add_value(match_value_location, self.span(ast));
-      } else {
-        return Err(CompileError::TooManyLocalVariables);
-      }
+      (compiler.chunk).add_value(compiler.locals.len() - 1, self.span(ast));
+
       let variable = self.variable().ok_or(CompileError::InvalidAST)?;
       compiler.define_variable(variable.name(ast), self.span(ast))?;
     }
@@ -878,6 +959,7 @@ impl<'s> CompilePattern<'s> for PatternOption {
     }
   }
 }
+
 /// An error from compiling an AST into bytecode
 #[derive(Debug, Clone, Copy)]
 pub enum CompileError {
