@@ -7,7 +7,7 @@ use std::{error, fmt, mem, ops};
 
 pub struct Compiler<'s> {
   chunk: ChunkBuilder<'s>,
-  stack: Vec<CompilerFunctionStack<'s>>,
+  stack: Vec<CompilerFunction<'s>>,
 
   scope_depth: u16,
   locals: Locals<'s>,
@@ -53,7 +53,7 @@ impl<'s> Compiler<'s> {
 
   fn new_chunk(&mut self, name: &'s str) {
     let chunk = mem::replace(&mut self.chunk, ChunkBuilder::new(name));
-    self.stack.push(CompilerFunctionStack {
+    self.stack.push(CompilerFunction {
       chunk,
       locals: mem::take(&mut self.locals),
       upvalues: mem::take(&mut self.upvalues),
@@ -278,10 +278,12 @@ enum UpvalueAction {
   GetLocal(u8 /* index of the local holding the pointer */),
   /// Get a pointer to an allocated variable from the call stack
   GetUpvalue(u8 /* index of the upvalue to get */),
+  /// Get a pointer to the current function (for recursion)
+  Recursive,
 }
 
 #[derive(Debug, Clone)]
-struct CompilerFunctionStack<'s> {
+struct CompilerFunction<'s> {
   chunk: ChunkBuilder<'s>,
   locals: Locals<'s>,
   upvalues: Upvalues,
@@ -459,6 +461,18 @@ impl<'s> Compile<'s> for Function {
         UpvalueAction::GetUpvalue(upvalue_index) => {
           (compiler.chunk).add_opcode(OpCode::GetAllocatedPointer, self.span(ast));
           compiler.chunk.add_value(upvalue_index, self.span(ast));
+        }
+        UpvalueAction::Recursive => {
+          compiler.chunk.add_opcode(OpCode::Recursive, self.span(ast));
+
+          // all upvalues are allocated on the heap, with the pointer stored on the stack
+          // so we need to allocate the function (using a temporary local variable)
+          let Some(temporary_local) = compiler.locals.len().checked_add(1) else {
+            return Err(CompileError::TooManyLocalVariables);
+          };
+          compiler.chunk.add_opcode(OpCode::Allocate, self.span(ast));
+          compiler.chunk.add_value(temporary_local, self.span(ast));
+          compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
         }
       }
     }
@@ -639,16 +653,22 @@ impl<'s> Compile<'s> for Variable {
     }
 
     // Check for it being a closure of an outer function
-    if let Some((stack_index, local_index)) = find_local_variable(&compiler.stack, self.name(ast)) {
+    if let Some((stack_index, variable)) = find_outer_variable(&compiler.stack, self.name(ast)) {
       let origin_function = &mut compiler.stack[stack_index];
-      let original_status = origin_function.locals[local_index].status;
+      let action = match variable {
+        OuterVariable::Local(local_index) => {
+          // mark the variable as closed over in the origin function, and create the upvalue
+          let original_status = origin_function.locals[local_index].status;
+          origin_function.locals[local_index].status = VariableStatus::Closed;
 
-      // mark the variable as closed over in the origin function, and create the upvalue
-      origin_function.locals[local_index].status = VariableStatus::Closed;
-      let mut upvalue_index = (origin_function.upvalues).find_or_add(match original_status {
-        VariableStatus::Open => UpvalueAction::Allocate(local_index),
-        VariableStatus::Closed => UpvalueAction::GetLocal(local_index),
-      })?;
+          match original_status {
+            VariableStatus::Open => UpvalueAction::Allocate(local_index),
+            VariableStatus::Closed => UpvalueAction::GetLocal(local_index),
+          }
+        }
+        OuterVariable::Recursive => UpvalueAction::Recursive,
+      };
+      let mut upvalue_index = origin_function.upvalues.find_or_add(action)?;
 
       // walk down the function stack, creating a chain of upvalues from the
       // source function to the current function
@@ -671,12 +691,18 @@ impl<'s> Compile<'s> for Variable {
     Ok(())
   }
 }
-
-/// walk backwards up the stack to find if the variable is defined in any parent function
-fn find_local_variable(stack: &[CompilerFunctionStack], name: &str) -> Option<(usize, u8)> {
+enum OuterVariable {
+  Local(u8),
+  Recursive,
+}
+/// walk backwards up the stack to find if the variable is defined in any outer function
+fn find_outer_variable(stack: &[CompilerFunction], name: &str) -> Option<(usize, OuterVariable)> {
   for (index, function) in stack.iter().enumerate().rev() {
     if let Some(local_index) = function.locals.find(name) {
-      return Some((index, local_index));
+      return Some((index, OuterVariable::Local(local_index)));
+    }
+    if function.chunk.name == name {
+      return Some((index, OuterVariable::Recursive));
     }
   }
 

@@ -260,7 +260,7 @@ pub enum OpCode {
   Recursive,
 
   // Closures
-  /// Allocates the top value on the stack.
+  /// Allocates a local variable on the stack. Arg(u8) - stack offset
   Allocate,
   /// Creates a closure. Arg(u8) - number of upvalues
   Closure,

@@ -1178,9 +1178,7 @@ fn lists() {
 
 #[test]
 fn recursion() {
-  let global_matching_main_no_recursion = run(indoc! {"
-        main()
-    "});
+  let global_matching_main_no_recursion = run("main()");
   assert!(global_matching_main_no_recursion.is_err());
 
   let recursive_function_stored_in_local = run(indoc! {"
@@ -1193,4 +1191,25 @@ fn recursion() {
     }
   "});
   assert!(recursive_function_stored_in_local.is_ok());
+
+  let mut local_function_recursive_in_child_function = run(indoc! {"
+    let a = {
+      let local = x => {
+        let local = 4
+        (_ => local)()
+      }
+      local(5)
+    }
+
+    let b = {
+        let local = 7 // check that it prefers the recursive function to variable in a higher scope
+        let local = x => {
+            (_ => local)()
+        }
+        local(5)
+    }
+    let c = string::from(b)
+  "});
+  assert_variable!(local_function_recursive_in_child_function; a, 4.0);
+  assert_variable!(local_function_recursive_in_child_function; c, string "<function local>");
 }
