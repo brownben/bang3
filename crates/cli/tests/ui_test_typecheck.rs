@@ -89,6 +89,30 @@ fn unknown_variable_without_suggestion() {
 }
 
 #[test]
+fn undefined_variable_possible_imports() {
+  let source = indoc! {"
+    let _x = sin(3.14)
+  "};
+  let output = run_typecheck(source);
+
+  assert_eq!(output, indoc! {"
+    ✕ Error: Undefined Variable
+    no variable defined with the name `sin`
+    hint: `sin` can be imported from: maths
+
+        ╭─[STDIN:1]
+      1 │ let _x = sin(3.14)
+    ────╯
+    ✕ Error: Type Not Callable
+    expected a function, `unknown` is not callable
+
+        ╭─[STDIN:1]
+      1 │ let _x = sin(3.14)
+    ────╯
+  "});
+}
+
+#[test]
 fn unknown_module_with_suggestion() {
   let source = indoc! {"
     from math import { sin }

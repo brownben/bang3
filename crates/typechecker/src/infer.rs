@@ -788,6 +788,7 @@ impl InferExpression for Variable {
         identifier: self.name(ast).to_owned(),
         span: self.span(ast),
         did_you_mean: similarly_named(self.name(ast), t.env.variables().map(Variable::name)),
+        possible_imports: stdlib::modules_defining_item(self.name(ast)),
       });
       TypeArena::UNKNOWN
     }

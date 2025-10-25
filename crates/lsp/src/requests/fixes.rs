@@ -95,7 +95,6 @@ mod parse_errors {
 
 mod type_errors {
   use super::{Document, IntoDiagnostic, Span, delete_edit, insert_edit, replace_edit};
-  use bang_stdlib::{MODULES, StdlibModule};
   use bang_typechecker::TypeError;
   use lsp_types as lsp;
 
@@ -127,6 +126,7 @@ mod type_errors {
       identifier,
       span,
       did_you_mean,
+      possible_imports,
     } = error
     else {
       unreachable!("Wrong Error Type Passed");
@@ -142,7 +142,7 @@ mod type_errors {
       });
     }
 
-    for module in is_from_module(identifier) {
+    for module in possible_imports {
       actions.push(lsp::CodeAction {
         title: format!("Qualify as `{module}::{identifier}`"),
         kind: Some(lsp::CodeActionKind::QUICKFIX),
@@ -151,13 +151,6 @@ mod type_errors {
         ..Default::default()
       });
     }
-  }
-
-  fn is_from_module(identifier: &str) -> impl Iterator<Item = &'static str> {
-    MODULES
-      .into_iter()
-      .filter(move |module| module.items().contains(&identifier))
-      .map(StdlibModule::name)
   }
 
   fn unreachable_case(file: &Document, error: &TypeError, span: Span) -> lsp::CodeAction {

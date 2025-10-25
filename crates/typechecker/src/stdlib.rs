@@ -75,3 +75,11 @@ impl ops::Deref for StdlibModule {
     self.0
   }
 }
+
+pub fn modules_defining_item(item: &str) -> Vec<&'static str> {
+  bang_stdlib::MODULES
+    .iter()
+    .filter(|module| module.items().contains(&item))
+    .map(|module| module.name())
+    .collect()
+}

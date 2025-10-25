@@ -12,6 +12,8 @@ pub enum Problem {
     span: Span,
     /// Suggestion for which variable could be used instead
     did_you_mean: Option<String>,
+    /// Modules from which the variable could be imported
+    possible_imports: Vec<&'static str>,
   },
   /// Expected a type, but recieved a different one
   ExpectedDifferentType {
@@ -268,6 +270,14 @@ impl Problem {
         ..
       } => Some(format!(
         "a variable with a similar name exists, did you mean `{did_you_mean}`?",
+      )),
+      Self::UndefinedVariable {
+        identifier,
+        possible_imports,
+        ..
+      } if !possible_imports.is_empty() => Some(format!(
+        "`{identifier}` can be imported from: {}",
+        possible_imports.join(", ")
       )),
       Self::ModuleNotFound {
         did_you_mean: Some(did_you_mean),
