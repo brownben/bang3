@@ -575,6 +575,14 @@ impl<'s> Compile<'s> for Variable {
       return Ok(());
     }
 
+    // if the variable name matches the current chunk (and the chunk is not the root chunk)
+    // then it is a recursive lookup. if the function is named it is a variable, and there is
+    // no way to for another value to shadow it before the body of the function.
+    if compiler.chunk.name == self.name(ast) && !compiler.chunk_stack.is_empty() {
+      compiler.chunk.add_opcode(OpCode::Recursive, span);
+      return Ok(());
+    }
+
     // Otherwise, it must be a global variable
     compiler.chunk.add_opcode(OpCode::GetGlobal, span);
     compiler.add_symbol(self.name(ast), span)?;
