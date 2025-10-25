@@ -785,7 +785,7 @@ macro_rules! next_instruction {
     }
 
     #[cfg(feature = "debug-stack")]
-    self.debug_stack(instruction);
+    $vm.debug_stack($instruction);
 
     $ip += $instruction.length();
     $instruction = $chunk.get($ip);

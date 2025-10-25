@@ -698,7 +698,7 @@ const ALLOCATED: TypeDescriptor = TypeDescriptor {
     trace_value(vm, vm.heap[value.cast::<Value>()]);
   },
   display: |_, _| unreachable!("Not accessed as a value"),
-  debug: |_, _| unreachable!("Not accessed as a value"),
+  debug: |vm, value| format!("<allocated {}>", vm.heap[value.cast::<Value>()].debug(vm)),
   is_falsy: |_, _| unreachable!("Not accessed as a value"),
   equals: |_, _, _| unreachable!("Not accessed as a value"),
   call: None,
