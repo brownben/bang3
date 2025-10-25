@@ -48,6 +48,26 @@
         "scopeName": "source.bang",
         "path": "./syntaxes/bang.tmLanguage.json"
       }
+    ],
+    "semanticTokenTypes": [
+      {
+        "id": "boolean",
+        "description": "Style for boolean literals",
+        "superType": "keyword"
+      }
+    ],
+    "semanticTokenScopes": [
+      {
+        "language": "bang",
+        "scopes": {
+          "boolean": [
+            "constant.language.boolean.bang"
+          ],
+          "keyword.declaration": [
+            "storage.type.bang"
+          ]
+        }
+      }
     ]
   },
   "main": "./dist/extension.js",

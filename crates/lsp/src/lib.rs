@@ -16,6 +16,7 @@
 //!   - Variables in Scope
 //!   - Module Items in Import
 //! - Selection Ranges
+//! - Semantic Tokens
 
 #![deny(unsafe_code)]
 
@@ -25,6 +26,7 @@ mod notifications;
 mod requests;
 
 use documents::DocumentIndex;
+use requests::{SemanticTokenKind, SemanticTokenModifier};
 
 /// An instance of a Language Server
 pub struct LanguageServer {
@@ -139,6 +141,21 @@ impl LanguageServer {
 
       // Code Actions (autofixes)
       code_action_provider: Some(lsp_types::CodeActionProviderCapability::Simple(true)),
+
+      // Semantic Tokens
+      semantic_tokens_provider: Some(
+        lsp_types::SemanticTokensServerCapabilities::SemanticTokensOptions(
+          lsp_types::SemanticTokensOptions {
+            legend: lsp_types::SemanticTokensLegend {
+              token_types: SemanticTokenKind::SUPPORTED_KINDS.to_vec(),
+              token_modifiers: SemanticTokenModifier::SUPPORTED_MODIFIERS.to_vec(),
+            },
+            full: Some(lsp_types::SemanticTokensFullOptions::Bool(true)),
+            range: Some(true),
+            ..Default::default()
+          },
+        ),
+      ),
 
       // Doesn't provide all capabilities
       ..Default::default()

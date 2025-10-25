@@ -167,20 +167,9 @@ pub fn highlight_source(output: &mut dyn fmt::Write, source: &str) -> fmt::Resul
 
     let style = match token.kind {
       TokenKind::Number | TokenKind::True | TokenKind::False => Style::new().blue(),
-      TokenKind::String
-      | TokenKind::FormatStringStart
-      | TokenKind::FormatStringPart
-      | TokenKind::FormatStringEnd
-      | TokenKind::FormatStringUnterminated
-      | TokenKind::UnterminatedString => Style::new().green(),
-      TokenKind::As
-      | TokenKind::Else
-      | TokenKind::From
-      | TokenKind::If
-      | TokenKind::Import
-      | TokenKind::Match
-      | TokenKind::Return => Style::new().cyan(),
+      kind if kind.is_string() => Style::new().green(),
       TokenKind::Let => Style::new().magenta(),
+      kind if kind.is_keyword() => Style::new().cyan(),
       TokenKind::Comment => Style::new().dimmed(),
       _ => Style::new(),
     };

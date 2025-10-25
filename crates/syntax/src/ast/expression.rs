@@ -665,6 +665,11 @@ impl ModuleAccess {
   pub fn item_span(&self, ast: &AST) -> Span {
     self.item.map(|i| ast[i]).unwrap_or_default().into()
   }
+
+  /// The location of the module being accessed
+  pub fn module_span(&self, ast: &AST) -> Span {
+    Span::from(ast[self.module])
+  }
 }
 
 /// A unary expression, e.g. `!true`, `-1`

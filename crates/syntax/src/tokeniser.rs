@@ -472,6 +472,50 @@ impl TokenKind {
         | Self::True
     )
   }
+
+  /// Is the token a string, or part of a format string?
+  #[must_use]
+  pub fn is_string(self) -> bool {
+    matches!(
+      self,
+      Self::String
+        | Self::UnterminatedString
+        | Self::FormatStringStart
+        | Self::FormatStringPart
+        | Self::FormatStringEnd
+        | Self::FormatStringUnterminated
+    )
+  }
+
+  /// Is the token an operator?
+  #[must_use]
+  pub fn is_operator(self) -> bool {
+    matches!(
+      self,
+      Self::Minus
+        | Self::Plus
+        | Self::Slash
+        | Self::Star
+        | Self::Percent
+        | Self::PlusPlus
+        | Self::Bang
+        | Self::Or
+        | Self::And
+        | Self::RightRight
+        | Self::FatRightArrow
+        | Self::BangEqual
+        | Self::Equal
+        | Self::EqualEqual
+        | Self::Greater
+        | Self::GreaterEqual
+        | Self::Less
+        | Self::LessEqual
+        | Self::Pipe
+        | Self::RightArrow
+        | Self::DotDot
+        | Self::Dot
+    )
+  }
 }
 impl fmt::Display for TokenKind {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -11,8 +11,11 @@ mod format;
 mod hover;
 mod inlay_hints;
 mod selection_range;
+mod semantic_tokens;
 mod symbols;
 mod variables;
+
+pub use semantic_tokens::{SemanticTokenKind, SemanticTokenModifier};
 
 use completions::completions;
 use diagnostics::file_diagnostics;
@@ -22,9 +25,11 @@ use format::format_file;
 use hover::hover;
 use inlay_hints::inlay_hints;
 use selection_range::selection_ranges;
+use semantic_tokens::semantic_tokens;
 use symbols::document_symbols;
 use variables::{get_references, goto_definition, is_valid_identifier, rename};
 
+#[expect(clippy::too_many_lines)]
 pub fn handle(
   request: lsp_server::Request,
   files: &mut DocumentIndex,
@@ -132,6 +137,21 @@ pub fn handle(
       let (request_id, params) = get_params::<CodeActionRequest>(request);
       let file = files.get(&params.text_document.uri);
       let result = fixes(file, params.range);
+
+      Some(lsp_server::Response::new_ok(request_id, result))
+    }
+    SemanticTokensFullRequest::METHOD => {
+      let (request_id, params) = get_params::<SemanticTokensFullRequest>(request);
+      let file = files.get(&params.text_document.uri);
+      let result = semantic_tokens(file, None);
+
+      Some(lsp_server::Response::new_ok(request_id, result))
+    }
+    SemanticTokensRangeRequest::METHOD => {
+      let (request_id, params) = get_params::<SemanticTokensRangeRequest>(request);
+      let file = files.get(&params.text_document.uri);
+      let tokens = semantic_tokens(file, Some(params.range));
+      let result = lsp::SemanticTokensRangeResult::Tokens(tokens);
 
       Some(lsp_server::Response::new_ok(request_id, result))
     }

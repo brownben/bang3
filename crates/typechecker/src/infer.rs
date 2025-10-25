@@ -500,11 +500,10 @@ impl InferExpression for Function {
     let expected_return = t.new_type_var();
     let function_type = t.types.new_type(Type::Function(parameter, expected_return));
 
-    t.env.define_variable(
+    t.env.define_parameter(
       self.parameter.name(ast),
       self.parameter.span(ast),
       parameter,
-      None,
     );
     let return_type = match self.body(ast).infer(t, ast) {
       ExpressionType::Expression(ty) | ExpressionType::Return(ty) => ty,

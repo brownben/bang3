@@ -172,6 +172,31 @@ impl Enviroment {
         name: variable_name.to_owned(),
         defined: variable_span,
         documentation,
+        parameter: false,
+      },
+
+      used: Vec::new(),
+      active: Some(variable_span),
+
+      depth: self.depth,
+      type_: TypeScheme::monomorphic(type_),
+
+      type_info: OnceCell::new(),
+    });
+  }
+
+  pub(crate) fn define_parameter(
+    &mut self,
+    variable_name: &str,
+    variable_span: Span,
+    type_: TypeRef,
+  ) {
+    self.variables.push(Variable {
+      kind: VariableKind::Declaration {
+        name: variable_name.to_owned(),
+        defined: variable_span,
+        documentation: None,
+        parameter: true,
       },
 
       used: Vec::new(),
@@ -289,6 +314,9 @@ pub enum VariableKind {
 
     /// the span where the variable was defined
     defined: Span,
+
+    /// is this a function parameter?
+    parameter: bool,
   },
   /// a variable that is defined by the runtime
   Builtin {
@@ -317,6 +345,14 @@ impl Variable {
   /// Checks if the variable is used
   pub(crate) fn is_used(&self) -> bool {
     !self.used.is_empty()
+  }
+
+  /// Is the variable a function parameter?
+  pub fn is_parameter(&self) -> bool {
+    match &self.kind {
+      VariableKind::Declaration { parameter, .. } => *parameter,
+      _ => false,
+    }
   }
 
   /// Is the variable active at the given position
