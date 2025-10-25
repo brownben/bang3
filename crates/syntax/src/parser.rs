@@ -263,6 +263,10 @@ impl<'ast> Parser<'ast> {
         expected: TokenKind::Identifier,
         recieved: self.ast[token],
       });
+
+      if kind == TokenKind::EndOfFile {
+        return None;
+      }
     }
 
     Some(Variable { token })
@@ -280,6 +284,10 @@ impl<'ast> Parser<'ast> {
         expected: TokenKind::Identifier,
         recieved: self.ast[token],
       });
+
+      if kind == TokenKind::EndOfFile {
+        return None;
+      }
     }
 
     Some(Variable { token })
