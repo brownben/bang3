@@ -98,6 +98,8 @@ fn yoda_equality() {
   assert!(lint("7 == x").is_err());
   assert!(lint("(7) != x").is_err());
   assert!(lint("7 == (x)").is_err());
+  assert!(lint("[] != x").is_err());
+  assert!(lint("`hello {7}` != x").is_err());
 
   assert!(lint("x == y").is_ok());
   assert!(lint("x == 7").is_ok());
@@ -105,6 +107,8 @@ fn yoda_equality() {
   assert!(lint("x != 7").is_ok());
   assert!(lint("7 < x").is_ok());
   assert!(lint("x > 7").is_ok());
+  assert!(lint("x == []").is_ok());
+  assert!(lint("x != `hello {7}`").is_ok());
 }
 
 #[test]

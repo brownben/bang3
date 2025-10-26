@@ -513,9 +513,13 @@ impl LintRule for YodaEquality {
     if let Expression::Binary(binary) = &expression
       && let BinaryOperator::Equal | BinaryOperator::NotEqual = binary.operator(ast)
       && let Expression::Variable(_) = unwrap(binary.right(ast), ast)
-      && let Expression::Literal(_) = unwrap(binary.left(ast), ast)
     {
-      context.add_diagnostic(&Self, binary.span(ast));
+      match unwrap(binary.left(ast), ast) {
+        Expression::Literal(_) | Expression::FormatString(_) | Expression::List(_) => {
+          context.add_diagnostic(&Self, binary.span(ast));
+        }
+        _ => {}
+      }
     }
   }
 }
