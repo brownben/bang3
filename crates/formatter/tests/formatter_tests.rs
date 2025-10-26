@@ -170,6 +170,16 @@ fn block() {
     6
   );
   assert_format!("{let a=false}", "{\n  let a = false\n}", 6);
+
+  let code = indoc! {"
+    {
+      [1, 2, 4, 5, 6, 10, 15]
+        >> list::iter
+        >> iter::map(x => assert::equal(fibonacciIf(x))(fibonacciMatch(x)))
+        >> iter::toList
+    }
+  "};
+  assert_format!(code, code, 80);
 }
 
 #[test]

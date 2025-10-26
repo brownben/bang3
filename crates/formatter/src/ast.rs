@@ -91,7 +91,7 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for Block {
 
       let statement = statement.format(f, ast);
       if is_single_expression || is_single_return {
-        return f.group([
+        return f.group_break_if_line([
           IR::Text("{"),
           f.indent([IR::LineOrSpace, statement]),
           IR::LineOrSpace,
