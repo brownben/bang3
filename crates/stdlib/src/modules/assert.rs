@@ -25,7 +25,7 @@ module!(assert, AssertModule, {
         Err(ErrorKind::Custom {
           title: "Assertion Error",
           message: format!(
-            "expected both values to be equal\nfirst: {} [type: {}]\nsecond: {} [type: {}]",
+            "expected both values to be equal — {} [type: {}] != {} [type: {}]",
             first.debug(vm), first.get_type(vm),
             second.debug(vm), second.get_type(vm),
           ),

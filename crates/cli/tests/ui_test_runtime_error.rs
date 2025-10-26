@@ -295,9 +295,7 @@ fn assertions() {
   let output = run("assert::equal('hello')('world')");
   assert_eq!(output, indoc! {"
     ✕ Error: Assertion Error
-    expected both values to be equal
-    first: 'hello' [type: string]
-    second: 'world' [type: string]
+    expected both values to be equal — 'hello' [type: string] != 'world' [type: string]
 
         ╭─[STDIN:1]
       1 │ assert::equal('hello')('world')
