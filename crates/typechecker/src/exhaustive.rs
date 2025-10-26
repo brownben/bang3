@@ -224,6 +224,9 @@ impl Eq for NumberRange {}
 impl fmt::Display for NumberRange {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
+      Self(f64::NEG_INFINITY, f64::INFINITY) => {
+        write!(f, "the arms don't cover any numbers")
+      }
       Self(f64::NEG_INFINITY, end) => {
         write!(f, "the arms don't cover numbers less than `{end}`")
       }
