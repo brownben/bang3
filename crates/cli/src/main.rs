@@ -62,7 +62,7 @@ enum App {
     file: String,
   },
 
-  /// Checks the file for type errors
+  /// Checks for type errors
   Typecheck {
     /// The file to typecheck
     file: String,

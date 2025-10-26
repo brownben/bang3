@@ -104,6 +104,8 @@ false
 | `and` / `&&`  | Logical And | `a and b` |
 | `or` / `\|\|` | Logical Or  | `x or y`  |
 
+Logical And and Logical Or both short-circuit and only calculate each value if required.
+
 ## Compound Types
 
 ### List
@@ -276,8 +278,8 @@ let outer = _ => {
   inner
 }
 
-outer()()
-
+// value cannot be accessed here and does not exist on the stack, when the inner function is called
+outer()() // 'hello'
 ```
 
 This can be used to have functions with multiple arguments. As functions can return other functions which reference the value passed as an argument. These inner functions don't need to be called straight away giving partial application for functions.

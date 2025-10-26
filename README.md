@@ -36,7 +36,7 @@ Commands:
   repl       Start an interactive Read-Eval-Print Loop (REPL)
   format     Formats source files
   lint       Checks for lint warnings
-  typecheck  Checks the file for type errors
+  typecheck  Checks for type errors
   print      Prints debugging information
   lsp        Run the language server. For editors, not humans
 
@@ -55,7 +55,7 @@ cargo fmt
 cargo clippy
 
 # To run the tests:
-cargo test
+cargo test --all
 
 # To generate the standard library docs:
 cargo run -p bang-interpreter --bin stdlib-docs
