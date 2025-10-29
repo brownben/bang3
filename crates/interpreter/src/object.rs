@@ -68,33 +68,6 @@ impl BangString {
     vm.heap[*self.0] == 0
   }
 
-  pub fn push(self, heap: &mut Heap, new_string: &str) -> Self {
-    let capacity = self.0.capacity(heap);
-    let current_length = self.length(heap);
-
-    let list = if current_length + new_string.len() > capacity {
-      // If the item doesn't fit in the current list, reallocate
-      let new_capacity = (capacity * 2).max(current_length + new_string.len());
-      let new_list = Self::with_capacity(heap, new_capacity);
-
-      // Copy the old list to the new list
-      let old_list_buffer =
-        unsafe { slice::from_raw_parts(heap.get_list_buffer_ptr(self.0), current_length) };
-      let new_list_buffer = heap.get_list_buffer_mut(new_list.0);
-      new_list_buffer.copy_from_slice(old_list_buffer);
-
-      new_list
-    } else {
-      // if it does fit just use the current list
-      self
-    };
-
-    // add the new item to the list
-    heap[*list.0] = current_length + new_string.len();
-    heap.get_list_buffer_mut(list.0)[current_length..].copy_from_slice(new_string.as_bytes());
-    list
-  }
-
   pub fn as_ptr(self) -> Gc<usize> {
     *self.0
   }
@@ -147,6 +120,68 @@ const STRING: TypeDescriptor = TypeDescriptor {
   call: None,
 };
 pub const STRING_TYPE_ID: TypeId = TypeId(0);
+
+pub struct StringWriter<'a> {
+  pub heap: &'a mut Heap,
+  pub string: GcList<u8>,
+}
+impl<'a> StringWriter<'a> {
+  pub fn with_capacity(heap: &'a mut Heap, capacity: usize) -> Self {
+    let string = heap.allocate_list_header::<u8>(capacity);
+    heap[*string] = 0; // set the initial length to 0
+    Self { heap, string }
+  }
+
+  pub fn from_existing_string(heap: &'a mut Heap, string: Gc<usize>) -> Self {
+    Self {
+      heap,
+      string: GcList::from(string),
+    }
+  }
+
+  pub fn as_ptr(self) -> Gc<usize> {
+    *self.string
+  }
+
+  fn length(&self) -> usize {
+    self.heap[*self.string]
+  }
+
+  fn capacity(&self) -> usize {
+    self.string.capacity(self.heap)
+  }
+}
+impl fmt::Write for StringWriter<'_> {
+  fn write_str(&mut self, new_string: &str) -> fmt::Result {
+    let capacity = self.capacity();
+    let current_length = self.length();
+
+    let list = if current_length + new_string.len() > capacity {
+      // If the item doesn't fit in the current list, reallocate
+      let new_capacity = (capacity * 2).max(current_length + new_string.len());
+      let new_list = BangString::with_capacity(self.heap, new_capacity);
+
+      // Copy the old list to the new list
+      let old_list_buffer = unsafe {
+        // we use pointer access, as otherwise the borrow checker can't tell the slices are disjoint
+        slice::from_raw_parts(self.heap.get_list_buffer_ptr(self.string), current_length)
+      };
+      let new_list_buffer = self.heap.get_list_buffer_mut(new_list.0);
+      new_list_buffer.copy_from_slice(old_list_buffer);
+
+      new_list.0
+    } else {
+      // if it does fit just use the current list
+      self.string
+    };
+
+    // add the new item to the list
+    self.heap[*list] = current_length + new_string.len();
+    self.heap.get_list_buffer_mut(list)[current_length..].copy_from_slice(new_string.as_bytes());
+
+    Ok(())
+  }
+}
 
 /// A string view - a reference to part of a string
 #[must_use]

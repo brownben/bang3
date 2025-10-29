@@ -199,6 +199,10 @@ impl<'context> VM<'context> {
   pub fn pop_stashed_value(&mut self, _value: StashedValue) -> Value {
     self.stack.pop()
   }
+  /// Get a stashed object from the stack
+  pub fn peek_stashed_object<T>(&mut self, _value: &StashedValue) -> Gc<T> {
+    self.stack.peek().as_object::<T>()
+  }
 
   #[inline]
   fn get_last_frame_upvalues(&self) -> GcList<Value> {

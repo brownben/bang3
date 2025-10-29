@@ -1,14 +1,16 @@
+use std::fmt::Write;
+
 use crate::StdlibModule;
 use crate::macros::module;
 use bang_interpreter::{
   ErrorKind, VM, Value,
   object::SOME_TYPE_ID,
-  object::{BangString, STRING_TYPE_ID},
   object::{ITERATOR_TRANSFORM_TYPE_ID, IteratorTransform},
   object::{ITERATOR_TYPE_ID, Iterator, IteratorLength},
   object::{LIST_TYPE_ID, List},
   object::{NATIVE_CLOSURE_TWO_TYPE_ID, NativeClosureTwo},
   object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
+  object::{STRING_TYPE_ID, StringWriter},
 };
 
 module!(iter, IterModule, {
@@ -649,10 +651,10 @@ module!(iter, IterModule, {
         IteratorLength::Max(length) => length,
       };
 
-      let string = BangString::with_capacity(&mut vm.heap, length * 3);
-      let mut string_ptr = vm.stash_object(string.as_ptr(), STRING_TYPE_ID)?;
+      let new_string = StringWriter::with_capacity(&mut vm.heap, length * 3).as_ptr();
+      let new_string_ptr = vm.stash_object(new_string, STRING_TYPE_ID)?;
 
-      let string_join = {
+      let separator_str = {
         // we can't borrow the string & result together - so we get the string without the lifetime
         let string = arg.as_string(&vm.heap);
         let slice = unsafe { std::slice::from_raw_parts(string.as_ptr(), string.len()) };
@@ -671,15 +673,17 @@ module!(iter, IterModule, {
           unsafe { std::str::from_utf8_unchecked(slice) }
         };
 
-        let string = BangString::from(vm.pop_stashed_value(string_ptr).as_object::<usize>());
-        let string = if state > 0 { string.push(&mut vm.heap, string_join) } else { string };
-        let new_string = string.push(&mut vm.heap, string_part);
-        string_ptr = vm.stash_object(new_string.as_ptr(), STRING_TYPE_ID)?;
+        let stashed_string_ptr = vm.peek_stashed_object(&new_string_ptr);
+        let mut string = StringWriter::from_existing_string(&mut vm.heap, stashed_string_ptr);
+        if state > 0 {
+          string.write_str(separator_str).unwrap();
+        }
+        string.write_str(string_part).unwrap();
 
         state = new_state;
       };
 
-      Ok(vm.pop_stashed_value(string_ptr))
+      Ok(vm.pop_stashed_value(new_string_ptr))
     }
 
     if !arg.is_string() {
