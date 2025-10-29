@@ -68,11 +68,11 @@ impl Chunk {
     ptr::from_ref::<Self>(self)
   }
 
-  pub(crate) fn display(&self) -> String {
+  pub(crate) fn display(&self, f: &mut dyn fmt::Write) -> fmt::Result {
     if self.name.is_empty() {
-      "<function>".to_owned()
+      f.write_str("<function>")
     } else {
-      format!("<function {}>", self.name)
+      write!(f, "<function {}>", self.name)
     }
   }
 
@@ -375,7 +375,7 @@ impl fmt::Debug for ConstantValue {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       Self::String(value) => write!(f, "'{value:?}'"),
-      Self::Function(func) => f.write_str(&func.display()),
+      Self::Function(func) => func.display(f),
     }
   }
 }

@@ -7,7 +7,7 @@ use bang_interpreter::{
   object::{ITERATOR_TYPE_ID, Iterator, IteratorLength},
   object::{NATIVE_CLOSURE_TWO_TYPE_ID, NativeClosureTwo},
   object::{NATIVE_CLOSURE_TYPE_ID, NativeClosure},
-  object::{STRING_VIEW_TYPE_ID, StringView},
+  object::{STRING_VIEW_TYPE_ID, StringView, StringWriter},
 };
 
 module!(string, StringModule, {
@@ -33,8 +33,7 @@ module!(string, StringModule, {
       return Ok(arg);
     }
 
-    let result = (arg).display(vm);
-    Ok(vm.allocate_string(&result))
+    Ok(StringWriter::display_value(vm, arg))
   };
   /// Converts a value to a string
   ///
@@ -52,8 +51,7 @@ module!(string, StringModule, {
       return Ok(arg);
     }
 
-    let result = (arg).display(vm);
-    Ok(vm.allocate_string(&result))
+    Ok(StringWriter::display_value(vm, arg))
   };
 
   /// The number of characters in the string

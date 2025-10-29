@@ -651,8 +651,8 @@ module!(iter, IterModule, {
         IteratorLength::Max(length) => length,
       };
 
-      let new_string = StringWriter::with_capacity(&mut vm.heap, length * 3).as_ptr();
-      let new_string_ptr = vm.stash_object(new_string, STRING_TYPE_ID)?;
+      let new_string = StringWriter::new(&mut vm.heap).as_ptr();
+      let mut new_string_ptr = vm.stash_object(new_string, STRING_TYPE_ID)?;
 
       let separator_str = {
         // we can't borrow the string & result together - so we get the string without the lifetime
@@ -673,7 +673,7 @@ module!(iter, IterModule, {
           unsafe { std::str::from_utf8_unchecked(slice) }
         };
 
-        let stashed_string_ptr = vm.peek_stashed_object(&new_string_ptr);
+        let stashed_string_ptr = vm.peek_stashed_object(&mut new_string_ptr);
         let mut string = StringWriter::from_existing_string(&mut vm.heap, stashed_string_ptr);
         if state > 0 {
           string.write_str(separator_str).unwrap();

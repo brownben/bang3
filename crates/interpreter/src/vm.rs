@@ -1,6 +1,6 @@
 use super::{
   bytecode::{Chunk, ConstantValue, OpCode},
-  object::{self, BangString, Closure, TypeDescriptor},
+  object::{self, BangString, Closure, StringWriter, TypeDescriptor},
   stdlib::{Context, ImportResult},
   value::{TypeId, Value},
 };
@@ -200,7 +200,7 @@ impl<'context> VM<'context> {
     self.stack.pop()
   }
   /// Get a stashed object from the stack
-  pub fn peek_stashed_object<T>(&mut self, _value: &StashedValue) -> Gc<T> {
+  pub fn peek_stashed_object<T>(&mut self, _value: &mut StashedValue) -> Gc<T> {
     self.stack.peek().as_object::<T>()
   }
 
@@ -462,7 +462,7 @@ impl<'context> VM<'context> {
           let string = if value.is_string() {
             value
           } else {
-            self.allocate_string(&value.display(self))
+            StringWriter::display_value(self, value)
           };
           push!(self.stack, string);
           next_instruction!(self, instruction, ip, chunk);

@@ -26,8 +26,8 @@ module!(assert, AssertModule, {
           title: "Assertion Error",
           message: format!(
             "expected both values to be equal — {} [type: {}] != {} [type: {}]",
-            first.debug(vm), first.get_type(vm),
-            second.debug(vm), second.get_type(vm),
+            first.debug_string(vm), first.get_type(vm),
+            second.debug_string(vm), second.get_type(vm),
           ),
         })
       }
@@ -53,7 +53,7 @@ module!(assert, AssertModule, {
         title: "Assertion Error",
         message: format!(
           "expected a truthy value, but got {} [type: {}]",
-          value.debug(vm), value.get_type(vm),
+          value.debug_string(vm), value.get_type(vm),
         ),
       })
     } else {
@@ -78,7 +78,7 @@ module!(assert, AssertModule, {
         title: "Assertion Error",
         message: format!(
           "expected a falsy value, but got {} [type: {}]",
-          value.debug(vm), value.get_type(vm),
+          value.debug_string(vm), value.get_type(vm),
         ),
       })
     } else {

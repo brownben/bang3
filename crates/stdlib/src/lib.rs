@@ -24,7 +24,9 @@ impl Context for StandardContext {
         if arg == Value::NULL {
           println!();
         } else {
-          println!("{}", arg.display(vm));
+          let mut output = String::new();
+          arg.display(&mut output, vm).unwrap();
+          println!("{output}");
         }
         Ok(arg)
       }),
@@ -33,11 +35,11 @@ impl Context for StandardContext {
         Ok(vm.allocate_string(type_string))
       }),
       NativeFunction::new("panic", |vm, arg| {
-        let message = if arg == Value::NULL {
-          String::new()
-        } else {
-          arg.display(vm)
-        };
+        let mut message = String::new();
+        if arg != Value::NULL {
+          arg.display(&mut message, vm).unwrap();
+        }
+
         Err(ErrorKind::Custom {
           title: "Panic",
           message,

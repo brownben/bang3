@@ -25,9 +25,9 @@ macro_rules! assert_variable {
     assert!(
       vm.equals(value, string),
       "{} (type {}) != {} (type {})",
-      value.display(&vm),
+      value.debug_string(&vm),
       value.get_type(&vm),
-      string.display(&vm),
+      string.debug_string(&vm),
       string.get_type(&vm),
     );
   };

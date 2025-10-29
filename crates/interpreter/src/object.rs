@@ -4,7 +4,9 @@ use crate::{
   vm::{ErrorKind, VM},
 };
 use bang_gc::{Gc, GcList, Heap};
-use std::{fmt, ptr, slice, str};
+use std::{fmt, io, ptr, slice, str};
+
+type DisplayFn = fn(&mut dyn fmt::Write, &VM, Gc<u8>) -> Result<(), fmt::Error>;
 
 /// A descriptor for a type in the virtual machine.
 /// Is only defined for primitive types which fit soley within a single [Value].
@@ -17,9 +19,9 @@ pub struct TypeDescriptor {
   /// Trace the value for the garbage collector
   pub trace: fn(vm: &VM, object_pointer: Gc<u8>, trace_value: TraceValueFunction) -> (),
   /// Display the value as a string
-  pub display: fn(vm: &VM, object_pointer: Gc<u8>) -> String,
+  pub display: DisplayFn,
   /// Display the value as a string for debug, or part of structure
-  pub debug: fn(vm: &VM, object_pointer: Gc<u8>) -> String,
+  pub debug: DisplayFn,
   /// Whether the value is falsy
   pub is_falsy: fn(vm: &VM, object_pointer: Gc<u8>) -> bool,
   /// Check if the value is equal to another value (of the same type)
@@ -113,8 +115,8 @@ impl<T> From<Gc<T>> for BangString {
 const STRING: TypeDescriptor = TypeDescriptor {
   type_name: "string",
   trace: |_, _, _| {},
-  display: |vm, value| BangString::from(value).as_str(&vm.heap).to_owned(),
-  debug: |vm, value| format!("'{}'", BangString::from(value).as_str(&vm.heap)),
+  display: |f, vm, value| f.write_str(BangString::from(value).as_str(&vm.heap)),
+  debug: |f, vm, value| write!(f, "'{}'", BangString::from(value).as_str(&vm.heap)),
   is_falsy: |vm, value| BangString::from(value).is_empty(vm),
   equals: string_equality,
   call: None,
@@ -126,10 +128,19 @@ pub struct StringWriter<'a> {
   pub string: GcList<u8>,
 }
 impl<'a> StringWriter<'a> {
-  pub fn with_capacity(heap: &'a mut Heap, capacity: usize) -> Self {
-    let string = heap.allocate_list_header::<u8>(capacity);
+  pub fn new(heap: &'a mut Heap) -> Self {
+    let string = heap.allocate_list_header::<u8>(32);
     heap[*string] = 0; // set the initial length to 0
     Self { heap, string }
+  }
+
+  pub fn display_value(vm: &mut VM, value: Value) -> Value {
+    // SAFETY: this is wrong, but we want to be able to access items in the heap
+    let heap = unsafe { &mut *ptr::from_mut(&mut vm.heap) };
+
+    let mut string = Self::new(heap);
+    value.display(&mut string, vm).unwrap();
+    string.finish()
   }
 
   pub fn from_existing_string(heap: &'a mut Heap, string: Gc<usize>) -> Self {
@@ -141,6 +152,11 @@ impl<'a> StringWriter<'a> {
 
   pub fn as_ptr(self) -> Gc<usize> {
     *self.string
+  }
+
+  #[must_use]
+  pub fn finish(self) -> Value {
+    Value::from_object(*self.string, STRING_TYPE_ID)
   }
 
   fn length(&self) -> usize {
@@ -179,6 +195,15 @@ impl fmt::Write for StringWriter<'_> {
     self.heap[*list] = current_length + new_string.len();
     self.heap.get_list_buffer_mut(list)[current_length..].copy_from_slice(new_string.as_bytes());
 
+    Ok(())
+  }
+}
+impl io::Write for StringWriter<'_> {
+  fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    Ok(buf.len())
+  }
+
+  fn flush(&mut self) -> io::Result<()> {
     Ok(())
   }
 }
@@ -231,8 +256,8 @@ const STRING_VIEW: TypeDescriptor = TypeDescriptor {
     let view = &vm.heap[value.cast::<StringView>()];
     trace_value(vm, view.string);
   },
-  display: |vm, value| StringView::from_ptr(value, &vm.heap).to_owned(),
-  debug: |vm, value| format!("'{}'", StringView::from_ptr(value, &vm.heap)),
+  display: |f, vm, value| f.write_str(StringView::from_ptr(value, &vm.heap)),
+  debug: |f, vm, value| write!(f, "'{}'", StringView::from_ptr(value, &vm.heap)),
   is_falsy: |vm, value| StringView::from_ptr(value, &vm.heap).is_empty(),
   equals: string_equality,
   call: None,
@@ -291,7 +316,9 @@ impl Closure {
 }
 impl fmt::Display for Closure {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "<closure {}>", self.function().display())
+    f.write_str("<closure ")?;
+    self.function().display(f)?;
+    f.write_str(">")
   }
 }
 const CLOSURE: TypeDescriptor = TypeDescriptor {
@@ -303,8 +330,8 @@ const CLOSURE: TypeDescriptor = TypeDescriptor {
       trace_value(vm, *upvalue);
     }
   },
-  display: |vm, value| vm.heap[value.cast::<Closure>()].to_string(),
-  debug: |vm, value| vm.heap[value.cast::<Closure>()].to_string(),
+  display: |f, vm, value| write!(f, "{}", vm.heap[value.cast::<Closure>()]),
+  debug: |f, vm, value| write!(f, "{}", vm.heap[value.cast::<Closure>()]),
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
   call: None,
@@ -331,8 +358,8 @@ impl fmt::Display for NativeFunction {
 const NATIVE_FUNCTION: TypeDescriptor = TypeDescriptor {
   type_name: "function",
   trace: |_vm, _value, _trace_value| {},
-  display: |vm, value| vm.heap[value.cast::<NativeFunction>()].to_string(),
-  debug: |vm, value| vm.heap[value.cast::<NativeFunction>()].to_string(),
+  display: |f, vm, value| write!(f, "{}", vm.heap[value.cast::<NativeFunction>()]),
+  debug: |f, vm, value| write!(f, "{}", vm.heap[value.cast::<NativeFunction>()]),
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
   call: Some(|vm, object, arg| {
@@ -370,8 +397,8 @@ const NATIVE_CLOSURE: TypeDescriptor = TypeDescriptor {
     let closure = &vm.heap[value.cast::<NativeClosure>()];
     trace_value(vm, closure.arg1);
   },
-  display: |vm, value| vm.heap[value.cast::<NativeClosure>()].to_string(),
-  debug: |vm, value| vm.heap[value.cast::<NativeClosure>()].to_string(),
+  display: |f, vm, value| write!(f, "{}", vm.heap[value.cast::<NativeClosure>()]),
+  debug: |f, vm, value| write!(f, "{}", vm.heap[value.cast::<NativeClosure>()]),
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
   call: Some(|vm, object, arg2| {
@@ -417,8 +444,8 @@ const NATIVE_CLOSURE_TWO: TypeDescriptor = TypeDescriptor {
     trace_value(vm, closure.arg1);
     trace_value(vm, closure.arg2);
   },
-  display: |vm, value| vm.heap[value.cast::<NativeClosureTwo>()].to_string(),
-  debug: |vm, value| vm.heap[value.cast::<NativeClosureTwo>()].to_string(),
+  display: |f, vm, value| write!(f, "{}", vm.heap[value.cast::<NativeClosureTwo>()]),
+  debug: |f, vm, value| write!(f, "{}", vm.heap[value.cast::<NativeClosureTwo>()]),
   is_falsy: |_, _| false,
   equals: |_vm, a, b| a == b,
   call: Some(|vm, object, arg3| {
@@ -499,8 +526,8 @@ const LIST: TypeDescriptor = TypeDescriptor {
       trace_value(vm, *item);
     }
   },
-  display: |vm, value| list_display(vm, List::from(value).items(&vm.heap)),
-  debug: |vm, value| list_display(vm, List::from(value).items(&vm.heap)),
+  display: |f, vm, value| list_display(f, vm, List::from(value).items(&vm.heap)),
+  debug: |f, vm, value| list_display(f, vm, List::from(value).items(&vm.heap)),
   is_falsy: |vm, value| List::from(value).is_empty(&vm.heap),
   equals: list_equality,
   call: None,
@@ -557,8 +584,8 @@ const LIST_VIEW: TypeDescriptor = TypeDescriptor {
     let view = &vm.heap[value.cast::<ListView>()];
     trace_value(vm, view.list);
   },
-  display: |vm, value| list_display(vm, ListView::from_ptr(value, &vm.heap).items(&vm.heap)),
-  debug: |vm, value| list_display(vm, ListView::from_ptr(value, &vm.heap).items(&vm.heap)),
+  display: |f, vm, value| list_display(f, vm, ListView::from_ptr(value, &vm.heap).items(&vm.heap)),
+  debug: |f, vm, value| list_display(f, vm, ListView::from_ptr(value, &vm.heap).items(&vm.heap)),
   is_falsy: |vm, value| ListView::from_ptr(value, &vm.heap).is_empty(vm),
   equals: list_equality,
   call: None,
@@ -603,32 +630,32 @@ fn list_equality(vm: &VM, a: Value, b: Value) -> bool {
 
   a.iter().zip(b.iter()).all(|(a, b)| vm.equals(*a, *b))
 }
-fn list_display(vm: &VM, list: &[Value]) -> String {
-  fn inner(vm: &VM, list: &[Value]) -> Result<String, fmt::Error> {
-    use std::fmt::Write;
-
-    let mut string = String::new();
-
-    write!(string, "[")?;
-    for (i, item) in list.iter().enumerate() {
-      if i > 0 {
-        write!(string, ", ")?;
-      }
-      write!(string, "{}", item.debug(vm))?;
+fn list_display(f: &mut dyn fmt::Write, vm: &VM, list: &[Value]) -> fmt::Result {
+  write!(f, "[")?;
+  for (i, item) in list.iter().enumerate() {
+    if i > 0 {
+      write!(f, ", ")?;
     }
-    write!(string, "]")?;
-
-    Ok(string)
+    item.debug(f, vm)?;
   }
+  write!(f, "]")?;
 
-  inner(vm, list).unwrap()
+  Ok(())
 }
 
 const OPTION_SOME: TypeDescriptor = TypeDescriptor {
   type_name: "option::Some",
   trace: |vm, value, trace_value| trace_value(vm, vm.heap[value.cast::<Value>()]),
-  display: |vm, value| format!("Some({})", vm.heap[value.cast::<Value>()].debug(vm)),
-  debug: |vm, value| format!("Some({})", vm.heap[value.cast::<Value>()].debug(vm)),
+  display: |f, vm, value| {
+    f.write_str("Some(")?;
+    vm.heap[value.cast::<Value>()].debug(f, vm)?;
+    f.write_str(")")
+  },
+  debug: |f, vm, value| {
+    f.write_str("Some(")?;
+    vm.heap[value.cast::<Value>()].debug(f, vm)?;
+    f.write_str(")")
+  },
   is_falsy: |_, _| false,
   equals: |vm, a, b| {
     if !b.is_object_type(SOME_TYPE_ID) {
@@ -647,8 +674,8 @@ pub const SOME_TYPE_ID: TypeId = TypeId(8);
 const OPTION_NONE: TypeDescriptor = TypeDescriptor {
   type_name: "option::None",
   trace: |_, _, _| {},
-  display: |_, _| "None".to_owned(),
-  debug: |_, _| "None".to_owned(),
+  display: |f, _, _| f.write_str("None"),
+  debug: |f, _, _| f.write_str("None"),
   is_falsy: |_, _| true,
   equals: |_, a, b| a == b,
   call: None,
@@ -671,8 +698,8 @@ const ITERATOR: TypeDescriptor = TypeDescriptor {
     let iterator = &vm.heap[value.cast::<Iterator>()];
     trace_value(vm, iterator.base);
   },
-  display: |_, _| "<iterator>".to_owned(),
-  debug: |_, _| "<iterator>".to_owned(),
+  display: |f, _, _| f.write_str("<iterator>"),
+  debug: |f, _, _| f.write_str("<iterator>"),
   is_falsy: |_, _| false,
   equals: |_, a, b| a == b,
   call: None,
@@ -694,8 +721,8 @@ const ITERATOR_TRANSFORM: TypeDescriptor = TypeDescriptor {
     trace_value(vm, transform.arg);
     trace_value(vm, transform.iterator);
   },
-  display: |_, _| "<iterator>".to_owned(),
-  debug: |_, _| "<iterator>".to_owned(),
+  display: |f, _, _| f.write_str("<iterator>"),
+  debug: |f, _, _| f.write_str("<iterator>"),
   is_falsy: |_, _| false,
   equals: |_, a, b| a == b,
   call: None,
@@ -732,8 +759,12 @@ const ALLOCATED: TypeDescriptor = TypeDescriptor {
     // If the allocated value is a compound value, we may need to trace the value inside
     trace_value(vm, vm.heap[value.cast::<Value>()]);
   },
-  display: |_, _| unreachable!("Not accessed as a value"),
-  debug: |vm, value| format!("<allocated {}>", vm.heap[value.cast::<Value>()].debug(vm)),
+  display: |_, _, _| unreachable!("Not accessed as a value"),
+  debug: |f, vm, value| {
+    f.write_str("<allocated ")?;
+    vm.heap[value.cast::<Value>()].debug(f, vm)?;
+    f.write_str(">")
+  },
   is_falsy: |_, _| unreachable!("Not accessed as a value"),
   equals: |_, _, _| unreachable!("Not accessed as a value"),
   call: None,

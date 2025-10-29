@@ -51,6 +51,8 @@ clippy.print_stdout = { level = "warn", priority = 1 }
 clippy.missing_const_for_fn = { level = "allow", priority = 1 }
 clippy.option_if_let_else = { level = "allow", priority = 1 }
 clippy.iter_with_drain = { level = "allow", priority = 1 }
+clippy.missing_errors_doc = { level = "allow", priority = 1 }
+clippy.missing_panics_doc = { level = "allow", priority = 1 }
 
 [profile.release]
 codegen-units = 1

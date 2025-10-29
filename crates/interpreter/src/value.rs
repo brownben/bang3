@@ -128,7 +128,7 @@ impl fmt::Debug for Value {
       Self(FALSE) => write!(f, "false"),
       Self(NULL) => write!(f, "null"),
       x if x.is_number() => write!(f, "{}", x.as_number()),
-      x if x.is_constant_function() => f.write_str(&x.as_constant_function().display()),
+      x if x.is_constant_function() => x.as_constant_function().display(f),
       x => write!(f, "{:?}", x.as_object::<()>()),
     }
   }
@@ -186,32 +186,37 @@ impl Value {
     }
   }
 
-  /// Get the value as a string
-  #[must_use]
-  pub fn display(&self, vm: &VM) -> String {
+  /// Write a display representation of the value to the given formatter
+  pub fn display(&self, f: &mut dyn fmt::Write, vm: &VM) -> fmt::Result {
     match self {
-      Self(TRUE) => "true".to_owned(),
-      Self(FALSE) => "false".to_owned(),
-      Self(NULL) => "null".to_owned(),
-      x if x.is_number() => x.as_number().to_string(),
-      x if x.is_constant_function() => x.as_function(&vm.heap).display(),
-      x => (vm.get_type_descriptor(*x).display)(vm, x.as_object()),
+      Self(TRUE) => f.write_str("true"),
+      Self(FALSE) => f.write_str("false"),
+      Self(NULL) => f.write_str("null"),
+      x if x.is_number() => write!(f, "{}", x.as_number()),
+      x if x.is_constant_function() => x.as_function(&vm.heap).display(f),
+      x => (vm.get_type_descriptor(*x).display)(f, vm, x.as_object()),
     }
   }
 
-  /// Get the value as a string
+  /// Write a debug representation of the value to the given formatter
   ///
   /// Prints quotes around strings, for use in compound structures
-  #[must_use]
-  pub fn debug(&self, vm: &VM) -> String {
+  pub fn debug(&self, f: &mut dyn fmt::Write, vm: &VM) -> fmt::Result {
     match self {
-      Self(TRUE) => "true".to_owned(),
-      Self(FALSE) => "false".to_owned(),
-      Self(NULL) => "null".to_owned(),
-      x if x.is_number() => x.as_number().to_string(),
-      x if x.is_constant_function() => x.as_function(&vm.heap).display(),
-      x => (vm.get_type_descriptor(*x).debug)(vm, x.as_object()),
+      Self(TRUE) => f.write_str("true"),
+      Self(FALSE) => f.write_str("false"),
+      Self(NULL) => f.write_str("null"),
+      x if x.is_number() => write!(f, "{}", x.as_number()),
+      x if x.is_constant_function() => x.as_function(&vm.heap).display(f),
+      x => (vm.get_type_descriptor(*x).debug)(f, vm, x.as_object()),
     }
+  }
+  /// Get a debug representation of the value as a string
+  #[must_use]
+  pub fn debug_string(&self, vm: &VM) -> String {
+    let mut string = String::new();
+    self.debug(&mut string, vm).unwrap();
+    string
   }
 }
 
