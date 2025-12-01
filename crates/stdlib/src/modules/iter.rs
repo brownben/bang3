@@ -762,7 +762,7 @@ macro_rules! function_transform {
         if !iterator.is_iterator() {
           return Err(ErrorKind::TypeError {
             expected: "iterator",
-            got: arg.get_type(vm),
+            got: iterator.get_type(vm),
           });
         }
 

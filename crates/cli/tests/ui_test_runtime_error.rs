@@ -361,3 +361,19 @@ fn stack_overflow() {
     at line 2
   "});
 }
+
+#[test]
+fn iterator_transform_not_iterator_error() {
+  let output = run("[1, 2, 3] >> iter::map(x => x + 2)");
+  assert_eq!(output, indoc! {"
+    ✕ Error: Type Error
+    expected `iterator`, got `list`
+
+        ╭─[STDIN:1]
+      1 │ [1, 2, 3] >> iter::map(x => x + 2)
+    ────╯
+
+    in native function 'iter::map'
+    at line 1
+  "});
+}
