@@ -1233,4 +1233,40 @@ fn recursion() {
   "});
   assert_variable!(local_function_recursive_in_child_function; a, 4.0);
   assert_variable!(local_function_recursive_in_child_function; c, string "<function local>");
+
+  // recursive closure needs to use the same upvalues for each invocation
+  let recursive_closure_reads_upvalue = run(indoc! {"
+    let outer = x => {
+      let inner = n => match n
+        | 0 -> x
+        | n -> inner(n - 1)
+
+      inner(3)
+    }
+
+    let a = outer(42)
+  "});
+  assert_variable!(recursive_closure_reads_upvalue; a, 42.0);
+
+  let recursive_closure_reads_upvalue_if_else = run(indoc! {"
+    let outer = x => {
+      let inner = n => if (n == 0) x else inner(n - 1)
+      inner(3)
+    }
+
+    let a = outer(42)
+  "});
+  assert_variable!(recursive_closure_reads_upvalue_if_else; a, 42.0);
+
+  // the upvalue must keep being carried correctly across many recursive calls,
+  // not just the first one
+  let deeply_recursive_closure_reads_upvalue = run(indoc! {"
+    let makeCounter = start => {
+      let count = n => if (n >= 50) start + n else count(n + 1)
+      count(0)
+    }
+
+    let a = makeCounter(1000)
+  "});
+  assert_variable!(deeply_recursive_closure_reads_upvalue; a, 1050.0);
 }

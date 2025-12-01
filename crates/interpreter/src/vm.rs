@@ -604,7 +604,15 @@ impl<'context> VM<'context> {
           next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::Recursive => {
-          push!(self.stack, Value::from(ptr::from_ref(chunk)));
+          // if we are already in a closure, we need to use the same upvalues
+          let value = match self.frames.peek().upvalues {
+            Some(upvalues) => {
+              let closure = Closure::new(chunk, upvalues);
+              self.allocate_value(closure, object::CLOSURE_TYPE_ID)
+            }
+            None => Value::from(ptr::from_ref(chunk)),
+          };
+          push!(self.stack, value);
           next_instruction!(self, instruction, ip, chunk);
         }
         OpCode::TailCall => {
