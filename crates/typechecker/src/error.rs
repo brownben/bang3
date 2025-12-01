@@ -318,7 +318,7 @@ impl Problem {
     message
   }
 
-  /// Is this an error or a warning?
+  /// Is this a warning rather than an error?
   #[must_use]
   pub fn is_warning(&self) -> bool {
     matches!(
@@ -336,7 +336,10 @@ impl Problem {
   pub fn is_unused(&self) -> bool {
     matches!(
       self,
-      Self::UnusedVariable { .. } | Self::UnusedImport { .. } | Self::UnreachableCase { .. }
+      Self::UnusedVariable { .. }
+        | Self::UnusedImport { .. }
+        | Self::UnreachableCase { .. }
+        | Self::PatternNeverMatches { .. }
     )
   }
 
