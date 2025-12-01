@@ -25,7 +25,7 @@ jobs:
       - name: Test
         run: |
           cargo test --workspace --verbose
-          cargo test -p bang-interpreter --verbose -F gc-stress-test
+          cargo test --workspace --features bang-interpreter/gc-stress-test
 
   miri:
     name: Miri

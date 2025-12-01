@@ -1187,7 +1187,7 @@ mod iter {
   }
 
   #[test]
-  fn reduce_fold() {
+  fn reduce() {
     let mut reduce = run(indoc! {"
       let sum = iter::reduce(acc => x => acc + x)
       let product = iter::reduce(acc => x => acc * x)
@@ -1219,6 +1219,15 @@ mod iter {
     assert!(reduce_not_callable.is_err());
     let reduce_not_callable_inner = run("list::iter([1, 2]) >> iter::reduce(x => 5)");
     assert!(reduce_not_callable_inner.is_err());
+
+    let mut heap_accumulator = run(indoc! {"
+        let result = iter::integers()
+            >> iter::takeWhile(n => n < 20)
+            >> iter::map(n => [n])
+            >> iter::reduce(a => b => a)
+            >> string::from
+    "});
+    assert_variable!(heap_accumulator; result, string "Some([0])");
   }
 
   #[test]
@@ -1248,6 +1257,13 @@ mod iter {
     assert!(fold_not_callable.is_err());
     let fold_not_callable_inner = run("list::iter([1, 2]) >> iter::fold(0)(x => 5)");
     assert!(fold_not_callable_inner.is_err());
+
+    let mut heap_accumulator = run(indoc! {"
+        let result = iter::integers()
+            >> iter::takeWhile(n => n < 20)
+            >> iter::fold('')(acc => n => acc ++ string::from(n))
+    "});
+    assert_variable!(heap_accumulator; result, string "012345678910111213141516171819");
   }
 
   #[test]
