@@ -470,6 +470,8 @@ impl TokenKind {
         | Self::Match
         | Self::Return
         | Self::True
+        | Self::Or
+        | Self::And
     )
   }
 
