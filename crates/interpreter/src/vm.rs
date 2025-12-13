@@ -607,6 +607,14 @@ impl<'context> VM<'context> {
           push!(self.stack, Value::from(ptr::from_ref(chunk)));
           next_instruction!(self, instruction, ip, chunk);
         }
+        OpCode::TailCall => {
+          let argument = self.stack.pop();
+          self.stack.truncate(offset);
+          self.stack.push(argument);
+
+          ip = 0;
+          instruction = chunk.get(ip); // no ip increment, as we're jumping to the chunk start
+        }
 
         // Closures
         OpCode::Allocate => {
@@ -761,8 +769,8 @@ impl<'context> VM<'context> {
   }
 
   #[cfg(feature = "debug-stack")]
-  fn debug_stack(&self, instruction: OpCode) {
-    print!("{instruction:?} [");
+  fn debug_stack(&self, ip: usize, instruction: OpCode) {
+    print!("{ip:>4} {instruction:?} [");
 
     for (index, value) in self.stack.iter().enumerate() {
       if index > 0 {
@@ -785,7 +793,7 @@ macro_rules! next_instruction {
     }
 
     #[cfg(feature = "debug-stack")]
-    $vm.debug_stack($instruction);
+    $vm.debug_stack($ip, $instruction);
 
     $ip += $instruction.length();
     $instruction = $chunk.get($ip);

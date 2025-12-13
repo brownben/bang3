@@ -745,6 +745,23 @@ impl<'s> Compile<'s> for Let {
 }
 impl<'s> Compile<'s> for Return {
   fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
+    if let Expression::Call(call) = self.expression(ast)
+      && let Expression::Variable(variable) = call.callee(ast)
+      && let variable_name = variable.name(ast)
+      && variable_name == compiler.chunk.name
+      && compiler.locals.find(variable_name).is_none()
+      && !compiler.stack.is_empty()
+    {
+      if let Some(argument) = call.argument(ast) {
+        argument.compile(compiler, ast)?;
+      } else {
+        compiler.chunk.add_opcode(OpCode::Null, call.span(ast));
+      }
+
+      (compiler.chunk).add_opcode(OpCode::TailCall, call.argument_span(ast));
+      return Ok(());
+    }
+
     self.expression(ast).compile(compiler, ast)?;
     compiler.chunk.add_opcode(OpCode::Return, self.span(ast));
     Ok(())

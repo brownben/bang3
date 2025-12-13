@@ -258,6 +258,8 @@ pub enum OpCode {
   Return,
   /// Places the current function onto the stack - so it can be called recursively
   Recursive,
+  /// Tail call optimization - calls a function, replacing the current stack frame
+  TailCall,
 
   // Closures
   /// Allocates a local variable on the stack. Arg(u8) - stack offset

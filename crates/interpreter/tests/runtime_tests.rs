@@ -1077,6 +1077,27 @@ fn return_statement() {
 }
 
 #[test]
+fn tail_call_return() {
+  let tail_call = run(indoc! {"
+    let countdown = x => if (x == 0) 0 else { return countdown(x - 1) }
+    let a = countdown(4)
+    let b = countdown(10)
+  "});
+  assert_variable!(tail_call; a, 0.0);
+  assert_variable!(tail_call; b, 0.0);
+
+  let tail_call = run(indoc! {"
+     let countup = x => if (x < 10) { return countup(x + 1) } else 10
+     let a = countup(4)
+     let b = countup(9)
+     let c = countup(11)
+   "});
+  assert_variable!(tail_call; a, 10.0);
+  assert_variable!(tail_call; b, 10.0);
+  assert_variable!(tail_call; c, 10.0);
+}
+
+#[test]
 fn imports() {
   let unknown_module = run("from unknown_goo_goo_gaa_gaa import { abs }");
   assert!(unknown_module.is_err());
