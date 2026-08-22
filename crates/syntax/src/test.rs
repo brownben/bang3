@@ -1,3 +1,4 @@
+use crate::ParseError;
 use crate::ast::AST;
 use indoc::indoc;
 
@@ -1041,6 +1042,54 @@ fn return_statement() {
   // no return value
   assert!(parse("_ => { return }").is_err());
   assert!(parse("_ => { return & }").is_err());
+}
+
+#[test]
+fn return_as_expression() {
+  // recovers as if it were wrapped in a block, so the `else` is still parsed
+  let ast = parse_to_string("_ => if (x) return 4 else 5");
+  let expected = indoc! {"
+    ├─ Function: _ =>
+    │  ╰─ If
+    │     ├─ Condition
+    │     │  ╰─ Variable (x)
+    │     ├─ Then
+    │     │  ╰─ Block
+    │     │     ╰─ Return
+    │     │        ╰─ Number (4)
+    │     ╰─ Otherwise
+    │        ╰─ Number (5)
+  "};
+  assert_eq!(ast, expected);
+
+  // the span in the error is correct
+  fn fix_span(source: &str) -> String {
+    let ast = parse(source);
+    assert_eq!(ast.errors.len(), 1);
+
+    let ParseError::ReturnAsExpression { statement, .. } = &ast.errors[0] else {
+      panic!("expected a ReturnAsExpression error for `{source}`");
+    };
+
+    statement.source_text(&ast.source).to_owned()
+  }
+  assert_eq!(fix_span("_ => if (x) return 4 else 5"), "return 4");
+  assert_eq!(fix_span("_ => return x + 1"), "return x + 1");
+  assert_eq!(
+    fix_span("_ => match x | 1 -> return 2 | _ -> 3"),
+    "return 2"
+  );
+  assert_eq!(fix_span("_ => (return 5)"), "return 5");
+
+  // a trailing comment stays outside the block, else it would swallow the `}`
+  assert_eq!(fix_span("_ => return 4 // hi"), "return 4");
+
+  // outside a function wrapping in a block doesn't help, so it is left as-is
+  let outside_function = parse("let x = return 5");
+  assert!(matches!(
+    outside_function.errors[0],
+    ParseError::ExpectedExpression(_)
+  ));
 }
 
 #[test]

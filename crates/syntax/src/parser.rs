@@ -227,6 +227,8 @@ impl<'ast> Parser<'ast> {
       TokenKind::If => Ok(self.if_(token)),
       TokenKind::Match => Ok(self.match_(token)),
 
+      TokenKind::Return if self.function_depth > 0 => Ok(self.return_in_expression(token)),
+
       TokenKind::Unknown => Err(ParseError::UnknownCharacter(self.ast[token])),
       TokenKind::UnterminatedString => Err(ParseError::UnterminatedString(self.ast[token])),
       _ => Err(ParseError::ExpectedExpression(self.ast[token])),
@@ -843,6 +845,31 @@ impl Parser<'_> {
       expression,
     })
   }
+
+  /// Recover from a `return` used where an expression was expected.
+  ///
+  /// Parses it as if it were wrapped in a block, so the rest of the expression
+  /// still parses, and the suggested fix has an accurate span to wrap.
+  fn return_in_expression(&mut self, keyword: TokenIdx) -> ExpressionIdx {
+    let expression = self.parse_expression();
+
+    self.add_error(ParseError::ReturnAsExpression {
+      keyword: self.ast[keyword],
+      statement: Span::from(self.ast[keyword]).merge(self.ast[expression].span(self.ast)),
+    });
+
+    let mut statements = ThinVec::new();
+    statements.push(self.ast.add_statement(Statement::Return(Return {
+      keyword,
+      expression,
+    })));
+
+    self.ast.add_expression(Block {
+      opening: keyword,
+      statements,
+      closing: None,
+    })
+  }
 }
 // Types
 impl Parser<'_> {
@@ -1043,6 +1070,13 @@ pub enum ParseError {
   BlockMustEndWithExpression(Token),
   /// Return Outside of Function
   ReturnOutsideFunction(Token),
+  /// Return used where an expression was expected
+  ReturnAsExpression {
+    /// The `return` keyword
+    keyword: Token,
+    /// The whole `return <expression>`, the span a block should wrap
+    statement: Span,
+  },
 
   /// No Single Equal Operator
   NoSingleEqualOperator {
@@ -1079,6 +1113,7 @@ impl ParseError {
       Self::UnterminatedString(_) => "Unterminated String".into(),
       Self::BlockMustEndWithExpression(_) => "Block Must End With Expression".into(),
       Self::ReturnOutsideFunction(_) => "Return Outside of Function".into(),
+      Self::ReturnAsExpression { .. } => "Return is Not an Expression".into(),
       Self::NoSingleEqualOperator { .. } => "No Single Equal Operator".into(),
       Self::KeywordAsImportItem(_) => "Keyword as Import Item".into(),
       Self::MultipleFunctionArgs(_) => "Multiple Function Arguments".into(),
@@ -1120,6 +1155,9 @@ impl ParseError {
         .into()
       }
       Self::ReturnOutsideFunction(_) => "can only return a value from a function".into(),
+      Self::ReturnAsExpression { .. } => {
+        "`return` is a statement, so cannot be used where a value is expected".into()
+      }
       Self::NoSingleEqualOperator { possible_assignment: false, .. } => {
         "a single equal is not an operator. use `==` for equality".into()
       }
@@ -1174,6 +1212,7 @@ impl ParseError {
       Self::UnterminatedString(token) => token.into(),
       Self::BlockMustEndWithExpression(token) => token.into(),
       Self::ReturnOutsideFunction(token) => token.into(),
+      Self::ReturnAsExpression { keyword, .. } => keyword.into(),
       Self::NoSingleEqualOperator { token, .. } => token.into(),
       Self::KeywordAsImportItem(token) => token.into(),
       Self::MultipleFunctionArgs(span) => *span,
@@ -1186,6 +1225,9 @@ impl ParseError {
   #[must_use]
   pub fn suggestion(&self) -> Option<String> {
     match self {
+      Self::ReturnAsExpression { .. } => Some(
+        "wrap it in a block to use it as an early return e.g. `if (x < 0) { return x }`".to_owned(),
+      ),
       Self::MultipleFunctionArgs { .. } => Some(
         "each argument should be in their own brackets e.g. `a(1, 2)` should be `a(1)(2)`"
           .to_owned(),

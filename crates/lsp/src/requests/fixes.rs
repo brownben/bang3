@@ -31,6 +31,19 @@ fn replace_edit(file: &Document, span: Span, replacement: &str) -> lsp::Workspac
   }])]))
 }
 
+fn surround_edit(file: &Document, span: Span, before: &str, after: &str) -> lsp::WorkspaceEdit {
+  lsp::WorkspaceEdit::new(HashMap::from([(file.id.clone(), vec![
+    lsp::TextEdit {
+      range: lsp_range_from_span(Span::new(span.start, span.start), file),
+      new_text: before.to_owned(),
+    },
+    lsp::TextEdit {
+      range: lsp_range_from_span(Span::new(span.end, span.end), file),
+      new_text: after.to_owned(),
+    },
+  ])]))
+}
+
 fn delete_edit(file: &Document, span: Span) -> lsp::WorkspaceEdit {
   lsp::WorkspaceEdit::new(HashMap::from([(file.id.clone(), vec![lsp::TextEdit {
     range: lsp_range_from_span(span, file),
@@ -41,7 +54,7 @@ fn delete_edit(file: &Document, span: Span) -> lsp::WorkspaceEdit {
 mod parse_errors {
   use crate::requests::diagnostics::IntoDiagnostic;
 
-  use super::{Document, Span, delete_edit, replace_edit};
+  use super::{Document, Span, delete_edit, replace_edit, surround_edit};
   use bang_syntax::ParseError;
   use lsp_types as lsp;
 
@@ -55,6 +68,9 @@ mod parse_errors {
           }
           ParseError::NoSingleEqualOperator { token, .. } => {
             Some(no_single_equal_operator(file, error, token.into()))
+          }
+          ParseError::ReturnAsExpression { statement, .. } => {
+            Some(return_as_expression(file, error, *statement))
           }
           ParseError::ExtraDot(token) => Some(extra_dot(file, error, token.into())),
           _ => None,
@@ -78,6 +94,16 @@ mod parse_errors {
       kind: Some(lsp::CodeActionKind::QUICKFIX),
       diagnostics: Some(vec![error.diagnostic(file)]),
       edit: Some(delete_edit(file, span)),
+      ..Default::default()
+    }
+  }
+
+  fn return_as_expression(file: &Document, error: &ParseError, span: Span) -> lsp::CodeAction {
+    lsp::CodeAction {
+      title: "Wrap `return` in a block".to_owned(),
+      kind: Some(lsp::CodeActionKind::QUICKFIX),
+      diagnostics: Some(vec![error.diagnostic(file)]),
+      edit: Some(surround_edit(file, span, "{ ", " }")),
       ..Default::default()
     }
   }

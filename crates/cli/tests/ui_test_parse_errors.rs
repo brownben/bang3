@@ -295,6 +295,28 @@ fn return_outside_function() {
 
 #[test]
 #[cfg_attr(miri, ignore)]
+fn return_as_expression() {
+  let file = indoc! {"
+    let f = x => {
+      if (x > 5) return true
+      x + 1
+    }
+  "};
+  let output = run_stderr(file);
+  let expected = indoc! {"
+    ✕ Error: Return is Not an Expression
+    `return` is a statement, so cannot be used where a value is expected
+    hint: wrap it in a block to use it as an early return e.g. `if (x < 0) { return x }`
+
+        ╭─[STDIN:2]
+      2 │   if (x > 5) return true
+    ────╯
+  "};
+  assert_eq!(output, expected);
+}
+
+#[test]
+#[cfg_attr(miri, ignore)]
 fn no_single_equal_operator() {
   let file = indoc! {"
     x = 5
