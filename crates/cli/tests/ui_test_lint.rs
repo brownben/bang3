@@ -1,5 +1,4 @@
 //! # UI Tests for Lints
-#![cfg(not(miri))]
 
 use assert_cmd::Command;
 use indoc::indoc;
@@ -17,6 +16,7 @@ fn run_lint(file: &str) -> String {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn fibonacci_example() {
   let output = Command::cargo_bin(env!("CARGO_PKG_NAME"))
     .unwrap()
@@ -25,11 +25,12 @@ fn fibonacci_example() {
     .unwrap();
 
   assert!(output.status.success());
-  assert!(output.stdout.is_empty());
-  assert!(output.stderr.is_empty());
+  assert_eq!(output.stdout, []);
+  assert_eq!(output.stderr, []);
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn constant_conditions() {
   let source = indoc! {"
     if (true) 4 else 5
@@ -66,6 +67,7 @@ fn constant_conditions() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn negative_zero() {
   let source = "-0";
   let output = run_lint(source);
@@ -81,6 +83,7 @@ fn negative_zero() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn self_assignment() {
   let source = indoc! {"
     let a = 5
@@ -99,6 +102,7 @@ fn self_assignment() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn self_comparison() {
   let source = "5 == 5";
   let output = run_lint(source);
@@ -114,6 +118,7 @@ fn self_comparison() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn underscore_variable_use() {
   let source = indoc! {"
     let _ = 5
@@ -132,6 +137,7 @@ fn underscore_variable_use() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn useless_match() {
   let source = indoc! {"
     match x
@@ -151,6 +157,7 @@ fn useless_match() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn yoda_equality() {
   let source = indoc! {"
     let x = 4
@@ -169,6 +176,7 @@ fn yoda_equality() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn unnecessary_closure() {
   let source = "x => print(x)";
   let output = run_lint(source);
@@ -184,6 +192,7 @@ fn unnecessary_closure() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn identical_branches() {
   let source = indoc! {"
     if (a) 4 else 4
@@ -214,6 +223,7 @@ fn identical_branches() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn erasing_operation() {
   let source = indoc! {"
     0 * 4
@@ -238,6 +248,7 @@ fn erasing_operation() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn constant_string_in_format_string() {
   let source = "`hello {'john'}`";
   let output = run_lint(source);
@@ -253,6 +264,7 @@ fn constant_string_in_format_string() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn unnecessary_return() {
   let source = "x => { return x }";
   let output = run_lint(source);
@@ -268,6 +280,7 @@ fn unnecessary_return() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn unreachable_code() {
   let source = indoc! {"
     a => {
@@ -290,6 +303,7 @@ fn unreachable_code() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn double_comparison_chain() {
   let source = indoc! {"
     let a = 0
@@ -310,6 +324,7 @@ fn double_comparison_chain() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn empty_imports() {
   let source = "from maths import {  }";
   let output = run_lint(source);
@@ -325,6 +340,7 @@ fn empty_imports() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn loss_of_precision() {
   let source = "let x = {\n  1234567890123456789\n}";
   let output = run_lint(source);
@@ -341,6 +357,7 @@ fn loss_of_precision() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn subtraction_zero_comparison() {
   let source = "a - b < 0";
   let output = run_lint(source);
@@ -357,6 +374,7 @@ fn subtraction_zero_comparison() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn branches_duplicate_condition() {
   let code = indoc! {"
     if (a) {

@@ -18,7 +18,7 @@ fn synthesize(source: &str) -> String {
     ExpressionType::Return(_) => TypeArena::UNKNOWN,
     ExpressionType::Both(ty, _) => ty,
   };
-  assert!(checker.problems.is_empty());
+  assert_eq!(checker.problems, []);
 
   let generalized_type = checker.types.generalize(result).raw_type();
   checker.types.type_to_string(generalized_type)
@@ -34,7 +34,7 @@ fn synthesize_has_error(source: &str) -> String {
     ExpressionType::Return(_) => TypeArena::UNKNOWN,
     ExpressionType::Both(ty, _) => ty,
   };
-  assert!(!checker.problems.is_empty());
+  assert_ne!(checker.problems, []);
 
   let generalized_type = checker.types.generalize(result).raw_type();
   checker.types.type_to_string(generalized_type)

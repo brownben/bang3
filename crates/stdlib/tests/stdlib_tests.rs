@@ -878,7 +878,6 @@ mod option {
 
 mod iter {
   use super::{Value, indoc, run};
-  use core::f64;
 
   #[test]
   fn basic_types() {

@@ -137,7 +137,6 @@ impl Block {
     &ast[self.statements[index]]
   }
   /// The statements in a block
-  #[must_use]
   pub fn statements<'a>(
     &'a self,
     ast: &'a AST,
@@ -450,7 +449,6 @@ impl Match {
     &ast[self.value]
   }
   /// The arms of the match
-  #[must_use]
   pub fn arms(&self) -> impl ExactSizeIterator<Item = &MatchArm> {
     self.arms.iter()
   }

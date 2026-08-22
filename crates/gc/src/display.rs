@@ -11,8 +11,8 @@ impl fmt::Display for Heap {
     let free_page_list_len = self.free_page_list.iter().count();
     let free_ream_list_len = self.free_ream_list.iter().count();
     let full_list_len = self.full_list.iter().count();
-    writeln!(f, "  ├─ Free Page List (length: {free_page_list_len})",)?;
-    writeln!(f, "  ├─ Free Ream List (length: {free_ream_list_len})",)?;
+    writeln!(f, "  ├─ Free Page List (length: {free_page_list_len})")?;
+    writeln!(f, "  ├─ Free Ream List (length: {free_ream_list_len})")?;
     writeln!(f, "  ├─ Full Page List (length: {full_list_len})")?;
     writeln!(f, "  │ ")?;
 

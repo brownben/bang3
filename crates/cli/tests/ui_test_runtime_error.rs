@@ -1,5 +1,4 @@
 //! # UI Tests for Runtime Errors
-#![cfg(not(miri))]
 
 use assert_cmd::Command;
 use indoc::indoc;
@@ -17,6 +16,7 @@ fn run(file: &str) -> String {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn fibonacci_example() {
   let output = Command::cargo_bin(env!("CARGO_PKG_NAME"))
     .unwrap()
@@ -25,13 +25,14 @@ fn fibonacci_example() {
     .unwrap();
 
   assert!(output.status.success());
-  assert!(output.stderr.is_empty());
+  assert_eq!(output.stderr, []);
 
   let stdout = String::from_utf8(output.stdout).unwrap();
   assert_eq!(stdout, "75025\n75025\n");
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn undefined_variable() {
   let output = run("a");
 
@@ -48,6 +49,7 @@ fn undefined_variable() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn expected_number() {
   let output = run("5 + 'hello'");
   assert_eq!(output, indoc! {"
@@ -75,6 +77,7 @@ fn expected_number() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn expected_ordered() {
   let output = run("5 > 'hello'");
   assert_eq!(output, indoc! {"
@@ -102,6 +105,7 @@ fn expected_ordered() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn import_not_found() {
   let output = run("from unknown import { item }");
   assert_eq!(output, indoc! {"
@@ -129,6 +133,7 @@ fn import_not_found() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn not_callable() {
   let output = run("5()");
   assert_eq!(output, indoc! {"
@@ -144,6 +149,7 @@ fn not_callable() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn traceback() {
   let source = indoc! {"
     let outerFunction = _ => {
@@ -192,6 +198,7 @@ fn traceback() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn traceback_native_functions() {
   let source = indoc! {"
     from option import { Some, None, map }
@@ -275,6 +282,7 @@ fn traceback_native_functions() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn panics() {
   let output = run("panic('did something wrong')");
   assert_eq!(output, indoc! {"
@@ -291,6 +299,7 @@ fn panics() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn assertions() {
   let output = run("assert::equal('hello')('world')");
   assert_eq!(output, indoc! {"
@@ -333,6 +342,7 @@ fn assertions() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn stack_overflow() {
   let output = run("let infiniteLoop = x => infiniteLoop(x)\ninfiniteLoop(1)");
   assert_eq!(output, indoc! {"
@@ -363,6 +373,7 @@ fn stack_overflow() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn iterator_transform_not_iterator_error() {
   let output = run("[1, 2, 3] >> iter::map(x => x + 2)");
   assert_eq!(output, indoc! {"

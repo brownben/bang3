@@ -1495,7 +1495,7 @@ mod fault_tolerant {
       │  ╰─ Number (5)
     "};
     assert!(ast.is_err());
-    assert!(ast.errors.len() == 1);
+    assert_eq!(ast.errors.len(), 1);
     assert_eq!(ast.to_string(), expected);
 
     let ast = parse("4 = 5");
@@ -1505,7 +1505,7 @@ mod fault_tolerant {
       │  ╰─ Number (5)
     "};
     assert!(ast.is_err());
-    assert!(ast.errors.len() == 1);
+    assert_eq!(ast.errors.len(), 1);
     assert_eq!(ast.to_string(), expected);
   }
 

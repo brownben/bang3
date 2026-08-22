@@ -1,5 +1,4 @@
 //! # UI Tests for Typecheck Errors
-#![cfg(not(miri))]
 
 use assert_cmd::Command;
 use indoc::indoc;
@@ -17,6 +16,7 @@ fn run_typecheck(file: &str) -> String {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn fibonacci_example() {
   let output = Command::cargo_bin(env!("CARGO_PKG_NAME"))
     .unwrap()
@@ -25,11 +25,12 @@ fn fibonacci_example() {
     .unwrap();
 
   assert!(output.status.success());
-  assert!(output.stdout.is_empty());
-  assert!(output.stderr.is_empty());
+  assert_eq!(output.stdout, []);
+  assert_eq!(output.stderr, []);
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn unused_variable() {
   let source = indoc! {"
     let hello = 5
@@ -48,6 +49,7 @@ fn unused_variable() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn unknown_variable_with_suggestion() {
   let source = indoc! {"
     let hello = 5
@@ -69,6 +71,7 @@ fn unknown_variable_with_suggestion() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn unknown_variable_without_suggestion() {
   let source = indoc! {"
     let hello = 5
@@ -89,6 +92,7 @@ fn unknown_variable_without_suggestion() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn undefined_variable_possible_imports() {
   let source = indoc! {"
     let _x = sin(3.14)
@@ -107,6 +111,7 @@ fn undefined_variable_possible_imports() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn unknown_module_with_suggestion() {
   let source = indoc! {"
     from math import { sin }
@@ -125,6 +130,7 @@ fn unknown_module_with_suggestion() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn unknown_module_without_suggestion() {
   let source = indoc! {"
     from wiggle import { sin }
@@ -142,6 +148,7 @@ fn unknown_module_without_suggestion() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn unknown_module_item_with_suggestion() {
   let source = indoc! {"
     from maths import { sine }
@@ -160,6 +167,7 @@ fn unknown_module_item_with_suggestion() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn unknown_module_item_without_suggestion() {
   let source = indoc! {"
     from maths import { farty }
@@ -177,6 +185,7 @@ fn unknown_module_item_without_suggestion() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn unknown_type_annotation_with_suggestion() {
   let source = indoc! {"
     let _x: strings = ''
@@ -195,6 +204,7 @@ fn unknown_type_annotation_with_suggestion() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn unknown_type_annotation_without_suggestion() {
   let source = indoc! {"
     let _x: farty = ''
@@ -212,6 +222,7 @@ fn unknown_type_annotation_without_suggestion() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn type_doesnt_accept_parameter() {
   let source = indoc! {"
     let _x: string<string> = ''
@@ -229,6 +240,7 @@ fn type_doesnt_accept_parameter() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn no_return_from_match_guard() {
   let source = indoc! {"
     let a = 5
@@ -250,6 +262,7 @@ fn no_return_from_match_guard() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn module_access_item_already_imported() {
   let source = indoc! {"
     from string import { length }
@@ -270,6 +283,7 @@ fn module_access_item_already_imported() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn referential_equality_warning() {
   let source = indoc! {"
     from string import { byteLength }

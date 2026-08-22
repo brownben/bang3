@@ -299,7 +299,6 @@ mod test {
   }
 
   #[test]
-  #[expect(clippy::float_cmp, reason = "we want exact equality here")]
   fn number() {
     for number in [0.0, 1.0, 2.0, 4.0, 8.0, 123.0, -0.0, -2.0, 123.45] {
       let num = Value::from(number);

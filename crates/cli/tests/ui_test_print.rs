@@ -1,10 +1,10 @@
 //! # UI Tests for Debug Print Commands
-#![cfg(not(miri))]
 
 use assert_cmd::Command;
 use indoc::indoc;
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn tokens_fibonacci_example() {
   let output = Command::cargo_bin(env!("CARGO_PKG_NAME"))
     .unwrap()
@@ -13,7 +13,7 @@ fn tokens_fibonacci_example() {
     .unwrap();
 
   assert!(output.status.success());
-  assert!(output.stderr.is_empty());
+  assert_eq!(output.stderr, []);
 
   let output = String::from_utf8(output.stdout).unwrap();
   let expected = indoc! {"
@@ -107,6 +107,7 @@ fn tokens_fibonacci_example() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn ast_fibonacci_example() {
   let output = Command::cargo_bin(env!("CARGO_PKG_NAME"))
     .unwrap()
@@ -115,7 +116,7 @@ fn ast_fibonacci_example() {
     .unwrap();
 
   assert!(output.status.success());
-  assert!(output.stderr.is_empty());
+  assert_eq!(output.stderr, []);
 
   let output = String::from_utf8(output.stdout).unwrap();
   let expected = indoc! {"
@@ -194,6 +195,7 @@ fn ast_fibonacci_example() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn bytecode_fibonacci_example() {
   let output = Command::cargo_bin(env!("CARGO_PKG_NAME"))
     .unwrap()
@@ -202,7 +204,7 @@ fn bytecode_fibonacci_example() {
     .unwrap();
 
   assert!(output.status.success());
-  assert!(output.stderr.is_empty());
+  assert_eq!(output.stderr, []);
 
   let output = String::from_utf8(output.stdout).unwrap();
   let expected = indoc! {"

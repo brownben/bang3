@@ -250,6 +250,7 @@ impl Closure {
   }
 
   #[inline]
+  #[must_use]
   pub fn function(&self) -> &Chunk {
     unsafe { &*self.func }
   }
@@ -502,6 +503,7 @@ impl ListView {
     }
   }
 
+  #[must_use]
   pub fn from_ptr<T>(ptr: Gc<T>, heap: &Heap) -> &Self {
     &heap[ptr.cast::<Self>()]
   }

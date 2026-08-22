@@ -769,6 +769,7 @@ impl<'context> VM<'context> {
   }
 
   #[cfg(feature = "debug-stack")]
+  #[allow(clippy::print_stdout)]
   fn debug_stack(&self, ip: usize, instruction: OpCode) {
     print!("{ip:>4} {instruction:?} [");
 

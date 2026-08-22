@@ -37,10 +37,10 @@ impl fmt::Display for Message {
       Severity::Error => write!(f, "{}", "✕ Error".bold().red()),
       Severity::Warning => write!(f, "{}", "⚠ Warning".bold().yellow()),
     }?;
-    writeln!(f, "{} {}", ":".bold(), &self.title.bold())?;
+    writeln!(f, "{} {}", ":".bold(), self.title.bold())?;
 
     if !self.body.is_empty() {
-      writeln!(f, "{}", &self.body)?;
+      writeln!(f, "{}", self.body)?;
     }
 
     if let Some(hint) = &self.hint {

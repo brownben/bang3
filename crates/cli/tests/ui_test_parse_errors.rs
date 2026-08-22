@@ -1,5 +1,4 @@
 //! # UI Tests for Parse Errors
-#![cfg(not(miri))]
 
 use assert_cmd::Command;
 use indoc::indoc;
@@ -13,11 +12,12 @@ fn run_stderr(file: &str) -> String {
     .unwrap();
 
   assert!(!output.status.success());
-  assert!(output.stdout.is_empty());
+  assert_eq!(output.stdout, []);
   String::from_utf8(output.stderr).unwrap()
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn expected() {
   let file = indoc! {"
     (5
@@ -43,6 +43,7 @@ fn expected() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn expected_expression() {
   let file = indoc! {"
     ()
@@ -67,6 +68,7 @@ fn expected_expression() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn expected_pattern() {
   let file = indoc! {"
     match x
@@ -92,6 +94,7 @@ fn expected_pattern() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn expected_pattern_range_end() {
   let file = indoc! {"
     match x
@@ -117,6 +120,7 @@ fn expected_pattern_range_end() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn expected_import_item() {
   let file = indoc! {"
     from maths import { 5 }
@@ -134,6 +138,7 @@ fn expected_import_item() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn expected_type() {
   let file = "let a: () = 4";
   let output = run_stderr(file);
@@ -149,6 +154,7 @@ fn expected_type() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn unknown_character() {
   let file = indoc! {"
     $
@@ -173,6 +179,7 @@ fn unknown_character() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn missing_identifier() {
   let file = indoc! {"
     let = 5
@@ -190,6 +197,7 @@ fn missing_identifier() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn missing_module_name() {
   let file = indoc! {"
     from import { sin }
@@ -214,6 +222,7 @@ fn missing_module_name() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn unterminated_string() {
   let file = indoc! {"
     'hello
@@ -247,6 +256,7 @@ fn unterminated_string() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn block_end_with_expression() {
   let file = indoc! {"
     {
@@ -266,6 +276,7 @@ fn block_end_with_expression() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn return_outside_function() {
   let file = indoc! {"
     return 5
@@ -283,6 +294,7 @@ fn return_outside_function() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn no_single_equal_operator() {
   let file = indoc! {"
     x = 5
@@ -307,6 +319,7 @@ fn no_single_equal_operator() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn keyword_as_import_item() {
   let file = "from string import { from }";
   let output = run_stderr(file);
@@ -322,6 +335,7 @@ fn keyword_as_import_item() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn extra_arguments() {
   let file = "func(1, 2, 3)";
   let output = run_stderr(file);
@@ -338,6 +352,7 @@ fn extra_arguments() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn nested_pattern() {
   let file = indoc! {"
     match x
@@ -371,6 +386,7 @@ fn nested_pattern() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn extra_dot() {
   let file = indoc! {"
     match x
@@ -403,6 +419,7 @@ fn extra_dot() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn end_of_file() {
   let file = "let x";
   let output = run_stderr(file);
@@ -424,6 +441,7 @@ fn end_of_file() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn missing_comma() {
   let file = "[1 2, 3]";
   let output = run_stderr(file);
