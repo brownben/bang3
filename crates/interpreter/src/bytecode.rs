@@ -264,6 +264,8 @@ pub enum OpCode {
   // Closures
   /// Allocates a local variable on the stack. Arg(u8) - stack offset
   Allocate,
+  /// Allocates the value on the top of the stack, replacing it with the pointer
+  AllocateTop,
   /// Creates a closure. Arg(u8) - number of upvalues
   Closure,
   /// Get an upvalue from the frame. Arg(u8) - upvalue id

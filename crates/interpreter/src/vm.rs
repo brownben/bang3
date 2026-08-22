@@ -633,6 +633,13 @@ impl<'context> VM<'context> {
           push!(self.stack, allocated);
           next_instruction!(self, instruction, ip, chunk);
         }
+        OpCode::AllocateTop => {
+          let top = self.stack.len() - 1;
+          let value = self.stack[top];
+          let allocated = Value::from_object(self.heap.allocate(value), object::ALLOCATED_TYPE_ID);
+          self.stack[top] = allocated;
+          next_instruction!(self, instruction, ip, chunk);
+        }
         OpCode::Closure => {
           let upvalue_count = chunk.get_value(ip + 1);
           let upvalues = (self.stack).drain(self.stack.len() - usize::from(upvalue_count));

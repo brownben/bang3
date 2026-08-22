@@ -1269,4 +1269,61 @@ fn recursion() {
     let a = makeCounter(1000)
   "});
   assert_variable!(deeply_recursive_closure_reads_upvalue; a, 1050.0);
+
+  // a curried function recursing through its inner function captures both the
+  // outer parameter and the function itself, so the recursive upvalue is not the
+  // first one to be allocated
+  let curried_recursive_function = run(indoc! {"
+    let count = a => b => {
+      if (a > 2) { return a + b }
+      count(a + 1)(b)
+    }
+
+    let a = count(0)(10)
+  "});
+  assert_variable!(curried_recursive_function; a, 13.0);
+
+  // the recursive upvalue is allocated at the top of the stack, which is not
+  // the same as the number of locals when there are also temporaries on the stack
+  let recursive_upvalue_with_temporaries_on_stack = run(indoc! {"
+    let apply = f => f(0)
+    let outer = x => apply(y => if (y == 0) x else outer(y - 1))
+
+    let a = outer(5)
+  "});
+  assert_variable!(recursive_upvalue_with_temporaries_on_stack; a, 5.0);
+
+  // variables declared in the block before the function shift the stack position
+  // that the recursive upvalue ends up being allocated at
+  let recursive_upvalue_after_other_variables = run(indoc! {"
+    let countdown = n => {
+      let step = 2
+      let helper = m => if (m <= 0) n + step else countdown(n - step)
+
+      helper(n)
+    }
+
+    let a = countdown(5)
+  "});
+  assert_variable!(recursive_upvalue_after_other_variables; a, 1.0);
+
+  // the inner function having locals of its own, as well as variables being
+  // declared before it in the enclosing block
+  let recursive_upvalue_with_locals_in_inner_function = run(indoc! {"
+    let a = {
+      let _b = 'b'
+      let countdown = n => {
+        let _c = 'c'
+        let step = 2
+        let helper = m => {
+          let _d = 'd'
+          let offset = 1
+          if (m <= 0) n + step - offset else countdown(n - step)
+        }
+        helper(n)
+      }
+      countdown(5)
+    }
+  "});
+  assert_variable!(recursive_upvalue_with_locals_in_inner_function; a, 0.0);
 }
