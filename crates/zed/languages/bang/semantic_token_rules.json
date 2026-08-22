@@ -1,0 +1,10 @@
+[
+  {
+    "token_type": "boolean",
+    "style": ["boolean", "constant"]
+  },
+  {
+    "token_type": "module",
+    "style": ["namespace", "module", "type"]
+  }
+]

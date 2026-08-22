@@ -48,3 +48,25 @@ jobs:
         run: |
           cargo miri nextest run -p bang -p bang-interpreter -p bang-gc -p bang-stdlib --no-fail-fast
           cargo miri nextest run -p bang-interpreter -F gc-stress-test --no-fail-fast
+
+  zed:
+    name: Zed Extension
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crates/zed
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        run: |
+          rustup toolchain install nightly --target wasm32-wasip2
+          rustup override set nightly
+          rustup component add clippy rustfmt
+      - name: Format
+        run: cargo fmt -- --check
+      - name: Build
+        run: cargo build --target wasm32-wasip2
+      - name: Lint
+        run: cargo clippy --target wasm32-wasip2 -- -D warnings

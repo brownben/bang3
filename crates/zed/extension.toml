@@ -1,0 +1,11 @@
+id = "bang"
+name = "Bang"
+description = "Support for the Bang language"
+version = "0.0.1"
+schema_version = 1
+authors = ["Ben Brown"]
+repository = "https://github.com/brownben/bang3"
+
+[language_servers.bang]
+name = "Bang Language Server"
+languages = ["Bang"]
