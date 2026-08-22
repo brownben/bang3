@@ -466,13 +466,8 @@ impl<'s> Compile<'s> for Function {
           compiler.chunk.add_opcode(OpCode::Recursive, self.span(ast));
 
           // all upvalues are allocated on the heap, with the pointer stored on the stack
-          // so we need to allocate the function (using a temporary local variable)
-          let Some(temporary_local) = compiler.locals.len().checked_add(1) else {
-            return Err(CompileError::TooManyLocalVariables);
-          };
-          compiler.chunk.add_opcode(OpCode::Allocate, self.span(ast));
-          compiler.chunk.add_value(temporary_local, self.span(ast));
-          compiler.chunk.add_opcode(OpCode::Pop, self.span(ast));
+          // so we need to allocate the function which has just been pushed
+          (compiler.chunk).add_opcode(OpCode::AllocateTop, self.span(ast));
         }
       }
     }
