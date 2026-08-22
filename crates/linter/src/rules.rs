@@ -445,7 +445,7 @@ impl LintRule for UnnecessaryReturn {
   }
   fn visit_expression(&self, context: &mut Context, expression: &Expression, ast: &AST) {
     if let Expression::Function(function) = &expression
-      && let Some(return_span) = function.body(ast).ends_with_return(ast)
+      && let Some(return_span) = (function.body(ast)).ends_with_return(ast, function.name(ast))
     {
       context.add_diagnostic(&Self, return_span);
     }

@@ -191,6 +191,26 @@ fn unnecessary_return() {
 }
 
 #[test]
+fn unnecessary_return_allows_tail_calls() {
+  // a `return` of a recursive call is optimised into a tail call, so is not unnecessary
+  assert!(lint("let f = x => { return f(x) }").is_ok());
+  assert!(lint("let f = x => { let y = x + 1\nreturn f(y) }").is_ok());
+  assert!(lint("let f = x => if (x) { return f(x) } else { return f(x - 1) }").is_ok());
+  assert!(lint("let f = x => match x | 1 -> { return f(x) } | _ -> 2").is_ok());
+
+  // only calls to the function itself are optimised
+  assert!(lint("let f = x => { return g(x) }").is_err());
+  assert!(lint("let f = x => { return f }").is_err());
+  assert!(lint("let f = x => { return f(x) + 1 }").is_err());
+  assert!(lint("let f = x => y => { return f(y) }").is_err());
+  assert!(lint("_ => { return f(x) }").is_err());
+
+  // the other branches are still unnecessary
+  assert!(lint("let f = x => if (x) { return f(x) } else { return 8 }").is_err());
+  assert!(lint("let f = x => if (x) { return 8 } else { return f(x) }").is_err());
+}
+
+#[test]
 fn unreachable_code() {
   assert!(
     lint(

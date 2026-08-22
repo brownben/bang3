@@ -338,8 +338,27 @@ pub trait ReturnAnalysis {
   /// Does the AST node end with a return statement?
   ///
   /// Gets the span of the return statement if it exists.
-  fn ends_with_return(&self, _ast: &AST) -> Option<Span> {
+  ///
+  /// A `return` which is a tail-call of `function_name` is ignored, as the
+  /// compiler optimises it, so the `return` is doing something.
+  fn ends_with_return(&self, _ast: &AST, _function_name: Option<&str>) -> Option<Span> {
     None
+  }
+}
+
+/// Is the return statement a recursive tail-call of the function it is in?
+///
+/// The compiler optimises these into a jump back to the start of the function,
+/// rather than growing the stack with another call frame. It only does that for
+/// a bare call to the function, so groups and comments are not unwrapped here.
+fn is_tail_call(return_: &Return, function_name: Option<&str>, ast: &AST) -> bool {
+  if let Some(function_name) = function_name
+    && let Expression::Call(call) = return_.expression(ast)
+    && let Expression::Variable(variable) = call.callee(ast)
+  {
+    variable.name(ast) == function_name
+  } else {
+    false
   }
 }
 
@@ -354,12 +373,13 @@ impl ReturnAnalysis for Statement {
     }
   }
 
-  fn ends_with_return(&self, ast: &AST) -> Option<Span> {
+  fn ends_with_return(&self, ast: &AST, function: Option<&str>) -> Option<Span> {
     match self {
       Self::Comment(_) => None,
-      Self::Expression(expression) => expression.expression(ast).ends_with_return(ast),
+      Self::Expression(expression) => (expression.expression(ast)).ends_with_return(ast, function),
       Self::Import(_) => None,
       Self::Let(_) => None,
+      Self::Return(return_) if is_tail_call(return_, function, ast) => None,
       Self::Return(return_) => Some(return_.span(ast)),
     }
   }
@@ -385,15 +405,15 @@ impl ReturnAnalysis for Expression {
     }
   }
 
-  fn ends_with_return(&self, ast: &AST) -> Option<Span> {
+  fn ends_with_return(&self, ast: &AST, function_name: Option<&str>) -> Option<Span> {
     match self {
-      Self::Block(block) => block.ends_with_return(ast),
-      Self::Comment(comment) => comment.expression(ast).ends_with_return(ast),
-      Self::Group(group) => group.expression(ast).ends_with_return(ast),
-      Self::If(if_) => if_.ends_with_return(ast),
-      Self::List(list) => list.ends_with_return(ast),
-      Self::Match(match_) => match_.ends_with_return(ast),
-      Self::Unary(unary) => unary.expression(ast).ends_with_return(ast),
+      Self::Block(block) => block.ends_with_return(ast, function_name),
+      Self::Comment(comment) => (comment.expression(ast)).ends_with_return(ast, function_name),
+      Self::Group(group) => group.expression(ast).ends_with_return(ast, function_name),
+      Self::If(if_) => if_.ends_with_return(ast, function_name),
+      Self::List(list) => list.ends_with_return(ast, function_name),
+      Self::Match(match_) => match_.ends_with_return(ast, function_name),
+      Self::Unary(unary) => unary.expression(ast).ends_with_return(ast, function_name),
 
       // Can never end with a return
       Self::Function(_)
@@ -419,12 +439,12 @@ impl ReturnAnalysis for Block {
       .any(|statement| statement.always_returns(ast))
   }
 
-  fn ends_with_return(&self, ast: &AST) -> Option<Span> {
+  fn ends_with_return(&self, ast: &AST, function_name: Option<&str>) -> Option<Span> {
     self
       .statements(ast)
       .rev()
       .find(|statement| !matches!(statement, Statement::Comment(_)))
-      .and_then(|statement| statement.ends_with_return(ast))
+      .and_then(|statement| statement.ends_with_return(ast, function_name))
   }
 }
 impl ReturnAnalysis for Call {
@@ -448,12 +468,11 @@ impl ReturnAnalysis for If {
         .is_some_and(|otherwise| otherwise.always_returns(ast))
   }
 
-  fn ends_with_return(&self, ast: &AST) -> Option<Span> {
+  fn ends_with_return(&self, ast: &AST, function_name: Option<&str>) -> Option<Span> {
     if let Some(otherwise) = self.otherwise(ast) {
-      return self
-        .then(ast)
-        .ends_with_return(ast)
-        .or_else(|| otherwise.ends_with_return(ast));
+      return (self.then(ast))
+        .ends_with_return(ast, function_name)
+        .or_else(|| otherwise.ends_with_return(ast, function_name));
     }
 
     None
@@ -471,9 +490,9 @@ impl ReturnAnalysis for Match {
       .all(|arm| arm.expression(ast).always_returns(ast))
   }
 
-  fn ends_with_return(&self, ast: &AST) -> Option<Span> {
+  fn ends_with_return(&self, ast: &AST, function_name: Option<&str>) -> Option<Span> {
     self
       .arms()
-      .find_map(|arm| arm.expression(ast).ends_with_return(ast))
+      .find_map(|arm| arm.expression(ast).ends_with_return(ast, function_name))
   }
 }
