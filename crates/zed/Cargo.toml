@@ -1,0 +1,18 @@
+# Not part of the main workspace, as it is compiled to WebAssembly by Zed
+[workspace]
+
+[package]
+name = "bang-zed"
+version = "0.0.1"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+zed_extension_api = "0.7.0"
+
+[lints]
+clippy.pedantic = "warn"
+clippy.nursery = "warn"
