@@ -5,13 +5,17 @@ use lsp_types as lsp;
 
 use bang_stdlib::MODULE_NAMES;
 use bang_syntax::{
-  AST, Span,
+  AST, Span, Token, TokenKind,
   ast::{Expression, Statement},
 };
 use bang_typechecker::{StaticTypeInfo, StdlibModule, VariableType};
 
 pub fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionList {
   let position = span_from_lsp_position(position, file);
+
+  if in_comment(&file.ast.tokens, position) {
+    return lsp::CompletionList::default();
+  }
 
   if let Some(import_statement) = in_import_statement(&file.ast, position) {
     let first_item_start = import_statement
@@ -294,6 +298,13 @@ fn type_annotation_snippets() -> [lsp::CompletionItem; 6] {
       ..Default::default()
     },
   ]
+}
+
+fn in_comment(tokens: &[Token], position: Span) -> bool {
+  tokens
+    .iter()
+    .filter(|token| token.kind == TokenKind::Comment)
+    .any(|token| Span::from(token).contains(position))
 }
 
 fn in_type_annotation(ast: &AST, position: Span) -> bool {
