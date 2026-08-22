@@ -39,7 +39,7 @@ impl SemanticTokenKind {
 impl From<SemanticTokenKind> for u32 {
   fn from(kind: SemanticTokenKind) -> Self {
     match kind {
-      SemanticTokenKind::Type => 1,
+      SemanticTokenKind::Type => 0,
       SemanticTokenKind::TypeParameter => 1,
       SemanticTokenKind::Parameter => 2,
       SemanticTokenKind::Variable => 3,

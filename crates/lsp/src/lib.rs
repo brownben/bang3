@@ -62,6 +62,9 @@ impl LanguageServer {
     eprintln!("Bang Language Server Running");
 
     self.main_loop();
+
+    // the threads only stop once the connection has been closed
+    drop(self.connection);
     self.connection_threads.join().unwrap();
 
     eprintln!("Stopping Bang Language Server");
