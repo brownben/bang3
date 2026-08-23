@@ -4,7 +4,7 @@ use crate::locations::{lsp_position_from_span_start, span_from_lsp_range};
 use crate::{documents::Document, requests::variables::find_variable};
 
 use bang_syntax::{AST, Span, Token, TokenKind, ast, tokenise};
-use bang_typechecker::Variable;
+use bang_typechecker::{StdlibModule, Variable, VariableKind};
 
 pub enum SemanticTokenKind {
   Type,
@@ -120,6 +120,10 @@ fn position_delta(last: lsp::Position, current: lsp::Position) -> (u32, u32) {
 }
 
 fn token_type(token: Token, file: &Document) -> Option<SemanticTokenKind> {
+  if let Some(kind) = module_access_token_type(token, &file.ast) {
+    return Some(kind);
+  }
+
   match token.kind {
     TokenKind::Identifier => identifier_token_type(token, file),
     TokenKind::Comment => Some(SemanticTokenKind::Comment),
@@ -133,10 +137,6 @@ fn token_type(token: Token, file: &Document) -> Option<SemanticTokenKind> {
 }
 
 fn identifier_token_type(token: Token, file: &Document) -> Option<SemanticTokenKind> {
-  if is_module_access(token, &file.ast) {
-    return Some(SemanticTokenKind::Module);
-  }
-
   let typechecker = file.typechecker();
   if let Some(variable) = find_variable(Span::from(token), typechecker) {
     return Some(variable_token_type(token, variable, &file.ast));
@@ -160,6 +160,11 @@ fn variable_token_type(token: Token, variable: &Variable, ast: &AST) -> Semantic
   if let Some(type_info) = variable.get_type_info()
     && type_info.kind.is_function()
   {
+    // builtins are all currently functions
+    if matches!(variable.kind, VariableKind::Builtin { .. }) {
+      return SemanticTokenKind::Function;
+    }
+
     if let Some(identifier_span) = variable.span()
       && is_let_body_a_function(identifier_span, ast)
     {
@@ -197,11 +202,27 @@ fn is_documentation_comment(token: Token, ast: &AST) -> bool {
     .any(|doc_comment| doc_comment.span(ast).contains(Span::from(token)))
 }
 
-fn is_module_access(token: Token, ast: &AST) -> bool {
-  (ast.expressions.iter()).any(|expr| match expr {
-    ast::Expression::ModuleAccess(module) => module.module_span(ast) == Span::from(token),
-    _ => false,
+/// The token type for a token which is part of a module access, e.g. `string::from`
+fn module_access_token_type(token: Token, ast: &AST) -> Option<SemanticTokenKind> {
+  let span = Span::from(token);
+
+  (ast.expressions.iter()).find_map(|expr| match expr {
+    ast::Expression::ModuleAccess(module) if module.module_span(ast) == span => {
+      Some(SemanticTokenKind::Module)
+    }
+    ast::Expression::ModuleAccess(module) if module.item_span(ast) == span => {
+      Some(stdlib_item_token_type(module.module(ast), module.item(ast)))
+    }
+    _ => None,
   })
+}
+
+/// Is an item from the standard library a function, or a plain value?
+fn stdlib_item_token_type(module: &str, item: &str) -> SemanticTokenKind {
+  match StdlibModule::get(module) {
+    Some(module) if module.type_info(item).kind.is_function() => SemanticTokenKind::Function,
+    _ => SemanticTokenKind::Variable,
+  }
 }
 
 fn is_callee(token: Token, ast: &AST) -> bool {
