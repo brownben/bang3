@@ -17,6 +17,9 @@
 //!   - Module Items in Import
 //! - Selection Ranges
 //! - Semantic Tokens
+//! - Code Actions
+//!   - Quick Fixes for Parse and Type Errors
+//!   - Inline Variable Refactor
 
 #![deny(unsafe_code)]
 
@@ -142,7 +145,7 @@ impl LanguageServer {
       // Selection Ranges
       selection_range_provider: Some(lsp_types::SelectionRangeProviderCapability::Simple(true)),
 
-      // Code Actions (autofixes)
+      // Code Actions (quick fixes and refactors)
       code_action_provider: Some(lsp_types::CodeActionProviderCapability::Simple(true)),
 
       // Semantic Tokens

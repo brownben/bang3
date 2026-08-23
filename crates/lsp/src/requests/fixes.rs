@@ -13,6 +13,7 @@ pub fn fixes(file: &Document, range: lsp::Range) -> Vec<lsp::CodeAction> {
 
   parse_errors::fixes(file, range, &mut actions);
   type_errors::fixes(file, range, &mut actions);
+  refactors::fixes(file, range, &mut actions);
 
   actions
 }
@@ -42,6 +43,21 @@ fn surround_edit(file: &Document, span: Span, before: &str, after: &str) -> lsp:
       new_text: after.to_owned(),
     },
   ])]))
+}
+
+fn multiple_edits(
+  file: &Document,
+  edits: impl IntoIterator<Item = (Span, String)>,
+) -> lsp::WorkspaceEdit {
+  let text_edits = edits
+    .into_iter()
+    .map(|(span, new_text)| lsp::TextEdit {
+      range: lsp_range_from_span(span, file),
+      new_text,
+    })
+    .collect();
+
+  lsp::WorkspaceEdit::new(HashMap::from([(file.id.clone(), text_edits)]))
 }
 
 fn delete_edit(file: &Document, span: Span) -> lsp::WorkspaceEdit {
@@ -233,6 +249,126 @@ mod type_errors {
       diagnostics: Some(vec![error.diagnostic(file)]),
       edit: Some(replace_edit(file, *span, defined_as)),
       ..Default::default()
+    }
+  }
+}
+
+mod refactors {
+  use super::{Document, Span, multiple_edits};
+  use crate::requests::variables::find_variable;
+
+  use bang_syntax::ast::{Expression, Statement, statement::Let};
+  use bang_typechecker::VariableKind;
+  use lsp_types as lsp;
+
+  pub fn fixes(file: &Document, range: Span, actions: &mut Vec<lsp::CodeAction>) {
+    actions.extend(inline_variable(file, range));
+  }
+
+  /// Replaces the use of a variable with its value,
+  /// removing the declaration if it was the last use
+  fn inline_variable(file: &Document, range: Span) -> Option<lsp::CodeAction> {
+    let variable = find_variable(range, file.typechecker())?;
+    let VariableKind::Declaration {
+      name,
+      defined,
+      parameter: false,
+      ..
+    } = &variable.kind
+    else {
+      return None;
+    };
+
+    // only the use which the cursor is on is inlined
+    let usage =
+      (variable.used.iter()).find(|used| used.contains(range) || range.contains(**used))?;
+
+    let declaration = find_declaration(file, *defined)?;
+    let declaration_span = declaration_span(file, declaration);
+
+    // a recursive function uses itself in its own value, which can't be replaced
+    if declaration_span.contains(*usage) {
+      return None;
+    }
+
+    let value = inlined_value(file, declaration.value(&file.ast))?;
+
+    let mut edits = vec![(*usage, value)];
+    if variable.used.len() == 1 {
+      // it was the only use, so the declaration is no longer needed
+      edits.push((declaration_span, String::new()));
+    }
+
+    Some(lsp::CodeAction {
+      title: format!("Inline variable `{name}`"),
+      kind: Some(lsp::CodeActionKind::REFACTOR_INLINE),
+      edit: Some(multiple_edits(file, edits)),
+      ..Default::default()
+    })
+  }
+
+  /// The `let` statement which declares the variable defined at the given span
+  fn find_declaration(file: &Document, defined: Span) -> Option<&Let> {
+    (file.ast.all_statements()).find_map(|statement| match statement {
+      Statement::Let(let_) if let_.identifier_span(&file.ast) == defined => Some(let_),
+      _ => None,
+    })
+  }
+
+  /// The span to remove for the declaration, including any doc comment,
+  /// the indentation before it, and any trailing comment and the line ending
+  fn declaration_span(file: &Document, declaration: &Let) -> Span {
+    let source = &file.ast.source;
+    let span = match declaration.doc_comment(&file.ast) {
+      Some(doc_comment) => doc_comment
+        .span(&file.ast)
+        .merge(declaration.span(&file.ast)),
+      None => declaration.span(&file.ast),
+    };
+
+    let start = source[..span.start as usize].trim_end_matches([' ', '\t']);
+
+    // the rest of the line can only be whitespace or a comment, but check to be safe
+    let rest_of_line = source[span.end as usize..].split('\n').next().unwrap_or("");
+    let end = if rest_of_line.trim().is_empty() || rest_of_line.trim_start().starts_with("//") {
+      span.end as usize + rest_of_line.len() + 1
+    } else {
+      span.end as usize
+    };
+
+    #[expect(clippy::cast_possible_truncation, reason = "source.len() < u32::MAX")]
+    Span::new(start.len() as u32, end.min(source.len()) as u32)
+  }
+
+  /// The text of the value to be inlined, wrapped in parentheses if it could be reparsed
+  ///
+  /// Returns `None` if the value can't be safely inlined
+  fn inlined_value(file: &Document, value: &Expression) -> Option<String> {
+    let ast = &file.ast;
+
+    // a comment after the value is left behind with the declaration
+    let value = match value {
+      Expression::Comment(comment) => comment.expression(ast),
+      value => value,
+    };
+
+    let text = value.span(ast).source_text(&ast.source);
+    if text.is_empty() || text.contains('\n') {
+      // multiline values would be inlined into the middle of another expression
+      return None;
+    }
+
+    match value {
+      Expression::Invalid(_) => None,
+
+      // could bind differently to the surrounding expression, so are grouped
+      Expression::Binary(_)
+      | Expression::Function(_)
+      | Expression::If(_)
+      | Expression::Match(_)
+      | Expression::Unary(_) => Some(format!("({text})")),
+
+      _ => Some(text.to_owned()),
     }
   }
 }
