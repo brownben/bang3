@@ -52,7 +52,8 @@ impl PrettyPrint for Expression {
 impl PrettyPrint for Assignment {
   fn pretty(&self, f: &mut fmt::Formatter, ast: &AST, prefix: &str, last: bool) -> fmt::Result {
     let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
-    writeln!(f, "{prefix}{connector}Assignment '{}' =", self.identifier(ast))?;
+    let identifier = self.identifier(ast);
+    writeln!(f, "{prefix}{connector}Assignment '{identifier}' =")?;
 
     let new_prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
     self.value(ast).pretty(f, ast, &new_prefix, true)
@@ -385,7 +386,9 @@ impl PrettyPrint for Let {
     }
 
     let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
-    writeln!(f, "{prefix}{connector}Let '{}' =", self.identifier(ast))?;
+    let mutable = if self.is_mutable() { "mut " } else { "" };
+    let identifier = self.identifier(ast);
+    writeln!(f, "{prefix}{connector}Let {mutable}'{identifier}' =")?;
 
     if let Some(annotation) = self.annotation(ast) {
       write!(f, "{prefix}{OTHER_CHILD}{OTHER_ENTRY}Type: ")?;

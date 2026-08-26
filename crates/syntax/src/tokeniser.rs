@@ -231,6 +231,7 @@ impl Tokeniser<'_> {
       b'i' if self.is_keyword(length, "import") => TokenKind::Import,
       b'l' if self.is_keyword(length, "let") => TokenKind::Let,
       b'm' if self.is_keyword(length, "match") => TokenKind::Match,
+      b'm' if self.is_keyword(length, "mut") => TokenKind::Mut,
       b'o' if self.is_keyword(length, "or") => TokenKind::Or,
       b'r' if self.is_keyword(length, "return") => TokenKind::Return,
       b't' if self.is_keyword(length, "true") => TokenKind::True,
@@ -405,6 +406,8 @@ pub enum TokenKind {
   Let,
   /// `match`
   Match,
+  /// `mut`
+  Mut,
   /// `return`
   Return,
   /// `true`
@@ -468,6 +471,7 @@ impl TokenKind {
         | Self::Import
         | Self::Let
         | Self::Match
+        | Self::Mut
         | Self::Return
         | Self::True
         | Self::Or
@@ -580,6 +584,7 @@ impl fmt::Display for TokenKind {
       Self::Import => write!(f, "import"),
       Self::Let => write!(f, "let"),
       Self::Match => write!(f, "match"),
+      Self::Mut => write!(f, "mut"),
       Self::Return => write!(f, "return"),
       Self::True => write!(f, "true"),
 

@@ -71,7 +71,7 @@
         },
         {
           "name": "storage.type.bang",
-          "match": "\\b(let)\\b"
+          "match": "\\b(let|mut)\\b"
         },
         {
           "name": "keyword.control.import.bang",
@@ -228,7 +228,7 @@
       "patterns": [
         {
           "name": "types.let.bang",
-          "begin": "(let)\\s+([_a-zA-Z][_a-zA-Z0-9]*)\\s*(:)",
+          "begin": "(let(?:\\s+mut)?)\\s+([_a-zA-Z][_a-zA-Z0-9]*)\\s*(:)",
           "beginCaptures": {
             "1": { "name": "storage.type.bang" },
             "2": { "name": "variable.other" },

@@ -48,7 +48,7 @@ pub fn completions(file: &Document, position: lsp::Position) -> lsp::CompletionL
   variable_completions(file, position)
 }
 
-fn constant_snippets() -> [lsp::CompletionItem; 11] {
+fn constant_snippets() -> [lsp::CompletionItem; 12] {
   [
     lsp::CompletionItem {
       label: "true".to_owned(),
@@ -88,6 +88,13 @@ fn constant_snippets() -> [lsp::CompletionItem; 11] {
       label: "let".to_owned(),
       kind: Some(lsp::CompletionItemKind::KEYWORD),
       insert_text: Some("let $1 = $0".to_owned()),
+      insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+      ..Default::default()
+    },
+    lsp::CompletionItem {
+      label: "let mut".to_owned(),
+      kind: Some(lsp::CompletionItemKind::KEYWORD),
+      insert_text: Some("let mut $1 = $0".to_owned()),
       insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
       ..Default::default()
     },

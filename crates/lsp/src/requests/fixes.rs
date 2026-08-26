@@ -159,6 +159,16 @@ mod type_errors {
           actions.push(already_imported_item(file, error));
         }
 
+        TypeError::AssignmentToImmutableVariable {
+          identifier,
+          declaration: Some(declaration),
+          ..
+        } => actions.push(make_variable_mutable(file, error, identifier, *declaration)),
+
+        TypeError::UnnecessaryMutable { span, .. } => {
+          actions.extend(Some(remove_unnecessary_mutable(file, error, *span)));
+        }
+
         _ => {}
       });
   }
@@ -228,6 +238,31 @@ mod type_errors {
       kind: Some(lsp::CodeActionKind::QUICKFIX),
       diagnostics: Some(vec![error.diagnostic(file)]),
       edit: Some(insert_edit(file, span.start, "_")),
+      ..Default::default()
+    }
+  }
+
+  fn make_variable_mutable(
+    file: &Document,
+    error: &TypeError,
+    identifier: &str,
+    declaration: Span,
+  ) -> lsp::CodeAction {
+    lsp::CodeAction {
+      title: format!("Declare `{identifier}` as mutable"),
+      kind: Some(lsp::CodeActionKind::QUICKFIX),
+      diagnostics: Some(vec![error.diagnostic(file)]),
+      edit: Some(insert_edit(file, declaration.start, "mut ")),
+      ..Default::default()
+    }
+  }
+
+  fn remove_unnecessary_mutable(file: &Document, error: &TypeError, span: Span) -> lsp::CodeAction {
+    lsp::CodeAction {
+      title: "Remove `mut`".to_owned(),
+      kind: Some(lsp::CodeActionKind::QUICKFIX),
+      diagnostics: Some(vec![error.diagnostic(file)]),
+      edit: Some(delete_edit(file, Span::new(span.start, span.end))),
       ..Default::default()
     }
   }

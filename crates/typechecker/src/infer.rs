@@ -29,6 +29,19 @@ impl TypeChecker {
     );
   }
 
+  fn check_unnecessary_mutable(&mut self) {
+    self.problems.extend(
+      (self.env.finished_variables())
+        .filter(|variable| variable.is_mutable() && !variable.is_assigned())
+        .filter_map(|variable| {
+          Some(TypeError::UnnecessaryMutable {
+            identifier: variable.name().to_owned(),
+            span: variable.mutable_span()?,
+          })
+        }),
+    );
+  }
+
   fn new_type_var(&mut self) -> TypeRef {
     self.types.new_type_var()
   }
@@ -127,8 +140,9 @@ impl InferType for AST {
     let end_span = self.root_statements.last().unwrap().span(self);
     t.env.exit_scope(end_span);
 
-    // Check for unused variables
+    // Check for unused variables, and `mut` declarations which aren't needed
     t.check_unused_variables();
+    t.check_unnecessary_mutable();
 
     result
   }
@@ -201,7 +215,13 @@ impl InferType for Let {
     let (identifier, identifier_span) = (self.identifier(ast), self.identifier_span(ast));
     let doc_comment = self.doc_comment(ast).map(|comment| comment.full_text(ast));
 
-    (t.env).define_variable(identifier, identifier_span, ty, doc_comment);
+    (t.env).define_variable(
+      identifier,
+      identifier_span,
+      ty,
+      doc_comment,
+      self.mutable_span(ast),
+    );
     ExpressionType::from(TypeArena::NEVER, return_type)
   }
 }
@@ -215,7 +235,13 @@ fn let_statement_function(
   let doc_comment = let_.doc_comment(ast).map(|comment| comment.full_text(ast));
 
   let function_type = t.new_type_var();
-  (t.env).define_variable(identifier, identifier_span, function_type, doc_comment);
+  (t.env).define_variable(
+    identifier,
+    identifier_span,
+    function_type,
+    doc_comment,
+    let_.mutable_span(ast),
+  );
 
   // Infer the function type
   let mut ty = function.infer(t, ast);
@@ -289,6 +315,33 @@ impl InferType for Assignment {
 
       return self.value(ast).infer(t, ast);
     };
+
+    // only variables declared with `let mut` can be modified, parameters never can
+    if let Some(variable) = t.env.lookup_variable(identifier)
+      && !variable.is_mutable()
+    {
+      let parameter = variable.is_parameter();
+
+      // a parameter can never be made mutable, and neither can an import or a builtin,
+      // so only a plain `let` declaration can be fixed by adding `mut`
+      let declaration = match &variable.kind {
+        VariableKind::Declaration {
+          parameter: false,
+          defined,
+          ..
+        } => Some(*defined),
+        _ => None,
+      };
+
+      t.problems.push(TypeError::AssignmentToImmutableVariable {
+        identifier: identifier.to_owned(),
+        span: identifier_span,
+        parameter,
+        declaration,
+      });
+    }
+
+    // an assignment is not a use of the variable, but it does need renaming with it
     t.env.mark_variable_assignment(identifier, identifier_span);
 
     let variable_type = t.types.instantiate(variable_type);
@@ -658,7 +711,13 @@ impl InferType for Match {
 
       match &case.pattern {
         Pattern::Identifier(identifier) => {
-          (t.env).define_variable(identifier.name(ast), identifier.span(ast), value_type, None);
+          (t.env).define_variable(
+            identifier.name(ast),
+            identifier.span(ast),
+            value_type,
+            None,
+            None,
+          );
         }
         Pattern::Invalid => {}
         Pattern::Literal(literal) => {
@@ -682,10 +741,10 @@ impl InferType for Match {
           check_pattern(t, list_type, value_type, list.span(ast));
 
           for variable in list.variables(ast) {
-            (t.env).define_variable(variable.name(ast), variable.span(ast), generic, None);
+            (t.env).define_variable(variable.name(ast), variable.span(ast), generic, None, None);
           }
           if let Some(rest) = list.rest(ast) {
-            (t.env).define_variable(rest.name(ast), rest.span(ast), value_type, None);
+            (t.env).define_variable(rest.name(ast), rest.span(ast), value_type, None, None);
           }
         }
         Pattern::Option(option) => {
@@ -695,7 +754,7 @@ impl InferType for Match {
           check_pattern(t, option_type, value_type, option.span(ast));
 
           if let Some(variable) = option.variable() {
-            (t.env).define_variable(variable.name(ast), variable.span(ast), generic, None);
+            (t.env).define_variable(variable.name(ast), variable.span(ast), generic, None, None);
           }
         }
       }

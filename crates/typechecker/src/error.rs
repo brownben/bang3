@@ -153,6 +153,27 @@ pub enum Problem {
     /// The location of the error
     span: Span,
   },
+  /// A variable which was not declared as mutable was assigned to
+  AssignmentToImmutableVariable {
+    /// The identifier of the variable
+    identifier: String,
+    /// The location of the assignment
+    span: Span,
+    /// Is the variable a function parameter? (they can never be modified)
+    parameter: bool,
+    /// The location of the declaration's identifier, where `mut ` could be inserted
+    /// to make the variable mutable.
+    ///
+    /// `None` if it can never be made mutable, such as a parameter or an import
+    declaration: Option<Span>,
+  },
+  /// A variable was declared with `let mut`, but is never modified
+  UnnecessaryMutable {
+    /// The identifier of the variable
+    identifier: String,
+    /// The location of the `mut` keyword
+    span: Span,
+  },
   /// Functions and iterators only have referential equality not structural equality
   /// This can give unexpected results
   ReferentialEquality {
@@ -184,6 +205,8 @@ impl Problem {
       Self::UnexpectedParameter { .. } => "Unexpected Parameter",
       Self::NoReturnFromMatchGuard { .. } => "No Return from Match Guard",
       Self::ModuleAccessAlreadyImported { .. } => "Module Access Item Already Imported",
+      Self::AssignmentToImmutableVariable { .. } => "Assignment to Immutable Variable",
+      Self::UnnecessaryMutable { .. } => "Unnecessary `mut`",
       Self::ReferentialEquality { .. } => "Referential Equality",
     }
   }
@@ -252,6 +275,12 @@ impl Problem {
       } => {
         format!("`{path}` has been imported as `{defined_as}`")
       }
+      Self::AssignmentToImmutableVariable { identifier, .. } => {
+        format!("`{identifier}` is not declared as mutable, so cannot be assigned to")
+      }
+      Self::UnnecessaryMutable { identifier, .. } => {
+        format!("`{identifier}` is never assigned to, so doesn't need to be mutable")
+      }
       Self::ReferentialEquality { .. } => {
         "functions and iterators only have referential equality defined\nthis can give unexpected behaviour".to_owned()
       }
@@ -265,6 +294,14 @@ impl Problem {
       Self::UnusedVariable { .. } => {
         Some("if this is intentional prefix with a underscore".to_owned())
       }
+      Self::AssignmentToImmutableVariable {
+        parameter: false,
+        identifier,
+        ..
+      } => Some(format!(
+        "declare it as `let mut {identifier} = ...` if it needs to be modified"
+      )),
+      Self::UnnecessaryMutable { .. } => Some("remove the `mut` keyword".to_owned()),
       Self::UndefinedVariable {
         did_you_mean: Some(did_you_mean),
         ..
@@ -327,6 +364,7 @@ impl Problem {
         | Self::UnusedImport { .. }
         | Self::UnreachableCase { .. }
         | Self::ModuleAccessAlreadyImported { .. }
+        | Self::UnnecessaryMutable { .. }
         | Self::ReferentialEquality { .. }
     )
   }
@@ -340,6 +378,7 @@ impl Problem {
         | Self::UnusedImport { .. }
         | Self::UnreachableCase { .. }
         | Self::PatternNeverMatches { .. }
+        | Self::UnnecessaryMutable { .. }
     )
   }
 
@@ -378,6 +417,8 @@ impl Problem {
       | Self::UnexpectedParameter { span, .. }
       | Self::NoReturnFromMatchGuard { span, .. }
       | Self::ModuleAccessAlreadyImported { span, .. }
+      | Self::AssignmentToImmutableVariable { span, .. }
+      | Self::UnnecessaryMutable { span, .. }
       | Self::ReferentialEquality { span, .. } => *span,
     }
   }

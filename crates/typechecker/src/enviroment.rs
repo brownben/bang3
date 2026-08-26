@@ -171,6 +171,7 @@ impl Enviroment {
     variable_span: Span,
     type_: TypeRef,
     documentation: Option<String>,
+    mutable: Option<Span>,
   ) {
     self.variables.push(Variable {
       kind: VariableKind::Declaration {
@@ -178,6 +179,7 @@ impl Enviroment {
         defined: variable_span,
         documentation,
         parameter: false,
+        mutable,
       },
 
       used: Vec::new(),
@@ -203,6 +205,7 @@ impl Enviroment {
         defined: variable_span,
         documentation: None,
         parameter: true,
+        mutable: None,
       },
 
       used: Vec::new(),
@@ -261,6 +264,11 @@ impl Enviroment {
     }
 
     None
+  }
+
+  /// Finds the variable currently in scope with the given name
+  pub(crate) fn lookup_variable(&self, identifier: &str) -> Option<&Variable> {
+    (self.variables.iter().rev()).find(|variable| variable.name() == identifier)
   }
 
   pub(crate) fn mark_variable_assignment(&mut self, identifier: &str, span: Span) {
@@ -339,6 +347,9 @@ pub enum VariableKind {
 
     /// is this a function parameter?
     parameter: bool,
+
+    /// the span of the `mut` keyword, if it was declared with `let mut`
+    mutable: Option<Span>,
   },
   /// a variable that is defined by the runtime
   Builtin {
@@ -375,6 +386,29 @@ impl Variable {
       VariableKind::Declaration { parameter, .. } => *parameter,
       _ => false,
     }
+  }
+
+  /// Can the variable be assigned a new value?
+  ///
+  /// Only variables declared with `let mut` can be modified.
+  #[must_use]
+  pub fn is_mutable(&self) -> bool {
+    self.mutable_span().is_some()
+  }
+
+  /// The location of the `mut` keyword, if the variable was declared as mutable
+  #[must_use]
+  pub fn mutable_span(&self) -> Option<Span> {
+    match &self.kind {
+      VariableKind::Declaration { mutable, .. } => *mutable,
+      _ => None,
+    }
+  }
+
+  /// Has the variable ever been assigned a new value?
+  #[must_use]
+  pub fn is_assigned(&self) -> bool {
+    !self.assigned.is_empty()
   }
 
   /// Is the variable active at the given position

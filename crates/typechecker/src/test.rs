@@ -440,19 +440,65 @@ fn recursive() {
 #[test]
 fn assignment() {
   // the assignment evaluates to the value which was assigned
-  assert_eq!(synthesize("let a = 5\na = 7\na"), "number");
-  assert_eq!(synthesize("let _a = 5\n_a = 7"), "number");
+  assert_eq!(synthesize("let mut a = 5\na = 7\na"), "number");
+  assert_eq!(synthesize("let mut _a = 5\n_a = 7"), "number");
 
   // the value must match the type of the variable
-  assert!(has_type_error("let a = 5\na = 'string'\na"));
-  assert!(has_type_error("let a: number = 5\na = false\na"));
+  assert!(has_type_error("let mut a = 5\na = 'string'\na"));
+  assert!(has_type_error("let mut a: number = 5\na = false\na"));
 
   // the variable must already exist
   assert!(has_type_error("a = 5"));
 
   // assigning to a variable is not a use of it
-  assert!(has_type_error("let a = 5\na = 7"));
-  assert!(!has_type_error("let a = 5\na = 7\na"));
+  assert!(has_type_error("let mut a = 5\na = 7"));
+  assert!(!has_type_error("let mut a = 5\na = 7\na"));
+}
+
+#[test]
+fn assignment_to_immutable_variable() {
+  // only variables declared with `let mut` can be modified
+  assert!(!has_type_error("let mut a = 5\na = 7\na"));
+  assert!(has_type_error("let a = 5\na = 7\na"));
+  assert!(has_type_error("let a = 5\n{ a = 7 }\na"));
+
+  // function parameters can never be modified
+  assert!(has_type_error("let f = x => {\n  x = 2\n  x\n}\nf(1)"));
+
+  // imported items cannot be modified
+  assert!(has_type_error("from maths import { sin }\nsin = 5\nsin"));
+}
+
+#[test]
+fn unnecessary_mutable() {
+  // `mut` on a variable which is never assigned to is unnecessary
+  assert!(has_type_error("let mut a = 5\na"));
+  assert!(!has_type_error("let mut a = 5\na = 7\na"));
+
+  // it is a warning, not an error
+  let ast = bang_syntax::parse("let mut a = 5\na".to_owned());
+  let problems = TypeChecker::check(&ast).problems().to_vec();
+  assert_eq!(problems.len(), 1);
+  assert!(problems[0].is_warning());
+  assert_eq!(problems[0].title(), "Unnecessary `mut`");
+  // the location is the `mut` keyword itself, so the fix knows what to remove
+  assert_eq!(problems[0].span().source_text(&ast.source), "mut");
+
+  // an assignment anywhere counts, including in a nested scope or a closure
+  assert!(!has_type_error("let mut a = 5\n{ a = 7 }\na"));
+  assert!(!has_type_error(
+    "let mut a = 5\nlet f = _ => { a = 7 }\nf()\na"
+  ));
+
+  // a plain `let` never warns, and neither do parameters
+  assert!(!has_type_error("let a = 5\na"));
+  assert!(!has_type_error("let f = x => x\nf(1)"));
+
+  // a variable which is unused gets the unused warning, and the `mut` warning too
+  let ast = parse("let mut a = 5".to_owned());
+  let problems = TypeChecker::check(&ast).problems().to_vec();
+  assert_eq!(problems.len(), 2);
+  assert!(problems.iter().all(Problem::is_warning));
 }
 
 #[test]

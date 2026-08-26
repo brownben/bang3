@@ -831,6 +831,7 @@ impl Parser<'_> {
 
   fn let_statement(&mut self, doc_comment: Option<StatementIdx>) -> Statement {
     let (_, keyword) = self.advance();
+    let mutable = (self.current_kind() == TokenKind::Mut).then(|| self.advance().1);
     let identifier = self.possibly_missing_identifier(TokenKind::Equal);
     let annotation = self.matches(TokenKind::Colon).then(|| self.parse_type());
     self.expect(TokenKind::Equal);
@@ -843,6 +844,7 @@ impl Parser<'_> {
     Statement::Let(Let {
       doc_comment,
       keyword,
+      mutable,
       annotation,
       identifier,
       value,

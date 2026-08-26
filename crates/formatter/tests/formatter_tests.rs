@@ -479,6 +479,20 @@ fn let_statement() {
 }
 
 #[test]
+fn let_mut_statement() {
+  let expected_output = "let mut variable = stuff";
+  assert_format!("let mut variable = stuff", expected_output, 30);
+  assert_format!("let   mut   variable = stuff", expected_output, 30);
+  assert_format!("let mut variable    =   stuff", expected_output, 30);
+
+  assert_format!(
+    "let mut variable: number = 4",
+    "let mut variable: number = 4",
+    30
+  );
+}
+
+#[test]
 fn match_() {
   assert_format!(
     "match n | ''.. -> a | b -> ''",

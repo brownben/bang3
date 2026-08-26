@@ -168,7 +168,7 @@ pub fn highlight_source(output: &mut dyn fmt::Write, source: &str) -> fmt::Resul
     let style = match token.kind {
       TokenKind::Number | TokenKind::True | TokenKind::False => Style::new().blue(),
       kind if kind.is_string() => Style::new().green(),
-      TokenKind::Let => Style::new().magenta(),
+      TokenKind::Let | TokenKind::Mut => Style::new().magenta(),
       kind if kind.is_keyword() => Style::new().cyan(),
       TokenKind::Comment => Style::new().dimmed(),
       _ => Style::new(),

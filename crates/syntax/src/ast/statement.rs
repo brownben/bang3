@@ -227,16 +227,29 @@ impl<'a> Iterator for ImportItemIterator<'a> {
   }
 }
 
-/// A variable declaration, e.g. `let x = 1`
+/// A variable declaration, e.g. `let x = 1` or `let mut x = 1`
 #[derive(Debug)]
 pub struct Let {
   pub(crate) doc_comment: Option<StatementIdx>,
   pub(crate) keyword: TokenIdx,
+  pub(crate) mutable: Option<TokenIdx>,
   pub(crate) annotation: Option<TypeIdx>,
   pub(crate) identifier: Option<Variable>,
   pub(crate) value: ExpressionIdx,
 }
 impl Let {
+  /// Was the variable declared as mutable?
+  #[must_use]
+  pub fn is_mutable(&self) -> bool {
+    self.mutable.is_some()
+  }
+
+  /// The location of the `mut` keyword, if the variable is mutable
+  #[must_use]
+  pub fn mutable_span(&self, ast: &AST) -> Option<Span> {
+    self.mutable.map(|token| Span::from(ast[token]))
+  }
+
   /// The name of the variable being declared
   #[must_use]
   pub fn identifier<'a>(&self, ast: &'a AST) -> &'a str {

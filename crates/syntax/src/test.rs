@@ -827,6 +827,25 @@ fn let_statement() {
 }
 
 #[test]
+fn let_mut_statement() {
+  let ast = parse_to_string("let mut variable = 4");
+  let expected = indoc! {"
+    ├─ Let mut 'variable' =
+    │  ╰─ Number (4)
+  "};
+  assert_eq!(ast, expected);
+
+  // `mut` goes between `let` and the identifier, and works with annotations
+  assert!(parse("let mut a = 1\na = 2\na").is_ok());
+  assert!(parse("let mut a: number = 1").is_ok());
+  assert!(parse("mut let a = 1").is_err());
+  assert!(parse("let a mut = 1").is_err());
+
+  // `mut` is a keyword, so cannot be used as an identifier
+  assert!(parse("let mut = 1").is_err());
+}
+
+#[test]
 fn assignment() {
   let ast = parse_to_string("variable = 4 + 33");
   let expected = indoc! {"

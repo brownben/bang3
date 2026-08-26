@@ -509,7 +509,11 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for Let {
       } else {
         IR::Empty
       },
-      IR::Text("let "),
+      if self.is_mutable() {
+        IR::Text("let mut ")
+      } else {
+        IR::Text("let ")
+      },
       IR::Text(self.identifier(ast)),
       if let Some(annotation) = self.annotation(ast) {
         f.concat([IR::Text(": "), annotation.format(f, ast)])

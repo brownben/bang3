@@ -185,7 +185,7 @@ fn variable_token_type(token: Token, variable: &Variable, ast: &AST) -> Semantic
 
 fn token_modifiers(token: Token, ast: &AST) -> SemanticTokenModifier {
   match token.kind {
-    TokenKind::Let => SemanticTokenModifier::Declaration,
+    TokenKind::Let | TokenKind::Mut => SemanticTokenModifier::Declaration,
     TokenKind::Comment if is_documentation_comment(token, ast) => {
       SemanticTokenModifier::Documentation
     }
