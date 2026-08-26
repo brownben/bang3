@@ -296,6 +296,7 @@ trait Compile<'s> {
 impl<'s> Compile<'s> for Expression {
   fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
     match self {
+      Self::Assignment(assignment) => assignment.compile(compiler, ast),
       Self::Binary(binary) => binary.compile(compiler, ast),
       Self::Block(block) => block.compile(compiler, ast),
       Self::Call(call) => call.compile(compiler, ast),
@@ -312,6 +313,56 @@ impl<'s> Compile<'s> for Expression {
       Self::Variable(variable) => variable.compile(compiler, ast),
       Self::Invalid(_) => Err(CompileError::InvalidAST),
     }
+  }
+}
+impl<'s> Compile<'s> for Assignment {
+  fn compile(&self, compiler: &mut Compiler<'s>, ast: &'s AST) -> Result<(), CompileError> {
+    let span = self.span(ast);
+    let name = self.identifier(ast);
+
+    // the value is left on the stack, so an assignment can be used as an expression
+    self.value(ast).compile(compiler, ast)?;
+
+    // See if the variable is local to the current function
+    if let Some(local_position) = compiler.locals.find(name) {
+      match compiler.locals[local_position].status {
+        VariableStatus::Open => compiler.chunk.add_opcode(OpCode::SetLocal, span),
+        VariableStatus::Closed => compiler.chunk.add_opcode(OpCode::SetAllocatedValue, span),
+      }
+      compiler.chunk.add_value(local_position, span);
+
+      return Ok(());
+    }
+
+    // Check for it being a variable of an outer function, which is closed over.
+    // A recursive reference to the enclosing function is not a variable, so is skipped
+    if let Some((stack_index, OuterVariable::Local(local_index))) =
+      find_outer_variable(&compiler.stack, name)
+    {
+      let origin_function = &mut compiler.stack[stack_index];
+      let original_status = origin_function.locals[local_index].status;
+      origin_function.locals[local_index].status = VariableStatus::Closed;
+
+      let action = match original_status {
+        VariableStatus::Open => UpvalueAction::Allocate(local_index),
+        VariableStatus::Closed => UpvalueAction::GetLocal(local_index),
+      };
+      let mut upvalue_index = origin_function.upvalues.find_or_add(action)?;
+
+      for function in &mut compiler.stack[stack_index + 1..] {
+        let upvalues = &mut function.upvalues;
+        upvalue_index = upvalues.find_or_add(UpvalueAction::GetUpvalue(upvalue_index))?;
+      }
+
+      compiler.chunk.add_opcode(OpCode::SetUpvalue, span);
+      compiler.chunk.add_value(upvalue_index, span);
+
+      return Ok(());
+    }
+
+    // Otherwise, it must be a global variable
+    compiler.chunk.add_opcode(OpCode::SetGlobal, span);
+    compiler.add_symbol(name, span)
   }
 }
 impl<'s> Compile<'s> for Binary {

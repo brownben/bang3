@@ -248,8 +248,12 @@ pub enum OpCode {
   DefineGlobal,
   /// Gets a global variable. Arg(u8) - symbol position
   GetGlobal,
+  /// Sets an existing global variable. Takes the top item of the stack. Arg(u8) - symbol position
+  SetGlobal,
   /// Gets a local variable on the stack. Arg(u8) - stack offset
   GetLocal,
+  /// Sets a local variable on the stack. Copies the top item of the stack. Arg(u8) - stack offset
+  SetLocal,
 
   // Functions
   /// Calls a function. Top item of stack is the argument, and the second is the function
@@ -274,6 +278,10 @@ pub enum OpCode {
   GetAllocatedValue,
   /// Gets the pointer to an allocated value from an upvalue. Arg(u8) - upvalue id
   GetAllocatedPointer,
+  /// Sets an upvalue in the frame to a copy of the top item of the stack.  Arg(u8) - upvalue id
+  SetUpvalue,
+  /// Sets an allocated value on the stack to a copy of the top item. Arg(u8) - stack offset
+  SetAllocatedValue,
 
   // Lists
   /// Creates a list. Arg(u8) - number of elements
@@ -315,6 +323,10 @@ impl OpCode {
       | Self::DefineGlobal
       | Self::GetGlobal
       | Self::GetLocal
+      | Self::SetGlobal
+      | Self::SetLocal
+      | Self::SetUpvalue
+      | Self::SetAllocatedValue
       | Self::GetUpvalue
       | Self::PopBelow
       | Self::Allocate
@@ -486,6 +498,23 @@ impl fmt::Display for Chunk {
         OpCode::GetLocal => {
           let local_position = self.get_value(position + 1);
           write!(f, "GetLocal ({local_position})")
+        }
+        OpCode::SetGlobal => {
+          let name_location = self.get_value(position + 1);
+          let name = self.get_symbol(name_location.into());
+          write!(f, "SetGlobal '{name}' ({name_location})")
+        }
+        OpCode::SetLocal => {
+          let local_position = self.get_value(position + 1);
+          write!(f, "SetLocal ({local_position})")
+        }
+        OpCode::SetUpvalue => {
+          let upvalue_position = self.get_value(position + 1);
+          write!(f, "SetUpvalue ({upvalue_position})")
+        }
+        OpCode::SetAllocatedValue => {
+          let local_position = self.get_value(position + 1);
+          write!(f, "SetAllocatedValue ({local_position})")
         }
         OpCode::PopBelow => {
           let count = self.get_value(position + 1);

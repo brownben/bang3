@@ -317,24 +317,17 @@ fn return_as_expression() {
 
 #[test]
 #[cfg_attr(miri, ignore)]
-fn no_single_equal_operator() {
+fn invalid_assignment_target() {
   let file = indoc! {"
-    x = 5
     4 = 5
   "};
   let output = run_stderr(file);
   let expected = indoc! {"
-    ✕ Error: No Single Equal Operator
-    a single equal is not an operator. start line with `let` for variable declaration, or use `==` for equality
+    ✕ Error: Invalid Assignment Target
+    only a variable can be assigned to. use `==` for equality
 
         ╭─[STDIN:1]
-      1 │ x = 5
-    ────╯
-    ✕ Error: No Single Equal Operator
-    a single equal is not an operator. use `==` for equality
-
-        ╭─[STDIN:2]
-      2 │ 4 = 5
+      1 │ 4 = 5
     ────╯
   "};
   assert_eq!(output, expected);

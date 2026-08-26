@@ -82,8 +82,8 @@ mod parse_errors {
           ParseError::ReturnOutsideFunction(token) => {
             Some(return_outside_function(file, error, token.into()))
           }
-          ParseError::NoSingleEqualOperator { token, .. } => {
-            Some(no_single_equal_operator(file, error, token.into()))
+          ParseError::InvalidAssignmentTarget(token) => {
+            Some(invalid_assignment_target(file, error, token.into()))
           }
           ParseError::ReturnAsExpression { statement, .. } => {
             Some(return_as_expression(file, error, *statement))
@@ -94,7 +94,7 @@ mod parse_errors {
     );
   }
 
-  fn no_single_equal_operator(file: &Document, error: &ParseError, span: Span) -> lsp::CodeAction {
+  fn invalid_assignment_target(file: &Document, error: &ParseError, span: Span) -> lsp::CodeAction {
     lsp::CodeAction {
       title: "Replace with `==`".to_owned(),
       kind: Some(lsp::CodeActionKind::QUICKFIX),
@@ -362,7 +362,8 @@ mod refactors {
       Expression::Invalid(_) => None,
 
       // could bind differently to the surrounding expression, so are grouped
-      Expression::Binary(_)
+      Expression::Assignment(_)
+      | Expression::Binary(_)
       | Expression::Function(_)
       | Expression::If(_)
       | Expression::Match(_)

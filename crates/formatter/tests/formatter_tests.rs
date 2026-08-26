@@ -442,6 +442,17 @@ fn literal() {
 }
 
 #[test]
+fn assignment() {
+  let expected_output = "variable = stuff";
+  assert_format!("variable = stuff", expected_output, 25);
+  assert_format!("variable    =    stuff", expected_output, 25);
+  assert_format!("variable=stuff", expected_output, 25);
+
+  assert_format!("a = b = 4", "a = b = 4", 25);
+  assert_format!("a = 1 + 2", "a = 1 + 2", 25);
+}
+
+#[test]
 fn let_statement() {
   let expected_output = "let variable = stuff";
   assert_format!("let variable = stuff", expected_output, 25);

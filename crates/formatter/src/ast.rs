@@ -30,6 +30,7 @@ impl<'a, 'b> Formattable<'a, 'b, Self> for AST {
 impl<'a, 'b> Formattable<'a, 'b, AST> for Expression {
   fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
     match self {
+      Self::Assignment(assignment) => assignment.format(f, ast),
       Self::Binary(binary) => binary.format(f, ast),
       Self::Block(block) => block.format(f, ast),
       Self::Call(call) => call.format(f, ast),
@@ -46,6 +47,15 @@ impl<'a, 'b> Formattable<'a, 'b, AST> for Expression {
       Self::Variable(variable) => variable.format(f, ast),
       Self::Invalid(_) => IR::Empty,
     }
+  }
+}
+impl<'a, 'b> Formattable<'a, 'b, AST> for Assignment {
+  fn format(&self, f: &Formatter<'a, 'b>, ast: &'a AST) -> IR<'a, 'b> {
+    f.concat([
+      IR::Text(self.identifier(ast)),
+      IR::Text(" = "),
+      self.value(ast).format(f, ast),
+    ])
   }
 }
 impl<'a, 'b> Formattable<'a, 'b, AST> for Binary {

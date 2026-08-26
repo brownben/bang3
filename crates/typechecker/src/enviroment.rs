@@ -52,6 +52,7 @@ impl Enviroment {
       },
 
       used: Vec::new(),
+      assigned: Vec::new(),
       active: None,
 
       depth: self.depth,
@@ -76,6 +77,7 @@ impl Enviroment {
       },
 
       used: Vec::new(),
+      assigned: Vec::new(),
       active: None,
 
       depth: self.depth,
@@ -98,6 +100,7 @@ impl Enviroment {
       },
 
       used: Vec::new(),
+      assigned: Vec::new(),
       active: None,
 
       depth: self.depth,
@@ -117,6 +120,7 @@ impl Enviroment {
       },
 
       used: Vec::new(),
+      assigned: Vec::new(),
       active: None,
 
       depth: self.depth,
@@ -136,6 +140,7 @@ impl Enviroment {
       },
 
       used: Vec::new(),
+      assigned: Vec::new(),
       active: None,
 
       depth: self.depth,
@@ -176,6 +181,7 @@ impl Enviroment {
       },
 
       used: Vec::new(),
+      assigned: Vec::new(),
       active: Some(variable_span),
 
       depth: self.depth,
@@ -200,6 +206,7 @@ impl Enviroment {
       },
 
       used: Vec::new(),
+      assigned: Vec::new(),
       active: Some(variable_span),
 
       depth: self.depth,
@@ -225,6 +232,7 @@ impl Enviroment {
       },
 
       used: Vec::new(),
+      assigned: Vec::new(),
       active: Some(item.span),
 
       depth: self.depth,
@@ -253,6 +261,18 @@ impl Enviroment {
     }
 
     None
+  }
+
+  pub(crate) fn mark_variable_assignment(&mut self, identifier: &str, span: Span) {
+    let variable = self
+      .variables
+      .iter_mut()
+      .rev()
+      .find(|variable| variable.name() == identifier);
+
+    if let Some(variable) = variable {
+      variable.assigned.push(span);
+    }
   }
 
   pub(crate) fn mark_variable_use(&mut self, identifier: &str, span: Span) {
@@ -286,6 +306,8 @@ pub struct Variable {
 
   /// the spans where the variable was used
   pub used: Vec<Span>,
+  /// the spans where the variable was assigned a new value
+  pub assigned: Vec<Span>,
   /// the span where the variable is active and can be used
   ///
   /// `None` if the variable can always be used

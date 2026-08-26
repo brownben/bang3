@@ -74,6 +74,7 @@ impl IsConstant for Expression {
     match self {
       Self::Call(_) | Self::ModuleAccess(_) | Self::Variable(_) | Self::Invalid(_) => false,
       Self::Function(_) | Self::Literal(_) => true,
+      Self::Assignment(a) => a.value(ast).is_constant(ast),
       Self::Binary(x) => x.is_constant(ast),
       Self::Block(x) => x.is_constant(ast),
       Self::Comment(x) => x.expression(ast).is_constant(ast),
@@ -387,6 +388,7 @@ impl ReturnAnalysis for Statement {
 impl ReturnAnalysis for Expression {
   fn always_returns(&self, ast: &AST) -> bool {
     match self {
+      Self::Assignment(assignment) => assignment.value(ast).always_returns(ast),
       Self::Binary(binary) => binary.always_returns(ast),
       Self::Block(block) => block.always_returns(ast),
       Self::Call(call) => call.always_returns(ast),
@@ -423,7 +425,7 @@ impl ReturnAnalysis for Expression {
       | Self::Invalid(_) => None,
 
       // Could feasibly end with a return, but would be contrived code not making sense
-      Self::Binary(_) | Self::Call(_) | Self::FormatString(_) => None,
+      Self::Assignment(_) | Self::Binary(_) | Self::Call(_) | Self::FormatString(_) => None,
     }
   }
 }

@@ -1327,3 +1327,81 @@ fn recursion() {
   "});
   assert_variable!(recursive_upvalue_with_locals_in_inner_function; a, 0.0);
 }
+
+#[test]
+fn assignment() {
+  // globals
+  let mut globals = run(indoc! {"
+    let a = 1
+    a = 2
+
+    let b = 'hello'
+    b = b ++ ' world'
+  "});
+  assert_variable!(globals; a, 2.0);
+  assert_variable!(globals; b, string "hello world");
+
+  // an assignment is an expression, evaluating to the value assigned
+  let as_expression = run(indoc! {"
+    let x = 1
+    let a = { x = 5 }
+  "});
+  assert_variable!(as_expression; a, 5.0);
+  assert_variable!(as_expression; x, 5.0);
+
+  // locals within a block
+  let locals = run(indoc! {"
+    let a = {
+      let x = 1
+      let y = 2
+      x = x + y
+      x
+    }
+  "});
+  assert_variable!(locals; a, 3.0);
+
+  // a function parameter is a local
+  let parameter = run(indoc! {"
+    let double = x => {
+      x = x * 2
+      x
+    }
+    let a = double(21)
+  "});
+  assert_variable!(parameter; a, 42.0);
+
+  // assigning to a global from inside a function
+  let global_from_function = run(indoc! {"
+    let count = 0
+    let increment = _ => { count = count + 1 }
+    increment()
+    increment()
+    increment()
+    let a = count
+  "});
+  assert_variable!(global_from_function; a, 3.0);
+  assert_variable!(global_from_function; count, 3.0);
+
+  // assigning to a variable closed over by an inner function
+  let closed_over = run(indoc! {"
+    let a = {
+      let total = 0
+      let add = n => { total = total + n }
+      add(3)
+      add(4)
+      total
+    }
+  "});
+  assert_variable!(closed_over; a, 7.0);
+
+  // the closure sees the update, and the enclosing scope sees the closure's
+  let shared_upvalue = run(indoc! {"
+    let a = {
+      let x = 1
+      let get = _ => x
+      x = 10
+      get()
+    }
+  "});
+  assert_variable!(shared_upvalue; a, 10.0);
+}

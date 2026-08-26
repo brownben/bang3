@@ -827,6 +827,43 @@ fn let_statement() {
 }
 
 #[test]
+fn assignment() {
+  let ast = parse_to_string("variable = 4 + 33");
+  let expected = indoc! {"
+    ├─ Assignment 'variable' =
+    │  ╰─ Binary (+)
+    │     ├─ Number (4)
+    │     ╰─ Number (33)
+  "};
+  assert_eq!(ast, expected);
+
+  // assignment is right-associative
+  let ast = parse_to_string("a = b = 4");
+  let expected = indoc! {"
+    ├─ Assignment 'a' =
+    │  ╰─ Assignment 'b' =
+    │     ╰─ Number (4)
+  "};
+  assert_eq!(ast, expected);
+
+  // it binds looser than every other operator
+  let ast = parse_to_string("a = 1 == 2");
+  let expected = indoc! {"
+    ├─ Assignment 'a' =
+    │  ╰─ Binary (==)
+    │     ├─ Number (1)
+    │     ╰─ Number (2)
+  "};
+  assert_eq!(ast, expected);
+
+  assert!(parse("a = 5").is_ok());
+  assert!(parse("let a = 1\na = 5").is_ok());
+  assert!(parse("a =").is_err());
+  assert!(parse("a() = 5").is_err());
+  assert!(parse("(a) = 5").is_err());
+}
+
+#[test]
 fn let_statement_missing_parts() {
   assert!(parse("let = 7").is_err());
   assert!(parse("let var").is_err());
@@ -1537,17 +1574,7 @@ mod fault_tolerant {
   }
 
   #[test]
-  fn single_equals_as_binary_operator() {
-    let ast = parse("a = 5");
-    let expected = indoc! {"
-      ├─ Binary (=)
-      │  ├─ Variable (a)
-      │  ╰─ Number (5)
-    "};
-    assert!(ast.is_err());
-    assert_eq!(ast.errors.len(), 1);
-    assert_eq!(ast.to_string(), expected);
-
+  fn assignment_to_non_variable() {
     let ast = parse("4 = 5");
     let expected = indoc! {"
       ├─ Binary (=)

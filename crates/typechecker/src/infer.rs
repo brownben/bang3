@@ -251,6 +251,7 @@ impl InferType for Return {
 impl InferType for Expression {
   fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
     match self {
+      Self::Assignment(assignment) => assignment.infer(t, ast),
       Self::Binary(binary) => binary.infer(t, ast),
       Self::Block(block) => block.infer(t, ast),
       Self::Call(call) => call.infer(t, ast),
@@ -269,6 +270,37 @@ impl InferType for Expression {
       Self::Variable(variable) => ExpressionType::Expression(variable.infer(t, ast)),
       Self::Invalid(_) => ExpressionType::Expression(TypeArena::UNKNOWN),
     }
+  }
+}
+impl InferType for Assignment {
+  fn infer(&self, t: &mut TypeChecker, ast: &AST) -> ExpressionType {
+    let identifier = self.identifier(ast);
+    let identifier_span = self.identifier_span(ast);
+
+    let Some(variable_type) = t.env.get_variable(identifier) else {
+      use super::enviroment::Variable;
+
+      t.problems.push(TypeError::UndefinedVariable {
+        identifier: identifier.to_owned(),
+        span: identifier_span,
+        did_you_mean: similarly_named(identifier, t.env.variables().map(Variable::name)),
+        possible_imports: stdlib::modules_defining_item(identifier),
+      });
+
+      return self.value(ast).infer(t, ast);
+    };
+    t.env.mark_variable_assignment(identifier, identifier_span);
+
+    let variable_type = t.types.instantiate(variable_type);
+    let (value_type, return_type) = match self.value(ast).infer(t, ast) {
+      ExpressionType::Expression(ty) => (ty, None),
+      ExpressionType::Return(ty) => return ExpressionType::Return(ty),
+      ExpressionType::Both(ty, return_ty) => (ty, Some(return_ty)),
+    };
+    t.assert_type(value_type, variable_type, self.value(ast).span(ast));
+
+    // the assignment evaluates to the value which has been assigned
+    ExpressionType::from(variable_type, return_type)
   }
 }
 impl InferType for Binary {

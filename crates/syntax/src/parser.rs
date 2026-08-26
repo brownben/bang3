@@ -299,11 +299,7 @@ impl<'ast> Parser<'ast> {
 impl Parser<'_> {
   fn binary(&mut self, left: ExpressionIdx, kind: TokenKind, operator: TokenIdx) -> ExpressionIdx {
     if kind == TokenKind::Equal {
-      let possible_assignment = matches!(self.ast[left], Expression::Variable(_));
-      self.add_error(ParseError::NoSingleEqualOperator {
-        token: self.ast[operator],
-        possible_assignment,
-      });
+      return self.assignment(left, operator);
     }
 
     self.skip_newline();
@@ -314,6 +310,27 @@ impl Parser<'_> {
       operator,
       right,
     })
+  }
+
+  fn assignment(&mut self, target: ExpressionIdx, operator: TokenIdx) -> ExpressionIdx {
+    let Expression::Variable(identifier) = &self.ast[target] else {
+      self.add_error(ParseError::InvalidAssignmentTarget(self.ast[operator]));
+
+      self.skip_newline();
+      let right = self.parse_expression_with_precedence(ParsePrecedence::Assignment);
+
+      return self.ast.add_expression(Binary {
+        left: target,
+        operator,
+        right,
+      });
+    };
+    let identifier = identifier.clone();
+
+    self.skip_newline();
+    let value = self.parse_expression_with_precedence(ParsePrecedence::Assignment);
+
+    self.ast.add_expression(Assignment { identifier, value })
   }
 
   fn block(&mut self, opening: TokenIdx) -> ExpressionIdx {
@@ -1078,13 +1095,8 @@ pub enum ParseError {
     statement: Span,
   },
 
-  /// No Single Equal Operator
-  NoSingleEqualOperator {
-    /// The equal token
-    token: Token,
-    /// Is the left hand side a possible assignment target
-    possible_assignment: bool,
-  },
+  /// Assigned to something which is not a variable
+  InvalidAssignmentTarget(Token),
   /// Keyword as Import Item
   KeywordAsImportItem(Token),
   /// Function calls only accept one argument
@@ -1114,7 +1126,7 @@ impl ParseError {
       Self::BlockMustEndWithExpression(_) => "Block Must End With Expression".into(),
       Self::ReturnOutsideFunction(_) => "Return Outside of Function".into(),
       Self::ReturnAsExpression { .. } => "Return is Not an Expression".into(),
-      Self::NoSingleEqualOperator { .. } => "No Single Equal Operator".into(),
+      Self::InvalidAssignmentTarget(_) => "Invalid Assignment Target".into(),
       Self::KeywordAsImportItem(_) => "Keyword as Import Item".into(),
       Self::MultipleFunctionArgs(_) => "Multiple Function Arguments".into(),
       Self::NestedPattern(_) => "Nested Pattern".into(),
@@ -1158,11 +1170,8 @@ impl ParseError {
       Self::ReturnAsExpression { .. } => {
         "`return` is a statement, so cannot be used where a value is expected".into()
       }
-      Self::NoSingleEqualOperator { possible_assignment: false, .. } => {
-        "a single equal is not an operator. use `==` for equality".into()
-      }
-      Self::NoSingleEqualOperator { possible_assignment: true, .. } => {
-        "a single equal is not an operator. start line with `let` for variable declaration, or use `==` for equality".into()
+      Self::InvalidAssignmentTarget(_) => {
+        "only a variable can be assigned to. use `==` for equality".into()
       }
       Self::KeywordAsImportItem(_) => {
         "import items may be keywords, but they must be renamed with `as` or accessed using module access".into()
@@ -1213,7 +1222,7 @@ impl ParseError {
       Self::BlockMustEndWithExpression(token) => token.into(),
       Self::ReturnOutsideFunction(token) => token.into(),
       Self::ReturnAsExpression { keyword, .. } => keyword.into(),
-      Self::NoSingleEqualOperator { token, .. } => token.into(),
+      Self::InvalidAssignmentTarget(token) => token.into(),
       Self::KeywordAsImportItem(token) => token.into(),
       Self::MultipleFunctionArgs(span) => *span,
       Self::NestedPattern(span) => span.into(),
@@ -1243,7 +1252,7 @@ impl ParseError {
     match self {
       Self::BlockMustEndWithExpression(_) => true,
       Self::ReturnOutsideFunction(_) => true,
-      Self::NoSingleEqualOperator { .. } => true,
+      Self::InvalidAssignmentTarget(_) => true,
       Self::MissingIdentifier(_) => true,
       Self::MissingModuleName(_) => true,
       Self::MissingPattern(_) => true,

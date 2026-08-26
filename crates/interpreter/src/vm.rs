@@ -523,10 +523,27 @@ impl<'context> VM<'context> {
           }
           next_instruction!(self, instruction, ip, chunk);
         }
+        OpCode::SetGlobal => {
+          let name = chunk.get_symbol(chunk.get_value(ip + 1).into());
+          let value = self.stack.peek();
+
+          let Some(global) = self.globals.get_mut(name) else {
+            let name = name.to_string();
+            break Some(ErrorKind::UndefinedVariable { name });
+          };
+          *global = value;
+
+          next_instruction!(self, instruction, ip, chunk);
+        }
         OpCode::GetLocal => {
           let slot = chunk.get_value(ip + 1);
           let value = self.stack[offset + usize::from(slot)];
           push!(self.stack, value);
+          next_instruction!(self, instruction, ip, chunk);
+        }
+        OpCode::SetLocal => {
+          let slot = chunk.get_value(ip + 1);
+          self.stack[offset + usize::from(slot)] = self.stack.peek();
           next_instruction!(self, instruction, ip, chunk);
         }
 
@@ -671,10 +688,25 @@ impl<'context> VM<'context> {
         }
         OpCode::GetAllocatedPointer => {
           let index = chunk.get_value(ip + 1);
-          let allocated: Value =
+          let allocated =
             self.heap.get_list_buffer(self.get_last_frame_upvalues())[usize::from(index)];
 
           push!(self.stack, allocated);
+          next_instruction!(self, instruction, ip, chunk);
+        }
+        OpCode::SetUpvalue => {
+          let upvalue = chunk.get_value(ip + 1);
+          let address =
+            self.heap.get_list_buffer(self.get_last_frame_upvalues())[usize::from(upvalue)];
+          self.heap[address.as_object::<Value>()] = self.stack.peek();
+
+          next_instruction!(self, instruction, ip, chunk);
+        }
+        OpCode::SetAllocatedValue => {
+          let slot = chunk.get_value(ip + 1);
+          let address = self.stack[offset + usize::from(slot)];
+          self.heap[address.as_object::<Value>()] = self.stack.peek();
+
           next_instruction!(self, instruction, ip, chunk);
         }
 

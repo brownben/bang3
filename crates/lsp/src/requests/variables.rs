@@ -25,9 +25,8 @@ pub fn get_references(file: &Document, position: lsp::Position) -> Option<Vec<ls
   let typechecker = file.typechecker();
   let declaration = find_variable(position, typechecker)?;
 
-  let references = declaration
-    .used
-    .iter()
+  let references = (declaration.used.iter())
+    .chain(&declaration.assigned)
     .map(|span| lsp::Location::new(file.id.clone(), lsp_range_from_span(*span, file)))
     .collect();
 
@@ -77,7 +76,7 @@ pub fn rename(file: &Document, position: lsp::Position, new_name: &str) -> lsp::
     }
   }
 
-  for used in &declaration.used {
+  for used in (declaration.used.iter()).chain(&declaration.assigned) {
     text_edits.push(lsp::TextEdit {
       range: lsp_range_from_span(*used, file),
       new_text: new_name.to_owned(),
@@ -102,6 +101,9 @@ pub fn find_variable(position: Span, typechecker: &TypeChecker) -> Option<&Varia
         } => defined.contains(position) || alias_span.is_some_and(|x| x.contains(position)),
       };
 
-      in_declaration || var.used.iter().any(|x| x.contains(position))
+      in_declaration
+        || (var.used.iter())
+          .chain(&var.assigned)
+          .any(|x| x.contains(position))
     })
 }

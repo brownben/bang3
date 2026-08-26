@@ -159,11 +159,20 @@ Functions for operating on iterators can be found in the [standard library](./st
 
 ## Variables
 
-`let` introduces a variable binding. Variables are immutable, so can't be mutated or reassigned. Variable declarations are statements that don't have a value and can't be used as an expression.
+`let` introduces a variable binding. Variable declarations are statements that don't have a value and can't be used as an expression.
 
 ```bang
 let x = 42
 ```
+
+A variable which has already been declared can be given a new value with `=`. The new value must have the same type as the variable. Unlike a declaration, an assignment is an expression, and evaluates to the value which was assigned.
+
+```bang
+let x = 42
+x = 12
+```
+
+Only a variable can be assigned to, and a variable must be declared with `let` before it can be assigned to.
 
 You can optionally specify a type annotation for the variable, these are unused by the runtime but can be used by the type-checker to verify your code. The type-checker can infer the type, so most of the time annotations are not recommended.
 

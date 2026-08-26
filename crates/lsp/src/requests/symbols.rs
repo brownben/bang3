@@ -65,6 +65,9 @@ fn expression_symbols(
   symbols: &mut Vec<lsp::DocumentSymbol>,
 ) {
   match expression {
+    Expression::Assignment(assignment) => {
+      expression_symbols(assignment.value(ast), file, ast, symbols);
+    }
     Expression::Binary(binary) => {
       expression_symbols(binary.left(ast), file, ast, symbols);
       expression_symbols(binary.right(ast), file, ast, symbols);

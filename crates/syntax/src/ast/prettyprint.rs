@@ -27,6 +27,7 @@ pub trait PrettyPrint {
 impl PrettyPrint for Expression {
   fn pretty(&self, f: &mut fmt::Formatter, ast: &AST, prefix: &str, last: bool) -> fmt::Result {
     match self {
+      Self::Assignment(x) => x.pretty(f, ast, prefix, last),
       Self::Binary(x) => x.pretty(f, ast, prefix, last),
       Self::Block(x) => x.pretty(f, ast, prefix, last),
       Self::Call(x) => x.pretty(f, ast, prefix, last),
@@ -46,6 +47,15 @@ impl PrettyPrint for Expression {
         writeln!(f, "{prefix}{connector}Invalid")
       }
     }
+  }
+}
+impl PrettyPrint for Assignment {
+  fn pretty(&self, f: &mut fmt::Formatter, ast: &AST, prefix: &str, last: bool) -> fmt::Result {
+    let connector = if last { FINAL_ENTRY } else { OTHER_ENTRY };
+    writeln!(f, "{prefix}{connector}Assignment '{}' =", self.identifier(ast))?;
+
+    let new_prefix = format!("{prefix}{}", if last { FINAL_CHILD } else { OTHER_CHILD });
+    self.value(ast).pretty(f, ast, &new_prefix, true)
   }
 }
 impl PrettyPrint for Binary {

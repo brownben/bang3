@@ -13,6 +13,8 @@ use thin_vec::ThinVec;
 #[must_use]
 #[derive(Debug)]
 pub enum Expression {
+  /// An assignment to an existing variable, e.g. `x = 1`, `x += 1`
+  Assignment(Assignment),
   /// A binary expression, e.g. `1 + 2`, `true and false`
   Binary(Binary),
   /// A block of statements, e.g. `{ .. }`
@@ -48,6 +50,7 @@ impl Expression {
   /// The location of the expression
   pub fn span(&self, ast: &AST) -> Span {
     match self {
+      Self::Assignment(assignment) => assignment.span(ast),
       Self::Binary(binary) => binary.span(ast),
       Self::Block(block) => block.span(ast),
       Self::Call(call) => call.span(ast),
@@ -64,6 +67,34 @@ impl Expression {
       Self::Variable(variable) => variable.span(ast),
       Self::Invalid(invalid) => invalid.span(ast),
     }
+  }
+}
+
+/// An assignment to an existing variable, e.g. `x = 1`
+#[derive(Debug)]
+pub struct Assignment {
+  pub(crate) identifier: Variable,
+  pub(crate) value: ExpressionIdx,
+}
+impl Assignment {
+  /// The variable being assigned to
+  #[must_use]
+  pub fn identifier<'a>(&self, ast: &'a AST) -> &'a str {
+    self.identifier.name(ast)
+  }
+  /// The location of the variable being assigned to
+  pub fn identifier_span(&self, ast: &AST) -> Span {
+    self.identifier.span(ast)
+  }
+
+  /// The expression which is to be assigned to the variable
+  pub fn value<'a>(&self, ast: &'a AST) -> &'a Expression {
+    &ast[self.value]
+  }
+
+  /// The location of the expression
+  pub fn span(&self, ast: &AST) -> Span {
+    self.identifier.span(ast).merge(self.value(ast).span(ast))
   }
 }
 
@@ -726,6 +757,11 @@ impl Invalid {
   }
 }
 
+impl From<Assignment> for Expression {
+  fn from(value: Assignment) -> Self {
+    Self::Assignment(value)
+  }
+}
 impl From<Binary> for Expression {
   fn from(value: Binary) -> Self {
     Self::Binary(value)

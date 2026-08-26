@@ -438,6 +438,24 @@ fn recursive() {
 }
 
 #[test]
+fn assignment() {
+  // the assignment evaluates to the value which was assigned
+  assert_eq!(synthesize("let a = 5\na = 7\na"), "number");
+  assert_eq!(synthesize("let _a = 5\n_a = 7"), "number");
+
+  // the value must match the type of the variable
+  assert!(has_type_error("let a = 5\na = 'string'\na"));
+  assert!(has_type_error("let a: number = 5\na = false\na"));
+
+  // the variable must already exist
+  assert!(has_type_error("a = 5"));
+
+  // assigning to a variable is not a use of it
+  assert!(has_type_error("let a = 5\na = 7"));
+  assert!(!has_type_error("let a = 5\na = 7\na"));
+}
+
+#[test]
 fn no_unused_variables() {
   assert!(has_type_error("let a = 5"));
   assert!(!has_type_error("let _a = 5"));

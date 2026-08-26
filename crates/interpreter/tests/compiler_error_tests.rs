@@ -31,7 +31,7 @@ fn invalid_ast() {
   }
 
   // binary operator
-  let ast = parse("hello = 5".to_owned());
+  let ast = parse("4 = 5".to_owned());
   match compile(&ast) {
     Ok(_) => panic!("Expected an error"),
     Err(CompileError::InvalidAST) => {}

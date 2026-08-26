@@ -116,6 +116,7 @@ impl SelectionRange for Expression {
     let parent = &mut range;
 
     match self {
+      Self::Assignment(assignment) => assignment.selection_range(file, span, parent),
       Self::Binary(binary) => binary.selection_range(file, span, parent),
       Self::Block(block) => block.selection_range(file, span, parent),
       Self::Call(call) => call.selection_range(file, span, parent),
@@ -133,6 +134,18 @@ impl SelectionRange for Expression {
       | Self::Variable(_)
       | Self::Invalid(_) => range,
     }
+  }
+}
+impl SelectionRange for expression::Assignment {
+  fn selection_range(
+    &self,
+    file: &Document,
+    span: Span,
+    parent: &mut Option<lsp::SelectionRange>,
+  ) -> Option<lsp::SelectionRange> {
+    (self.value(&file.ast))
+      .selection_range(file, span, parent)
+      .or_else(|| parent.take())
   }
 }
 impl SelectionRange for expression::Binary {
