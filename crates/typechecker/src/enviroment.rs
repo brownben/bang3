@@ -6,6 +6,9 @@ use bang_syntax::{Span, ast::statement::ImportItem};
 use indoc::indoc;
 use std::cell::OnceCell;
 
+/// The depth of the global scope, the outermost scope entered when checking an AST
+const GLOBAL_SCOPE_DEPTH: u32 = 1;
+
 /// Holds variables and where they are defined and used
 #[derive(Debug)]
 pub struct Enviroment {
@@ -264,6 +267,17 @@ impl Enviroment {
     }
 
     None
+  }
+
+  pub(crate) fn lookup_global(&self, identifier: &str) -> Option<&Variable> {
+    if self.depth != GLOBAL_SCOPE_DEPTH {
+      return None;
+    }
+
+    (self.variables.iter().rev())
+      .take_while(|variable| variable.depth == GLOBAL_SCOPE_DEPTH)
+      .filter(|variable| matches!(variable.kind, VariableKind::Declaration { .. }))
+      .find(|variable| variable.name() == identifier)
   }
 
   /// Finds the variable currently in scope with the given name

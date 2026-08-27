@@ -502,6 +502,39 @@ fn unnecessary_mutable() {
 }
 
 #[test]
+fn global_variable_redefined() {
+  // a global can't be redefined, it must be made mutable and reassigned
+  assert!(has_type_error("let a = 5\nlet a = 7\na"));
+  assert!(!has_type_error("let mut a = 5\na = 7\na"));
+
+  // it is an error, and points at the new declaration
+  let ast = parse("let a = 5\nlet a = 7\na".to_owned());
+  let all_problems = TypeChecker::check(&ast).problems().to_vec();
+  let problems = (all_problems.iter())
+    .filter(|problem| !problem.is_warning())
+    .collect::<Vec<_>>();
+  assert_eq!(problems.len(), 1);
+  assert_eq!(problems[0].title(), "Global Variable Redefined");
+
+  // functions are globals too
+  assert!(has_type_error("let f = _ => 1\nlet f = _ => 2\nf()"));
+
+  // shadowing a global inside a nested scope is still allowed
+  assert!(!has_type_error("let a = 5\n{\n  let a = a + 1\n  a\n}"));
+  assert!(!has_type_error("let a = 5\nlet f = a => a\nf(a)"));
+  // as is shadowing a local
+  assert!(!has_type_error("{\n  let a = 5\n  let a = a + 1\n  a\n}"));
+
+  // builtins can still be shadowed by a global
+  assert!(!has_type_error("let print = 5\nprint"));
+
+  // an import can't be redefined by a global either
+  assert!(has_type_error(
+    "from maths import { sin }\nlet sin = 5\nsin"
+  ));
+}
+
+#[test]
 fn no_unused_variables() {
   assert!(has_type_error("let a = 5"));
   assert!(!has_type_error("let _a = 5"));

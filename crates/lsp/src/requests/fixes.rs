@@ -136,7 +136,9 @@ mod parse_errors {
 }
 
 mod type_errors {
-  use super::{Document, IntoDiagnostic, Span, delete_edit, insert_edit, replace_edit};
+  use super::{Document, IntoDiagnostic, Span};
+  use super::{delete_edit, insert_edit, multiple_edits, replace_edit};
+  use bang_syntax::ast::Statement;
   use bang_typechecker::TypeError;
   use lsp_types as lsp;
 
@@ -167,6 +169,16 @@ mod type_errors {
 
         TypeError::UnnecessaryMutable { span, .. } => {
           actions.extend(Some(remove_unnecessary_mutable(file, error, *span)));
+        }
+
+        TypeError::GlobalVariableRedefined {
+          identifier,
+          span,
+          declaration,
+          mutable,
+        } => {
+          let action = assign_to_global(file, error, identifier, *span, *declaration, *mutable);
+          actions.extend(action);
         }
 
         _ => {}
@@ -265,6 +277,46 @@ mod type_errors {
       edit: Some(delete_edit(file, Span::new(span.start, span.end))),
       ..Default::default()
     }
+  }
+
+  fn assign_to_global(
+    file: &Document,
+    error: &TypeError,
+    identifier: &str,
+    span: Span,
+    declaration: Span,
+    mutable: bool,
+  ) -> Option<lsp::CodeAction> {
+    let find_let = |identifier: Span| {
+      (file.ast.all_statements()).find_map(|statement| match statement {
+        Statement::Let(let_) if let_.keyword_span(&file.ast) == identifier => Some(let_),
+        _ => None,
+      })
+    };
+
+    let mut edits = Vec::new();
+
+    // replace everything from `let` up to the value (covering any `mut` and annotation)
+    let redefinition = find_let(span)?;
+    let value_start = redefinition.value(&file.ast).span(&file.ast).start;
+    edits.push((
+      Span::new(span.start, value_start),
+      format!("{identifier} = "),
+    ));
+
+    // if it is not mutable, insert `mut` before the identifier in the declaration
+    if !mutable {
+      let mut_location = Span::new(declaration.start, declaration.start);
+      edits.push((mut_location, "mut ".into()));
+    }
+
+    Some(lsp::CodeAction {
+      title: format!("Assign to `{identifier}` instead of redefining it"),
+      kind: Some(lsp::CodeActionKind::QUICKFIX),
+      diagnostics: Some(vec![error.diagnostic(file)]),
+      edit: Some(multiple_edits(file, edits)),
+      ..Default::default()
+    })
   }
 
   fn already_imported_item(file: &Document, error: &TypeError) -> lsp::CodeAction {

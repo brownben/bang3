@@ -42,6 +42,19 @@ impl TypeChecker {
     );
   }
 
+  fn check_global_redefinition(&mut self, identifier: &str, span: Span) {
+    if let Some(existing) = self.env.lookup_global(identifier) {
+      let problem = TypeError::GlobalVariableRedefined {
+        identifier: identifier.to_owned(),
+        span,
+        declaration: existing.span().unwrap_or(span),
+        mutable: existing.is_mutable(),
+      };
+
+      self.problems.push(problem);
+    }
+  }
+
   fn new_type_var(&mut self) -> TypeRef {
     self.types.new_type_var()
   }
@@ -215,6 +228,7 @@ impl InferType for Let {
     let (identifier, identifier_span) = (self.identifier(ast), self.identifier_span(ast));
     let doc_comment = self.doc_comment(ast).map(|comment| comment.full_text(ast));
 
+    t.check_global_redefinition(identifier, self.keyword_span(ast));
     (t.env).define_variable(
       identifier,
       identifier_span,
@@ -235,6 +249,7 @@ fn let_statement_function(
   let doc_comment = let_.doc_comment(ast).map(|comment| comment.full_text(ast));
 
   let function_type = t.new_type_var();
+  t.check_global_redefinition(identifier, let_.keyword_span(ast));
   (t.env).define_variable(
     identifier,
     identifier_span,

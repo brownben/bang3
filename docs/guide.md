@@ -209,11 +209,29 @@ let b = 4
 a + b
 ```
 
-Separate bindings with the same name are allowed, you can "shadow" a variable. This can be used to give the impression of mutability.
+Separate bindings with the same name are allowed inside a nested scope (to "shadow" a variable).
 
 ```
 let x = 13
-let x = x + 3
+
+{
+  let x = x + 3
+
+  // `x` is 16 here
+}
+
+// `x` is 13 here
+```
+
+Global variables cannot be redefined though, as it makes it difficult to reason about which value is chosen for
+closures. If a global needs a new value, declare it as mutable and assign to it.
+
+```
+let x = 13
+let x = x + 3 // error: `x` is already defined in the global scope
+
+let mut y = 13
+y = y + 3 // this is fine
 ```
 
 ## Blocks

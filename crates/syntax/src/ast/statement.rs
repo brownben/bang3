@@ -238,6 +238,11 @@ pub struct Let {
   pub(crate) value: ExpressionIdx,
 }
 impl Let {
+  /// The location of the `let` keyword
+  pub fn keyword_span(&self, ast: &AST) -> Span {
+    Span::from(ast[self.keyword])
+  }
+
   /// Was the variable declared as mutable?
   #[must_use]
   pub fn is_mutable(&self) -> bool {

@@ -167,6 +167,17 @@ pub enum Problem {
     /// `None` if it can never be made mutable, such as a parameter or an import
     declaration: Option<Span>,
   },
+  /// A variable in the global scope was declared again with the same name
+  GlobalVariableRedefined {
+    /// The identifier of the variable
+    identifier: String,
+    /// The location of the new declaration
+    span: Span,
+    /// The location of the existing declaration's identifier
+    declaration: Span,
+    /// Was the existing declaration made with `let mut`?
+    mutable: bool,
+  },
   /// A variable was declared with `let mut`, but is never modified
   UnnecessaryMutable {
     /// The identifier of the variable
@@ -206,6 +217,7 @@ impl Problem {
       Self::NoReturnFromMatchGuard { .. } => "No Return from Match Guard",
       Self::ModuleAccessAlreadyImported { .. } => "Module Access Item Already Imported",
       Self::AssignmentToImmutableVariable { .. } => "Assignment to Immutable Variable",
+      Self::GlobalVariableRedefined { .. } => "Global Variable Redefined",
       Self::UnnecessaryMutable { .. } => "Unnecessary `mut`",
       Self::ReferentialEquality { .. } => "Referential Equality",
     }
@@ -278,6 +290,9 @@ impl Problem {
       Self::AssignmentToImmutableVariable { identifier, .. } => {
         format!("`{identifier}` is not declared as mutable, so cannot be assigned to")
       }
+      Self::GlobalVariableRedefined { identifier, .. } => {
+        format!("`{identifier}` is already defined in the global scope, so cannot be redefined")
+      }
       Self::UnnecessaryMutable { identifier, .. } => {
         format!("`{identifier}` is never assigned to, so doesn't need to be mutable")
       }
@@ -300,6 +315,18 @@ impl Problem {
         ..
       } => Some(format!(
         "declare it as `let mut {identifier} = ...` if it needs to be modified"
+      )),
+      Self::GlobalVariableRedefined {
+        identifier,
+        mutable: true,
+        ..
+      } => Some(format!("assign to it instead with `{identifier} = ...`")),
+      Self::GlobalVariableRedefined {
+        identifier,
+        mutable: false,
+        ..
+      } => Some(format!(
+        "declare it as `let mut {identifier} = ...`, then assign to it with `{identifier} = ...`"
       )),
       Self::UnnecessaryMutable { .. } => Some("remove the `mut` keyword".to_owned()),
       Self::UndefinedVariable {
@@ -391,6 +418,11 @@ impl Problem {
         definition_location: span,
         ..
       } => Some((*span, format!("`{defined_as}` is imported here"))),
+      Self::GlobalVariableRedefined {
+        identifier,
+        declaration,
+        ..
+      } => Some((*declaration, format!("`{identifier}` is defined here"))),
       _ => None,
     }
   }
@@ -418,6 +450,7 @@ impl Problem {
       | Self::NoReturnFromMatchGuard { span, .. }
       | Self::ModuleAccessAlreadyImported { span, .. }
       | Self::AssignmentToImmutableVariable { span, .. }
+      | Self::GlobalVariableRedefined { span, .. }
       | Self::UnnecessaryMutable { span, .. }
       | Self::ReferentialEquality { span, .. } => *span,
     }
