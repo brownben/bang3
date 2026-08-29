@@ -14,6 +14,10 @@ jobs:
           rustup toolchain install nightly
           rustup override set nightly
           rustup component add clippy rustfmt
+      - name: "Install Cargo Nextest"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
       - name: Format
         run: cargo fmt --all -- --check
       - name: Build
@@ -23,9 +27,9 @@ jobs:
       - name: Standard Library Documentation
         run: cargo run -p bang-stdlib --bin stdlib-docs -- --check
       - name: Test
-        run: |
-          cargo test --workspace --verbose
-          cargo test --workspace --features bang-interpreter/gc-stress-test
+        run: cargo nextest run --workspace
+      - name: Test (GC Stress Test)
+        run: cargo nextest run --workspace --features bang-interpreter/gc-stress-test
 
   miri:
     name: Miri
