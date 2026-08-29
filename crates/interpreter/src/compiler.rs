@@ -334,11 +334,18 @@ impl<'s> Compile<'s> for Assignment {
       return Ok(());
     }
 
+    // if it is a recursive function, it cannot be assigned to
+    if compiler.chunk.name == name && !compiler.stack.is_empty() {
+      return Err(CompileError::InvalidRecursiveAssignment);
+    }
+
     // Check for it being a variable of an outer function, which is closed over.
-    // A recursive reference to the enclosing function is not a variable, so is skipped
-    if let Some((stack_index, OuterVariable::Local(local_index))) =
-      find_outer_variable(&compiler.stack, name)
-    {
+    if let Some((stack_index, variable)) = find_outer_variable(&compiler.stack, name) {
+      let local_index = match variable {
+        OuterVariable::Local(index) => index,
+        OuterVariable::Recursive => return Err(CompileError::InvalidRecursiveAssignment),
+      };
+
       let origin_function = &mut compiler.stack[stack_index];
       let original_status = origin_function.locals[local_index].status;
       origin_function.locals[local_index].status = VariableStatus::Closed;
@@ -1066,6 +1073,8 @@ pub enum CompileError {
   TooManyListItems,
   /// AST to compile has an error in it
   InvalidAST,
+  /// Assigned to a recursive reference to the enclosing function
+  InvalidRecursiveAssignment,
 }
 impl CompileError {
   /// The title of the error message
@@ -1079,6 +1088,7 @@ impl CompileError {
       Self::TooManyLocalVariables => "Too Many Local Variables",
       Self::TooManyListItems => "Too Many List Items",
       Self::InvalidAST => "Invalid AST",
+      Self::InvalidRecursiveAssignment => "Invalid Recursive Assignment",
     }
   }
 
@@ -1093,6 +1103,9 @@ impl CompileError {
       Self::TooManyLocalVariables => "more than 256 local variables have been defined",
       Self::TooManyListItems => "the maximum no. of items in a list has been reached (256)",
       Self::InvalidAST => "the AST contains an error, see errors from parser",
+      Self::InvalidRecursiveAssignment => {
+        "a function cannot assign a new value to its own recursive reference"
+      }
     }
   }
 }

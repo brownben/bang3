@@ -183,6 +183,7 @@ impl Enviroment {
         documentation,
         parameter: false,
         mutable,
+        in_own_function: false,
       },
 
       used: Vec::new(),
@@ -209,6 +210,7 @@ impl Enviroment {
         documentation: None,
         parameter: true,
         mutable: None,
+        in_own_function: false,
       },
 
       used: Vec::new(),
@@ -283,6 +285,36 @@ impl Enviroment {
   /// Finds the variable currently in scope with the given name
   pub(crate) fn lookup_variable(&self, identifier: &str) -> Option<&Variable> {
     (self.variables.iter().rev()).find(|variable| variable.name() == identifier)
+  }
+
+  /// Marks the variable which was just defined as the function whose own body is
+  /// now being inferred.
+  pub(crate) fn begin_function_body(&mut self) {
+    if let Some(Variable {
+      kind:
+        VariableKind::Declaration {
+          in_own_function: own_function_body,
+          ..
+        },
+      ..
+    }) = self.variables.last_mut()
+    {
+      *own_function_body = true;
+    }
+  }
+
+  pub(crate) fn end_function_body(&mut self) {
+    if let Some(Variable {
+      kind:
+        VariableKind::Declaration {
+          in_own_function: own_function_body,
+          ..
+        },
+      ..
+    }) = self.variables.last_mut()
+    {
+      *own_function_body = false;
+    }
   }
 
   pub(crate) fn mark_variable_assignment(&mut self, identifier: &str, span: Span) {
@@ -364,6 +396,11 @@ pub enum VariableKind {
 
     /// the span of the `mut` keyword, if it was declared with `let mut`
     mutable: Option<Span>,
+
+    /// `true` while we are currently inferring the body of this variable's own
+    /// function value (i.e. this is `identifier` in `let identifier = function`, and
+    /// `function`'s body is presently being type-checked).
+    in_own_function: bool,
   },
   /// a variable that is defined by the runtime
   Builtin {
@@ -417,6 +454,16 @@ impl Variable {
       VariableKind::Declaration { mutable, .. } => *mutable,
       _ => None,
     }
+  }
+
+  /// Is this variable currently the recursive self-reference of the function whose
+  /// body is presently being inferred?
+  #[must_use]
+  pub(crate) fn is_own_function_body(&self) -> bool {
+    matches!(self.kind, VariableKind::Declaration {
+      in_own_function: true,
+      ..
+    })
   }
 
   /// Has the variable ever been assigned a new value?

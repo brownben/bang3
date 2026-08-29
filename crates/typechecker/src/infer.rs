@@ -258,8 +258,10 @@ fn let_statement_function(
     let_.mutable_span(ast),
   );
 
-  // Infer the function type
+  t.env.begin_function_body();
   let mut ty = function.infer(t, ast);
+  t.env.end_function_body();
+
   if let Some(annotation) = let_.annotation(ast) {
     let annotation_type = t.types.type_from_annotation(annotation, ast);
 
@@ -331,29 +333,34 @@ impl InferType for Assignment {
       return self.value(ast).infer(t, ast);
     };
 
-    // only variables declared with `let mut` can be modified, parameters never can
-    if let Some(variable) = t.env.lookup_variable(identifier)
-      && !variable.is_mutable()
-    {
-      let parameter = variable.is_parameter();
+    if let Some(variable) = t.env.lookup_variable(identifier) {
+      if variable.is_own_function_body() {
+        // a function cannot redefine the recursive reference to its function
+        t.problems.push(TypeError::InvalidRecursiveAssignment {
+          identifier: identifier.to_owned(),
+          span: identifier_span,
+        });
+      } else if !variable.is_mutable() {
+        // only variables declared with `let mut` can be modified, parameters never can
+        let parameter = variable.is_parameter();
 
-      // a parameter can never be made mutable, and neither can an import or a builtin,
-      // so only a plain `let` declaration can be fixed by adding `mut`
-      let declaration = match &variable.kind {
-        VariableKind::Declaration {
-          parameter: false,
-          defined,
-          ..
-        } => Some(*defined),
-        _ => None,
-      };
+        // only a plain `let` (not import/ builtin) can be made mutable
+        let declaration = match &variable.kind {
+          VariableKind::Declaration {
+            parameter: false,
+            defined,
+            ..
+          } => Some(*defined),
+          _ => None,
+        };
 
-      t.problems.push(TypeError::AssignmentToImmutableVariable {
-        identifier: identifier.to_owned(),
-        span: identifier_span,
-        parameter,
-        declaration,
-      });
+        t.problems.push(TypeError::AssignmentToImmutableVariable {
+          identifier: identifier.to_owned(),
+          span: identifier_span,
+          parameter,
+          declaration,
+        });
+      }
     }
 
     // an assignment is not a use of the variable, but it does need renaming with it

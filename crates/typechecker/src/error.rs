@@ -185,6 +185,16 @@ pub enum Problem {
     /// The location of the `mut` keyword
     span: Span,
   },
+  /// A function tried to assign a new value to its own recursive self-reference
+  ///
+  /// This is not allowed, regardless of whether the function is declared as mutable,
+  /// as the recursive reference has no real variable slot to write to
+  InvalidRecursiveAssignment {
+    /// The identifier of the function
+    identifier: String,
+    /// The location of the assignment
+    span: Span,
+  },
   /// Functions and iterators only have referential equality not structural equality
   /// This can give unexpected results
   ReferentialEquality {
@@ -219,6 +229,7 @@ impl Problem {
       Self::AssignmentToImmutableVariable { .. } => "Assignment to Immutable Variable",
       Self::GlobalVariableRedefined { .. } => "Global Variable Redefined",
       Self::UnnecessaryMutable { .. } => "Unnecessary `mut`",
+      Self::InvalidRecursiveAssignment { .. } => "Invalid Recursive Assignment",
       Self::ReferentialEquality { .. } => "Referential Equality",
     }
   }
@@ -295,6 +306,11 @@ impl Problem {
       }
       Self::UnnecessaryMutable { identifier, .. } => {
         format!("`{identifier}` is never assigned to, so doesn't need to be mutable")
+      }
+      Self::InvalidRecursiveAssignment { identifier, .. } => {
+        format!(
+          "`{identifier}` is a recursive reference to the enclosing function, so a new value cannot be assigned to it"
+        )
       }
       Self::ReferentialEquality { .. } => {
         "functions and iterators only have referential equality defined\nthis can give unexpected behaviour".to_owned()
@@ -452,6 +468,7 @@ impl Problem {
       | Self::AssignmentToImmutableVariable { span, .. }
       | Self::GlobalVariableRedefined { span, .. }
       | Self::UnnecessaryMutable { span, .. }
+      | Self::InvalidRecursiveAssignment { span, .. }
       | Self::ReferentialEquality { span, .. } => *span,
     }
   }

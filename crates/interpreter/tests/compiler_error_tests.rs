@@ -5,6 +5,7 @@
 
 use bang_interpreter::{CompileError, compile};
 use bang_syntax::parse;
+use indoc::indoc;
 use std::fmt::Write;
 
 fn integer_to_identifier(integer: u32) -> String {
@@ -45,6 +46,52 @@ fn invalid_ast() {
     Err(CompileError::InvalidAST) => {}
     Err(e) => panic!("Expected InvalidAST, got {e}"),
   }
+}
+
+#[test]
+fn invalid_recursive_assignment() {
+  // assigning to the function's own name, from directly within its own body
+  let source = indoc! {"
+    let mut f = x => {
+      f = x
+      f
+    }
+    f(1)
+  "};
+  let ast = parse(source.to_owned());
+  match compile(&ast) {
+    Ok(_) => panic!("Expected an error"),
+    Err(CompileError::InvalidRecursiveAssignment) => {}
+    Err(e) => panic!("Expected InvalidRecursiveAssignment, got {e}"),
+  }
+
+  // assigning to an ancestor function's own name, from a nested closure
+  let source = indoc! {"
+    let mut f = x => {
+      let g = _ => { f = x }
+      g()
+      x
+    }
+    f(1)
+  "};
+  let ast = parse(source.to_owned());
+  match compile(&ast) {
+    Ok(_) => panic!("Expected an error"),
+    Err(CompileError::InvalidRecursiveAssignment) => {}
+    Err(e) => panic!("Expected InvalidRecursiveAssignment, got {e}"),
+  }
+
+  // a plain (non-recursive) assignment to a local still works fine
+  let source = indoc! {"
+    let a = _ => {
+      let mut a = 1
+      a = 2
+      a
+    }
+    a(0)
+  "};
+  let ast = parse(source.to_owned());
+  assert!(compile(&ast).is_ok());
 }
 
 #[test]

@@ -470,6 +470,69 @@ fn assignment_to_immutable_variable() {
 }
 
 #[test]
+fn invalid_recursive_assignment() {
+  // a function cannot assign a new value to its own recursive reference, even if it
+  // is declared `mut` and the assigned value has the correct type
+  let source = indoc! {"
+    let mut f = x => {
+      f = y => y
+      f(x)
+    }
+    f(1)
+  "};
+  assert!(has_type_error(source));
+
+  // it is specifically an `Invalid Recursive Assignment`, not e.g. treated as an
+  // ordinary (legal) mutable assignment, or as an immutable-variable error
+  let ast = parse(source.to_owned());
+  let all_problems = TypeChecker::check(&ast).problems().to_vec();
+  let problems = (all_problems.iter())
+    .filter(|problem| !problem.is_warning())
+    .collect::<Vec<_>>();
+  assert_eq!(problems.len(), 1);
+  assert_eq!(problems[0].title(), "Invalid Recursive Assignment");
+
+  // it applies even without `mut` - it isn't just a special case of immutability,
+  // reported instead of `Assignment to Immutable Variable`
+  let source = indoc! {"
+    let f = x => {
+      f = y => y
+      f(x)
+    }
+    f(1)
+  "};
+  let ast = parse(source.to_owned());
+  let all_problems = TypeChecker::check(&ast).problems().to_vec();
+  let problems = (all_problems.iter())
+    .filter(|problem| !problem.is_warning())
+    .collect::<Vec<_>>();
+  assert_eq!(problems.len(), 1);
+  assert_eq!(problems[0].title(), "Invalid Recursive Assignment");
+
+  // it also applies to an ancestor function's recursive reference, assigned to from
+  // within a nested closure
+  assert!(has_type_error(indoc! {"
+    let mut f = x => {
+      let g = _ => { f = y => y }
+      g()
+      x
+    }
+    f(1)
+  "}));
+
+  // a local which merely shares its name with the enclosing function (shadowing it)
+  // is not the recursive reference, so can be freely reassigned
+  assert!(!has_type_error(indoc! {"
+    let f = _ => {
+      let mut f = 5
+      f = 10
+      f
+    }
+    f
+  "}));
+}
+
+#[test]
 fn unnecessary_mutable() {
   // `mut` on a variable which is never assigned to is unnecessary
   assert!(has_type_error("let mut a = 5\na"));
